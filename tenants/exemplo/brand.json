@@ -20,5 +20,9 @@
   },
   "dominios": ["painel.exemplo.test"],
   "mostrarOrigem": true,
-  "app": { "nome": "Exemplo Mobi", "pacote": "test.exemplo.painel", "urlPainel": "https://painel.exemplo.test" }
+  "app": {
+    "nome": "Exemplo Mobi", "pacote": "test.exemplo.painel", "urlPainel": "https://painel.exemplo.test", "empresaId": "exemplo",
+    "passageiro": { "nome": "Exemplo Mobi", "pacote": "test.exemplo.passageiro" },
+    "motorista": { "nome": "Exemplo Motorista", "pacote": "test.exemplo.motorista" }
+  }
 }
