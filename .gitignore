@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.log
+.claude/
+# Dados de cada empresa (marca enviada, usuários, credenciais, CSVs): ficam só no servidor
+painel/dados/
+# Chaves de assinatura de app
+*.jks
+*.keystore
+tenants/*/assinatura/
+# Originais dos sistemas de referência (contêm chaves e dados; ficam só no computador)
+/*.rar
+/*.zip
+*.apk
+*.aab
+referencia/

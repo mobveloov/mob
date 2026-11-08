@@ -1,0 +1,16 @@
+{
+  "name": "mob-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Scripts de apoio: gerar o app (PWA/APK/AAB) de cada empresa.",
+  "scripts": {
+    "app": "node build-app-empresa.mjs"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "sharp": "^0.34.0"
+  }
+}

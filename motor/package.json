@@ -1,0 +1,14 @@
+{
+  "name": "mob-motor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Motor de integração Sistema A + Sistema B (sem dependências de execução).",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "test:deno": "deno test -A --no-check test/",
+    "test:real": "MOTOR_TESTE_REAL=1 node --test --experimental-strip-types test/contrato-real.test.ts"
+  }
+}

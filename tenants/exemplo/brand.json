@@ -1,0 +1,24 @@
+{
+  "produto": "Painel Exemplo Mobilidade",
+  "nomeExibido": "Exemplo Mobilidade",
+  "assistente": { "nome": "Lia", "tom": "direto, cordial e prático" },
+  "cores": { "primaria": "#0f9d76", "secundaria": "#0b2e2a", "fundo": "#f3f7f6", "texto": "#14231f" },
+  "fonte": "Poppins",
+  "tema": "sistema",
+  "arquivos": {
+    "logoClaro": "logo-claro.svg",
+    "logoEscuro": "logo-escuro.svg",
+    "favicon": "icone.svg",
+    "iconeApp": "icone.png",
+    "abertura": "abertura.png"
+  },
+  "textos": {
+    "saudacao": "Bom dia! Vamos rodar bem hoje.",
+    "suporteEmail": "suporte@exemplo.test",
+    "suporteTelefone": "(00) 0000-0000",
+    "rodapeRelatorio": "Exemplo Mobilidade — uso interno"
+  },
+  "dominios": ["painel.exemplo.test"],
+  "mostrarOrigem": true,
+  "app": { "nome": "Exemplo Mobi", "pacote": "test.exemplo.painel", "urlPainel": "https://painel.exemplo.test" }
+}
