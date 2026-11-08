@@ -8,6 +8,7 @@ import {
   avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias,
   type CorridaPropria, type StatusProprio,
 } from "../corridas/index.ts";
+import { completarPonto, rota } from "../enderecos/index.ts";
 import type { CategoriaBot, Local } from "./tipos.ts";
 
 export interface NovaCorridaBot {
@@ -63,12 +64,19 @@ const detalheDe = (empresaId: string, c: CorridaPropria): DetalheBot => ({
 
 export const corridasProprias: CorridasBot = {
   async categorias(empresaId, embarque, destino) {
-    const km = distanciaEstimada(embarque, destino);
+    // Mesma conta da corrida (criarCorridaPropria): endereço em texto ganha ponto pelo CNEFE e a distância vem da rota.
+    // Assim o preço mostrado no WhatsApp é o mesmo que fica gravado na corrida.
+    const a = completarPonto(empresaId, embarque), b = completarPonto(empresaId, destino);
+    let km = distanciaEstimada(a, b), minutos: number | null = null;
+    if (a?.lat != null && a.lng != null && b?.lat != null && b.lng != null) {
+      const r = await rota({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng });
+      km = r.distanciaKm; minutos = r.minutos;
+    }
     return listar(empresaId, cadastroPorId("categorias")!)
       .filter((c) => c.ativa !== false && String(c.nome ?? "").trim())
       .map((c) => {
         const nome = String(c.nome);
-        const est = estimarPreco(empresaId, { categoria: nome, distanciaKm: km });
+        const est = estimarPreco(empresaId, { categoria: nome, distanciaKm: km, minutos });
         return { id: c.id, nome, descricao: c.descricao ? String(c.descricao) : undefined, preco: est.valor ?? undefined, estimado: km != null };
       });
   },

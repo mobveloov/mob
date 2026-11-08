@@ -16,6 +16,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import * as D from "../servidor/dados.ts";
+import { validarUrlExterna } from "../servidor/url.ts";
 import { CONFIG_PADRAO, type Campanha, type ConfigEnvio, type ItemFila, type Jornada, type Lista } from "./tipos.ts";
 
 function pasta(empresaId: string) {
@@ -118,10 +119,5 @@ export function salvarCredWhatsApp(e: string, novos: Partial<Record<keyof CredWh
 
 /** Só https e endereço público (o servidor não chama a rede interna). CRM_PERMITIR_URL_LOCAL=true libera para testes locais. */
 export function validarUrl(u: string) {
-  let url: URL;
-  try { url = new URL(u); } catch { throw new Error("URL do WhatsApp inválida."); }
-  const local = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[::1\]|\[f[cd])/i.test(url.hostname);
-  const liberado = process.env.CRM_PERMITIR_URL_LOCAL === "true";
-  if (!liberado && (url.protocol !== "https:" || local)) throw new Error("Use um endereço https público para o WhatsApp.");
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("URL do WhatsApp inválida.");
+  validarUrlExterna(u, "do WhatsApp");
 }

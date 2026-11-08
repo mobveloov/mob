@@ -4,6 +4,7 @@
 
 import express, { type Request, type Response } from "express";
 import * as D from "../servidor/dados.ts";
+import { validarUrlExterna } from "../servidor/url.ts";
 import { exigirLogin, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
 import { encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
@@ -77,7 +78,8 @@ rotasBot.put("/config", admin, ok((req, res) => {
   };
   // Servidor próprio da empresa (opcional). Vazio = usa o servidor da plataforma.
   const urlApi = typeof b.urlApi === "string" ? b.urlApi.trim() : undefined;
-  if (urlApi && !/^https?:\/\/[^\s]+$/i.test(urlApi)) throw new Error("Endereço do servidor inválido (use http:// ou https://).");
+  // Servidor da empresa: só https público (o painel não chama a rede interna a pedido de uma empresa).
+  if (urlApi) validarUrlExterna(urlApi, "do servidor de WhatsApp");
   // Token vazio = mantém o atual. Sem endereço, o token também sai.
   const token = urlApi === "" ? "" : typeof b.token === "string" && b.token.trim() ? b.token.trim() : undefined;
   A.salvarSegredosBot(id, { urlApi, token });
