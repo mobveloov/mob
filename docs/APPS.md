@@ -114,6 +114,24 @@ No `brand.json` (todos opcionais):
 }
 ```
 
+## UP Corridas (empresa 1)
+
+```bash
+node scripts/build-app-empresa.mjs up-corridas --app=passageiro --apk
+```
+
+```bash
+node scripts/build-app-empresa.mjs up-corridas --app=motorista --apk
+```
+
+- Marca: `tenants/up-corridas/brand.json`, com amarelo `#FFC400`, preto e branco. O ícone sai de
+  `tenants/up-corridas/assets/icone.png`. Quando a arte oficial for salva nesse caminho, basta gerar de novo.
+- Pacotes: sem `app.passageiro` e `app.motorista` no `brand.json`, ficam `br.com.upcorridas.passageiro` e
+  `br.com.upcorridas.motorista`. Os nomes ficam "UP Corridas" e "UP Corridas Motorista". **Confirme antes de publicar:**
+  o pacote não muda depois que o app vai para a loja.
+- API: `app.urlPainel` (`https://painel.upcorridas.com.br`, ainda a confirmar). Enquanto esse endereço não responder,
+  o app abre e mostra "Sem conexão com a central".
+
 ## Ligações nos arquivos comuns (para a sessão Base)
 
 Estes três arquivos são da sessão Base. As linhas abaixo ligam os apps no painel.

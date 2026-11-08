@@ -7,7 +7,7 @@
 // Sai em build/apps/<empresa>-<app>/ (APK: <empresa>-<app>-teste.apk).
 // Marca: tenants/<empresa>/brand.json + assets/ (ícone, abertura, cores), igual ao casco do painel.
 //   app.passageiro / app.motorista: { "nome", "pacote" } (opcional). Sem eles: o nome do app (+ " Motorista") e
-//   o pacote com ".passageiro" / ".motorista" no lugar de ".painel".
+//   o pacote com ".passageiro" / ".motorista" no lugar de ".painel" ou ".central".
 //   app.empresaId: id da empresa no painel (padrão: o nome da pasta em tenants/).
 // API: APP_URL_API (ex.: http://10.0.2.2:8787 no emulador) ou app.urlApi ou app.urlPainel.
 // Push (opcional): google-services.json do Firebase DA EMPRESA, fora do Git, em FIREBASE_GOOGLE_SERVICES_PASSAGEIRO /
@@ -40,7 +40,7 @@ if (!fs.existsSync(arqBrand)) falhar(`Não achei ${path.relative(RAIZ, arqBrand)
 const marca = JSON.parse(fs.readFileSync(arqBrand, "utf8"));
 const base = marca.app ?? {};
 const nome = base[papel]?.nome ?? (papel === "motorista" ? `${base.nome ?? ""} Motorista`.trim() : base.nome);
-const pacote = base[papel]?.pacote ?? (base.pacote ? `${base.pacote.replace(/\.painel$/, "")}.${papel}` : "");
+const pacote = base[papel]?.pacote ?? (base.pacote ? `${base.pacote.replace(/\.(painel|central)$/, "")}.${papel}` : "");
 const urlApi = String(process.env.APP_URL_API ?? base.urlApi ?? base.urlPainel ?? "").replace(/\/+$/, "");
 const empresaId = base.empresaId ?? empresa;
 const erros = [];
@@ -79,9 +79,14 @@ fs.writeFileSync(path.join(saida, "www", "config.json"), JSON.stringify({ empres
 // ---------------------------------------------------------------- ícone e abertura
 const sharp = (await import("sharp")).default;
 passo("Preparando ícone e tela de abertura");
-await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", background: primaria }).png().toFile(path.join(saida, "assets", "icon-only.png"));
-await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toFile(path.join(saida, "assets", "icon-foreground.png"));
-await sharp({ create: { width: 1024, height: 1024, channels: 4, background: primaria } }).png().toFile(path.join(saida, "assets", "icon-background.png"));
+// Fundo do ícone = cor do canto da própria imagem (ícone com fundo preto fica preto); transparente → cor primária.
+const canto = await sharp(icone, { density: 384 }).resize(64, 64).ensureAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
+const fundoIcone = canto[3] > 200 ? `#${[canto[0], canto[1], canto[2]].map((n) => n.toString(16).padStart(2, "0")).join("")}` : primaria;
+await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", background: fundoIcone }).png().toFile(path.join(saida, "assets", "icon-only.png"));
+// Ícone adaptativo do Android: só ~66% do centro aparece. O desenho vai para 660 px no meio (nada é cortado).
+const desenho = await sharp(icone, { density: 384 }).resize(660, 660, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: desenho, gravity: "center" }]).png().toFile(path.join(saida, "assets", "icon-foreground.png"));
+await sharp({ create: { width: 1024, height: 1024, channels: 4, background: fundoIcone } }).png().toFile(path.join(saida, "assets", "icon-background.png"));
 const abertura = asset("abertura") ?? icone;
 const meio = await sharp(abertura, { density: 384 }).resize(asset("abertura") ? 2732 : 900, asset("abertura") ? 2732 : 900, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 await sharp({ create: { width: 2732, height: 2732, channels: 4, background: fundo } }).composite([{ input: meio, gravity: "center" }]).png().toFile(path.join(saida, "assets", "splash.png"));
@@ -113,7 +118,7 @@ passo("Instalando o Capacitor no projeto do app");
 rodar(npm, ["install", "--no-audit", "--no-fund"]);
 if (!fs.existsSync(path.join(saida, "android"))) { passo("Criando projeto Android"); rodar(npx, ["cap", "add", "android"]); }
 passo("Gerando ícones e telas de abertura do Android");
-rodar(npx, ["capacitor-assets", "generate", "--android", "--iconBackgroundColor", primaria, "--splashBackgroundColor", fundo]);
+rodar(npx, ["capacitor-assets", "generate", "--android", "--iconBackgroundColor", fundoIcone, "--splashBackgroundColor", fundo]);
 rodar(npx, ["cap", "sync", "android"]);
 
 // Permissões: GPS, microfone (áudio do chat) e notificações; motorista também GPS em segundo plano.
