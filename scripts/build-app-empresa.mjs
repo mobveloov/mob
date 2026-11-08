@@ -21,6 +21,9 @@ const args = process.argv.slice(2);
 const empresa = args.find((a) => !a.startsWith("--"));
 const quer = (f) => args.includes(`--${f}`);
 
+// --app=passageiro | --app=motorista: app próprio (React) em vez do casco do painel. Veja scripts/build-app-proprio.mjs.
+if (args.some((a) => a.startsWith("--app="))) { await import("./build-app-proprio.mjs"); process.exit(0); }
+
 function falhar(msg) { console.error(`\n✖ ${msg}\n`); process.exit(1); }
 function passo(msg) { console.log(`• ${msg}`); }
 

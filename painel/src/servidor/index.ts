@@ -22,6 +22,8 @@ import { rotasBot } from "../bot/rotas.ts";
 import { rotasTotem } from "../totem/rotas.ts";
 import { router as rotasCrm } from "../crm/rotas.ts";
 import { rotasEnderecos } from "../enderecos/rotas.ts";
+import { rotasApps, rotasAppsCentral } from "../apps/rotas.ts";
+import { iniciarApps } from "../apps/despacho.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -125,6 +127,8 @@ app.post("/api/sair", (_req, res) => { apagarCookie(res); res.json({ ok: true })
 // Bot e totem têm partes públicas (webhook e tela do totem): cuidam do próprio login.
 app.use("/api/bot", rotasBot);
 app.use("/api/totem", rotasTotem);
+// Apps do passageiro e do motorista: login próprio pelo telefone (token).
+app.use("/api/apps", rotasApps);
 
 app.use("/api", exigirLogin);
 const admin = exigirPapel("admin");
@@ -375,6 +379,7 @@ app.use("/api/cadastros", rotasCadastros);
 app.use("/api/corridas-proprias", rotasCorridasProprias);
 app.use("/api/crm", rotasCrm);
 app.use("/api/enderecos", rotasEnderecos);
+app.use("/api/apps-central", rotasAppsCentral);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 
@@ -387,6 +392,10 @@ app.use((err: unknown, req: Request, res: Response, next: express.NextFunction) 
   const erro = e.type === "entity.parse.failed" ? "Dados mal formatados." : e.type === "entity.too.large" ? "Dados grandes demais." : status >= 500 ? "Erro no servidor. Tente de novo." : "Pedido inválido.";
   res.status(status).json({ erro });
 });
+
+// Apps do passageiro e do motorista no navegador (npm run build:apps): /apps/passageiro/?empresa=<id>
+const distApps = path.resolve("dist-apps");
+if (fs.existsSync(distApps)) app.use("/apps", express.static(distApps));
 
 // Produção: serve o painel compilado (npm run build).
 const dist = path.resolve("dist");
@@ -402,6 +411,8 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(porta, () => console.log(`Painel (API) em http://localhost:${porta}`));
   // A cada minuto: corrida sem motorista há mais de 20 min vira "não atendida".
   setInterval(() => { for (const e of D.listarEmpresas()) encerrarSemMotorista(e.id).catch(() => undefined); }, 60_000).unref();
+  // Despacho dos apps: oferta ao motorista mais perto, vence ofertas e avisa mudanças (a cada 2 s).
+  iniciarApps();
 }
 
 export { app };
