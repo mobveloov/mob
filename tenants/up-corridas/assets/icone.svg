@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Ícone PROVISÓRIO da UP Corridas (troque por icone.png com a arte oficial). -->
+  <rect width="1024" height="1024" fill="#000000"/>
+  <text x="512" y="600" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="480"
+        fill="#000000" stroke="#FFFFFF" stroke-width="30" stroke-linejoin="round" paint-order="stroke">UP</text>
+  <text x="512" y="800" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="150"
+        letter-spacing="6" fill="#FFC400">CORRIDAS</text>
+</svg>

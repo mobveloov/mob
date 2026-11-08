@@ -63,6 +63,7 @@ export default function App() {
   const [marca, setMarca] = useState<Marca>(MARCA_PADRAO);
   const [estado, setEstado] = useState<"carregando" | "entrar" | "configurar" | "pronto" | "erro">("carregando");
   const [escuro, setEscuro] = useState(false);
+  const [empresaPublica, setEmpresaPublica] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -72,7 +73,7 @@ export default function App() {
       if (e instanceof ErroApi && e.status === 401) {
         try {
           const p = await api.marcaPublica();
-          setMarca(p.marca); aplicarMarca(p.marca, p.empresaId, usaEscuro(p.marca));
+          setMarca(p.marca); setEmpresaPublica(p.empresaId); setEscuro(usaEscuro(p.marca)); aplicarMarca(p.marca, p.empresaId, usaEscuro(p.marca));
           setEstado(p.precisaConfigurar ? "configurar" : "entrar");
         } catch { setEstado("erro"); }
       } else setEstado("erro");
@@ -83,7 +84,12 @@ export default function App() {
 
   if (estado === "carregando") return <div className="vazio">Carregando...</div>;
   if (estado === "erro") return <div className="aviso erro" style={{ margin: 20 }}>Não consegui falar com o servidor do painel. Rode <code>npm run dev</code> e recarregue a página.</div>;
-  if (estado !== "pronto" || !sessao) return <Entrar marca={marca} primeiroAcesso={estado === "configurar"} onEntrou={carregar} />;
+  if (estado !== "pronto" || !sessao) {
+    // Logo da empresa na tela de entrada (a versão escura no tema escuro, se houver).
+    const arqLogo = escuro ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro || marca.arquivos.logoEscuro;
+    const logo = empresaPublica && arqLogo ? urlImagem(empresaPublica, arqLogo) : "";
+    return <Entrar marca={marca} logo={logo} primeiroAcesso={estado === "configurar"} onEntrou={carregar} />;
+  }
 
   const trocarTema = () => { const novo = !escuro; gravar("tema", novo ? "escuro" : "claro"); setEscuro(novo); aplicarMarca(marca, sessao.empresa.id, novo); };
   const trocarEmpresa = (id: string) => { escolherEmpresa(id); gravar("empresa", id); carregar(); };
