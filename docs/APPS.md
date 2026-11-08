@@ -135,8 +135,8 @@ node scripts/build-app-empresa.mjs up-corridas --app=motorista --apk
 ## Ambiente de teste no Docker (endereço https temporário)
 
 Enquanto não há domínio de produção, `docker-compose.apps-teste.yml` sobe um painel **separado** do normal
-(projeto `mob-apps-teste`, porta 8795, dados próprios), já com as rotas dos apps ligadas só dentro da imagem
-(`scripts/teste/ligar-apps.mjs`), mais um túnel que dá um endereço `https://….trycloudflare.com`, sem conta e sem
+(projeto `mob-apps-teste`, porta 8795, dados próprios), com a pasta `tenants/` para importar a empresa
+(`scripts/teste/ligar-apps.mjs` só liga as rotas dos apps se o `index.ts` ainda não tiver), mais um túnel que dá um endereço `https://….trycloudflare.com`, sem conta e sem
 domínio. Qualquer celular, no Wi-Fi ou no 4G, alcança esse endereço.
 
 ```bash
@@ -169,7 +169,7 @@ APP_URL_API=https://<endereço-do-túnel> APP_TESTE=1 node scripts/build-app-emp
 
 ## Ligações nos arquivos comuns (para a sessão Base)
 
-Estes três arquivos são da sessão Base. As linhas abaixo ligam os apps no painel.
+Estes três arquivos são da sessão Base. **Já ligado no `main`** (PR #9). As linhas ficam aqui como referência.
 
 ### `painel/src/servidor/index.ts`
 
