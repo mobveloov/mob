@@ -34,6 +34,7 @@ import type {
   Pagina,
   PedidoEstimativa,
   Rastreio,
+  Tarifa,
   TipoIntegracao,
 } from "./tipos.ts";
 import { NOME_DO_TIPO, ORIGEM_DO_TIPO } from "./tipos.ts";
@@ -45,7 +46,7 @@ export { criarAdaptadorSistemaB } from "./sistema-b.ts";
 export { criarObservador } from "./observador.ts";
 export { CAPACIDADES } from "./lacunas.ts";
 
-export const VERSAO_CONTRATO = "3.1.0";
+export const VERSAO_CONTRATO = "3.2.0";
 
 /** Id de integração da empresa, ou "todas". */
 export type Alvo = string | "todas";
@@ -233,6 +234,23 @@ export function criarMotor(empresa: Empresa, rede: OpcoesRede = {}) {
     punicoes: (alvo: Alvo, f: FiltroLista = {}) => juntar(alvo, (a) => a.punicoes(f), undefined, "punicoes"),
     areas: (alvo: Alvo) => lista(alvo, "areas", (a) => a.areas()),
     veiculos: (alvo: Alvo, f: FiltroLista = {}) => juntar(alvo, (a) => a.veiculos(f), undefined, "veiculos"),
+
+    // ------------------------------------------------ 3.2
+    /** id do motor da programada: "<integração>:<número>". */
+    async cancelarProgramada(id: string): Promise<void> {
+      const { a, original } = doId(id);
+      return a.cancelarProgramada(original);
+    },
+    async despacharProgramada(id: string): Promise<void> {
+      const { a, original } = doId(id);
+      return a.despacharProgramada(original);
+    },
+    /** id do motor da categoria: "<integração>:<número>". */
+    async tarifas(categoriaId: string): Promise<Tarifa[]> {
+      const { a, original } = doId(categoriaId);
+      return a.tarifas(original);
+    },
+    webhooksCadastrados: (alvo: Alvo) => lista(alvo, "webhooksCadastrados", (a) => a.webhooksCadastrados()),
   };
 
   /** Funções que devolvem lista simples: embrulha em Pagina para juntar as integrações. */

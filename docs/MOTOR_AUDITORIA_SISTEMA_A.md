@@ -10,7 +10,8 @@
 - Nada foi testado com uma conta real. A documentação pode diferir do servidor em algum detalhe.
 
 Legenda da coluna "O que fazer":
-- **Corrigido**: mudou nesta versão do motor (3.1.0) e tem teste.
+- **Corrigido**: mudou na versão 3.1.0 do motor e tem teste.
+- **Feito na 3.2**: entrou na versão 3.2.0 e tem teste (com respostas simuladas).
 - **A fazer**: falta no motor; fica para depois.
 - **Ok**: já estava certo.
 
@@ -48,12 +49,12 @@ Legenda da coluna "O que fazer":
 | Datas: o texto em horário da central e a cópia `_utc` em ISO | Usa `_utc` primeiro | Ok |
 | `valor_corrida` já com desconto; `valor_corrida_integral` sem desconto | Usa os dois | Ok |
 | A consulta traz `empresa_id`, `cliente_id`, `tipo_pagamento`, `data_hora_pendencia`, `taxas_cancelamento`, `descricao_categoria`, `codigo_coleta` | Ficam só em `bruto` | **A fazer**: levar `data_hora_pendencia` e as taxas de cancelamento para o modelo, se o painel precisar |
-| Filtros extras na consulta: `empresa_id`, `cliente_id`, `tipo_pagamento`, `obter_filiais` | Só data, status e motorista | **A fazer** (filtro por empresa conveniada e por passageiro) |
+| Filtros extras na consulta: `empresa_id`, `cliente_id`, `tipo_pagamento`, `obter_filiais` | Data, status, motorista, empresa, passageiro e pagamento | **Feito na 3.2** (falta só `obter_filiais`) |
 | `GET /corridas/{id}`: vem em lista; qualquer erro vira 404 | Pega o primeiro item | Ok |
 | `GET /corridas/{id}/status`: `fase` (`a_caminho`, `proximo`, `no_local`, `espera_prolongada`) e as datas de cada fase | Usa a fase para mostrar "no local" | Ok |
-| `POST /corridas` aceita `paradas` (até 1000), `codigo_cupom`, `empresa` (corrida corporativa), `extras` (porta-malas, animais, cadeirante…), `condutor` (motorista escolhido), `chat_ativo`, `info_apos_aceite` | Manda passageiro, partida, destino, categoria, pagamento e observação | **A fazer**: paradas, cupom e corrida corporativa pedem campos novos em `NovaCorrida` (mudança de contrato) |
+| `POST /corridas` aceita `paradas` (até 1000), `codigo_cupom`, `empresa` (corrida corporativa), `extras` (porta-malas, animais, cadeirante…), `condutor` (motorista escolhido), `chat_ativo`, `info_apos_aceite` | Manda também paradas, cupom e empresa (com centro de custo); confere parada sem bairro e id externo com mais de 36 letras antes de chamar | **Feito na 3.2**. **A fazer**: `extras`, motorista escolhido, `chat_ativo` |
 | A resposta da criação traz `tipo`, `passageiro_id` e `condutor_id` (para o chat) | Guarda só o id e o valor; o resto fica em `bruto` | Ok por enquanto |
-| Corridas **programadas**: criar, ver uma, cancelar, **despachar agora** e estimar | Só lista | **A fazer**: ver uma, cancelar e despachar |
+| Corridas **programadas**: criar, ver uma, cancelar, **despachar agora** (responde 202; 409 se já saiu) e estimar | Lista, cancela e despacha | **Feito na 3.2** (cancelar e despachar). **A fazer**: criar e ver uma |
 | `GET /corridas/{id}/recibo` (só corrida finalizada) | Não usa | **A fazer**, se o painel quiser recibo |
 | Cancelar: `motivo_id` obrigatório; códigos `26` (motivo não existe) e `151` (já finalizada ou cancelada) | Exige número do motivo | Ok |
 
@@ -76,15 +77,15 @@ Legenda da coluna "O que fazer":
 | Formatos antigos (status com `status_solicitacao` e `id_mch`; posição com `lat_cond` e `lng_cond`) ainda podem chegar até a central cadastrar de novo | Status antigo vinha sem status; posição antiga era descartada | **Corrigido**: os dois formatos antigos são lidos |
 | Assinatura `Signature-V2`: HMAC-SHA512 com a chave; na posição, sobre o corpo inteiro. O exemplo é hexadecimal | Confere o corpo inteiro, em hexadecimal ou base64 | Ok. Continua **sem prova real**: conferir com o primeiro webhook verdadeiro |
 | O status `A` traz `driver.pix_key` (chave Pix do motorista): é dado pessoal, não gravar em log | O motor não grava log do corpo; o evento leva `bruto` | **A fazer** no painel: não guardar `bruto` do webhook em log |
-| Cadastrar, mudar, apagar e ver a saúde do webhook (`GET /webhooks/{id}/status`: ativo, bloqueado por um tempo ou de vez) | Não tem | **A fazer**: cadastrar o webhook pelo painel e mostrar se ele está bloqueado |
+| Cadastrar, mudar, apagar e ver a saúde do webhook (`GET /webhooks/{id}/status`: ativo, bloqueado por um tempo ou de vez) | Lista os webhooks com a situação de cada um | **Feito na 3.2** (leitura). **A fazer**: cadastrar, mudar e apagar |
 
 ## 6. Motoristas
 
 | O que a doc diz | O que o motor faz | O que fazer |
 |---|---|---|
 | `GET /condutores` **sem resultado responde 404 com código `56`**, e não lista vazia | Dava erro "não encontrado" na busca | **Corrigido**: volta lista vazia |
-| Filtros: `id`, `telefone`, `cpf` (busca exata) e `status_condutor` (A, E, F, I, S, R, D) | Telefone e CPF; nome é filtrado no motor só na página recebida | **A fazer**: filtro por situação (ativo, em análise, suspenso…) |
-| Traz `numero_viatura`, `foto_url`, `email`, endereço, `data_hora_ultima_corrida` e `chave_pix` | Usa nome, telefone, CPF, status, avaliação, categorias e veículo | **A fazer**: viatura e foto. `chave_pix` é dado pessoal |
+| Filtros: `id`, `telefone`, `cpf` (busca exata) e `status_condutor` (A, E, F, I, S, R, D) | Telefone, CPF e situação; nome é filtrado no motor só na página recebida | **Feito na 3.2** (situação) |
+| Traz `numero_viatura`, `foto_url`, `email`, endereço, `data_hora_ultima_corrida` e `chave_pix` | Usa também situação, viatura e foto | **Feito na 3.2**. `chave_pix` fica de fora de propósito: é dado pessoal |
 | `GET /condutores/{id}/score` (pontos e nível do trimestre) | Não usa | **A fazer**, se o painel quiser |
 | Escrita: mudar cadastro, documentos, créditos (recarga, saque e saldo, 5 por minuto por motorista) e áreas de bloqueio | Não tem (motor só lê) | **A fazer** com cuidado: mexe em dinheiro e cadastro |
 
@@ -94,7 +95,7 @@ Legenda da coluna "O que fazer":
 |---|---|---|
 | `GET /configuracoes/categorias` **exige um local**: `lat` e `lng`, ou endereço, bairro e cidade. Uma filial devolve as categorias dela | Chamava sem local (a doc indica que dá erro 400) | **Corrigido**: usa `latPadrao`/`lngPadrao` da empresa. Sem esse ponto, a recusa vira `NAO_CONFIGURADO` com a explicação |
 | A lista traz só `id` e `nome` | Igual | Ok |
-| Tarifas por categoria: `GET /configuracoes/categorias/{id}/tarifas` (padrão e extras com horários). Criar, editar e excluir também existem | Não usa | **A fazer**: ler as tarifas para mostrar preço por categoria |
+| Tarifas por categoria: `GET /configuracoes/categorias/{id}/tarifas` (padrão e extras com horários). Criar, editar e excluir também existem | Lê as tarifas: padrão, extras com horários e faixas por distância | **Feito na 3.2** (leitura). **A fazer**: criar, editar e excluir |
 
 ## 8. Funções extras (só leitura)
 
@@ -110,18 +111,21 @@ Legenda da coluna "O que fazer":
 | Conveniadas | Limite acima de 100 é reduzido pela API | Máximo 100 | Ok |
 | Extrato | `data_ini`/`data_fim` no fuso da central; **no máximo 31 dias**, só os últimos 6 meses; 10 por página | Não conferia o período | **Corrigido**: mais de 31 dias dá `DADOS_INVALIDOS` sem chamar |
 | Cupons | 10 por página; filtro `status` (ativo, inativo, aguardo); campo novo `exibir_app` | Lê código, desconto, vigência e usos | Ok |
-| Dinâmicas | Por área: fator ou valor adicional, embarque ou destino. Há também faixas por distância e a dinâmica sem área | Lê só por área | **A fazer**: dinâmica sem área e faixas |
+| Dinâmicas | Por área: fator ou valor adicional, embarque ou destino. Há também faixas por distância e a dinâmica sem área | Lê as de área e a geral (sem área) | **Feito na 3.2** (sem área). **A fazer**: faixas por distância |
 | Punições | Filtro `taxista_id` (não `condutor_id`); busca precisa de 3 letras | Usa a busca | Ok |
 | Áreas | Só `id` e `nome` (áreas de filial e cercas, não de tarifa) | Igual | Ok |
 
 ## 9. O que existe no Sistema A e o motor ainda não usa
 
-Em ordem de utilidade para o painel:
+Já entraram na 3.2: ver a situação dos webhooks, cancelar e despachar programadas, ler tarifas e criar corrida
+com paradas, cupom e empresa.
 
-1. **Webhooks pelo painel**: cadastrar, trocar a URL e ver se estão bloqueados.
-2. **Programadas completas**: ver uma, cancelar e despachar agora.
-3. **Tarifas** por categoria (só leitura, primeiro).
-4. **Criar corrida com paradas, cupom e empresa** (corrida corporativa, funcionários e centros de custo).
+O que falta, em ordem de utilidade para o painel:
+
+1. **Webhooks pelo painel**: cadastrar, trocar a URL e apagar.
+2. **Programadas**: criar e ver uma.
+3. Lista de funcionários e centros de custo da empresa, para escolher na corrida corporativa.
+4. Ler `X-RateLimit-Remaining` para frear antes do limite.
 5. **Recibo** da corrida.
 6. **Cadastrar ou achar passageiro pelo telefone** (`POST /clientes`) e **cupons disponíveis do passageiro**.
 7. **Mensagens**: escrever no chat da corrida e mandar mensagem para um motorista ou uma empresa.

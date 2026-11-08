@@ -159,6 +159,17 @@ export function criarServidor(op: OpcoesServidor = {}): Server {
           return responder(200, await motor.areas(alvo));
         case "/v1/veiculos":
           return responder(200, await motor.veiculos(alvo, filtro));
+        // 3.2
+        case "/v1/programadas/cancelar":
+          await motor.cancelarProgramada(String(corpo.id ?? ""));
+          return responder(200, { ok: true });
+        case "/v1/programadas/despachar":
+          await motor.despacharProgramada(String(corpo.id ?? ""));
+          return responder(200, { ok: true });
+        case "/v1/tarifas":
+          return responder(200, { tarifas: await motor.tarifas(String(corpo.categoriaId ?? "")) });
+        case "/v1/webhooks/cadastrados":
+          return responder(200, await motor.webhooksCadastrados(alvo));
         case "/v1/webhooks/ler":
           return responder(200, {
             eventos: await motor.lerWebhook(String(corpo.integracaoId ?? ""), String(corpo.corpo ?? ""), (corpo.cabecalhos ?? {}) as Record<string, string>),

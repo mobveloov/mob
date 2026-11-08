@@ -166,6 +166,12 @@ export interface FiltroCorridas {
   ate?: string;
   status?: StatusCorrida[];
   motoristaId?: string;
+  /** Só corridas desta empresa conveniada (id do motor ou original). */
+  empresaId?: string;
+  /** Só corridas deste passageiro (id do motor ou original). */
+  passageiroId?: string;
+  /** Só corridas com esta forma de pagamento. */
+  pagamento?: FormaPagamento;
   pagina?: number; // começa em 1
   limite?: number; // padrão 50
 }
@@ -201,12 +207,21 @@ export interface Motorista {
   avaliacao?: number;
   categorias: string[];
   veiculo?: Veiculo;
+  /** Situação do cadastro, quando o sistema informa. */
+  situacao?: SituacaoMotorista;
+  /** Número da viatura (Sistema A). */
+  viatura?: string;
+  fotoUrl?: string;
   semDado: SemDado[];
   bruto: unknown;
 }
 
+export type SituacaoMotorista = "ativo" | "em_analise" | "fila_de_espera" | "inativo" | "suspenso" | "rejeitado" | "deletado";
+
 export interface FiltroMotoristas {
   busca?: string; // nome, telefone ou CPF
+  /** Só motoristas nesta situação. */
+  situacao?: SituacaoMotorista;
   pagina?: number;
   limite?: number;
 }
@@ -236,6 +251,12 @@ export interface NovaCorrida {
   idExterno?: string;
   /** Só Sistema B: valor combinado (o Sistema B deixa a central definir). */
   valor?: number;
+  /** Só Sistema A: paradas no caminho, na ordem (cada uma com endereço e bairro). */
+  paradas?: Endereco[];
+  /** Só Sistema A: código do cupom de desconto. */
+  cupom?: string;
+  /** Só Sistema A: corrida corporativa (empresa conveniada e, se houver, centro de custo). */
+  empresa?: { id: string; centroCustoId?: string };
 }
 
 export interface CorridaCriada {
@@ -445,6 +466,31 @@ export interface VeiculoCadastro extends DoSistema {
   motorista?: Pessoa;
 }
 
+/** Tarifa de uma categoria (padrão ou extra, com os horários em que vale). */
+export interface Tarifa extends DoSistema {
+  nome: string;
+  /** Código do método de cálculo como o sistema manda (ex.: "D", "P", "T"). */
+  metodo?: string;
+  /** true = tarifa padrão (vale o tempo todo). */
+  padrao: boolean;
+  inicio?: string;
+  /** Dia da semana 0-6 e horas "HH:MM". */
+  horarios: { diaSemana: number; inicio: string; fim: string }[];
+  /** Valores por faixa de distância, quando a tarifa é tabelada. */
+  faixas: { ateKm?: number; aPartirDe?: boolean; valor?: number }[];
+}
+
+/** Webhook cadastrado no sistema, com a situação de entrega. */
+export interface WebhookCadastrado extends DoSistema {
+  tipo: string;
+  url: string;
+  /** desconhecido = a consulta da situação não respondeu. */
+  situacao: "ativo" | "bloqueado_temporariamente" | "bloqueado_definitivamente" | "desconhecido";
+  /** Quando o bloqueio é temporário: próxima tentativa de entrega (ISO 8601). */
+  proximaTentativa?: string;
+  falhasSeguidas?: number;
+}
+
 export interface FiltroLista {
   busca?: string;
   pagina?: number;
@@ -468,6 +514,9 @@ export type Funcao =
   | "observador"
   | "estimativa"
   | "programadas"
+  | "gerirProgramadas"
+  | "tarifas"
+  | "webhooksCadastrados"
   | "posicoes"
   | "rastreio"
   | "linhaDoTempo"
@@ -526,6 +575,12 @@ export interface Adaptador {
   punicoes(f?: FiltroLista): Promise<Pagina<Punicao>>;
   areas(): Promise<Area[]>;
   veiculos(f?: FiltroLista): Promise<Pagina<VeiculoCadastro>>;
+  // 3.2: programadas (escrita), tarifas e webhooks cadastrados.
+  cancelarProgramada(idOriginal: string): Promise<void>;
+  /** Manda a programada sair agora (o sistema cria a corrida em seguida). */
+  despacharProgramada(idOriginal: string): Promise<void>;
+  tarifas(categoriaIdOriginal: string): Promise<Tarifa[]>;
+  webhooksCadastrados(): Promise<WebhookCadastrado[]>;
 }
 
 export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;

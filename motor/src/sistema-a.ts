@@ -27,6 +27,7 @@ import type {
   NovaCorrida,
   OpcoesRede,
   Pagina,
+  SituacaoMotorista,
   StatusCorrida,
 } from "./tipos.ts";
 import { coord, grupoDe, isoLocal, num, semPrefixo, telefoneBr, txt } from "./util.ts";
@@ -322,6 +323,18 @@ export function eventosSistemaA(corpo: string, integracaoId: string = TIPO): Eve
   return saida;
 }
 
+/** Situação do condutor no Sistema A (status_condutor). */
+const SITUACAO_A: Record<string, SituacaoMotorista> = {
+  A: "ativo",
+  E: "em_analise",
+  F: "fila_de_espera",
+  I: "inativo",
+  S: "suspenso",
+  R: "rejeitado",
+  D: "deletado",
+};
+const SITUACAO_PARA_A = Object.fromEntries(Object.entries(SITUACAO_A).map(([k, v]) => [v, k])) as Record<SituacaoMotorista, string>;
+
 export function motoristaSistemaA(m: Obj, integracaoId: string = TIPO): Motorista {
   const veics = Array.isArray(m.veiculos) ? (m.veiculos as Obj[]) : [];
   const v = veics.find((x) => x.em_uso) ?? veics[0];
@@ -338,6 +351,9 @@ export function motoristaSistemaA(m: Obj, integracaoId: string = TIPO): Motorist
     avaliacao: num(m.avaliacao_media),
     categorias: Array.isArray(m.categorias) ? (m.categorias as Obj[]).map((c) => String(c.nome ?? "")).filter(Boolean) : [],
     veiculo: v ? { modelo: txt(v.modelo), placa: txt(v.placa) } : undefined,
+    situacao: SITUACAO_A[String(m.status ?? "").toUpperCase()],
+    viatura: txt(m.numero_viatura),
+    fotoUrl: txt(m.foto_url),
     bruto: m,
   };
   return { ...r, semDado: semDado(TIPO, r, MOTORISTA_NAO_EXPOE["sistema-a"], ["telefone", "veiculo"]) };
@@ -404,12 +420,18 @@ export function criarAdaptadorSistemaA(
       const ate = f.ate ?? new Date().toISOString();
       conferirIntervalo(de, ate, integracaoId);
       const codigos = [...new Set((f.status ?? []).flatMap(codigosSistemaA))];
+      const pagCodigos = f.pagamento ? Object.entries(PAGAMENTO_A).filter(([, v]) => v === f.pagamento).map(([k]) => k) : [];
+      const numero = (v?: string) => (v ? Number(semPrefixo(v)) : undefined);
       const corpo: Obj = {
         pagina,
         limite,
         data_hora_solicitacao_min: de,
         data_hora_solicitacao_max: ate,
-        condutor_id: f.motoristaId ? Number(semPrefixo(f.motoristaId)) : undefined,
+        condutor_id: numero(f.motoristaId),
+        empresa_id: numero(f.empresaId),
+        cliente_id: numero(f.passageiroId),
+        // Um pagamento do motor pode valer mais de um código (ex.: pix = X e I); aí filtramos aqui.
+        tipo_pagamento: pagCodigos.length === 1 ? pagCodigos[0] : undefined,
         // A API só aceita UM status por pedido; com mais de um, filtramos aqui.
         status_solicitacao: codigos.length === 1 ? codigos[0] : undefined,
       };
@@ -417,6 +439,7 @@ export function criarAdaptadorSistemaA(
       const dados = Array.isArray(r.data) ? (r.data as Obj[]) : [];
       let itens = dados.map((o) => corridaSistemaA(o, integracaoId));
       if (f.status?.length) itens = itens.filter((c) => f.status!.includes(c.status));
+      if (f.pagamento) itens = itens.filter((c) => c.pagamento === f.pagamento);
       return { itens, pagina, temMais: dados.length >= limite };
     },
 
@@ -442,6 +465,12 @@ export function criarAdaptadorSistemaA(
       if (!tel) throw new MotorErro("DADOS_INVALIDOS", "Sistema A: telefone do passageiro inválido (use DDD + número).", { integracaoId });
       if (!n.partida.texto || !n.partida.bairro)
         throw new MotorErro("DADOS_INVALIDOS", "Sistema A: a partida precisa de endereço e bairro.", { integracaoId });
+      // Erro 32 da documentação: parada sem endereço ou bairro. Conferimos antes de chamar.
+      if (n.paradas?.some((p) => !p.texto || !p.bairro))
+        throw new MotorErro("DADOS_INVALIDOS", "Sistema A: cada parada precisa de endereço e bairro.", { integracaoId });
+      if (n.paradas && n.paradas.length > 1000) throw new MotorErro("DADOS_INVALIDOS", "Sistema A: no máximo 1000 paradas.", { integracaoId });
+      if (n.idExterno && n.idExterno.length > 36)
+        throw new MotorErro("DADOS_INVALIDOS", "Sistema A: o id externo pode ter no máximo 36 caracteres.", { integracaoId });
       const fone = { codigo_pais: tel.codigoPais, codigo_area: tel.ddd, telefone: Number(tel.numero) };
       const end = (x: Endereco) => ({ endereco: x.texto, bairro: x.bairro, cidade: x.cidade, estado: x.estado, lat: x.lat, lng: x.lng });
       const corpo: Obj = {
@@ -453,6 +482,13 @@ export function criarAdaptadorSistemaA(
         desejado: n.destino ? end(n.destino) : undefined,
         categoria_id: n.categoriaId ? Number(semPrefixo(n.categoriaId)) : undefined,
         info_antes_aceite: n.observacao,
+        codigo_cupom: n.cupom?.trim() || undefined,
+        empresa: n.empresa
+          ? { id: Number(semPrefixo(n.empresa.id)), centro_custo_id: n.empresa.centroCustoId ? Number(semPrefixo(n.empresa.centroCustoId)) : undefined }
+          : undefined,
+        paradas: n.paradas?.length
+          ? n.paradas.map((p) => ({ endereco_parada: p.texto, bairro_parada: p.bairro, cidade_parada: p.cidade, estado_parada: p.estado, lat_parada: p.lat, lng_parada: p.lng }))
+          : undefined,
       };
       let r: Obj;
       try {
@@ -487,7 +523,7 @@ export function criarAdaptadorSistemaA(
       const limite = Math.min(Math.max(1, f.limite ?? 50), LIMITE_MAXIMO_A);
       const b = (f.busca ?? "").trim();
       const digitos = b.replace(/\D/g, "");
-      const query: Record<string, string | number | undefined> = { pagina, limite };
+      const query: Record<string, string | number | undefined> = { pagina, limite, status_condutor: f.situacao ? SITUACAO_PARA_A[f.situacao] : undefined };
       if (/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(b)) query.cpf = b; // CPF só com máscara, para não confundir com telefone
       else if (digitos.length >= 10) query.telefone = digitos;
       let r: Obj;
