@@ -1,7 +1,7 @@
 // Peças de tela comuns aos dois apps: marca da empresa, login, chat (texto e áudio), mapa simples e estrelas.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api, ErroApi, guardarToken, Gravador, urlArquivo, urlDoAudio, type Papel, type Posicao } from "./api";
+import { api, config, ErroApi, guardarToken, Gravador, trocarServidor, urlArquivo, urlDoAudio, type Papel, type Posicao } from "./api";
 
 export interface MarcaApp {
   empresaId: string; nome: string; nomeExibido: string; cores: { primaria: string; secundaria: string; fundo: string; texto: string };
@@ -30,8 +30,13 @@ export function aplicarMarca(m: MarcaApp) {
 export function useMarca() {
   const [marca, setMarca] = useState<MarcaApp | null>(null);
   const [erro, setErro] = useState("");
+  // Sem sinal ao abrir: mostra o aviso e tenta de novo a cada 3 s, sozinho.
   useEffect(() => {
-    api<MarcaApp>("/marca").then((m) => { aplicarMarca(m); setMarca(m); }).catch((e) => setErro(e.message));
+    let vivo = true, t: ReturnType<typeof setTimeout>;
+    const tentar = () => api<MarcaApp>("/marca").then((m) => { if (vivo) { aplicarMarca(m); setMarca(m); setErro(""); } })
+      .catch((e) => { if (vivo) { setErro(e.message); t = setTimeout(tentar, 3000); } });
+    void tentar();
+    return () => { vivo = false; clearTimeout(t); };
   }, []);
   return { marca, erro };
 }
@@ -43,6 +48,25 @@ export function Logo({ marca }: { marca: MarcaApp }) {
 
 export function Aviso({ texto, tipo = "erro" }: { texto: string; tipo?: "erro" | "ok" | "info" }) {
   return texto ? <div className={`aviso aviso-${tipo}`} role="alert">{texto}</div> : null;
+}
+
+/** Só no APK de teste: mostra e troca o endereço do servidor (o túnel temporário muda quando reinicia). */
+export function ServidorTeste() {
+  const [aberto, setAberto] = useState(false);
+  const [url, setUrl] = useState(config().api);
+  const [erro, setErro] = useState("");
+  if (!config().teste) return null;
+  if (!aberto) return <button type="button" className="botao-link" onClick={() => setAberto(true)}>Servidor de teste: {config().api || "—"}</button>;
+  return (
+    <form className="cartao" onSubmit={(e) => { e.preventDefault(); try { trocarServidor(url); } catch (x) { setErro((x as Error).message); } }}>
+      <label>Endereço do servidor (teste)<input inputMode="url" value={url} placeholder="https://….trycloudflare.com" onChange={(e) => setUrl(e.target.value)} /></label>
+      <Aviso texto={erro} />
+      <div className="linha">
+        <button type="button" className="botao secundario" onClick={() => trocarServidor("")}>Voltar ao padrão</button>
+        <button className="botao">Salvar</button>
+      </div>
+    </form>
+  );
 }
 
 // ------------------------------------------------------------------ login pelo telefone
@@ -96,6 +120,7 @@ export function Entrar({ marca, papel, aoEntrar }: { marca: MarcaApp; papel: Pap
       )}
       <Aviso texto={erro} />
       {papel === "motorista" && <p className="dica">Só entra quem está cadastrado pela central. Dúvidas: {marca.suporte.telefone}</p>}
+      <ServidorTeste />
     </div>
   );
 }

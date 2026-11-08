@@ -1,0 +1,23 @@
+# Imagem do AMBIENTE DE TESTE dos apps (docker-compose.apps-teste.yml). Igual à do painel, mais:
+#  - liga as rotas dos apps no index.ts só dentro da imagem (scripts/teste/ligar-apps.mjs);
+#  - compila as telas dos apps (npm run build:apps), servidas em /apps/passageiro/ e /apps/motorista/;
+#  - leva tenants/ para importar a marca da empresa (npm run empresa:importar).
+# Nenhuma chave dentro da imagem.
+FROM node:22-alpine
+
+WORKDIR /app
+COPY motor/ ./motor/
+COPY painel/package.json painel/package-lock.json ./painel/
+RUN cd painel && npm ci --no-audit --no-fund
+COPY painel/ ./painel/
+COPY tenants/ ./tenants/
+COPY scripts/teste/ligar-apps.mjs ./scripts/teste/ligar-apps.mjs
+RUN node scripts/teste/ligar-apps.mjs painel/src/servidor/index.ts \
+ && cd painel && npm run build && npm run build:apps
+
+WORKDIR /app/painel
+ENV PAINEL_API_PORTA=8787 \
+    DADOS_DIR=/dados
+VOLUME ["/dados"]
+EXPOSE 8787
+CMD ["npm", "start"]

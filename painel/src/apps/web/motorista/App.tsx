@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ErroApi, hora, ligarPush, observarPosicao, posicaoAgora, reais, telefoneBonito, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
-import { Abas, Aviso, Carregando, Cartao, Chat, Entrar, MapaSimples, mensagemDeErro, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Abas, Aviso, Carregando, ServidorTeste, Cartao, Chat, Entrar, MapaSimples, mensagemDeErro, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 
 interface Ponto { texto: string; lat?: number; lng?: number }
 interface Corrida {
@@ -19,7 +19,7 @@ export default function App() {
   const { marca, erro } = useMarca();
   const [logado, setLogado] = useState(!!token());
   useEffect(() => { const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
-  if (erro) return <div className="tela centro"><Aviso texto={erro} /></div>;
+  if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
   if (!marca) return <Carregando />;
   if (!logado) return <Entrar marca={marca} papel="motorista" aoEntrar={() => setLogado(true)} />;
   return <Logado marca={marca} sair={() => setLogado(false)} />;
@@ -47,6 +47,12 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     if (onlineRef.current && !s.online) ultimoEnvio.current = 0; // servidor reiniciou: a próxima posição religa
   }, []);
   useEffect(() => { void carregar().catch(() => undefined); }, [carregar]);
+  // Voltou para a tela (app em segundo plano pode perder o tempo real): busca o estado de novo.
+  useEffect(() => {
+    const f = () => { if (document.visibilityState === "visible") void carregar().catch(() => undefined); };
+    document.addEventListener("visibilitychange", f);
+    return () => document.removeEventListener("visibilitychange", f);
+  }, [carregar]);
   useEffect(() => { void ligarPush(marca.push, () => void carregar()); }, [marca.push, carregar]);
 
   useEffect(() => {
@@ -78,18 +84,26 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, (ligado) => { setConectado(ligado); if (ligado) void carregar().catch(() => undefined); }), [carregar]);
 
   // GPS: online manda a posição (no máximo a cada 5 s). Se o servidor esqueceu (reiniciou), fica online de novo.
+  // Parado, o GPS não manda posição nova: a cada 30 s a última é reenviada, senão o despacho acha que ele sumiu.
   useEffect(() => {
     if (!online) return;
     onlineRef.current = true;
-    const parar = observarPosicao(async (p) => {
-      setPosicao(p);
-      if (Date.now() - ultimoEnvio.current < 5000) return;
+    let ultima: Posicao | null = null;
+    const enviar = async (p: Posicao) => {
       ultimoEnvio.current = Date.now();
       try { await api("/posicao", { corpo: p }); }
       catch (e) { if (e instanceof ErroApi && e.status === 409) await api("/online", { corpo: p }).catch(() => undefined); }
+    };
+    const parar = observarPosicao((p) => {
+      ultima = p;
+      setPosicao(p);
+      if (Date.now() - ultimoEnvio.current >= 5000) void enviar(p);
     }, (msg) => setErro(msg), true);
-    return () => { onlineRef.current = false; parar(); };
+    const vivo = setInterval(() => { const p = ultima ?? posicaoRef.current; if (p && Date.now() - ultimoEnvio.current >= 25_000) void enviar(p); }, 30_000);
+    return () => { onlineRef.current = false; clearInterval(vivo); parar(); };
   }, [online]);
+  const posicaoRef = useRef<Posicao | null>(null);
+  posicaoRef.current = posicao;
 
   const alternarOnline = async () => {
     setErro("");

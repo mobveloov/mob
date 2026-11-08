@@ -24,7 +24,7 @@ export const OFERTA_MS = () => Math.max(5, Number(process.env.APPS_OFERTA_SEGUND
 /** Raio máximo da oferta (km). */
 const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
 /** Posição mais velha que isso não conta (motorista sumiu). */
-const POSICAO_MS = 3 * 60_000;
+const POSICAO_MS = 10 * 60_000; // o app reenvia a cada 30 s; em segundo plano o Android pode atrasar
 /** Depois de recusar ou deixar passar, o motorista só recebe de novo a mesma corrida depois disso. */
 const REOFERTA_MS = 2 * 60_000;
 

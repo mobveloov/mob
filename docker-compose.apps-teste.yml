@@ -1,0 +1,42 @@
+# AMBIENTE DE TESTE dos apps do passageiro e do motorista, com endereço https TEMPORÁRIO (túnel).
+# Separado do painel normal (docker-compose.yml): outro projeto, outros dados, outra porta.
+#
+#   docker compose -f docker-compose.apps-teste.yml -p mob-apps-teste up -d --build
+#   docker compose -f docker-compose.apps-teste.yml -p mob-apps-teste logs tunel | grep trycloudflare   → endereço https
+#
+# O endereço do túnel MUDA cada vez que o contêiner "tunel" reinicia. Os APKs de teste deixam trocar o servidor na
+# tela de entrada, sem gerar o APK de novo. Em produção: domínio próprio com https e NODE_ENV=production
+# (aí o código de login nunca volta na resposta). Veja docs/APPS.md, "Ambiente de teste".
+services:
+  painel:
+    build:
+      context: .
+      dockerfile: scripts/teste/Dockerfile.apps-teste
+    container_name: mob-apps-teste
+    ports:
+      - "${APPS_TESTE_PORTA:-8795}:8787"
+    env_file:
+      - path: painel/.env
+        required: false
+    environment:
+      DADOS_DIR: /dados
+      BANCO_ARQUIVO: /banco/painel.db
+      # Teste: o código de login aparece no app e no log (sem WhatsApp configurado). NUNCA em produção.
+      NODE_ENV: teste
+      APPS_MOSTRAR_CODIGO: "1"
+    volumes:
+      - apps-teste-dados:/dados
+      - apps-teste-banco:/banco
+    restart: unless-stopped
+
+  tunel:
+    # Túnel rápido: endereço https://<aleatório>.trycloudflare.com, sem conta e sem domínio. Só para teste.
+    image: cloudflare/cloudflared:2026.10.7
+    command: tunnel --no-autoupdate --url http://painel:8787
+    depends_on:
+      - painel
+    restart: unless-stopped
+
+volumes:
+  apps-teste-dados:
+  apps-teste-banco:

@@ -132,6 +132,41 @@ node scripts/build-app-empresa.mjs up-corridas --app=motorista --apk
 - API: `app.urlPainel` (`https://painel.upcorridas.com.br`, ainda a confirmar). Enquanto esse endereço não responder,
   o app abre e mostra "Sem conexão com a central".
 
+## Ambiente de teste no Docker (endereço https temporário)
+
+Enquanto não há domínio de produção, `docker-compose.apps-teste.yml` sobe um painel **separado** do normal
+(projeto `mob-apps-teste`, porta 8795, dados próprios), já com as rotas dos apps ligadas só dentro da imagem
+(`scripts/teste/ligar-apps.mjs`), mais um túnel que dá um endereço `https://….trycloudflare.com`, sem conta e sem
+domínio. Qualquer celular, no Wi-Fi ou no 4G, alcança esse endereço.
+
+```bash
+docker compose -f docker-compose.apps-teste.yml -p mob-apps-teste up -d --build
+```
+
+```bash
+docker logs mob-apps-teste-tunel-1 2>&1 | findstr trycloudflare
+```
+
+Depois, importe a empresa e gere os APKs de teste apontando para o túnel:
+
+```bash
+docker exec -e ADMIN_SENHA=<senha> mob-apps-teste npm run empresa:importar -- /app/tenants/up-corridas --admin <email>
+```
+
+```bash
+APP_URL_API=https://<endereço-do-túnel> APP_TESTE=1 node scripts/build-app-empresa.mjs up-corridas --app=passageiro --apk
+```
+
+- **O endereço muda** quando o contêiner do túnel reinicia. Os APKs de teste (`APP_TESTE=1`) mostram
+  "Servidor de teste" na tela de entrada: cole o endereço novo ali, sem gerar o APK de novo.
+- O túnel rápido **não repassa SSE**. Nesse caso os apps passam sozinhos, em 5 s, para a espera longa
+  (`/eventos/espera`), e o tempo real continua funcionando.
+- O código de login aparece no próprio app (`APPS_MOSTRAR_CODIGO=1` com `NODE_ENV=teste`). Use só dados de teste:
+  quem tiver o endereço consegue entrar.
+- **Produção:** domínio próprio com https no `app.urlPainel` (ou `app.urlApi`), `NODE_ENV=production`, WhatsApp
+  configurado para mandar o código, e APKs gerados **sem** `APP_TESTE`. O `--aab` recusa `APP_TESTE` e http.
+- Para desligar: `docker compose -f docker-compose.apps-teste.yml -p mob-apps-teste down` (com `-v` apaga os dados de teste).
+
 ## Ligações nos arquivos comuns (para a sessão Base)
 
 Estes três arquivos são da sessão Base. As linhas abaixo ligam os apps no painel.
