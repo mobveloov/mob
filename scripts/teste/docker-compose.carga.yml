@@ -1,0 +1,29 @@
+# AMBIENTE DE CARGA (só no computador local). Separado do painel normal: outro projeto, outros dados, outra porta.
+# O código de login volta na resposta (APPS_MOSTRAR_CODIGO) e o limite de códigos por IP é alto, porque todos os
+# passageiros e motoristas simulados saem do mesmo computador. NUNCA use assim em produção.
+#
+#   docker compose -f scripts/teste/docker-compose.carga.yml -p mob-carga up -d --build
+#   node scripts/teste/carga.mjs http://localhost:8796 500
+#   docker compose -f scripts/teste/docker-compose.carga.yml -p mob-carga down -v     (apaga tudo)
+services:
+  painel:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: mob-carga
+    ports:
+      - "${CARGA_PORTA:-8796}:8787"
+    environment:
+      NODE_ENV: teste
+      DADOS_DIR: /dados
+      BANCO_ARQUIVO: /banco/painel.db
+      APPS_MOSTRAR_CODIGO: "1"
+      APPS_CODIGOS_POR_IP: "100000"
+      APPS_OFERTA_SEGUNDOS: "20"
+    volumes:
+      - carga-dados:/dados
+      - carga-banco:/banco
+
+volumes:
+  carga-dados:
+  carga-banco:

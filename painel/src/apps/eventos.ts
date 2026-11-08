@@ -74,5 +74,11 @@ export function aguardar(empresaId: string, alvo: Alvo, desde: number, ms = 25_0
   });
 }
 
+/** Esta pessoa está com o tempo real aberto agora (fluxo ou espera longa)? */
+export function conectado(empresaId: string, a: Alvo): boolean {
+  for (const o of ouvintes.get(empresaId) ?? []) if (o.papel === a.papel && o.chave === a.chave) return true;
+  return esperando.has(chaveDe(empresaId, a));
+}
+
 export const empresasComOuvintes = () => [...new Set([...ouvintes.keys(), ...[...esperando.keys()].map((k) => k.split("|")[0])])];
 export const temOuvinte = (empresaId: string) => (ouvintes.get(empresaId)?.size ?? 0) > 0 || [...esperando.keys()].some((k) => k.startsWith(`${empresaId}|`));

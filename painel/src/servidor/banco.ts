@@ -3,7 +3,7 @@
 // "empresa" e toda consulta filtra por ela.
 //
 // Onde fica: BANCO_ARQUIVO (no .env). Vazio = DADOS_DIR/painel.db.
-// O que guarda hoje: conversas do bot e fila de envio do CRM (antes eram arquivos JSON reescritos inteiros).
+// O que guarda hoje: corridas próprias, conversas do bot e fila de envio do CRM (antes eram arquivos JSON reescritos inteiros).
 // Na primeira vez que uma empresa usa o banco, os dados do JSON antigo entram aqui e o arquivo vira
 // "<nome>.json.migrado" (fica guardado, nada é apagado).
 
@@ -48,6 +48,12 @@ export function banco(): Banco {
       PRIMARY KEY (empresa, id));
     CREATE INDEX IF NOT EXISTS crm_fila_pendentes ON crm_fila (empresa, estado, proxima_em, criado_em);
     CREATE INDEX IF NOT EXISTS crm_fila_origem ON crm_fila (empresa, origem, estado);
+    CREATE TABLE IF NOT EXISTS corridas_proprias (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, os_num INTEGER NOT NULL, status TEXT NOT NULL, telefone TEXT NOT NULL,
+      motorista_id TEXT, solicitada_em TEXT NOT NULL, dados TEXT NOT NULL,
+      PRIMARY KEY (empresa, id));
+    CREATE INDEX IF NOT EXISTS corridas_proprias_os ON corridas_proprias (empresa, os_num);
+    CREATE INDEX IF NOT EXISTS corridas_proprias_status ON corridas_proprias (empresa, status);
   `);
   aberto = { arquivo, db };
   return db;

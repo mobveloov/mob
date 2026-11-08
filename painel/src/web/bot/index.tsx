@@ -31,3 +31,13 @@ export default function BotWhatsApp() {
 }
 
 export { BotWhatsApp };
+
+/** Tela "Conversas" do menu (Comunicação): as conversas do WhatsApp, com título próprio. */
+export function ConversasWhatsApp() {
+  return (
+    <>
+      <Titulo titulo="Conversas" sub="Conversas do WhatsApp com os passageiros. Responda por aqui quando o bot passar para a central." />
+      <BotConversas />
+    </>
+  );
+}

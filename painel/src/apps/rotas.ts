@@ -67,6 +67,7 @@ function exigirApp(req: Request, res: Response, next: NextFunction) {
   const s = sessaoDoToken(req.params.empresa, token);
   if (!s) return res.status(401).json({ erro: "Entre de novo." });
   req.app_ = { empresaId: req.params.empresa, sessao: s, token };
+  if (s.papel === "motorista") P.marcarVisto(req.params.empresa, s.chave); // ainda está com o app aberto
   next();
 }
 const so = (papel: PapelApp) => (req: Request, res: Response, next: NextFunction) =>
