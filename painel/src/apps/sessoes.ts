@@ -63,7 +63,8 @@ function impedimento(empresaId: string, papel: PapelApp, telefone: string): stri
 interface Codigo { hash: string; expira: number; erros: number }
 const codigos = new Map<string, Codigo>();
 const podePedirPorTelefone = limitador(5, 60 * 60_000);
-const podePedirPorIp = limitador(30, 60 * 60_000);
+// Pedidos de código por IP por hora (APPS_CODIGOS_POR_IP, padrão 30). Atrás de proxy, ligue CONFIAR_PROXY.
+const podePedirPorIp = limitador(() => Number(process.env.APPS_CODIGOS_POR_IP) || 30, 60 * 60_000);
 
 /** Só para os testes. */
 export const limparCodigos = () => codigos.clear();

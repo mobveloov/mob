@@ -119,7 +119,7 @@ export function Entrar({ marca, papel, aoEntrar }: { marca: MarcaApp; papel: Pap
         </form>
       )}
       <Aviso texto={erro} />
-      {papel === "motorista" && <p className="dica">Só entra quem está cadastrado pela central. Dúvidas: {marca.suporte.telefone}</p>}
+      {papel === "motorista" && <p className="dica">Só entra quem está cadastrado pela central.{marca.suporte.telefone || marca.suporte.email ? ` Dúvidas: ${marca.suporte.telefone || marca.suporte.email}` : ""}</p>}
       <ServidorTeste />
     </div>
   );

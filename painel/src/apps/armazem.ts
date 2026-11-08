@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { idValido, raiz } from "../servidor/dados.ts";
+import { gravarJson, lerJson } from "../servidor/jsoncache.ts";
 
 export function pastaApps(empresaId: string) {
   if (!idValido(empresaId)) throw new Error("Empresa inválida.");
@@ -19,14 +20,11 @@ export function pastaApps(empresaId: string) {
 }
 
 export function ler<T>(arq: string, padrao: T): T {
-  try { return JSON.parse(fs.readFileSync(arq, "utf8")) as T; } catch { return padrao; }
+  return lerJson<T>(arq, padrao); // só leitura (cache): para mudar, copie e grave
 }
 
 export function gravar(arq: string, valor: unknown) {
-  fs.mkdirSync(path.dirname(arq), { recursive: true });
-  const tmp = `${arq}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(valor), { mode: 0o600 });
-  fs.renameSync(tmp, arq);
+  gravarJson(arq, valor, { modo: 0o600 });
 }
 
 export const arquivo = (empresaId: string, ...partes: string[]) => path.join(pastaApps(empresaId), ...partes);
@@ -39,13 +37,16 @@ export const txt = (v: unknown, max: number) => (typeof v === "string" ? v.repla
 export const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : undefined);
 
 /** Limite simples por chave (pedidos de código, tentativas). */
-export function limitador(max: number, janelaMs: number) {
+export function limitador(max: number | (() => number), janelaMs: number) {
   const m = new Map<string, number[]>();
+  let limpezaEm = 0;
   return (chave: string) => {
     const agora = Date.now();
+    // Apaga as chaves velhas de vez em quando (senão o mapa cresce com cada telefone e IP).
+    if (agora - limpezaEm > janelaMs) { limpezaEm = agora; for (const [k, l] of m) if (!l.some((t) => agora - t < janelaMs)) m.delete(k); }
     const l = (m.get(chave) ?? []).filter((t) => agora - t < janelaMs);
     l.push(agora);
     m.set(chave, l);
-    return l.length <= max;
+    return l.length <= (typeof max === "function" ? max() : max);
   };
 }

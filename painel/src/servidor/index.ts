@@ -14,7 +14,7 @@ import { opcoesDoFiltro } from "./filtro.ts";
 import { corridasDoCsv } from "./fontes/arquivo.ts";
 import { buscarCorridas, limparCachePlanilhas } from "./fontes/index.ts";
 import { CAMPOS, pendenciasDoMotor, type TipoMotor } from "./fontes/motor.ts";
-import { apagarCookie, criarCookie, exigirLogin, exigirPapel, podeTentar } from "./sessao.ts";
+import { apagarCookie, criarCookie, errouLogin, exigirLogin, exigirPapel, podeTentar } from "./sessao.ts";
 import { rotasCadastros } from "../cadastros/rotas.ts";
 import { rotasCorridasProprias } from "../corridas/rotas.ts";
 import { encerrarSemMotorista } from "../corridas/index.ts";
@@ -28,6 +28,12 @@ import { iniciarApps } from "../apps/despacho.ts";
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
 const app = express();
+// Atrás de proxy (nginx, túnel, balanceador): CONFIAR_PROXY=1 (número de proxies) faz o painel ver o IP real de quem
+// acessa. Sem isso, todos parecem vir do mesmo IP e os limites de tentativa travam todo mundo junto.
+{
+  const p = (process.env.CONFIAR_PROXY ?? "").trim();
+  if (p) app.set("trust proxy", /^\d+$/.test(p) ? Number(p) : p);
+}
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 
@@ -112,10 +118,10 @@ app.post("/api/configurar", ok((req, res) => {
 }));
 
 app.post("/api/entrar", ok((req, res) => {
-  if (!podeTentar(req.ip ?? "")) return res.status(429).json({ erro: "Muitas tentativas. Espere alguns minutos." });
   const email = String(req.body?.email ?? "").trim().toLowerCase();
+  if (!podeTentar(req.ip ?? "", email)) return res.status(429).json({ erro: "Muitas tentativas. Espere alguns minutos." });
   const u = D.listarUsuarios().find((x) => x.email === email);
-  if (!u || !D.senhaConfere(String(req.body?.senha ?? ""), u.hash)) return res.status(401).json({ erro: "E-mail ou senha errados." });
+  if (!u || !D.senhaConfere(String(req.body?.senha ?? ""), u.hash)) { errouLogin(req.ip ?? "", email); return res.status(401).json({ erro: "E-mail ou senha errados." }); }
   criarCookie(res, req, u.id);
   res.json({ ok: true });
 }));
@@ -408,7 +414,11 @@ if (process.env.NODE_ENV !== "test") {
   // Promessa sem tratamento em algum módulo (bot, CRM, totem): registra e segue, em vez de derrubar o painel.
   process.on("unhandledRejection", (e) => console.error("[painel] erro sem tratamento:", e instanceof Error ? e.message : e));
   const porta = Number(process.env.PAINEL_API_PORTA) || 8787;
-  app.listen(porta, () => console.log(`Painel (API) em http://localhost:${porta}`));
+  const servidor = app.listen(porta, () => console.log(`Painel (API) em http://localhost:${porta}`));
+  // Conexão parada fica aberta por 65 s (o padrão do Node é 5 s): apps e proxies reaproveitam a conexão e não
+  // recebem "conexão fechada" no meio de um pedido (o teste de carga mostrou centenas desses erros).
+  servidor.keepAliveTimeout = 65_000;
+  servidor.headersTimeout = 66_000;
   // A cada minuto: corrida sem motorista há mais de 20 min vira "não atendida".
   setInterval(() => { for (const e of D.listarEmpresas()) encerrarSemMotorista(e.id).catch(() => undefined); }, 60_000).unref();
   // Despacho dos apps: oferta ao motorista mais perto, vence ofertas e avisa mudanças (a cada 2 s).

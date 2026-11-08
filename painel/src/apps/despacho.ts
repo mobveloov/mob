@@ -15,7 +15,7 @@ import { linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { arquivo, gravar, ler } from "./armazem.ts";
-import { emitir, empresasComOuvintes, temOuvinte, type Alvo } from "./eventos.ts";
+import { emitir, empresasComOuvintes, temOuvinte, type Alvo, conectado } from "./eventos.ts";
 import { avisar } from "./push.ts";
 import type { PapelApp } from "./sessoes.ts";
 
@@ -31,7 +31,19 @@ const REOFERTA_MS = 2 * 60_000;
 const ABERTA_COM_MOTORISTA = new Set(["a_caminho", "no_local", "em_andamento"]);
 const ABERTA = new Set(["procurando", "a_caminho", "no_local", "em_andamento"]);
 
-interface Online { lat: number; lng: number; em: number; desde: number }
+interface Online { lat: number; lng: number; em: number; desde: number; /** último pedido do app (qualquer um) */ visto: number }
+
+/**
+ * Motorista que fechou o app sem ficar offline: sem nenhum pedido do app há mais que isso e sem tempo real aberto,
+ * não recebe oferta (antes ficava "online" até 10 min e cada corrida esperava 20 s por motorista sumido).
+ */
+const VISTO_MS = 90_000;
+
+/** Chamado a cada pedido do app do motorista (rotas.ts). */
+export function marcarVisto(empresaId: string, motoristaId: string) {
+  const o = estados.get(empresaId)?.online.get(motoristaId);
+  if (o) o.visto = Date.now();
+}
 export interface Oferta { id: string; corridaId: string; motoristaId: string; expira: number; distanciaKm: number | null }
 
 interface Estado {
@@ -99,7 +111,7 @@ export function ficarOnline(empresaId: string, motoristaId: string, lat: number,
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new Error("Posição inválida. Ligue o GPS.");
   const e = estado(empresaId);
   const antes = e.online.get(motoristaId);
-  e.online.set(motoristaId, { lat, lng, em: Date.now(), desde: antes?.desde ?? Date.now() });
+  e.online.set(motoristaId, { lat, lng, em: Date.now(), desde: antes?.desde ?? Date.now(), visto: Date.now() });
   if (!antes) despachar(empresaId);
 }
 
@@ -164,6 +176,7 @@ export function despachar(empresaId: string) {
     let melhor: { id: string; km: number | null } | null = null;
     for (const [id, p] of e.online) {
       if (busy.has(id) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
+      if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
@@ -269,12 +282,30 @@ export function vigiar(empresaId: string) {
   }
 }
 
+/**
+ * Uma vez por minuto: esquece o que não serve mais (antes crescia para sempre, uma entrada por corrida).
+ * "tentados" só vale enquanto a corrida procura motorista; "vistos" só para corridas abertas ou das últimas 24 h.
+ */
+const ultimaLimpeza = new Map<string, number>();
+function limparMemoria(empresaId: string, e: Estado, agora: number) {
+  if (agora - (ultimaLimpeza.get(empresaId) ?? 0) < 60_000) return;
+  ultimaLimpeza.set(empresaId, agora);
+  const porId = new Map(listarProprias(empresaId).map((c) => [c.id, c]));
+  const limite = agoraBr().getTime() - 24 * 3600_000;
+  for (const id of e.tentados.keys()) if (porId.get(id)?.status !== "procurando") e.tentados.delete(id);
+  for (const id of e.vistos.keys()) {
+    const c = porId.get(id);
+    if (!c || (!ABERTA.has(c.status) && Date.parse(c.solicitadaEm) < limite)) e.vistos.delete(id);
+  }
+}
+
 /** Uma volta do despacho: vence ofertas, avisa mudanças e oferece corridas. O servidor chama de tempos em tempos. */
 export function ciclo(empresaId: string) {
   const e = estado(empresaId);
   const agora = Date.now();
   for (const o of [...e.ofertas.values()]) if (o.expira <= agora) passarOferta(empresaId, o);
   for (const [id, p] of e.online) if (agora - p.em > 2 * POSICAO_MS) e.online.delete(id);
+  limparMemoria(empresaId, e, agora);
   vigiar(empresaId);
   despachar(empresaId);
 }
@@ -337,7 +368,7 @@ export function registrarSos(empresaId: string, c: CorridaPropria, papel: PapelA
 }
 
 export function resolverAlerta(empresaId: string, id: string, por: string) {
-  const l = alertas(empresaId);
+  const l = structuredClone(alertas(empresaId)); // cópia: o cache é só leitura
   const a = l.find((x) => x.id === id);
   if (!a) throw new Error("Alerta não encontrado.");
   a.resolvido = true; a.resolvidoPor = por.slice(0, 120);

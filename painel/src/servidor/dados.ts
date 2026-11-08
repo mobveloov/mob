@@ -14,6 +14,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { MARCA_PADRAO, sanearMarca, type Marca } from "../comum/marca.ts";
+import { gravarJson, lerJson } from "./jsoncache.ts";
 
 export type TipoIntegracao = "sistema-a" | "sistema-b" | "arquivo" | "exemplo";
 export interface Integracao { id: string; tipo: TipoIntegracao; nome: string; ativa: boolean }
@@ -33,13 +34,12 @@ function pastaEmpresa(id: string) {
   return path.join(raiz(), "empresas", id);
 }
 function ler<T>(arq: string, padrao: T): T {
-  try { return JSON.parse(fs.readFileSync(arq, "utf8")) as T; } catch { return padrao; }
+  return structuredClone(lerJson<T>(arq, padrao)); // cópia: quem chama pode mudar à vontade
 }
+/** Só leitura, sem cópia (os arquivos lidos em todo pedido: empresas e usuários). */
+const lerFixo = <T>(arq: string, padrao: T): T => lerJson<T>(arq, padrao);
 function gravar(arq: string, valor: unknown, secreto = false) {
-  fs.mkdirSync(path.dirname(arq), { recursive: true });
-  const tmp = `${arq}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(valor, null, 2), { mode: secreto ? 0o600 : 0o644 });
-  fs.renameSync(tmp, arq);
+  gravarJson(arq, valor, { espacos: 2, modo: secreto ? 0o600 : 0o644 });
 }
 
 /** "Rota Fácil Ltda" -> "rota-facil-ltda" */
@@ -52,7 +52,7 @@ export function criarId(nome: string): string {
 
 // ------------------------------------------------------------------ empresas
 
-export const listarEmpresas = () => ler<Empresa[]>(path.join(raiz(), "plataforma.json"), []);
+export const listarEmpresas = () => lerFixo<Empresa[]>(path.join(raiz(), "plataforma.json"), []);
 export const empresa = (id: string) => listarEmpresas().find((e) => e.id === id) ?? null;
 
 export function criarEmpresa(nome: string, marca?: Partial<Marca>): Empresa {
@@ -119,7 +119,7 @@ export function pastaPlanilhas(id: string) {
 // ------------------------------------------------------------------ usuários
 
 const arqUsuarios = () => path.join(raiz(), "usuarios.json");
-export const listarUsuarios = () => ler<Usuario[]>(arqUsuarios(), []);
+export const listarUsuarios = () => lerFixo<Usuario[]>(arqUsuarios(), []);
 
 export function hashSenha(senha: string, sal = crypto.randomBytes(16).toString("hex")): string {
   return `scrypt$${sal}$${crypto.scryptSync(senha, sal, 64).toString("hex")}`;

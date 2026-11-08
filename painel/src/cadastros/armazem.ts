@@ -7,6 +7,7 @@ import path from "node:path";
 import type { Cadastro, Campo } from "../comum/cadastros.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { normal } from "../servidor/util.ts";
+import { gravarJson, lerJson } from "../servidor/jsoncache.ts";
 
 export type Valor = string | number | boolean | null;
 export interface Registro { id: string; criadoEm: string; atualizadoEm: string; atualizadoPor: string; [campo: string]: Valor }
@@ -17,15 +18,11 @@ function arquivo(empresaId: string, cad: Cadastro) {
 }
 
 export function listar(empresaId: string, cad: Cadastro): Registro[] {
-  try { return JSON.parse(fs.readFileSync(arquivo(empresaId, cad), "utf8")) as Registro[]; } catch { return []; }
+  return lerJson<Registro[]>(arquivo(empresaId, cad), []); // só leitura (cache): para mudar, copie e grave
 }
 
 function gravar(empresaId: string, cad: Cadastro, l: Registro[]) {
-  const arq = arquivo(empresaId, cad);
-  fs.mkdirSync(path.dirname(arq), { recursive: true });
-  const tmp = `${arq}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(l, null, 1));
-  fs.renameSync(tmp, arq);
+  gravarJson(arquivo(empresaId, cad), l, { espacos: 1 });
 }
 
 const soDigitos = (v: string) => v.replace(/\D/g, "");
@@ -96,7 +93,7 @@ export function criar(empresaId: string, cad: Cadastro, entrada: Record<string, 
 }
 
 export function atualizar(empresaId: string, cad: Cadastro, id: string, entrada: Record<string, unknown>, por: string): Registro {
-  const lista = listar(empresaId, cad);
+  const lista = [...listar(empresaId, cad)]; // cópia: o cache é só leitura
   const i = lista.findIndex((r) => r.id === id);
   if (i < 0) throw new Error(`${cad.singular[0].toUpperCase()}${cad.singular.slice(1)} não encontrado.`);
   const dados = limpar(cad, entrada, lista[i]);
@@ -117,7 +114,7 @@ export function remover(empresaId: string, cad: Cadastro, id: string) {
  * que a central já editou) e cria os novos. Devolve quantos criou e quantos atualizou.
  */
 export function mesclar(empresaId: string, cad: Cadastro, novos: Array<Record<string, Valor>>, por: string): { criados: number; atualizados: number } {
-  const lista = listar(empresaId, cad);
+  const lista = structuredClone(listar(empresaId, cad)); // cópia: o cache é só leitura
   const chave = cad.chaveUnica!;
   const indice = new Map(lista.map((r, i) => [normal(String(r[chave] ?? "")), i]));
   const calculados = new Set(cad.campos.filter((c) => c.calculado).map((c) => c.chave));
@@ -142,6 +139,6 @@ export function mesclar(empresaId: string, cad: Cadastro, novos: Array<Record<st
       if (mudou) { r.atualizadoEm = agora; atualizados++; }
     }
   }
-  gravar(empresaId, cad, lista);
+  if (criados || atualizados) gravar(empresaId, cad, lista); // nada mudou: não regrava (cada corrida chama isto)
   return { criados, atualizados };
 }

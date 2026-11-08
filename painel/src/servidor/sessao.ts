@@ -74,12 +74,23 @@ export const exigirPapel = (...papeis: Papel[]) => (req: Request, res: Response,
   res.status(403).json({ erro: "Seu usuário não tem acesso a esta parte." });
 };
 
-// Tentativas de login: no máximo 8 por 10 minutos por IP.
-const tentativas = new Map<string, number[]>();
-export function podeTentar(ip: string): boolean {
+// Tentativas de login ERRADAS: no máximo 8 por 10 minutos para o mesmo IP e e-mail, e 30 para o mesmo e-mail.
+// Só o erro conta (antes, entrar certo também contava, e uma central atrás do mesmo IP se trancava).
+const JANELA_LOGIN = 600_000;
+const erros = new Map<string, number[]>();
+let limpezaLogin = 0;
+const recentes = (chave: string, agora: number) => (erros.get(chave) ?? []).filter((t) => agora - t < JANELA_LOGIN);
+function limparErros(agora: number) {
+  if (agora - limpezaLogin < JANELA_LOGIN) return;
+  limpezaLogin = agora;
+  for (const [k, l] of erros) if (!l.some((t) => agora - t < JANELA_LOGIN)) erros.delete(k);
+}
+export function podeTentar(ip: string, email = ""): boolean {
   const agora = Date.now();
-  const l = (tentativas.get(ip) ?? []).filter((t) => agora - t < 600_000);
-  l.push(agora);
-  tentativas.set(ip, l);
-  return l.length <= 8;
+  limparErros(agora);
+  return recentes(`${ip}|${email}`, agora).length < 8 && (!email || recentes(`*|${email}`, agora).length < 30);
+}
+export function errouLogin(ip: string, email = "") {
+  const agora = Date.now();
+  for (const k of [`${ip}|${email}`, ...(email ? [`*|${email}`] : [])]) erros.set(k, [...recentes(k, agora), agora]);
 }

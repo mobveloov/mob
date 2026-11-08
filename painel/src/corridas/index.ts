@@ -13,6 +13,7 @@ import { corridaVazia, type CorridaPainel, type GrupoStatus } from "../comum/cor
 import { listar, mesclar, type Registro } from "../cadastros/armazem.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
+import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
 
 export type StatusProprio = "procurando" | "a_caminho" | "no_local" | "em_andamento" | "finalizada" | "cancelada" | "nao_atendida";
 export type Canal = "painel" | "bot" | "totem" | "app";
@@ -78,16 +79,53 @@ function arquivo(empresaId: string) {
   if (!idValido(empresaId)) throw new Error("Empresa inválida.");
   return path.join(raiz(), "empresas", empresaId, "corridas.json");
 }
+// Corridas próprias ficam no banco do painel (tabela corridas_proprias, uma linha por corrida). Antes, cada mudança
+// regravava o corridas.json inteiro da empresa: com centenas de corridas abertas, a fila travava (teste de carga).
+// O corridas.json antigo entra no banco na primeira vez e vira corridas.json.migrado (guardado).
+// Na memória fica uma lista só de leitura por empresa, atualizada a cada gravação (sem reler o banco).
+const memoria = new Map<string, { arquivoBanco: string; lista: readonly CorridaPropria[] }>();
+
+function congelar<T>(v: T): T {
+  if (v && typeof v === "object" && !Object.isFrozen(v)) { Object.freeze(v); for (const x of Object.values(v as object)) congelar(x); }
+  return v;
+}
+
 export function listarProprias(empresaId: string): CorridaPropria[] {
-  try { return JSON.parse(fs.readFileSync(arquivo(empresaId), "utf8")) as CorridaPropria[]; } catch { return []; }
+  const arq = arquivo(empresaId); // valida o id da empresa
+  const m = memoria.get(empresaId);
+  if (m && m.arquivoBanco === arquivoDoBanco()) return m.lista as CorridaPropria[];
+  migrarUmaVez(empresaId, "corridas_proprias", arq, (conteudo) => {
+    const l = Array.isArray(conteudo) ? (conteudo as CorridaPropria[]).filter((c) => c && typeof c.id === "string") : [];
+    for (const c of l) gravarLinha(empresaId, c);
+    return l.length;
+  });
+  const lista = banco().prepare("SELECT dados FROM corridas_proprias WHERE empresa = ? ORDER BY os_num, id").all(empresaId)
+    .map((r) => congelar(JSON.parse(String((r as { dados: string }).dados)) as CorridaPropria));
+  memoria.set(empresaId, { arquivoBanco: arquivoDoBanco(), lista: Object.freeze(lista) });
+  return lista;
 }
-function gravar(empresaId: string, l: CorridaPropria[]) {
-  const arq = arquivo(empresaId);
-  fs.mkdirSync(path.dirname(arq), { recursive: true });
-  const tmp = `${arq}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(l));
-  fs.renameSync(tmp, arq);
+
+function gravarLinha(empresaId: string, c: CorridaPropria) {
+  banco().prepare(`INSERT INTO corridas_proprias (empresa, id, os_num, status, telefone, motorista_id, solicitada_em, dados) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (empresa, id) DO UPDATE SET os_num = excluded.os_num, status = excluded.status, telefone = excluded.telefone,
+      motorista_id = excluded.motorista_id, solicitada_em = excluded.solicitada_em, dados = excluded.dados`)
+    .run(empresaId, c.id, Number(c.os) || 0, c.status, c.passageiro?.telefone ?? "", c.motoristaId ?? null, c.solicitadaEm ?? "", JSON.stringify(c));
 }
+
+/** Grava as corridas mudadas (tudo ou nada) e atualiza a lista da memória. */
+function gravar(empresaId: string, mudadas: CorridaPropria[]) {
+  if (!mudadas.length) return;
+  const atual = listarProprias(empresaId);
+  transacao(() => { for (const c of mudadas) gravarLinha(empresaId, c); });
+  const novas = new Map(mudadas.map((c) => [c.id, congelar(structuredClone(c))]));
+  const lista = atual.map((c) => novas.get(c.id) ?? c);
+  for (const [id, c] of novas) if (!atual.some((x) => x.id === id)) lista.push(c);
+  memoria.set(empresaId, { arquivoBanco: arquivoDoBanco(), lista: Object.freeze(lista) });
+}
+
+/** Só para testes: esquece a lista da memória (força ler do banco). */
+export const esquecerCorridasDaMemoria = () => memoria.clear();
+
 /** Trava simples por empresa: evita duas gravações ao mesmo tempo no mesmo processo. */
 const filas = new Map<string, Promise<unknown>>();
 function emFila<T>(empresaId: string, fn: () => T): Promise<T> {
@@ -190,7 +228,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       solicitadaEm: agora, iniciadaEm: null, finalizadaEm: null,
       historico: [{ em: agora, status: "procurando", por }],
     };
-    gravar(empresaId, [...lista, corrida]);
+    gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
     mesclar(empresaId, cadastroPorId("clientes")!, [{ nome, telefone, status: "Ativo" }], por);
     return corrida;
@@ -199,11 +237,11 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
 
 function alterar(empresaId: string, id: string, fn: (c: CorridaPropria) => void): Promise<CorridaPropria> {
   return emFila(empresaId, () => {
-    const lista = listarProprias(empresaId);
-    const c = lista.find((x) => x.id === id || x.os === id);
-    if (!c) throw new Error("Corrida não encontrada.");
+    const achada = listarProprias(empresaId).find((x) => x.id === id || x.os === id);
+    if (!achada) throw new Error("Corrida não encontrada.");
+    const c = structuredClone(achada); // cópia: a lista da memória é só leitura
     fn(c);
-    gravar(empresaId, lista);
+    gravar(empresaId, [c]);
     return c;
   });
 }
@@ -261,14 +299,14 @@ export function avaliar(empresaId: string, id: string, nota: number, por = "sist
 /** Sem motorista por muito tempo: vira "não atendida" (chame de tempos em tempos). */
 export function encerrarSemMotorista(empresaId: string, minutos = 20) {
   return emFila(empresaId, () => {
-    const lista = listarProprias(empresaId);
     const limite = agoraBr().getTime() - minutos * 60_000;
-    let n = 0;
-    for (const c of lista) if (c.status === "procurando" && Date.parse(c.solicitadaEm) < limite) {
-      c.status = "nao_atendida"; c.historico.push({ em: agoraBr().toISOString(), status: "nao_atendida", por: "sistema" }); n++;
-    }
-    if (n) gravar(empresaId, lista);
-    return n;
+    const mudadas = listarProprias(empresaId).filter((c) => c.status === "procurando" && Date.parse(c.solicitadaEm) < limite).map((x) => {
+      const c = structuredClone(x);
+      c.status = "nao_atendida"; c.historico.push({ em: agoraBr().toISOString(), status: "nao_atendida", por: "sistema" });
+      return c;
+    });
+    gravar(empresaId, mudadas);
+    return mudadas.length;
   });
 }
 
