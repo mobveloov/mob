@@ -1,0 +1,24 @@
+/* Telas do bot de WhatsApp. Usa as variáveis de tema do painel (marca da empresa). */
+.bot-abas { margin-bottom: 14px; display: inline-flex; }
+.bot-conversas { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 14px; min-height: 520px; }
+@media (max-width: 760px) { .bot-conversas { grid-template-columns: 1fr; } }
+.bot-lista { list-style: none; margin: 0; padding: 0; max-height: 620px; overflow-y: auto; }
+.bot-lista li button { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 10px 8px; border-bottom: 1px solid var(--borda); cursor: pointer; }
+.bot-lista li button:hover, .bot-lista li button.ativo { background: var(--fundo); }
+.bot-lista small { color: var(--suave); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bot-lista .bot-topo-item { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+.bot-bolinha { background: var(--primaria); color: var(--primaria-txt); border-radius: 999px; font-size: 11px; font-weight: 800; padding: 1px 7px; }
+.bot-chat { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; padding: 6px 2px; }
+.bot-msg { max-width: 78%; padding: 8px 11px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
+.bot-msg small { display: block; font-size: 11px; color: var(--suave); margin-top: 4px; }
+.bot-msg.passageiro { align-self: flex-start; background: var(--fundo); }
+.bot-msg.bot { align-self: flex-end; background: var(--info-bg); color: var(--texto); }
+.bot-msg.operador { align-self: flex-end; background: var(--ok-bg); color: var(--texto); }
+.bot-resposta { display: flex; gap: 8px; margin-top: 10px; }
+.bot-resposta input { flex: 1; }
+.bot-qr { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; }
+.bot-qr img { width: 240px; height: 240px; image-rendering: pixelated; background: #fff; border-radius: 8px; padding: 8px; }
+.bot-codigo { font-family: ui-monospace, monospace; word-break: break-all; font-size: 12px; background: var(--fundo); padding: 8px; border-radius: 8px; }
+.bot-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.form label.bot-check { flex-direction: row; align-items: center; gap: 8px; text-align: left; }
+.form label.bot-check input { width: auto; }
