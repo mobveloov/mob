@@ -53,6 +53,24 @@ export const STATUS_A: Record<string, { status: StatusCorrida; texto: string }> 
   U: { status: "agrupada", texto: "Agrupada" },
 };
 
+/** Códigos que só chegam no webhook de status (fases do aceite e liberação). Fonte: Webhooks > Sobre. */
+const STATUS_SO_WEBHOOK_A: Record<string, StatusCorrida> = {
+  AN: "aceita", // motorista perto do embarque
+  AP: "no_local", // motorista chegou
+  AW: "no_local", // espera passou do previsto
+  L: "pendente", // aguardando liberação
+};
+
+/** A API aceita no máximo 100 itens por página (documentação: Paginação). */
+export const LIMITE_MAXIMO_A = 100;
+/** Intervalo máximo de busca de corridas e do extrato (códigos 39 e 31 dias). */
+export const DIAS_MAXIMOS_A = 31;
+
+/** Códigos de erro do Sistema A que dizem "sem permissão" mesmo vindo com HTTP 400 (Códigos de erro). */
+const ERROS_PERMISSAO_A = new Set(["1", "19", "63", "67", "68", "B5", "B6"]);
+/** Códigos de "não encontrado" que chegam com HTTP 400. */
+const ERROS_NAO_ACHOU_A = new Set(["25", "56", "72", "75", "167"]);
+
 /** Códigos de pagamento do Sistema A (tipo_pagamento / forma_pagamento). */
 export const PAGAMENTO_A: Record<string, FormaPagamento> = {
   D: "dinheiro",
@@ -173,8 +191,37 @@ export function corridaSistemaA(o: Obj, integracaoId: string = TIPO, fase?: stri
 function codigosSistemaA(s: StatusCorrida): string[] {
   if (s === "no_local") return ["A"];
   return Object.entries(STATUS_A)
-    .filter(([, v]) => v.status === s)
+    .filter(([k, v]) => v.status === s && k !== "U") // a busca recusa U (código 98)
     .map(([k]) => k);
+}
+
+/** Códigos dos itens de `errors` numa resposta de erro do Sistema A. */
+function codigosErroA(corpo: unknown): string[] {
+  const errs = (corpo as { errors?: unknown } | null)?.errors;
+  if (!Array.isArray(errs)) return [];
+  return errs.flat().map((e) => String((e as { code?: unknown } | null)?.code ?? "")).filter(Boolean);
+}
+
+/** Corrige a tradução de erros: o Sistema A manda falta de permissão e "não achei" com HTTP 400. */
+export function ajustarErroSistemaA(e: unknown): unknown {
+  if (!(e instanceof MotorErro) || e.codigo !== "DADOS_INVALIDOS") return e;
+  const codigos = codigosErroA(e.detalhe);
+  const extra = { integracaoId: e.integracaoId, statusHttp: e.statusHttp, detalhe: e.detalhe };
+  if (codigos.some((c) => ERROS_PERMISSAO_A.has(c)))
+    return new MotorErro("SEM_AUTORIZACAO", `${NOME}: o usuário de integração não tem permissão ou a licença não inclui a API. Confira no painel do ${NOME}.`, extra);
+  if (codigos.some((c) => ERROS_NAO_ACHOU_A.has(c))) return new MotorErro("NAO_ENCONTRADO", `${NOME}: não encontrado.`, extra);
+  if (codigos.includes("18")) return new MotorErro("LIMITE", `${NOME}: muitas corridas seguidas para o mesmo passageiro. Espere um pouco.`, { ...extra, tentarEmSegundos: 60 });
+  return e;
+}
+
+/** Confere o intervalo de datas antes de chamar (a API recusa mais de 31 dias e início igual ao fim). */
+function conferirIntervalo(de: string, ate: string, integracaoId: string) {
+  const a = Date.parse(de);
+  const b = Date.parse(ate);
+  if (Number.isNaN(a) || Number.isNaN(b)) throw new MotorErro("DADOS_INVALIDOS", `${NOME}: data inválida no filtro.`, { integracaoId });
+  if (b <= a) throw new MotorErro("DADOS_INVALIDOS", `${NOME}: a data final precisa ser depois da inicial.`, { integracaoId });
+  if (b - a > DIAS_MAXIMOS_A * 86_400_000)
+    throw new MotorErro("DADOS_INVALIDOS", `${NOME}: a busca aceita no máximo ${DIAS_MAXIMOS_A} dias. Diminua o período.`, { integracaoId });
 }
 
 /** Confere o cabeçalho Signature-V2 (HMAC-SHA512 do corpo com a api-key).
@@ -235,11 +282,31 @@ export function eventosSistemaA(corpo: string, integracaoId: string = TIPO): Eve
     }
     const req = txt(e.request_id ?? e.id_mch ?? e.solicitacao_id);
     const corridaId = req ? `${integracaoId}:${req}` : undefined;
-    const codigo = txt(e.status_code ?? e.status)?.toUpperCase();
+    // Formato antigo (deprecado) de posição: { id_mch, condutor_id, lat_cond, lng_cond }
+    if (e.lat_cond !== undefined || e.lng_cond !== undefined) {
+      const lat = coord(e.lat_cond);
+      const lng = coord(e.lng_cond);
+      if (lat !== undefined && lng !== undefined)
+        saida.push({ ...base, tipo: "posicao", corridaId, em, posicao: { lat, lng, motoristaId: txt(e.condutor_id) }, bruto: e });
+      continue;
+    }
+    // status_solicitacao = formato antigo (deprecado) do webhook de status
+    const codigo = txt(e.status_code ?? e.status_solicitacao ?? e.status)?.toUpperCase();
     if (codigo === "ER") {
       saida.push({ ...base, tipo: "parada", corridaId, em, idEvento: txt(e.event_id), bruto: e });
     } else if (codigo) {
-      saida.push({ ...base, tipo: "status", corridaId, em, status: STATUS_A[codigo]?.status ?? "desconhecido", idEvento: txt(e.event_id), bruto: e });
+      const ev: Evento = {
+        ...base,
+        tipo: "status",
+        corridaId,
+        em,
+        status: STATUS_A[codigo]?.status ?? STATUS_SO_WEBHOOK_A[codigo] ?? "desconhecido",
+        idEvento: txt(e.event_id),
+        bruto: e,
+      };
+      // Cancelada com will_reopen=true: a MESMA corrida volta para a distribuição (não abrir outra).
+      if (codigo === "C" && typeof e.will_reopen === "boolean") ev.reabre = e.will_reopen;
+      saida.push(ev);
     } else if (e.content !== undefined || e.message_id !== undefined) {
       saida.push({
         ...base,
@@ -309,7 +376,12 @@ export function criarAdaptadorSistemaA(
     exigir();
     const url = new URL(base() + caminho);
     for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
-    const r = await pedir<T>({ metodo, url, cabecalhos: cabecalhos(), json });
+    let r: Awaited<ReturnType<typeof pedir<T>>>;
+    try {
+      r = await pedir<T>({ metodo, url, cabecalhos: cabecalhos(), json });
+    } catch (e) {
+      throw ajustarErroSistemaA(e);
+    }
     const corpo = r.corpo as Obj;
     if (corpo && typeof corpo === "object" && corpo.success === false)
       throw new MotorErro("ERRO_REMOTO", "Sistema A: pedido recusado.", { integracaoId, detalhe: corpo });
@@ -327,14 +399,16 @@ export function criarAdaptadorSistemaA(
 
     async listarCorridas(f: FiltroCorridas = {}): Promise<Pagina<Corrida>> {
       const pagina = Math.max(1, f.pagina ?? 1);
-      const limite = Math.min(Math.max(1, f.limite ?? 50), 200);
+      const limite = Math.min(Math.max(1, f.limite ?? 50), LIMITE_MAXIMO_A);
       const de = f.de ?? new Date(Date.now() - 86_400_000).toISOString();
-      const codigos = (f.status ?? []).flatMap(codigosSistemaA);
+      const ate = f.ate ?? new Date().toISOString();
+      conferirIntervalo(de, ate, integracaoId);
+      const codigos = [...new Set((f.status ?? []).flatMap(codigosSistemaA))];
       const corpo: Obj = {
         pagina,
         limite,
         data_hora_solicitacao_min: de,
-        data_hora_solicitacao_max: f.ate,
+        data_hora_solicitacao_max: ate,
         condutor_id: f.motoristaId ? Number(semPrefixo(f.motoristaId)) : undefined,
         // A API só aceita UM status por pedido; com mais de um, filtramos aqui.
         status_solicitacao: codigos.length === 1 ? codigos[0] : undefined,
@@ -380,7 +454,19 @@ export function criarAdaptadorSistemaA(
         categoria_id: n.categoriaId ? Number(semPrefixo(n.categoriaId)) : undefined,
         info_antes_aceite: n.observacao,
       };
-      const r = await chamar<Obj>("POST", "/corridas", corpo);
+      let r: Obj;
+      try {
+        r = await chamar<Obj>("POST", "/corridas", corpo);
+      } catch (e) {
+        // A documentação avisa: no erro 500 por tempo esgotado a corrida pode ter sido criada mesmo assim.
+        if (e instanceof MotorErro && e.codigo === "INDISPONIVEL")
+          throw new MotorErro(
+            "INDISPONIVEL",
+            `${e.message} A corrida pode ter sido criada mesmo assim: confira a lista antes de pedir de novo${n.idExterno ? ` (id externo ${n.idExterno})` : ""}.`,
+            { integracaoId, statusHttp: e.statusHttp, detalhe: e.detalhe },
+          );
+        throw e;
+      }
       const d = (r.data ?? {}) as Obj;
       const id = String(d.id_mch ?? "");
       if (!id) throw new MotorErro("ERRO_REMOTO", "Sistema A: a corrida foi aceita mas não veio o número dela.", { integracaoId, detalhe: r });
@@ -398,13 +484,20 @@ export function criarAdaptadorSistemaA(
 
     async motoristas(f: FiltroMotoristas = {}): Promise<Pagina<Motorista>> {
       const pagina = Math.max(1, f.pagina ?? 1);
-      const limite = Math.min(Math.max(1, f.limite ?? 50), 200);
+      const limite = Math.min(Math.max(1, f.limite ?? 50), LIMITE_MAXIMO_A);
       const b = (f.busca ?? "").trim();
       const digitos = b.replace(/\D/g, "");
       const query: Record<string, string | number | undefined> = { pagina, limite };
       if (/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(b)) query.cpf = b; // CPF só com máscara, para não confundir com telefone
       else if (digitos.length >= 10) query.telefone = digitos;
-      const r = await chamar<Obj>("GET", "/condutores", undefined, query);
+      let r: Obj;
+      try {
+        r = await chamar<Obj>("GET", "/condutores", undefined, query);
+      } catch (e) {
+        // Sem condutor para o filtro, a API responde 404 com código 56 (e não lista vazia).
+        if (e instanceof MotorErro && e.codigo === "NAO_ENCONTRADO") return { itens: [], pagina, temMais: false };
+        throw e;
+      }
       const dados = Array.isArray(r.data) ? (r.data as Obj[]) : [];
       let itens = dados.map((m) => motoristaSistemaA(m, integracaoId));
       if (b && !query.cpf && !query.telefone) {
@@ -415,7 +508,22 @@ export function criarAdaptadorSistemaA(
     },
 
     async categorias(): Promise<Categoria[]> {
-      const r = await chamar<Obj>("GET", "/configuracoes/categorias");
+      // A API pede um local (lat e lng, ou endereço). Usamos o ponto padrão da empresa, se houver.
+      const lat = coord(cred.latPadrao);
+      const lng = coord(cred.lngPadrao);
+      const temLocal = lat !== undefined && lng !== undefined && lat !== 0 && lng !== 0;
+      let r: Obj;
+      try {
+        r = await chamar<Obj>("GET", "/configuracoes/categorias", undefined, temLocal ? { lat, lng } : undefined);
+      } catch (e) {
+        if (!temLocal && e instanceof MotorErro && e.codigo === "DADOS_INVALIDOS")
+          throw new MotorErro("NAO_CONFIGURADO", `${NOME}: a lista de categorias precisa de um local. Configure latPadrao e lngPadrao da empresa.`, {
+            integracaoId,
+            statusHttp: e.statusHttp,
+            detalhe: e.detalhe,
+          });
+        throw e;
+      }
       const dados = Array.isArray(r.data) ? (r.data as Obj[]) : [];
       return dados.map((c) => {
         const cat: Omit<Categoria, "semDado"> = {

@@ -92,6 +92,15 @@ Detalhes do Claude: SDK oficial `@anthropic-ai/sdk`, esforço `medium` no relat�
 - **Arquivos JSON por empresa (`DADOS_DIR/empresas/<id>/`):** cadastros, corridas próprias, marca, integrações, campanhas, jornadas e configurações.
 - **No Docker:** o banco fica no volume `painel-banco`, e os arquivos no volume `painel-dados`.
 
+## Regras para quem mexer com o Sistema A
+
+Estas regras vêm da auditoria da documentação dele (`docs/MOTOR_AUDITORIA_SISTEMA_A.md`).
+
+- **Período:** cada busca de corridas aceita no máximo 31 dias. O painel já divide sozinho os períodos maiores em pedaços de até 30 dias (`fontes/motor.ts`).
+- **Categorias:** a lista de categorias exige um local. Preencha a latitude e a longitude de um ponto da cidade em **Integrações → Sistema A**.
+- **Mapa de motoristas:** quando ele existir, não pode consultar as posições mais de 10 vezes por minuto por empresa.
+- **Avisos do Sistema A:** o aviso que ele manda chega com a chave Pix do motorista. Nunca grave esse aviso inteiro em log, banco ou tela. Guarde só os campos que o painel usa.
+
 ## Multiempresa e isolamento
 
 - Cada empresa tem a sua pasta em `DADOS_DIR` (`painel/dados/`, fora do Git): marca, integrações, **segredos** (credenciais e chaves de IA, arquivo com permissão restrita), imagens e planilhas.

@@ -45,7 +45,7 @@ export { criarAdaptadorSistemaB } from "./sistema-b.ts";
 export { criarObservador } from "./observador.ts";
 export { CAPACIDADES } from "./lacunas.ts";
 
-export const VERSAO_CONTRATO = "3.0.0";
+export const VERSAO_CONTRATO = "3.1.0";
 
 /** Id de integração da empresa, ou "todas". */
 export type Alvo = string | "todas";
@@ -260,6 +260,8 @@ export function empresaDoEnv(env: Record<string, string | undefined> = process.e
         senha: e("SISTEMA_A_SENHA"),
         apiUrl: e("SISTEMA_A_API_URL"),
         motivoCancelamentoId: e("SISTEMA_A_MOTIVO_CANCELAMENTO_ID") ? Number(e("SISTEMA_A_MOTIVO_CANCELAMENTO_ID")) : undefined,
+        latPadrao: e("SISTEMA_A_LAT") ? Number(e("SISTEMA_A_LAT")) : undefined,
+        lngPadrao: e("SISTEMA_A_LNG") ? Number(e("SISTEMA_A_LNG")) : undefined,
       },
     });
   if (e("SISTEMA_B_COOKIE") || e("SISTEMA_B_CIDADE_ID"))

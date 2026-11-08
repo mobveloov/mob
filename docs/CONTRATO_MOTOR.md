@@ -1,4 +1,4 @@
-# Contrato do motor (versão 3.0.0)
+# Contrato do motor (versão 3.1.0)
 
 Formato que o painel consome. Dono: sessão do **motor**. Arquivo compartilhado com o **painel**:
 mudou aqui, avise a outra sessão. Os tipos de verdade estão em [`motor/src/tipos.ts`](../motor/src/tipos.ts).
@@ -27,7 +27,7 @@ mudou aqui, avise a outra sessão. Os tipos de verdade estão em [`motor/src/tip
 interface Empresa { id: string; integracoes: Integracao[] }
 
 type Integracao =
-  | { id: string; tipo: "sistema-a"; credenciais: { apiUrl; apiKey; usuario; senha; motivoCancelamentoId? } }
+  | { id: string; tipo: "sistema-a"; credenciais: { apiUrl; apiKey; usuario; senha; motivoCancelamentoId?; latPadrao?; lngPadrao? } }
   | { id: string; tipo: "sistema-b"; credenciais: { painelUrl; cookie; cidadeId?; appApiUrl? } };
 ```
 
@@ -160,8 +160,13 @@ interface Categoria { id; integracaoId; tipo; origem; idOriginal; nome; descrica
 interface NovaCorrida { passageiro: { nome; telefone }; partida: Endereco; destino?: Endereco; categoriaId?: string;
   pagamento: FormaPagamento; observacao?: string; idExterno?: string; valor?: number /* só Sistema B */ }
 interface Evento { tipo: "status" | "posicao" | "mensagem" | "parada"; integracaoId; origem; corridaId?; em: string;
-  status?; statusAnterior?; posicao?: { lat; lng; motoristaId? }; mensagem?: { texto; de? }; idEvento?; bruto }
+  status?; statusAnterior?; posicao?: { lat; lng; motoristaId? }; mensagem?: { texto; de? }; idEvento?;
+  reabre?: boolean /* só em "cancelada": true = a mesma corrida volta a procurar motorista */; bruto }
 ```
+
+Sistema A: `latPadrao`/`lngPadrao` são um ponto da cidade da empresa. A lista de categorias do Sistema A exige um local;
+sem esse ponto, `categorias()` pode dar `NAO_CONFIGURADO`. Limites do Sistema A: no máximo 100 itens por página e
+31 dias por busca de corridas ou de extrato (pedido maior dá `DADOS_INVALIDOS` sem chamar a plataforma).
 
 Datas: Sistema A vem em UTC (`Z`), Sistema B em horário de Brasília (`-03:00`). Para comparar, use `Date.parse`.
 `valor` é em reais.
@@ -270,6 +275,10 @@ Conferir a assinatura: `assinaturaSistemaAValida(corpo, cabecalho Signature-V2, 
 
 ## Histórico
 
+- 3.1.0 (08/11/2026): ajustes da auditoria do Sistema A (`docs/MOTOR_AUDITORIA_SISTEMA_A.md`). Só acréscimos:
+  `Evento.reabre`, credenciais `latPadrao`/`lngPadrao` (variáveis `SISTEMA_A_LAT`/`SISTEMA_A_LNG`). Webhook entende
+  as fases `AN`/`AP`/`AW`, o status `L` e os formatos antigos. Erros de permissão e licença do Sistema A (HTTP 400)
+  viram `SEM_AUTORIZACAO`. Motoristas sem resultado voltam lista vazia.
 - 3.0.0 (08/11/2026): nomes neutros. Tipos viraram `"sistema-a"` / `"sistema-b"` (também em `origem`; ids padrão
   `sistema-a:123`). Variáveis `SISTEMA_A_*` / `SISTEMA_B_*`. Endereços obrigatórios na configuração: `apiUrl`
   (Sistema A, termina em `/api/v2/integracao`), `painelUrl` e, para categorias, `appApiUrl` (Sistema B).

@@ -80,7 +80,7 @@ test("corrida do motor vira corrida do painel com origem neutra", () => {
 });
 
 test("credenciais do painel viram as do contrato v2 do motor", async () => {
-  assert.deepEqual(credenciaisV2("sistema-a", { chaveApi: "k", usuario: "u", senha: "s", motivoCancelamento: "7" }), { apiKey: "k", usuario: "u", senha: "s", apiUrl: undefined, motivoCancelamentoId: 7 });
+  assert.deepEqual(credenciaisV2("sistema-a", { chaveApi: "k", usuario: "u", senha: "s", motivoCancelamento: "7" }), { apiKey: "k", usuario: "u", senha: "s", apiUrl: undefined, motivoCancelamentoId: 7, latPadrao: undefined, lngPadrao: undefined });
   assert.deepEqual(credenciaisV2("sistema-b", { cookie: "PHPSESSID=x" }), { cookie: "PHPSESSID=x", cidadeId: undefined, painelUrl: undefined, appApiUrl: undefined });
   // o motor de verdade (pasta motor/) responde o que falta, sem chamar a internet
   const falta = await pendenciasDoMotor("sistema-a", {});

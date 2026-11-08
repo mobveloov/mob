@@ -297,8 +297,13 @@ export function extrasSistemaA(ctx: { integracaoId: string; chamar: Chamar }): E
 
     async extrato(f?: FiltroLista): Promise<Pagina<Lancamento>> {
       const pg = pagina(f);
-      const de = partesBrasilia(f?.de ?? new Date(Date.now() - 7 * 86_400_000).toISOString()).dia;
-      const ate = partesBrasilia(f?.ate ?? new Date().toISOString()).dia;
+      const deIso = f?.de ?? new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const ateIso = f?.ate ?? new Date().toISOString();
+      // A API aceita no máximo 31 dias por consulta (e só os últimos 6 meses).
+      if (Date.parse(ateIso) - Date.parse(deIso) > 31 * 86_400_000)
+        throw new MotorErro("DADOS_INVALIDOS", "Sistema A: o extrato aceita no máximo 31 dias por consulta. Diminua o período.", { integracaoId });
+      const de = partesBrasilia(deIso).dia;
+      const ate = partesBrasilia(ateIso).dia;
       const r = await chamar<Obj>("GET", "/financeiro/extrato", undefined, { data_ini: de, data_fim: ate, pagina: pg, tipo: "T" });
       const d = (r.data ?? {}) as Obj;
       const itens = lista(d.lista).map((l) => {

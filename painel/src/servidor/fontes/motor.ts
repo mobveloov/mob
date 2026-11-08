@@ -22,6 +22,8 @@ export const CAMPOS: Record<TipoMotor, Array<{ chave: string; rotulo: string; se
     { chave: "senha", rotulo: "Senha do usuário de integração", secreto: true },
     { chave: "urlApi", rotulo: "Endereço da API (termina em /api/v2/integracao)", secreto: false },
     { chave: "motivoCancelamento", rotulo: "Motivo padrão de cancelamento (número)", secreto: false, opcional: true },
+    { chave: "latPadrao", rotulo: "Latitude de um ponto da cidade (para as categorias, ex.: -21,0106)", secreto: false, opcional: true },
+    { chave: "lngPadrao", rotulo: "Longitude do mesmo ponto (ex.: -48,2196)", secreto: false, opcional: true },
   ],
   "sistema-b": [
     { chave: "cookie", rotulo: "Cookie da sessão do painel web", secreto: true },
@@ -59,7 +61,12 @@ export function credenciaisV2(tipo: TipoMotor, c: Record<string, string>): Recor
   const v = (k: string) => (c[k] ?? "").trim() || undefined;
   if (tipo === "sistema-a") {
     const motivo = Number(v("motivoCancelamento"));
-    return { apiKey: v("chaveApi"), usuario: v("usuario"), senha: v("senha"), apiUrl: v("urlApi"), motivoCancelamentoId: Number.isFinite(motivo) && motivo > 0 ? motivo : undefined };
+    // Coordenada aceita vírgula ou ponto; fora do mapa ou vazia = sem ponto padrão.
+    const coord = (k: string, max: number) => { const n = Number(String(v(k) ?? "").replace(",", ".")); return v(k) && Number.isFinite(n) && n !== 0 && Math.abs(n) <= max ? n : undefined; };
+    return {
+      apiKey: v("chaveApi"), usuario: v("usuario"), senha: v("senha"), apiUrl: v("urlApi"), motivoCancelamentoId: Number.isFinite(motivo) && motivo > 0 ? motivo : undefined,
+      latPadrao: coord("latPadrao", 90), lngPadrao: coord("lngPadrao", 180),
+    };
   }
   return { cookie: v("cookie"), cidadeId: v("cidade"), painelUrl: v("urlPainel"), appApiUrl: v("urlApiApp") };
 }
@@ -105,18 +112,32 @@ export function corridaDoMotor(c: CorridaMotor, origem: string, origemNome: stri
 }
 
 const MAX_PAGINAS = 40;
+const DIAS_POR_BUSCA = 30;
+
+/** Divide [de, ate] em pedaços de até `dias` dias, sem sobrepor (o fim de um é o começo do outro). */
+export function pedacos(de: Date, ate: Date, dias: number): Array<[Date, Date]> {
+  const out: Array<[Date, Date]> = [];
+  const passo = dias * 86_400_000;
+  for (let t = de.getTime(); t < ate.getTime(); t += passo) out.push([new Date(t), new Date(Math.min(t + passo, ate.getTime()))]);
+  return out.length ? out : [[de, ate]];
+}
 
 /** Busca todas as páginas do período numa integração do motor. */
 export async function corridasDoMotor(tipo: TipoMotor, credenciais: Record<string, string>, de: Date, ate: Date, origem: string, origemNome: string) {
   const a = await adaptador(tipo, credenciais, origem);
   if (!a.configurado()) return { corridas: [] as CorridaPainel[], aviso: `${origemNome}: falta configurar a integração.` };
   const corridas: CorridaPainel[] = [];
-  for (let pagina = 1; pagina <= MAX_PAGINAS; pagina++) {
-    const p = await a.listarCorridas({ de: paraIsoBrasilia(de), ate: paraIsoBrasilia(ate), pagina, limite: 100 });
-    corridas.push(...p.itens.map((c) => corridaDoMotor(c, origem, origemNome)));
-    if (!p.temMais || !p.itens.length) return { corridas };
+  let paginas = 0;
+  // O Sistema A aceita no máximo 31 dias por busca: período maior vai em pedaços de até 30 dias.
+  for (const [ini, fim] of pedacos(de, ate, DIAS_POR_BUSCA)) {
+    for (let pagina = 1; ; pagina++) {
+      if (++paginas > MAX_PAGINAS) return { corridas, aviso: `${origemNome}: período grande; mostrando as primeiras ${corridas.length} corridas.` };
+      const p = await a.listarCorridas({ de: paraIsoBrasilia(ini), ate: paraIsoBrasilia(fim), pagina, limite: 100 });
+      corridas.push(...p.itens.map((c) => corridaDoMotor(c, origem, origemNome)));
+      if (!p.temMais || !p.itens.length) break;
+    }
   }
-  return { corridas, aviso: `${origemNome}: período grande; mostrando as primeiras ${corridas.length} corridas.` };
+  return { corridas };
 }
 
 /** O que falta configurar numa integração (texto do próprio motor). */

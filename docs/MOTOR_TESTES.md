@@ -19,6 +19,17 @@ Comandos com essas ferramentas:
 "$USERPROFILE/ferramentas/node-v26.13.0-win-x64/node" --test --experimental-strip-types motor/test/*.test.ts
 ```
 
+## Resultado da versão 3.1 (08/11/2026, auditoria do Sistema A)
+
+- O que mudou está em `MOTOR_AUDITORIA_SISTEMA_A.md`. As correções foram testadas **só com respostas simuladas**,
+  montadas com os formatos e códigos de erro da documentação pública. Nada foi testado com conta real.
+- `tsc` oficial (modo estrito): **sem erros**.
+- Node 26: **69 testes, 62 passaram, 0 falharam, 7 pulados** (os de API real sem credencial).
+- Deno 2.9.7: **62 passaram, 0 falharam**.
+- Testes novos em `sistema-a.test.ts`: limite de 100, trava de 31 dias, filtro sem `U`, erros de permissão com
+  HTTP 400, motoristas com 404 código 56, categorias com local, aviso no erro 500 ao criar, fases `AN`/`AP`/`AW`,
+  `will_reopen` e formatos antigos do webhook.
+
 ## Resultado da versão 2.1 (08/11/2026, funções extras)
 
 - `tsc` oficial (modo estrito): **sem erros**.
