@@ -10,6 +10,7 @@
 //   o pacote com ".passageiro" / ".motorista" no lugar de ".painel" ou ".central".
 //   app.empresaId: id da empresa no painel (padrão: o nome da pasta em tenants/).
 // API: APP_URL_API (ex.: http://10.0.2.2:8787 no emulador) ou app.urlApi ou app.urlPainel.
+// APP_TESTE=1: APK de teste, com o campo "Servidor" na entrada (para o endereço temporário do túnel). Nunca para a loja.
 // Push (opcional): google-services.json do Firebase DA EMPRESA, fora do Git, em FIREBASE_GOOGLE_SERVICES_PASSAGEIRO /
 //   FIREBASE_GOOGLE_SERVICES_MOTORISTA (caminho) ou em tenants/<empresa>/firebase/google-services-<app>.json.
 //   Sem o arquivo, o app sai sem push e segue pelo tempo real com o app aberto.
@@ -51,6 +52,7 @@ if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(empresaId)) erros.push("app.empresaId");
 if (erros.length) falhar(`Falta no brand.json: ${erros.join("; ")}.`);
 const cleartext = urlApi.startsWith("http://");
 if (cleartext && quer("aab")) falhar("A loja não aceita API sem https. Use https no AAB.");
+if (process.env.APP_TESTE === "1" && quer("aab")) falhar("APP_TESTE é só para APK de teste, nunca para a loja.");
 const cor = (c, p) => (/^#[0-9a-fA-F]{6}$/.test(c ?? "") ? c : p);
 const primaria = cor(marca.cores?.primaria, "#2563eb"), fundo = cor(marca.cores?.fundo, "#ffffff");
 
@@ -74,7 +76,7 @@ passo(`Compilando o app do ${papel} (${nome})`);
 const painel = path.join(RAIZ, "painel");
 if (!fs.existsSync(path.join(painel, "node_modules"))) falhar("Rode npm install na pasta painel antes.");
 rodar(npx, ["vite", "build", "--config", "vite.apps.config.ts", "--logLevel", "warn"], painel, { ...process.env, APP: papel, SAIDA: path.join(saida, "www") });
-fs.writeFileSync(path.join(saida, "www", "config.json"), JSON.stringify({ empresaId, api: urlApi }, null, 2));
+fs.writeFileSync(path.join(saida, "www", "config.json"), JSON.stringify({ empresaId, api: urlApi, ...(process.env.APP_TESTE === "1" ? { teste: true } : {}) }, null, 2));
 
 // ---------------------------------------------------------------- ícone e abertura
 const sharp = (await import("sharp")).default;

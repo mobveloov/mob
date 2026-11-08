@@ -24,7 +24,7 @@ import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
 import { arquivoDoAudio, enviarAudio, enviarTexto, maxAudioBytes, mensagens } from "./chat.ts";
 import * as P from "./despacho.ts";
-import { emitir, ouvir, type Alvo } from "./eventos.ts";
+import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
 import { entrar, eu, pedirCodigo, sair, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
@@ -138,7 +138,9 @@ r.get("/estado", ok((req, res) => {
 // Tempo real (SSE). Um comentário a cada 20 s mantém a conexão viva.
 r.get("/eventos", (req, res) => {
   const { empresaId } = ctx(req);
-  res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+  // "text/event-stream" sem charset e sem "Connection": proxies e túneis (HTTP/2) só repassam o fluxo na hora assim.
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
+  res.flushHeaders();
   res.write("retry: 3000\n\n");
   const enviar = (tipo: string, dados: unknown) => { res.write(`event: ${tipo}\ndata: ${JSON.stringify(dados)}\n\n`); };
   const parar = ouvir(empresaId, alvo(req), enviar);
@@ -147,6 +149,17 @@ r.get("/eventos", (req, res) => {
   const vivo = setInterval(() => res.write(": vivo\n\n"), 20_000);
   req.on("close", () => { clearInterval(vivo); parar(); });
 });
+
+// Espera longa (quando o SSE não passa pela rede): responde com os eventos depois de "desde", ou espera até 25 s.
+r.get("/eventos/espera", ok(async (req, res) => {
+  const { empresaId } = ctx(req);
+  const desde = Number(req.query.desde);
+  if (!Number.isFinite(desde)) throw new Error("Informe desde.");
+  if (desde < 0) { try { P.vigiar(empresaId); } catch { /* sem corridas ainda */ } }
+  const fechou = new Promise<void>((ok) => req.on("close", () => ok()));
+  const r2 = await aguardar(empresaId, alvo(req), desde, 25_000, fechou);
+  if (!res.headersSent && !res.writableEnded) res.json({ seq: r2.seq, eventos: r2.eventos.map((e) => ({ seq: e.seq, tipo: e.tipo, dados: e.dados })) });
+}));
 
 // ------------------------------------------------------------------ endereços e preço
 
