@@ -225,6 +225,8 @@ export function criarAdaptadorSistemaB(
     capacidades: () => CAPACIDADES["sistema-b"],
 
     async listarCorridas(f: FiltroCorridas = {}): Promise<Pagina<Corrida>> {
+      if (f.empresaId || f.passageiroId)
+        throw new MotorErro("NAO_SUPORTADO", "Sistema B: a lista do painel não filtra por empresa conveniada nem por passageiro.", { integracaoId });
       const pagina = Math.max(1, f.pagina ?? 1);
       const de = partesBrasilia(f.de ?? new Date(Date.now() - 86_400_000).toISOString());
       const ate = partesBrasilia(f.ate ?? new Date().toISOString());
@@ -253,6 +255,7 @@ export function criarAdaptadorSistemaB(
       const dados = Array.isArray(o.data) ? (o.data as Obj[]) : [];
       let itens = dados.map((d) => corridaSistemaB(d, integracaoId));
       if (f.status?.length) itens = itens.filter((c) => f.status!.includes(c.status));
+      if (f.pagamento) itens = itens.filter((c) => c.pagamento === f.pagamento);
       if (f.motoristaId) itens = itens.filter((c) => !c.motorista?.id || c.motorista.id === semPrefixo(f.motoristaId!));
       const totalPags = num(o.total_pags);
       const stats = (o.stats ?? {}) as Obj;
@@ -272,6 +275,8 @@ export function criarAdaptadorSistemaB(
       if (!cidade) throw new MotorErro("NAO_CONFIGURADO", "Sistema B: configure o id da cidade da empresa para criar corridas.", { integracaoId });
       if (n.partida.lat === undefined || n.partida.lng === undefined)
         throw new MotorErro("DADOS_INVALIDOS", "Sistema B: a partida precisa de latitude e longitude.", { integracaoId });
+      if (n.paradas?.length || n.cupom || n.empresa)
+        throw new MotorErro("NAO_SUPORTADO", "Sistema B: criar corrida com paradas, cupom ou empresa conveniada ainda não foi mapeado no painel.", { integracaoId });
       const pag = PAGAMENTO_PARA_B[n.pagamento];
       if (!pag) throw new MotorErro("DADOS_INVALIDOS", `Sistema B: forma de pagamento "${n.pagamento}" não é aceita no painel.`, { integracaoId });
       const o = await painelPhp("solicitar_corrida.php", {
@@ -313,6 +318,8 @@ export function criarAdaptadorSistemaB(
     },
 
     async motoristas(f: FiltroMotoristas = {}): Promise<Pagina<Motorista>> {
+      if (f.situacao && f.situacao !== "ativo" && f.situacao !== "inativo")
+        throw new MotorErro("NAO_SUPORTADO", "Sistema B: o motor só sabe separar motoristas ativos e inativos.", { integracaoId });
       const pagina = Math.max(1, f.pagina ?? 1);
       const b = (f.busca ?? "").trim();
       const dig = b.replace(/\D/g, "");
@@ -330,7 +337,9 @@ export function criarAdaptadorSistemaB(
       const dados = Array.isArray(o.data) ? (o.data as Obj[]) : [];
       const pg = (o.paginacao ?? {}) as Obj;
       const total = num(pg.total_paginas);
-      return { itens: dados.map((m) => motoristaSistemaB(m, integracaoId)), pagina, temMais: total !== undefined ? pagina < total : false };
+      let itens = dados.map((m) => motoristaSistemaB(m, integracaoId));
+      if (f.situacao) itens = itens.filter((m) => m.ativo === (f.situacao === "ativo"));
+      return { itens, pagina, temMais: total !== undefined ? pagina < total : false };
     },
 
     async categorias(): Promise<Categoria[]> {

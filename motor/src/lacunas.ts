@@ -41,7 +41,7 @@ export const MOTORISTA_NAO_EXPOE: Record<TipoIntegracao, Record<string, string>>
 
 /** Campos de categoria que o sistema não fornece. */
 export const CATEGORIA_NAO_EXPOE: Record<TipoIntegracao, Record<string, string>> = {
-  "sistema-a": { tarifa: "a lista de categorias do Sistema A não traz valores; as tarifas ficam em outra rota (ainda não usada)" },
+  "sistema-a": { tarifa: "a lista de categorias do Sistema A não traz valores; use tarifas(categoria)" },
   "sistema-b": {},
 };
 
@@ -89,7 +89,10 @@ export const CAPACIDADES: Record<TipoIntegracao, Record<Funcao, Capacidade>> = {
     webhook: sim("status, posição e mensagens; assinatura Signature-V2 ainda não confirmada com envio real"),
     observador: sim("consulta periódica, reserva para quando o webhook falhar"),
     estimativa: sim("todas as categorias de uma vez ou uma só"),
-    programadas: sim("só leitura"),
+    programadas: sim("lista"),
+    gerirProgramadas: sim("cancelar e despachar agora; ainda sem teste com conta real"),
+    tarifas: sim("tarifa padrão e extras de cada categoria; só leitura"),
+    webhooksCadastrados: sim("lista os webhooks e a situação de entrega de cada um; só leitura"),
     posicoes: sim("só motoristas livres; limite de 10 consultas por minuto"),
     rastreio: sim(),
     linhaDoTempo: sim("aceite, chegada, início, fim e cancelamento; o Sistema A não informa as ofertas recusadas"),
@@ -99,7 +102,7 @@ export const CAPACIDADES: Record<TipoIntegracao, Record<Funcao, Capacidade>> = {
     extrato: sim("10 lançamentos por página; limite de 40 consultas por minuto"),
     carteiras: nao("o Sistema A não tem lista de saldos; só o saldo de um motorista por vez"),
     cupons: sim("só leitura"),
-    dinamicas: sim("dinâmicas por área; só leitura"),
+    dinamicas: sim("por área e a dinâmica geral (sem área); só leitura"),
     punicoes: sim("só leitura; limite de 10 consultas por minuto"),
     areas: sim("só nome; os polígonos ficam em outra rota"),
     veiculos: nao("o Sistema A traz os veículos dentro de cada motorista (veja motoristas)"),
@@ -119,6 +122,9 @@ export const CAPACIDADES: Record<TipoIntegracao, Record<Funcao, Capacidade>> = {
     observador: sim("único jeito de ter eventos no Sistema B: consulta periódica"),
     estimativa: sim(`${SEM_TESTE_B}; precisa do id da cidade e de latitude/longitude`),
     programadas: sim(`${SEM_TESTE_B}; a lista vem em HTML, o motor tira os números e lê o detalhe de cada uma`),
+    gerirProgramadas: nao("cancelar ou despachar programada no painel do Sistema B ainda não foi mapeado; falta sessão real"),
+    tarifas: nao("o Sistema B já manda os valores dentro de cada categoria (veja categorias)"),
+    webhooksCadastrados: nao("o Sistema B não envia webhooks"),
     posicoes: nao("o mapa do Sistema B não usa uma rota do painel que o motor consiga ler (as posições vêm por outro canal)"),
     rastreio: sim(SEM_TESTE_B),
     linhaDoTempo: sim(`${SEM_TESTE_B}; inclui as ofertas aos motoristas (raio-x)`),

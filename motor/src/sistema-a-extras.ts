@@ -23,6 +23,8 @@ import type {
   Punicao,
   Rastreio,
   SemDado,
+  Tarifa,
+  WebhookCadastrado,
 } from "./tipos.ts";
 import { coord, isoLocal, num, partesBrasilia, semPrefixo, txt } from "./util.ts";
 
@@ -65,6 +67,10 @@ export type ExtrasSistemaA = Pick<
   | "punicoes"
   | "areas"
   | "veiculos"
+  | "cancelarProgramada"
+  | "despacharProgramada"
+  | "tarifas"
+  | "webhooksCadastrados"
 >;
 
 export function extrasSistemaA(ctx: { integracaoId: string; chamar: Chamar }): ExtrasSistemaA {
@@ -356,8 +362,31 @@ export function extrasSistemaA(ctx: { integracaoId: string; chamar: Chamar }): E
     },
 
     async dinamicas(): Promise<Dinamica[]> {
-      const r = await chamar<Obj>("GET", "/dinamicas/area");
-      return lista(r.data).map((d) => ({
+      const [r, geral] = await Promise.all([
+        chamar<Obj>("GET", "/dinamicas/area"),
+        // A dinâmica geral (sem área) vale na central toda. Se a rota falhar, seguimos só com as de área.
+        chamar<Obj>("GET", "/dinamicas/sem-area").catch(() => undefined),
+      ]);
+      const g = geral?.data as Obj | undefined;
+      const semArea: Dinamica[] =
+        g && typeof g === "object"
+          ? [
+              {
+                id: pre("sem-area"),
+                integracaoId,
+                origem: ORIGEM,
+                idOriginal: "sem-area",
+                nome: String(g.nome ?? "Dinâmica geral"),
+                ativa: g.ativo === true,
+                tipo: "geral (sem área)",
+                fator: num(g.fator),
+                adicional: num(g.valor_adicional),
+                semDado: [],
+                bruto: g,
+              },
+            ]
+          : [];
+      return lista(r.data).map((d): Dinamica => ({
         id: pre(d.id),
         integracaoId,
         origem: ORIGEM,
@@ -369,7 +398,89 @@ export function extrasSistemaA(ctx: { integracaoId: string; chamar: Chamar }): E
         adicional: num(d.valor_adicional),
         semDado: [],
         bruto: d,
-      }));
+      })).concat(semArea);
+    },
+
+    async cancelarProgramada(idOriginal: string): Promise<void> {
+      const id = semPrefixo(idOriginal);
+      await chamar("POST", `/corridas/programadas/${encodeURIComponent(id)}/cancelar`);
+    },
+
+    async despacharProgramada(idOriginal: string): Promise<void> {
+      const id = semPrefixo(idOriginal);
+      try {
+        // Responde 202: a corrida é criada pelo agendador em até 1 minuto.
+        await chamar("POST", `/corridas/programadas/${encodeURIComponent(id)}/despachar`);
+      } catch (e) {
+        // 409 = já disparada, cancelada, agrupada ou com outro disparo em andamento.
+        if (e instanceof MotorErro && e.statusHttp === 409)
+          throw new MotorErro("DADOS_INVALIDOS", "Sistema A: esta programada não está mais esperando para sair (já saiu, foi cancelada ou agrupada).", {
+            integracaoId,
+            statusHttp: 409,
+            detalhe: e.detalhe,
+          });
+        throw e;
+      }
+    },
+
+    async tarifas(categoriaIdOriginal: string): Promise<Tarifa[]> {
+      const cat = semPrefixo(categoriaIdOriginal);
+      const r = await chamar<Obj>("GET", `/configuracoes/categorias/${encodeURIComponent(cat)}/tarifas`);
+      return lista(r.data).map((t): Tarifa => {
+        const horarios = lista(t.horarios).map((h) => ({ diaSemana: num(h.dia_semana) ?? 0, inicio: String(h.hora_inicio ?? ""), fim: String(h.hora_fim ?? "") }));
+        return {
+          id: pre(`${cat}-${t.id}`),
+          integracaoId,
+          origem: ORIGEM,
+          idOriginal: String(t.id ?? ""),
+          nome: String(t.nome ?? ""),
+          metodo: txt(t.metodo_calculo_tarifa),
+          padrao: horarios.length === 0, // a padrão vem com "horarios" vazio
+          inicio: txt(t.data_inicio),
+          horarios,
+          faixas: lista(t.valores_tabelados).map((v) => ({ ateKm: num(v.distancia_km), aPartirDe: v.a_partir_de === true || undefined, valor: num(v.valor) })),
+          semDado: [],
+          bruto: t,
+        };
+      });
+    },
+
+    async webhooksCadastrados(): Promise<WebhookCadastrado[]> {
+      const r = await chamar<Obj>("GET", "/webhooks");
+      const ws = lista(((r.data ?? {}) as Obj).webhooks);
+      // Uma consulta de situação por webhook (no máximo 5 por tipo; o grupo aceita 60 por minuto).
+      return Promise.all(
+        ws.map(async (w): Promise<WebhookCadastrado> => {
+          const id = String(w.id ?? "");
+          let situacao: WebhookCadastrado["situacao"] = "desconhecido";
+          let proximaTentativa: string | undefined;
+          let falhasSeguidas: number | undefined;
+          const semDado: SemDado[] = [];
+          try {
+            const st = ((await chamar<Obj>("GET", `/webhooks/${encodeURIComponent(id)}/status`)).data ?? {}) as Obj;
+            const s = String(st.situacao ?? "");
+            if (s === "ativo" || s === "bloqueado_temporariamente" || s === "bloqueado_definitivamente") situacao = s;
+            const bt = (st.bloqueio_temporario ?? {}) as Obj;
+            proximaTentativa = txt(bt.proxima_tentativa);
+            falhasSeguidas = num(bt.falhas_consecutivas);
+          } catch {
+            semDado.push({ campo: "situacao", motivo: "Sistema A: a consulta da situação do webhook não respondeu", doSistema: false });
+          }
+          return {
+            id: pre(id),
+            integracaoId,
+            origem: ORIGEM,
+            idOriginal: id,
+            tipo: String(w.tipo ?? ""),
+            url: String(w.url ?? ""),
+            situacao,
+            proximaTentativa,
+            falhasSeguidas,
+            semDado,
+            bruto: w,
+          };
+        }),
+      );
     },
 
     async punicoes(f?: FiltroLista): Promise<Pagina<Punicao>> {

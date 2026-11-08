@@ -19,6 +19,29 @@ Comandos com essas ferramentas:
 "$USERPROFILE/ferramentas/node-v26.13.0-win-x64/node" --test --experimental-strip-types motor/test/*.test.ts
 ```
 
+## Resultado da versão 3.2 (08/11/2026, pendências da auditoria)
+
+- `tsc` oficial (modo estrito): **sem erros**, no motor e no painel.
+- Node 26: **80 testes, 73 passaram, 0 falharam, 7 pulados** (os de API real sem credencial).
+- Deno 2.9.7: **73 passaram, 0 falharam**.
+- Painel: **74 testes passaram** com o motor novo.
+- Testes novos em `sistema-a-pendencias.test.ts`, todos com respostas simuladas no formato da documentação:
+  - filtros de corridas por empresa, passageiro e pagamento;
+  - filtro de motoristas por situação, com viatura e foto;
+  - criar corrida com paradas, cupom e empresa;
+  - cancelar e despachar programada;
+  - tarifas;
+  - webhooks cadastrados;
+  - dinâmica geral;
+  - respostas do Sistema B para o que ele não tem.
+
+### O que ainda depende de conta real
+
+- **Sistema A**: tudo que fala com o servidor. Isso inclui conferir que a resposta real bate com a documentação,
+  testar a assinatura `Signature-V2` com um webhook verdadeiro e testar as escritas (criar e cancelar corrida,
+  cancelar e despachar programada). Para as escritas, o melhor caminho é usar o ambiente de **homologação** do Sistema A.
+- **Sistema B**: tudo que usa o painel com sessão (cookie), e mapear cancelar ou despachar programada.
+
 ## Resultado da versão 3.1 (08/11/2026, auditoria do Sistema A)
 
 - O que mudou está em `MOTOR_AUDITORIA_SISTEMA_A.md`. As correções foram testadas **só com respostas simuladas**,

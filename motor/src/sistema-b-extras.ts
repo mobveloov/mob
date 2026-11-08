@@ -49,12 +49,16 @@ export type ExtrasSistemaB = Pick<
   | "punicoes"
   | "areas"
   | "veiculos"
+  | "cancelarProgramada"
+  | "despacharProgramada"
+  | "tarifas"
+  | "webhooksCadastrados"
 >;
 
 export function extrasSistemaB(ctx: { integracaoId: string; painelPhp: PainelPhp; cidadeId: () => string }): ExtrasSistemaB {
   const { integracaoId, painelPhp, cidadeId } = ctx;
   const pre = (id: unknown) => `${integracaoId}:${id}`;
-  const naoTem = (f: "posicoes" | "conveniadas" | "extrato" | "areas") => {
+  const naoTem = (f: "posicoes" | "conveniadas" | "extrato" | "areas" | "gerirProgramadas" | "tarifas" | "webhooksCadastrados"): never => {
     throw new MotorErro("NAO_SUPORTADO", `Sistema B: ${CAPACIDADES["sistema-b"][f].motivo}`, { integracaoId });
   };
   const pagina = (f?: FiltroLista) => Math.max(1, f?.pagina ?? 1);
@@ -340,6 +344,19 @@ export function extrasSistemaB(ctx: { integracaoId: string; painelPhp: PainelPhp
         pagina: pg,
         temMais: temMais(o, pg, dados.length),
       };
+    },
+
+    async cancelarProgramada() {
+      return naoTem("gerirProgramadas");
+    },
+    async despacharProgramada() {
+      return naoTem("gerirProgramadas");
+    },
+    async tarifas() {
+      return naoTem("tarifas");
+    },
+    async webhooksCadastrados() {
+      return naoTem("webhooksCadastrados");
     },
   };
 }

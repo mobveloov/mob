@@ -1,4 +1,4 @@
-# Contrato do motor (versão 3.1.0)
+# Contrato do motor (versão 3.2.0)
 
 Formato que o painel consome. Dono: sessão do **motor**. Arquivo compartilhado com o **painel**:
 mudou aqui, avise a outra sessão. Os tipos de verdade estão em [`motor/src/tipos.ts`](../motor/src/tipos.ts).
@@ -158,7 +158,18 @@ interface Motorista { id; integracaoId; tipo; origem; idOriginal; nome; telefone
 interface Categoria { id; integracaoId; tipo; origem; idOriginal; nome; descricao?;
   tarifa?: { base?; km?; minuto?; minima? }; semDado: SemDado[]; bruto }
 interface NovaCorrida { passageiro: { nome; telefone }; partida: Endereco; destino?: Endereco; categoriaId?: string;
-  pagamento: FormaPagamento; observacao?: string; idExterno?: string; valor?: number /* só Sistema B */ }
+  pagamento: FormaPagamento; observacao?: string; idExterno?: string /* até 36 letras */; valor?: number /* só Sistema B */;
+  paradas?: Endereco[]; cupom?: string; empresa?: { id; centroCustoId? } /* os três: só Sistema A */ }
+interface FiltroCorridas { de?; ate?; status?; motoristaId?; empresaId?; passageiroId?; pagamento?; pagina?; limite? }
+  // empresaId e passageiroId: só Sistema A (no Sistema B dão NAO_SUPORTADO)
+interface FiltroMotoristas { busca?; situacao?: SituacaoMotorista; pagina?; limite? }
+type SituacaoMotorista = "ativo" | "em_analise" | "fila_de_espera" | "inativo" | "suspenso" | "rejeitado" | "deletado";
+  // Motorista ganhou situacao?, viatura? e fotoUrl? (Sistema A). No Sistema B, só "ativo" e "inativo".
+interface Tarifa { id; integracaoId; origem; idOriginal; nome; metodo?; padrao: boolean; inicio?;
+  horarios: { diaSemana; inicio; fim }[]; faixas: { ateKm?; aPartirDe?; valor? }[]; semDado; bruto }
+interface WebhookCadastrado { id; integracaoId; origem; idOriginal; tipo; url;
+  situacao: "ativo" | "bloqueado_temporariamente" | "bloqueado_definitivamente" | "desconhecido";
+  proximaTentativa?; falhasSeguidas?; semDado; bruto }
 interface Evento { tipo: "status" | "posicao" | "mensagem" | "parada"; integracaoId; origem; corridaId?; em: string;
   status?; statusAnterior?; posicao?: { lat; lng; motoristaId? }; mensagem?: { texto; de? }; idEvento?;
   reabre?: boolean /* só em "cancelada": true = a mesma corrida volta a procurar motorista */; bruto }
@@ -184,6 +195,9 @@ Datas: Sistema A vem em UTC (`Z`), Sistema B em horário de Brasília (`-03:00`)
 | Eventos por consulta periódica | sim | sim |
 | Estimativa de preço | sim (todas as categorias de uma vez) | sim* (precisa de lat/lng e cidade) |
 | Programadas | sim (leitura) | sim* (lista em HTML; o motor lê o detalhe de cada uma) |
+| Cancelar / despachar programada | sim (sem teste real) | **não ainda** (falta mapear com sessão real) |
+| Tarifas por categoria | sim (padrão e extras, com horários e faixas) | **não precisa** (vêm dentro da categoria) |
+| Webhooks cadastrados e situação de entrega | sim | **não existe** |
 | Mapa de motoristas | sim (só livres; 10 consultas/min) | **não** (o mapa do Sistema B não usa rota legível) |
 | Rastreio da corrida | sim | sim* |
 | Linha do tempo / raio-x | sim, sem as ofertas recusadas | sim*, com as ofertas aos motoristas |
@@ -193,7 +207,7 @@ Datas: Sistema A vem em UTC (`Z`), Sistema B em horário de Brasília (`-03:00`)
 | Extrato financeiro | sim (10 por página) | **não** (vem pronto na página) |
 | Carteiras (saldos) | **não** (só um motorista por vez) | sim* |
 | Cupons (leitura) | sim | sim* |
-| Dinâmicas (leitura) | sim (por área) | sim* (área, horário, demanda) |
+| Dinâmicas (leitura) | sim (por área e a geral, sem área) | sim* (área, horário, demanda) |
 | Punições (leitura) | sim | sim* |
 | Áreas | sim (só nome) | **não** (vem pronta na página) |
 | Veículos | **não** (vêm dentro de cada motorista) | sim* |
@@ -262,6 +276,9 @@ Todo `POST` leva `{ empresaId, integracoes: [...] }` no corpo. O motor não guar
 | `POST /v1/programadas`, `/v1/passageiros`, `/v1/conveniadas`, `/v1/extrato`, `/v1/carteiras`, `/v1/cupons`, `/v1/punicoes`, `/v1/veiculos` | `alvo?`, `filtro?` | `Pagina<...>` |
 | `POST /v1/posicoes`, `/v1/dinamicas`, `/v1/areas` | `alvo?` | `Pagina<...>` |
 | `POST /v1/corridas/rastreio`, `/v1/corridas/linha-do-tempo`, `/v1/corridas/mensagens` | `id` | `{ rastreio }`, `{ linhaDoTempo }`, `{ mensagens }` |
+| `POST /v1/programadas/cancelar`, `/v1/programadas/despachar` | `id` (da programada) | `{ ok }` |
+| `POST /v1/tarifas` | `categoriaId` (id do motor) | `{ tarifas }` |
+| `POST /v1/webhooks/cadastrados` | `alvo?` | `Pagina<WebhookCadastrado>` |
 
 Erro: `{ erro: "texto em português", codigo, integracaoId?, tentarEmSegundos? }`.
 
@@ -275,6 +292,11 @@ Conferir a assinatura: `assinaturaSistemaAValida(corpo, cabecalho Signature-V2, 
 
 ## Histórico
 
+- 3.2.0 (08/11/2026): pendências da auditoria do Sistema A. Funções novas no motor: `cancelarProgramada(id)`,
+  `despacharProgramada(id)`, `tarifas(categoriaId)` e `webhooksCadastrados(alvo)`. Filtros novos: corridas por
+  `empresaId`, `passageiroId` e `pagamento`; motoristas por `situacao`. `NovaCorrida` aceita `paradas`, `cupom` e
+  `empresa` (Sistema A). `Motorista` ganhou `situacao`, `viatura` e `fotoUrl`. Dinâmicas incluem a geral (sem área).
+  Quem implementa `Adaptador` precisa das quatro funções novas; quem usa `criarMotor` não precisa mudar nada.
 - 3.1.0 (08/11/2026): ajustes da auditoria do Sistema A (`docs/MOTOR_AUDITORIA_SISTEMA_A.md`). Só acréscimos:
   `Evento.reabre`, credenciais `latPadrao`/`lngPadrao` (variáveis `SISTEMA_A_LAT`/`SISTEMA_A_LNG`). Webhook entende
   as fases `AN`/`AP`/`AW`, o status `L` e os formatos antigos. Erros de permissão e licença do Sistema A (HTTP 400)
