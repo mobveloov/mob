@@ -121,7 +121,9 @@ test("pedido com JSON malformado volta erro curto em JSON", async () => {
     assert.equal(r.status, 400);
     assert.deepEqual(await r.json(), { erro: "Dados mal formatados." });
   } finally {
+    srv.closeAllConnections();
     srv.close();
+    (await import("../src/servidor/banco.ts")).fecharBanco(); // no Windows, arquivo aberto não apaga
     fs.rmSync(DADOS, { recursive: true, force: true });
     fs.rmSync(CNEFE, { recursive: true, force: true });
   }

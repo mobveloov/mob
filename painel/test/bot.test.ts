@@ -338,6 +338,7 @@ test("webhook HTTP: segredo da empresa, resposta imediata e login nas outras rot
     assert.equal((await fetch(`${base}/conversas`)).status, 401);
     assert.equal((await fetch(`${base}/config`)).status, 401);
   } finally {
+    srv.closeAllConnections();
     srv.close();
   }
 });

@@ -36,7 +36,7 @@ export function atualizarStatus(empresaId: string, conversaId: string, deps: Dep
 /** Uma rodada: todas as corridas abertas das empresas com o bot ligado. */
 export async function verificarTodas() {
   for (const empresaId of A.empresasComBot()) {
-    const abertas = Object.values(A.conversas(empresaId)).filter((c) => c.corrida?.grupo === "aberta");
+    const abertas = A.conversasComCorridaAberta(empresaId);
     for (const c of abertas) {
       await atualizarStatus(empresaId, c.id).catch((e) => console.error("[bot] status", empresaId, e instanceof Error ? e.message : e));
     }

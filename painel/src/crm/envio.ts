@@ -53,7 +53,7 @@ async function disparar(empresaId: string, campanhaId: string, agora: number): P
   const empresa = nomeEmpresa(empresaId);
   const textos = [c.texto, ...c.variacoes];
   const itens = alvo.map((p) => novoItem({ tipo: "campanha", id: c.id }, p, montarTexto(escolherVariacao(textos, `${c.id}:${p.chave}`), { contato: p, cupom, empresa }), agora));
-  A.alterarFila(empresaId, (f) => { f.push(...itens); });
+  A.adicionarNaFila(empresaId, itens);
   atualizarCampanha(empresaId, c.id, (x) => {
     x.estado = itens.length ? "enviando" : "concluida";
     x.disparadaEm = agoraBr().toISOString();
@@ -84,9 +84,8 @@ function fecharConcluidas(empresaId: string) {
   const l = A.campanhas(empresaId);
   const abertas = l.filter((c) => c.estado === "enviando");
   if (!abertas.length) return;
-  const f = A.fila(empresaId);
   let mudou = false;
-  for (const c of abertas) if (!f.some((i) => i.origem.id === c.id && i.estado === "pendente")) { c.estado = "concluida"; c.concluidaEm = agoraBr().toISOString(); mudou = true; }
+  for (const c of abertas) if (!A.filaDaOrigem(empresaId, c.id).some((i) => i.estado === "pendente")) { c.estado = "concluida"; c.concluidaEm = agoraBr().toISOString(); mudou = true; }
   if (mudou) A.salvarCampanhas(empresaId, l);
 }
 
@@ -94,7 +93,7 @@ function fecharConcluidas(empresaId: string) {
 export function relatorioCampanha(empresaId: string, id: string) {
   const c = A.campanhas(empresaId).find((x) => x.id === id);
   if (!c) throw new Error("Campanha não encontrada.");
-  const itens = A.fila(empresaId).filter((i) => i.origem.tipo === "campanha" && i.origem.id === id);
+  const itens = A.filaDaOrigem(empresaId, id).filter((i) => i.origem.tipo === "campanha");
   const conta = (e: ItemFila["estado"]) => itens.filter((i) => i.estado === e).length;
   const erros = new Map<string, number>();
   for (const i of itens) if (i.estado === "falha") erros.set(i.erro || "Erro", (erros.get(i.erro || "Erro") ?? 0) + 1);
@@ -141,7 +140,7 @@ async function rodar(empresaId: string, j: Jornada, agora: number): Promise<numb
   for (const c of alvo) ja[c.chave] = quando;
   d[j.id] = ja;
   A.salvarDisparos(empresaId, d);
-  if (itens.length) A.alterarFila(empresaId, (f) => { f.push(...itens); });
+  A.adicionarNaFila(empresaId, itens);
   const l = A.jornadas(empresaId);
   const x = l.find((y) => y.id === j.id);
   if (x) { x.ultimaRodada = quando; A.salvarJornadas(empresaId, l); }
@@ -184,7 +183,7 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
   const r: ResumoRodada = { enviados: 0, falhas: 0, adiados: 0, pausaAte: null, motivo: "vazia" };
   for (let n = 0; n < maxItens; n++) {
     const t = agora();
-    const item = A.fila(empresaId).filter((i) => i.estado === "pendente" && i.proximaEm <= t && !pausadas.has(i.origem.id)).sort((a, b) => a.proximaEm - b.proximaEm || a.criadoEm - b.criadoEm)[0];
+    const item = A.proximaPendente(empresaId, t, pausadas);
     if (!item) { r.motivo = n ? "fim" : "vazia"; break; }
     const res = reservar(cfg, A.ritmo(empresaId), t, o.sorteio);
     if (!res.ok) {
@@ -194,8 +193,7 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
     }
     A.salvarRitmo(empresaId, res.estado);
     const envio = await provedor.enviar(item.telefone, item.texto);
-    A.alterarFila(empresaId, (f) => {
-      const i = f.find((x) => x.id === item.id);
+    A.alterarItem(empresaId, item.id, (i) => {
       if (!i || i.estado !== "pendente") return; // cancelada no meio do envio
       i.tentativas++;
       if (envio.ok) { i.estado = "enviado"; i.enviadoEm = agora(); i.erro = ""; r.enviados++; }

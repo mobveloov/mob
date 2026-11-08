@@ -73,5 +73,6 @@ test("corrida própria: preço pela tarifa, cupom, motorista, status, finalizar 
   assert.equal(r.corridas[0].motorista, "Bruno");
   assert.equal(r.corridas[0].avaliacao, 5);
   assert.equal((await buscarCorridas(e2, { inicio: hoje, fim: hoje, origem: "propria" })).corridas.length, 0, "outra empresa não vê");
+  (await import("../src/servidor/banco.ts")).fecharBanco(); // no Windows, arquivo aberto não apaga
   fs.rmSync(DADOS, { recursive: true, force: true });
 });
