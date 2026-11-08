@@ -7,7 +7,7 @@ COPY motor/ ./motor/
 COPY painel/package.json painel/package-lock.json ./painel/
 RUN cd painel && npm ci --no-audit --no-fund
 COPY painel/ ./painel/
-RUN cd painel && npm run build && node -e "require('node:sqlite')" 2>/dev/null
+RUN cd painel && npm run build && npm run build:apps && node -e "require('node:sqlite')" 2>/dev/null
 
 WORKDIR /app/painel
 ENV NODE_ENV=production \

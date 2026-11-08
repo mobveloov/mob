@@ -24,6 +24,7 @@ export const FUNCOES: Funcao[] = [
   { id: "programadas", grupo: "Operação", nome: "Programadas", rota: "/programadas", emA: true, emB: true, situacao: "parcial", falta: "Campo 'programada' e data agendada na Corrida do motor." },
   { id: "solicitar", grupo: "Operação", nome: "Solicitar corrida", rota: "/solicitar", emA: true, emB: true, situacao: "pronto" },
   { id: "mapa", grupo: "Operação", nome: "Mapa de motoristas", rota: "/mapa", emA: true, emB: true, situacao: "aguarda-motor", falta: "Posição dos motoristas (eventos 'posicao') no motor." },
+  { id: "apps", grupo: "Operação", nome: "Apps e SOS", rota: "/apps", emA: true, emB: true, situacao: "pronto" },
   { id: "raiox", grupo: "Operação", nome: "Auditoria da corrida (raio-x)", rota: "/raiox", emA: false, emB: true, situacao: "aguarda-motor", falta: "Histórico de ofertas e linha do tempo por corrida no motor." },
   { id: "despacho", grupo: "Operação", nome: "Despacho", rota: "/despacho", emA: true, emB: true, situacao: "aguarda-motor", falta: "Leitura e gravação das regras de despacho." },
   { id: "ocorrencias", grupo: "Operação", nome: "Retorno e ocorrências", rota: "/ocorrencias", emA: true, emB: true, situacao: "pronto" },
