@@ -34,8 +34,11 @@ const ok = (fn: Fn) => async (req: Request, res: Response) => {
 /** Limite simples por chave (tentativas de senha, pedidos por local). */
 function limitador(max: number, janelaMs: number) {
   const m = new Map<string, number[]>();
+  let limpezaEm = 0;
   return (chave: string) => {
     const agora = Date.now();
+    // Apaga as chaves velhas de vez em quando (senão o mapa cresce com cada IP que tentou).
+    if (agora - limpezaEm > janelaMs) { limpezaEm = agora; for (const [k, l] of m) if (!l.some((t) => agora - t < janelaMs)) m.delete(k); }
     const l = (m.get(chave) ?? []).filter((t) => agora - t < janelaMs);
     l.push(agora);
     m.set(chave, l);
@@ -149,7 +152,7 @@ rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   const { empresaId, local: l } = req.totem!;
   const b = (req.body ?? {}) as Record<string, unknown>;
   const pedidoId = pedidoIdValido(b.pedidoId) ? b.pedidoId : crypto.randomUUID();
-  const chave = `${empresaId}|${pedidoId}`;
+  const chave = `${empresaId}|${l.id}|${pedidoId}`; // um local nunca recebe a corrida de outro
   if (!pedidos.has(chave) && !podePedir(`${empresaId}|${l.id}`)) return res.status(429).json({ erro: "Muitos pedidos seguidos neste totem. Espere alguns minutos." });
   const semDestino = b.semDestino === true;
   const destino = semDestino ? undefined : T.lerPonto(b.destino);

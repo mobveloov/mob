@@ -2,6 +2,7 @@
 // Cada mensagem roda na fila da conversa (naFila): uma de cada vez, então um toque duplo nunca cria duas corridas.
 
 import * as A from "./armazem.ts";
+import { validarUrlExterna } from "../servidor/url.ts";
 import { CANCELAR, classificarComIa, ehCumprimento, limparEndereco, MENU, NAO, normalizar, opcao, pareceEndereco, pareceRua, SEM_DESTINO, SIM, type Classificador } from "./entender.ts";
 import { clienteDoTelefone, corridasDoBot } from "./corridas.ts";
 import { provedorEvolution, provedorSimulado, type ProvedorWhatsApp } from "./provedores.ts";
@@ -31,7 +32,12 @@ export function servidorWhatsApp(empresaId: string) {
 /** Provedor de WhatsApp da empresa (o configurado em Bot de WhatsApp). */
 export function provedorDe(empresaId: string): ProvedorWhatsApp {
   if (A.config(empresaId).provedor === "simulado") return provedorSimulado(empresaId);
-  const { urlApi, token, instancia } = servidorWhatsApp(empresaId);
+  const { urlApi, token, instancia, daPlataforma } = servidorWhatsApp(empresaId);
+  // Endereço salvo antes desta regra (ou mexido no arquivo): confere de novo antes de chamar.
+  if (!daPlataforma) {
+    try { validarUrlExterna(urlApi, "do servidor de WhatsApp"); }
+    catch { return provedorEvolution({ urlApi: "", token: "", instancia }); } // vira "não configurado"
+  }
   return provedorEvolution({ urlApi, token, instancia });
 }
 

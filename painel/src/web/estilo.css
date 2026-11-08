@@ -182,3 +182,6 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 .campo-endereco .sugestoes li.sub { padding: 6px 8px; }
 .campo-endereco .sugestoes button { width: 100%; text-align: left; background: none; border: 0; padding: 8px; border-radius: 6px; color: inherit; cursor: pointer; font: inherit; }
 .campo-endereco .sugestoes button:hover { background: var(--fundo, #f3f4f6); }
+
+/* Logo da empresa na tela de entrada */
+.entrar .logo-entrar { display: block; max-width: 220px; max-height: 72px; margin: 0 auto 12px; object-fit: contain; }

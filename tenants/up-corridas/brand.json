@@ -1,0 +1,24 @@
+{
+  "produto": "Central UP Corridas",
+  "nomeExibido": "UP Corridas",
+  "assistente": { "nome": "Assistente UP", "tom": "direto, cordial e prático" },
+  "cores": { "primaria": "#FFC400", "secundaria": "#000000", "fundo": "#F5F5F2", "texto": "#111111" },
+  "fonte": "Montserrat",
+  "tema": "sistema",
+  "arquivos": {
+    "logoClaro": "logo-claro.svg",
+    "logoEscuro": "logo-escuro.svg",
+    "favicon": "icone.svg",
+    "iconeApp": "icone.png",
+    "abertura": "abertura.png"
+  },
+  "textos": {
+    "saudacao": "Bom dia! Vamos rodar bem hoje.",
+    "suporteEmail": "",
+    "suporteTelefone": "",
+    "rodapeRelatorio": "UP Corridas — uso interno"
+  },
+  "dominios": [],
+  "mostrarOrigem": true,
+  "app": { "nome": "UP Corridas", "pacote": "br.com.upcorridas.central", "urlPainel": "https://painel.upcorridas.com.br" }
+}

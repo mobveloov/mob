@@ -108,12 +108,15 @@ export function aplicarRegras(contatos: Contato[], r: Regras, listasSalvas: List
   return out;
 }
 
-/** Quem pode receber WhatsApp: tem telefone válido, não pediu para sair e não está bloqueado no cadastro. Um envio por telefone. */
+/** Situações do cadastro que não recebem mensagem (passageiro suspenso também não). */
+const BLOQUEADOS = new Set(["Bloqueado", "Suspenso", "Bloqueio definitivo"]);
+
+/** Quem pode receber WhatsApp: tem telefone válido, não pediu para sair e não está bloqueado nem suspenso no cadastro. Um envio por telefone. */
 export function destinatarios(lista: Contato[]): Contato[] {
   const vistos = new Set<string>();
   return lista.filter((c) => {
     const t = telefoneWhatsApp(c.telefone);
-    if (!t || c.optOut || c.situacao === "Bloqueado" || vistos.has(t)) return false;
+    if (!t || c.optOut || BLOQUEADOS.has(c.situacao) || vistos.has(t)) return false;
     vistos.add(t);
     return true;
   });
