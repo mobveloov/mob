@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-apps/
 build/
 .env
 .env.*
@@ -12,6 +13,10 @@ painel/dados/
 *.jks
 *.keystore
 tenants/*/assinatura/
+# Firebase de cada empresa (google-services.json e conta de serviço): fora do Git
+tenants/*/firebase/
+firebase-servico*.json
+google-services*.json
 # Originais dos sistemas de referência (contêm chaves e dados; ficam só no computador)
 /*.rar
 /*.zip

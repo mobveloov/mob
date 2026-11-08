@@ -7,6 +7,8 @@
     "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "tsx watch --clear-screen=false src/servidor/index.ts",
     "dev:web": "vite",
+    "dev:apps": "vite --config vite.apps.config.ts",
+    "build:apps": "vite build --config vite.apps.config.ts",
     "build": "tsc --noEmit && vite build",
     "start": "tsx src/servidor/index.ts",
     "typecheck": "tsc --noEmit",
@@ -22,6 +24,7 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
+    "@capacitor/core": "^8.6.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
