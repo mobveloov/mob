@@ -18,6 +18,9 @@ import Analise from "./paginas/Analise";
 import MarcaAparencia from "./paginas/MarcaAparencia";
 import Integracoes from "./paginas/Integracoes";
 import Usuarios from "./paginas/Usuarios";
+import { BotConversas, BotWhatsApp } from "./bot";
+import { LocaisTotem, SolicitarCorrida } from "./totem";
+import { CrmCampanhas, CrmJornadas, CrmPublico } from "./crm";
 
 interface Ctx { sessao: Sessao; marca: Marca; setMarca: (m: Marca) => void; recarregar: () => void }
 const SessaoCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -96,6 +99,8 @@ const PAGINAS: Record<string, JSX.Element> = {
   producao: <Motoristas />, nps: <Avaliacoes />, financeiro: <Financeiro />, estatisticas: <Estatisticas />, analise: <Analise />,
   // Cadastros (motoristas, passageiros, veículos, conveniadas, categorias, cupons, áreas, punições, ocorrências, objetos, desafios)
   ...Object.fromEntries(CADASTROS.map((c) => [c.funcao, <TelaCadastro key={c.id} id={c.id} />])),
+  solicitar: <SolicitarCorrida />, totem: <LocaisTotem />, bot: <BotWhatsApp />, conversas: <BotConversas />,
+  "crm-publico": <CrmPublico />, "crm-campanhas": <CrmCampanhas />, "crm-jornadas": <CrmJornadas />,
   marca: <MarcaAparencia />, integracoes: <Integracoes />, usuarios: <Usuarios />,
 };
 const SO_ADMIN = new Set(["marca", "integracoes", "usuarios"]);

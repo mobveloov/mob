@@ -18,6 +18,9 @@ import { apagarCookie, criarCookie, exigirLogin, exigirPapel, podeTentar } from 
 import { rotasCadastros } from "../cadastros/rotas.ts";
 import { rotasCorridasProprias } from "../corridas/rotas.ts";
 import { encerrarSemMotorista } from "../corridas/index.ts";
+import { rotasBot } from "../bot/rotas.ts";
+import { rotasTotem } from "../totem/rotas.ts";
+import { router as rotasCrm } from "../crm/rotas.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -117,6 +120,10 @@ app.post("/api/entrar", ok((req, res) => {
 app.post("/api/sair", (_req, res) => { apagarCookie(res); res.json({ ok: true }); });
 
 // ------------------------------------------------------------------ com login
+
+// Bot e totem têm partes públicas (webhook e tela do totem): cuidam do próprio login.
+app.use("/api/bot", rotasBot);
+app.use("/api/totem", rotasTotem);
 
 app.use("/api", exigirLogin);
 const admin = exigirPapel("admin");
@@ -365,6 +372,7 @@ app.post("/api/empresas", exigirPapel(), ok((req, res) => {
 // Cadastros (motoristas, passageiros, categorias, cupons...) e corridas próprias: o painel é o sistema da empresa.
 app.use("/api/cadastros", rotasCadastros);
 app.use("/api/corridas-proprias", rotasCorridasProprias);
+app.use("/api/crm", rotasCrm);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 
