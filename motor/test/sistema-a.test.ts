@@ -5,7 +5,10 @@ import { MotorErro } from "../src/erros.ts";
 import { assinaturaSistemaAValida, criarAdaptadorSistemaA, eventosSistemaA } from "../src/sistema-a.ts";
 import { A_URL, B_APP, B_PAINEL, fetchFalso, rota } from "./fetch-falso.ts";
 
-const INTEG = { id: "sistema-a", credenciais: { apiUrl: A_URL, apiKey: "chave-teste", usuario: "usuario-teste", senha: "senha-teste", motivoCancelamentoId: 3 } };
+const INTEG = {
+  id: "sistema-a",
+  credenciais: { apiUrl: A_URL, apiKey: "chave-teste", usuario: "usuario-teste", senha: "senha-teste", motivoCancelamentoId: 3, latPadrao: -22.18, lngPadrao: -47.39 },
+};
 
 // Item no formato documentado de POST /corridas/consultar (exemplo da documentação, dados fictícios).
 const ITEM = {
@@ -43,7 +46,7 @@ const ITEM = {
 test("listarCorridas: chama POST /corridas/consultar com api-key e Basic Auth, e traduz", async () => {
   const f = fetchFalso(rota("POST", "/corridas/consultar", { json: { success: true, data: [ITEM] } }));
   const m = criarAdaptadorSistemaA(INTEG, { fetch: f.fetch });
-  const r = await m.listarCorridas({ de: "2024-05-02T00:00:00Z", status: ["finalizada"], limite: 10 });
+  const r = await m.listarCorridas({ de: "2024-05-02T00:00:00Z", ate: "2024-05-03T00:00:00Z", status: ["finalizada"], limite: 10 });
   const p = f.pedidos[0];
   assert.equal(p.url.href, "https://sistema-a.exemplo.invalid/api/v2/integracao/corridas/consultar");
   assert.equal(p.cabecalhos["api-key"], "chave-teste");
@@ -52,6 +55,7 @@ test("listarCorridas: chama POST /corridas/consultar com api-key e Basic Auth, e
   assert.equal(corpo.status_solicitacao, "F");
   assert.equal(corpo.limite, 10);
   assert.equal(corpo.data_hora_solicitacao_min, "2024-05-02T00:00:00Z");
+  assert.equal(corpo.data_hora_solicitacao_max, "2024-05-03T00:00:00Z");
 
   assert.equal(r.itens.length, 1);
   const c = r.itens[0];
@@ -92,6 +96,67 @@ test("listarCorridas: com dois status, não manda filtro e filtra no motor", asy
   const r = await m.listarCorridas({ status: ["finalizada", "em_andamento"] });
   assert.equal(JSON.parse(f.pedidos[0].corpo!).status_solicitacao, undefined);
   assert.deepEqual(r.itens.map((c) => c.idOriginal), ["100018001", "2"]);
+});
+
+test("listarCorridas (auditoria): limite no máximo 100, sempre manda data final, nunca manda U", async () => {
+  const f = fetchFalso(rota("POST", "/corridas/consultar", { json: { success: true, data: [{ ...ITEM, status_solicitacao: "U" }] } }));
+  const m = criarAdaptadorSistemaA(INTEG, { fetch: f.fetch });
+  const r = await m.listarCorridas({ limite: 500, status: ["agrupada"] });
+  const corpo = JSON.parse(f.pedidos[0].corpo!);
+  assert.equal(corpo.limite, 100);
+  assert.ok(corpo.data_hora_solicitacao_max, "data final presente");
+  assert.equal(corpo.status_solicitacao, undefined); // U daria erro 98: filtramos no motor
+  assert.equal(r.itens[0].status, "agrupada");
+});
+
+test("listarCorridas (auditoria): mais de 31 dias ou fim antes do início = DADOS_INVALIDOS sem chamar a rede", async () => {
+  const f = fetchFalso();
+  const m = criarAdaptadorSistemaA(INTEG, { fetch: f.fetch });
+  await assert.rejects(m.listarCorridas({ de: "2026-01-01T00:00:00Z", ate: "2026-03-01T00:00:00Z" }), (e: MotorErro) => e.codigo === "DADOS_INVALIDOS" && /31 dias/.test(e.message));
+  await assert.rejects(m.listarCorridas({ de: "2026-01-02T00:00:00Z", ate: "2026-01-01T00:00:00Z" }), (e: MotorErro) => e.codigo === "DADOS_INVALIDOS");
+  assert.equal(f.pedidos.length, 0);
+});
+
+test("erros (auditoria): permissão e licença chegam com 400 e viram SEM_AUTORIZACAO; código 25 vira NAO_ENCONTRADO", async () => {
+  const casos: [unknown, string][] = [
+    [{ success: false, errors: [{ code: 1, message: "Usuário e/ou senhas inválidos." }] }, "SEM_AUTORIZACAO"],
+    [{ success: false, errors: [{ code: 19, message: "Não é possível utilizar a API com a sua licença." }] }, "SEM_AUTORIZACAO"],
+    [{ success: false, errors: [{ code: 68, message: "O usuário informado não tem permissão para realizar essa operação." }] }, "SEM_AUTORIZACAO"],
+    [{ success: false, errors: [{ code: 25, message: "Solicitação não encontrada." }] }, "NAO_ENCONTRADO"],
+    [{ success: false, errors: [{ code: 151, message: "Não é possível cancelar." }] }, "DADOS_INVALIDOS"],
+  ];
+  for (const [json, codigo] of casos) {
+    const f = fetchFalso(() => ({ status: 400, json }));
+    await assert.rejects(criarAdaptadorSistemaA(INTEG, { fetch: f.fetch }).cancelarCorrida("5"), (e: MotorErro) => {
+      assert.equal(e.codigo, codigo, JSON.stringify(json));
+      return true;
+    });
+  }
+});
+
+test("motoristas (auditoria): 404 com código 56 = nenhum motorista, lista vazia", async () => {
+  const f = fetchFalso(rota("GET", "/condutores", { status: 404, json: { success: false, errors: [{ code: 56, message: "Motorista não encontrado" }] } }));
+  const r = await criarAdaptadorSistemaA(INTEG, { fetch: f.fetch }).motoristas({ busca: "11999990000", limite: 300 });
+  assert.deepEqual(r.itens, []);
+  assert.equal(f.pedidos[0].url.searchParams.get("limite"), "100");
+});
+
+test("categorias (auditoria): manda o ponto padrão; sem ponto e com recusa = NAO_CONFIGURADO com explicação", async () => {
+  const f = fetchFalso(rota("GET", "/configuracoes/categorias", { json: { success: true, data: [] } }));
+  await criarAdaptadorSistemaA(INTEG, { fetch: f.fetch }).categorias();
+  assert.equal(f.pedidos[0].url.searchParams.get("lat"), "-22.18");
+  assert.equal(f.pedidos[0].url.searchParams.get("lng"), "-47.39");
+  const semPonto = { id: "sistema-a", credenciais: { ...INTEG.credenciais, latPadrao: undefined, lngPadrao: undefined } };
+  const g = fetchFalso(() => ({ status: 400, json: { success: false, errors: [{ code: 2, message: "Campo 'endereco' é obrigatório." }] } }));
+  await assert.rejects(criarAdaptadorSistemaA(semPonto, { fetch: g.fetch }).categorias(), (e: MotorErro) => e.codigo === "NAO_CONFIGURADO" && /latPadrao/.test(e.message));
+});
+
+test("criarCorrida (auditoria): erro 500 avisa que a corrida pode ter sido criada", async () => {
+  const f = fetchFalso(() => ({ status: 500, json: { success: false, errors: [{ code: 0, message: "Falha na operação" }] } }));
+  await assert.rejects(
+    criarAdaptadorSistemaA(INTEG, { fetch: f.fetch }).criarCorrida({ passageiro: { nome: "F", telefone: "19999991234" }, partida: { texto: "Rua A", bairro: "Centro" }, pagamento: "pix", idExterno: "x1" }),
+    (e: MotorErro) => e.codigo === "INDISPONIVEL" && /pode ter sido criada/.test(e.message) && /x1/.test(e.message),
+  );
 });
 
 test("listarCorridas: sem corridas a API omite data", async () => {
@@ -220,6 +285,25 @@ test("webhook de posição em lote e mensagem de corrida", () => {
   assert.equal(msg[0].mensagem?.texto, "Estou no portão");
   const parada = eventosSistemaA(JSON.stringify({ request_id: 9, status_code: "ER", stop_id: 1 }));
   assert.equal(parada[0].tipo, "parada");
+});
+
+test("webhook (auditoria): fases AN/AP/AW, cancelada que reabre e formatos antigos", () => {
+  const ev = (o: unknown) => eventosSistemaA(JSON.stringify(o));
+  assert.equal(ev({ request_id: 1, status_code: "AN", status_label: "NEAR_LOCATION" })[0].status, "aceita");
+  assert.equal(ev({ request_id: 1, status_code: "AP", status_label: "ARRIVED_AT_LOCATION" })[0].status, "no_local");
+  assert.equal(ev({ request_id: 1, status_code: "AW" })[0].status, "no_local");
+  assert.equal(ev({ request_id: 1, status_code: "L" })[0].status, "pendente");
+  const canc = ev({ request_id: 1, status_code: "C", will_reopen: true })[0];
+  assert.equal(canc.status, "cancelada");
+  assert.equal(canc.reabre, true);
+  assert.equal(ev({ request_id: 1, status_code: "A" })[0].reabre, undefined);
+  // Formato antigo de status e de posição
+  const velho = ev({ id_mch: "77", status_solicitacao: "F", data_hora_solicitacao: "2026-11-07 10:00:00" })[0];
+  assert.equal(velho.corridaId, "sistema-a:77");
+  assert.equal(velho.status, "finalizada");
+  const pos = ev([{ id_mch: "77", condutor_id: "5", lat_cond: "-22.1", lng_cond: "-47.3" }])[0];
+  assert.equal(pos.tipo, "posicao");
+  assert.deepEqual(pos.posicao, { lat: -22.1, lng: -47.3, motoristaId: "5" });
 });
 
 test("webhook inválido = DADOS_INVALIDOS", () => {

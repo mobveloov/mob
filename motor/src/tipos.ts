@@ -23,6 +23,9 @@ export interface CredenciaisSistemaA {
   apiUrl?: string;
   /** Motivo usado quando o painel cancela sem escolher um. */
   motivoCancelamentoId?: number;
+  /** Um ponto da cidade da empresa. A lista de categorias do Sistema A exige um local. */
+  latPadrao?: number;
+  lngPadrao?: number;
 }
 
 export interface CredenciaisSistemaB {
@@ -259,6 +262,8 @@ export interface Evento {
   mensagem?: { texto: string; de?: string };
   /** Id do evento no sistema, para não processar duas vezes. */
   idEvento?: string;
+  /** Só em status "cancelada": true = a mesma corrida volta para a distribuição (não abra outra). */
+  reabre?: boolean;
   bruto: unknown;
 }
 
