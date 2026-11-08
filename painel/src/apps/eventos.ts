@@ -30,8 +30,17 @@ export function ouvir(empresaId: string, alvo: Alvo, enviar: Envio): () => void 
 }
 
 /** Manda um evento para todos os aparelhos abertos dessa pessoa (SSE e espera longa). Devolve quantos SSE receberam. */
+let limpezaEm = 0;
+/** Apaga quem não recebe evento há mais de 5 minutos (senão o mapa cresce com cada pessoa que já usou o app). */
+function limpar(agora: number) {
+  if (agora - limpezaEm < 60_000) return;
+  limpezaEm = agora;
+  for (const [k, l] of guardados) if (!l.length || agora - l[l.length - 1].em >= GUARDA_MS) guardados.delete(k);
+}
+
 export function emitir(empresaId: string, alvo: Alvo, tipo: string, dados: unknown): number {
   const agora = Date.now();
+  limpar(agora);
   const k = chaveDe(empresaId, alvo);
   const l = (guardados.get(k) ?? []).filter((e) => agora - e.em < GUARDA_MS).slice(-99);
   l.push({ seq: ++seq, tipo, dados, em: agora });

@@ -7,6 +7,9 @@
 # O endereço do túnel MUDA cada vez que o contêiner "tunel" reinicia. Os APKs de teste deixam trocar o servidor na
 # tela de entrada, sem gerar o APK de novo. Em produção: domínio próprio com https e NODE_ENV=production
 # (aí o código de login nunca volta na resposta). Veja docs/APPS.md, "Ambiente de teste".
+#
+# CUIDADO: aqui o código de login volta na resposta e o endereço do túnel é público. Quem souber o endereço
+# entra como qualquer telefone. Use só dados de teste, desligue quando terminar e não ponha chaves reais no painel/.env.
 services:
   painel:
     build:
