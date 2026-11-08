@@ -9,6 +9,10 @@ build
 referencia
 painel/dados
 scripts
+# o ambiente de teste dos apps precisa deste script (docker-compose.apps-teste.yml)
+!scripts/teste/ligar-apps.mjs
+**/dist-apps
+tenants/*/firebase
 tenants/*/assinatura
 *.apk
 *.aab

@@ -288,3 +288,24 @@ test("push: usa a conta de serviço da própria empresa e manda a oferta ao moto
   assert.equal(JSON.parse(envio!.corpo).message.token, "tokenaparelho-carlos-1234567890");
   definirBuscaDeTeste(null);
 });
+
+test("tempo real por espera longa (rede que não repassa SSE): só os eventos da própria pessoa", async () => {
+  const E = await import("../src/apps/eventos.ts");
+  const tokPedro = await login(A.id, "passageiro", "11944443333");
+  const inicio = await chamar("GET", `/api/apps/${A.id}/eventos/espera?desde=-1`, undefined, tokPedro);
+  assert.equal(inicio.status, 200);
+  const desde = inicio.corpo.seq as number;
+  // Evento de outra pessoa não acorda; o dele acorda na hora.
+  const pedido = chamar("GET", `/api/apps/${A.id}/eventos/espera?desde=${desde}`, undefined, tokPedro);
+  await new Promise((ok) => setTimeout(ok, 100));
+  E.emitir(A.id, { papel: "passageiro", chave: "11988887777" }, "chat", { de: "outro" });
+  E.emitir(B.id, { papel: "passageiro", chave: "11944443333" }, "chat", { de: "outra empresa" });
+  E.emitir(A.id, { papel: "passageiro", chave: "11944443333" }, "corrida", { id: "x" });
+  const r = await pedido;
+  assert.deepEqual(r.corpo.eventos.map((e: { tipo: string; dados: unknown }) => [e.tipo, e.dados]), [["corrida", { id: "x" }]]);
+  // Já tem evento depois de "desde": responde sem esperar.
+  const de2 = await chamar("GET", `/api/apps/${A.id}/eventos/espera?desde=${desde}`, undefined, tokPedro);
+  assert.equal(de2.corpo.eventos.length, 1);
+  assert.equal((await chamar("GET", `/api/apps/${A.id}/eventos/espera?desde=abc`, undefined, tokPedro)).status, 400);
+  assert.equal((await chamar("GET", `/api/apps/${A.id}/eventos/espera?desde=0`)).status, 401);
+});

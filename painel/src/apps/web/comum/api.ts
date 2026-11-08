@@ -5,7 +5,8 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 
 export type Papel = "passageiro" | "motorista";
-export interface Config { empresaId: string; api: string; papel: Papel }
+/** teste: APK de teste (build com APP_TESTE=1). Mostra o campo "Servidor" na entrada, para trocar o endereço temporário. */
+export interface Config { empresaId: string; api: string; papel: Papel; teste?: boolean }
 
 const ler = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const gravar = (k: string, v: string | null) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* sem armazenamento */ } };
@@ -14,12 +15,23 @@ let cfg: Config = { empresaId: "", api: "", papel: "passageiro" };
 export const config = () => cfg;
 export const nativo = () => Capacitor.isNativePlatform();
 
+/** Só no APK de teste: guarda outro endereço de servidor (ou volta ao do build com ""). Recarrega o app. */
+export function trocarServidor(url: string) {
+  const u = url.trim().replace(/\/+$/, "");
+  if (u && !/^https?:\/\/[^\s"'<>]+$/.test(u)) throw new Error("Endereço inválido. Ex.: https://exemplo.trycloudflare.com");
+  gravar("servidor-teste", u || null);
+  location.reload();
+}
+
 export async function carregarConfig(papel: Papel): Promise<Config> {
   try {
     const r = await fetch("./config.json", { cache: "no-store" });
     if (r.ok) {
       const j = (await r.json()) as Partial<Config>;
-      if (j.empresaId) return (cfg = { empresaId: j.empresaId, api: (j.api ?? "").replace(/\/+$/, ""), papel });
+      if (j.empresaId) {
+        const outro = j.teste ? ler("servidor-teste") : null;
+        return (cfg = { empresaId: j.empresaId, api: (outro || j.api || "").replace(/\/+$/, ""), papel, teste: !!j.teste });
+      }
     }
   } catch { /* sem config.json: navegador */ }
   const q = new URLSearchParams(location.search);
@@ -57,36 +69,70 @@ export async function api<T = Record<string, unknown>>(caminho: string, o: { met
 
 // ------------------------------------------------------------------ tempo real (SSE lido com fetch, para mandar o token)
 
+/**
+ * Tempo real. Tenta o SSE; se o "ola" não chegar em 5 s (rede, proxy ou túnel que segura o fluxo), passa para a
+ * espera longa (GET /eventos/espera), que funciona em qualquer rede. Reconecta sozinho.
+ */
 export function tempoReal(aoEvento: (tipo: string, dados: any) => void, aoMudar: (ligado: boolean) => void): () => void {
-  let parado = false, ctrl: AbortController | null = null;
-  const rodar = async () => {
+  let parado = false, ctrl: AbortController | null = null, usarEspera = false;
+  const sair = () => { guardarToken(null); window.dispatchEvent(new Event("app-sair")); };
+  const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+  const sse = async () => {
+    ctrl = new AbortController();
+    const c = ctrl;
+    let recebeu = false;
+    const vigia = setTimeout(() => { if (!recebeu) { usarEspera = true; c.abort(); } }, 5000);
+    try {
+      const r = await fetch(urlApi("/eventos"), { headers: { authorization: `Bearer ${token() ?? ""}` }, signal: c.signal });
+      if (r.status === 401) { sair(); parado = true; return; }
+      if (!r.ok || !r.body) throw new Error();
+      const leitor = r.body.getReader(), dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await leitor.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i: number;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const bloco = buf.slice(0, i); buf = buf.slice(i + 2);
+          const tipo = /^event: (.+)$/m.exec(bloco)?.[1], dados = /^data: (.*)$/m.exec(bloco)?.[1];
+          if (tipo === "ola" && !recebeu) { recebeu = true; aoMudar(true); }
+          if (tipo && dados && tipo !== "ola") { try { aoEvento(tipo, JSON.parse(dados)); } catch { /* evento estranho */ } }
+        }
+      }
+    } catch { /* caiu ou trocou para a espera longa */ } finally { clearTimeout(vigia); }
+  };
+
+  const espera = async () => {
+    let desde = -1;
     while (!parado) {
       ctrl = new AbortController();
       try {
-        const r = await fetch(urlApi("/eventos"), { headers: { authorization: `Bearer ${token() ?? ""}` }, signal: ctrl.signal });
-        if (r.status === 401) { guardarToken(null); window.dispatchEvent(new Event("app-sair")); return; }
-        if (!r.ok || !r.body) throw new Error();
-        aoMudar(true);
-        const leitor = r.body.getReader(), dec = new TextDecoder();
-        let buf = "";
-        for (;;) {
-          const { value, done } = await leitor.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          let i: number;
-          while ((i = buf.indexOf("\n\n")) >= 0) {
-            const bloco = buf.slice(0, i); buf = buf.slice(i + 2);
-            const tipo = /^event: (.+)$/m.exec(bloco)?.[1], dados = /^data: (.*)$/m.exec(bloco)?.[1];
-            if (tipo && dados) { try { aoEvento(tipo, JSON.parse(dados)); } catch { /* evento estranho */ } }
-          }
-        }
-      } catch { /* caiu: tenta de novo */ }
-      if (parado) return;
-      aoMudar(false);
-      await new Promise((ok) => setTimeout(ok, 3000));
+        const r = await fetch(urlApi(`/eventos/espera?desde=${desde}`), { headers: { authorization: `Bearer ${token() ?? ""}` }, signal: ctrl.signal, cache: "no-store" });
+        if (r.status === 401) { sair(); return; }
+        if (!r.ok) throw new Error();
+        const j = (await r.json()) as { seq: number; eventos: Array<{ seq: number; tipo: string; dados: unknown }> };
+        if (desde < 0) aoMudar(true);
+        for (const e of j.eventos) { try { aoEvento(e.tipo, e.dados); } catch { /* evento estranho */ } }
+        desde = j.seq;
+      } catch {
+        if (parado) return;
+        aoMudar(false); desde = desde < 0 ? -1 : desde;
+        await esperar(3000);
+      }
     }
   };
-  void rodar();
+
+  void (async () => {
+    while (!parado && !usarEspera) {
+      await sse();
+      if (parado || usarEspera) break;
+      aoMudar(false);
+      await esperar(3000);
+    }
+    if (!parado) await espera();
+  })();
   return () => { parado = true; ctrl?.abort(); };
 }
 
@@ -167,11 +213,14 @@ export function observarPosicao(aoMudar: (p: Posicao) => void, aoErro: (msg: str
   return () => navigator.geolocation.clearWatch(w);
 }
 
+/** Posição de agora: tenta o GPS preciso; se demorar (lugar fechado, GPS acordando), aceita a posição aproximada. */
 export function posicaoAgora(): Promise<Posicao> {
-  return new Promise((ok, falha) => {
+  const pedir = (o: PositionOptions) => new Promise<Posicao>((ok, falha) => {
     if (!navigator.geolocation) return falha(new Error("Este aparelho não tem GPS."));
-    navigator.geolocation.getCurrentPosition((p) => ok({ lat: p.coords.latitude, lng: p.coords.longitude }), (e) => falha(new Error(e.code === 1 ? "Libere a localização." : "GPS indisponível.")), { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+    navigator.geolocation.getCurrentPosition((p) => ok({ lat: p.coords.latitude, lng: p.coords.longitude }), (e) => falha(Object.assign(new Error(e.code === 1 ? "Libere a localização." : "GPS indisponível. Tente de novo em alguns segundos."), { negado: e.code === 1 })), o);
   });
+  return pedir({ enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 })
+    .catch((e: Error & { negado?: boolean }) => (e.negado ? Promise.reject(e) : pedir({ enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 })));
 }
 
 // ------------------------------------------------------------------ push (Firebase da empresa)

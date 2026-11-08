@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, hora, ligarPush, posicaoAgora, reais, telefoneBonito, tempoReal, token, vibrar, type Posicao } from "../comum/api";
-import { Abas, Aviso, Carregando, Cartao, Chat, Entrar, Estrelas, MapaSimples, mensagemDeErro, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Abas, Aviso, Carregando, ServidorTeste, Cartao, Chat, Entrar, Estrelas, MapaSimples, mensagemDeErro, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 
 interface Ponto { texto: string; lat?: number; lng?: number }
 interface Corrida {
@@ -19,7 +19,7 @@ export default function App() {
   const { marca, erro } = useMarca();
   const [logado, setLogado] = useState(!!token());
   useEffect(() => { const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
-  if (erro) return <div className="tela centro"><Aviso texto={erro} /></div>;
+  if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
   if (!marca) return <Carregando />;
   if (!logado) return <Entrar marca={marca} papel="passageiro" aoEntrar={() => setLogado(true)} />;
   return <Logado marca={marca} sair={() => setLogado(false)} />;
@@ -41,6 +41,12 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     setEu(e.eu); setCorrida(s.corrida); setPosMotorista(s.posicaoMotorista);
   }, []);
   useEffect(() => { void carregar().catch(() => undefined); }, [carregar]);
+  // Voltou para a tela (app em segundo plano pode perder o tempo real): busca o estado de novo.
+  useEffect(() => {
+    const f = () => { if (document.visibilityState === "visible") void carregar().catch(() => undefined); };
+    document.addEventListener("visibilitychange", f);
+    return () => document.removeEventListener("visibilitychange", f);
+  }, [carregar]);
   useEffect(() => { void ligarPush(marca.push, () => void carregar()); }, [marca.push, carregar]);
 
   // Mensagens da corrida atual.
