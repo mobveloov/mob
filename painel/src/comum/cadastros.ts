@@ -130,6 +130,8 @@ export const CADASTROS: Cadastro[] = [
       { chave: "valorMinimo", rotulo: "Valor mínimo", tipo: "dinheiro" },
       { chave: "tarifaNoturna", rotulo: "Acréscimo noturno (%)", tipo: "numero" },
       { chave: "dinamicaMaxima", rotulo: "Fator dinâmico máximo", tipo: "numero" },
+      { chave: "taxaCancelamento", rotulo: "Taxa de cancelamento", tipo: "dinheiro", dica: "Cobrada do passageiro que cancela depois que o motorista aceitou. Vazio = sem taxa." },
+      { chave: "toleranciaCancelamento", rotulo: "Tolerância para cancelar sem taxa (min)", tipo: "numero", dica: "Padrão: 2 minutos." },
       { chave: "ativa", rotulo: "Ativa", tipo: "booleano" },
       { chave: "origem", rotulo: "Origem", tipo: "texto", calculado: true },
       { chave: "corridas", rotulo: "Corridas (30 dias)", tipo: "numero", calculado: true },
@@ -232,6 +234,19 @@ export const CADASTROS: Cadastro[] = [
       { chave: "regras", rotulo: "Regras", tipo: "textoLongo" },
     ],
     colunas: ["nome", "tipo", "meta", "premio", "inicio", "fim", "ativo"],
+  },
+  {
+    id: "notificacoes", funcao: "notificacoes", nome: "Notificações do app", singular: "notificação", operadorEdita: true,
+    descricao: "Avisos que aparecem na caixa de notificações dos apps do passageiro e do motorista.",
+    campos: [
+      { chave: "titulo", rotulo: "Título", tipo: "texto", obrigatorio: true },
+      { chave: "texto", rotulo: "Texto", tipo: "textoLongo", obrigatorio: true },
+      { chave: "publico", rotulo: "Para quem", tipo: "selecao", opcoes: ["Todos", "Passageiros", "Motoristas"], obrigatorio: true },
+      { chave: "inicio", rotulo: "Mostrar a partir de", tipo: "data" },
+      { chave: "fim", rotulo: "Mostrar até", tipo: "data" },
+      { chave: "ativa", rotulo: "Ativa", tipo: "booleano" },
+    ],
+    colunas: ["titulo", "publico", "inicio", "fim", "ativa"],
   },
 ];
 

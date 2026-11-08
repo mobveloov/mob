@@ -24,6 +24,7 @@ import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
 import { arquivoDoAudio, enviarAudio, enviarTexto, maxAudioBytes, mensagens } from "./chat.ts";
 import * as P from "./despacho.ts";
+import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
 import { entrar, eu, pedirCodigo, sair, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
@@ -41,7 +42,7 @@ const ok = (fn: Fn) => async (req: Request, res: Response) => {
   }
 };
 
-const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na maquininha"];
+const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na maquininha", PAGAMENTO_SALDO];
 const ANTES_DE_COMECAR = new Set(["procurando", "a_caminho", "no_local"]);
 
 // ------------------------------------------------------------------ CORS e empresa
@@ -107,7 +108,11 @@ r.post("/entrar", ok((req, res) => {
 
 // ------------------------------------------------------------------ com token
 
+// Link público de acompanhar a viagem (sem token).
+r.use(rotasPublicasExtras);
+
 r.use(exigirApp);
+r.use(rotasExtras);
 
 r.post("/sair", ok((req, res) => {
   if (ctx(req).sessao.papel === "motorista") P.ficarOffline(ctx(req).empresaId, ctx(req).sessao.chave);
@@ -217,11 +222,26 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
   const nome = String(eu(empresaId, sessao).nome ?? "");
   if (!nome) throw new Error("Informe seu nome antes de pedir.");
   const pedidoId = typeof b.pedidoId === "string" && /^[\w-]{8,64}$/.test(b.pedidoId) ? b.pedidoId : `${Date.now()}`;
-  const c = await umaVez(`${empresaId}:${sessao.telefone}:${pedidoId}`, () => criarCorridaPropria(empresaId, {
-    passageiro: { nome, telefone: sessao.telefone }, embarque: ponto(b.embarque), destino: b.destino ? ponto(b.destino) : undefined,
-    categoria: txt(b.categoria, 60), pagamento: PAGAMENTOS.includes(b.pagamento) ? b.pagamento : "", canal: "app",
-    observacao: txt(b.observacao, 300), cupom: txt(b.cupom, 30),
-  }, "app do passageiro"));
+  const pagamento = PAGAMENTOS.includes(b.pagamento) ? b.pagamento : "";
+  const paradas = Array.isArray(b.paradas) ? b.paradas.slice(0, 4).map(ponto) : [];
+  const c = await umaVez(`${empresaId}:${sessao.telefone}:${pedidoId}`, async () => {
+    if (pagamento === PAGAMENTO_SALDO) {
+      // Confere o saldo pela estimativa (com as paradas) antes de criar.
+      const pontos = [ponto(b.embarque), ...paradas, b.destino ? ponto(b.destino) : null].filter(Boolean) as Array<{ lat?: number; lng?: number }>;
+      let km: number | null = null;
+      if (pontos.length > 1 && pontos.every((p) => p.lat != null && p.lng != null)) {
+        km = 0;
+        for (let i = 1; i < pontos.length; i++) km += (await rota({ lat: pontos[i - 1].lat!, lng: pontos[i - 1].lng! }, { lat: pontos[i].lat!, lng: pontos[i].lng! })).distanciaKm;
+      }
+      conferirPagamento(empresaId, sessao.telefone, pagamento, estimarPreco(empresaId, { categoria: txt(b.categoria, 60), distanciaKm: km }).valor);
+    }
+    return criarCorridaPropria(empresaId, {
+      passageiro: { nome, telefone: sessao.telefone }, embarque: ponto(b.embarque), destino: b.destino ? ponto(b.destino) : undefined,
+      categoria: txt(b.categoria, 60), pagamento, canal: "app",
+      observacao: txt(b.observacao, 300), cupom: txt(b.cupom, 30), paradas,
+      agendadaPara: typeof b.agendadaPara === "string" && b.agendadaPara ? b.agendadaPara : undefined,
+    }, "app do passageiro");
+  });
   P.despachar(empresaId);
   res.json({ corrida: P.corridaParaApp(empresaId, c, "passageiro") });
 }));
@@ -250,6 +270,7 @@ r.post("/corridas/:id/cancelar", ok(async (req, res) => {
   } else {
     feita = await cancelarCorrida(empresaId, c.id, "Motorista", motivo || "Cancelada pelo motorista", "app do motorista");
   }
+  aposCancelar(empresaId, feita); // passageiro que cancelou depois do prazo paga a taxa ao motorista
   P.vigiar(empresaId);
   res.json({ corrida: P.corridaParaApp(empresaId, feita, sessao.papel) });
 }));
@@ -257,7 +278,7 @@ r.post("/corridas/:id/cancelar", ok(async (req, res) => {
 r.post("/corridas/:id/avaliar", so("passageiro"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
-  const feita = await avaliar(empresaId, c.id, Number(req.body?.nota), "app do passageiro");
+  const feita = await avaliar(empresaId, c.id, Number(req.body?.nota), "app do passageiro", txt(req.body?.comentario, 500));
   res.json({ corrida: P.corridaParaApp(empresaId, feita, "passageiro") });
 }));
 
@@ -270,6 +291,7 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   const valor = num(req.body?.valor);
   if (valor != null && (valor < 0 || valor > 10_000)) throw new Error("Valor inválido.");
   const feita = await mudarStatus(empresaId, c.id, novo as never, { valor }, "app do motorista");
+  aposFinalizar(empresaId, feita); // pago com saldo: passa da carteira do passageiro para a do motorista
   P.vigiar(empresaId);
   res.json({ corrida: P.corridaParaApp(empresaId, feita, "motorista") });
 }));
