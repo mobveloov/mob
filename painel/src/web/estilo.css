@@ -173,3 +173,12 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 .acoes-corrida h3 { margin: 4px 0 0; font-size: 13px; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
 .linha-acao { display: flex; gap: 8px; } .linha-acao select, .linha-acao input { flex: 1; min-width: 0; }
 .form textarea { font: inherit; color: var(--texto); background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 10px; resize: vertical; }
+
+/* Campo de endereço com sugestões */
+.campo-endereco { position: relative; }
+.campo-endereco small.ok { color: var(--ok, #16a34a); display: inline-flex; gap: 4px; align-items: center; }
+.campo-endereco .sugestoes { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px; list-style: none; background: var(--cartao, #fff); border: 1px solid var(--borda, #ddd); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); max-height: 280px; overflow: auto; }
+.campo-endereco .sugestoes li { padding: 0; }
+.campo-endereco .sugestoes li.sub { padding: 6px 8px; }
+.campo-endereco .sugestoes button { width: 100%; text-align: left; background: none; border: 0; padding: 8px; border-radius: 6px; color: inherit; cursor: pointer; font: inherit; }
+.campo-endereco .sugestoes button:hover { background: var(--fundo, #f3f4f6); }

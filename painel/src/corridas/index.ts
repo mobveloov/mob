@@ -4,6 +4,7 @@
 //
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
+import { completarPonto, rota } from "../enderecos/index.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -145,7 +146,14 @@ export function descontoDoCupom(empresaId: string, codigo: string, valor: number
 
 const soDigitos = (s: string) => String(s ?? "").replace(/\D/g, "");
 
-export function criarCorridaPropria(empresaId: string, n: NovaCorridaPropria, por = "sistema"): Promise<CorridaPropria> {
+/** Pede uma corrida própria. Endereço só em texto ganha coordenada pelo CNEFE (se houver); distância e tempo pela rota (OSRM, se houver). */
+export async function criarCorridaPropria(empresaId: string, pedido: NovaCorridaPropria, por = "sistema"): Promise<CorridaPropria> {
+  const n: NovaCorridaPropria = { ...pedido, embarque: completarPonto(empresaId, pedido.embarque) ?? pedido.embarque, destino: completarPonto(empresaId, pedido.destino) };
+  let minutos: number | null = null;
+  if (n.distanciaKm == null && n.embarque?.lat != null && n.embarque.lng != null && n.destino?.lat != null && n.destino.lng != null) {
+    const r = await rota({ lat: n.embarque.lat, lng: n.embarque.lng }, { lat: n.destino.lat, lng: n.destino.lng });
+    n.distanciaKm = r.distanciaKm; minutos = r.minutos;
+  }
   return emFila(empresaId, () => {
     const nome = String(n.passageiro?.nome ?? "").trim().slice(0, 80);
     const telefone = soDigitos(n.passageiro?.telefone ?? "");
@@ -165,7 +173,7 @@ export function criarCorridaPropria(empresaId: string, n: NovaCorridaPropria, po
     if (aberta) throw new Error(`Este passageiro já tem uma corrida em aberto (OS ${aberta.os}).`);
 
     const km = n.distanciaKm ?? distanciaEstimada(n.embarque, n.destino);
-    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km });
+    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos });
     const desconto = descontoDoCupom(empresaId, n.cupom ?? "", est.valor, n.categoria);
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);

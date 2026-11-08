@@ -5,9 +5,10 @@
 import { useEffect, useState } from "react";
 import { Car, RefreshCw, UserCheck, X } from "lucide-react";
 import { Cartao, Gaveta, Titulo, useCarregar } from "../componentes/ui";
+import { CampoEndereco, type PontoEscolhido } from "../componentes/CampoEndereco";
 import { apiCentral, horaBr, mascaraTelefone, reais, type CorridaLista, type MotoristaOpcao } from "./api";
 
-const VAZIO = { embarque: "", destino: "", semDestino: false, distanciaKm: "", categoria: "", pagamento: "Dinheiro", nome: "", telefone: "", observacao: "", motoristaId: "", cupom: "" };
+const VAZIO = { embarque: { texto: "" } as PontoEscolhido, destino: { texto: "" } as PontoEscolhido, semDestino: false, distanciaKm: "", categoria: "", pagamento: "Dinheiro", nome: "", telefone: "", observacao: "", motoristaId: "", cupom: "" };
 const TOM: Record<string, string> = { aberta: "info", finalizada: "ok", cancelada: "ruim", nao_atendida: "alerta" };
 /** Próximo passo de cada status (mesma ordem de src/corridas). */
 const AVANCAR: Record<string, { status: string; rotulo: string } | undefined> = {
@@ -33,13 +34,21 @@ export default function SolicitarCorrida() {
     return () => clearTimeout(t);
   }, [f.categoria, f.distanciaKm]);
 
+  // Os dois endereços achados no mapa: distância e tempo pela rota.
+  useEffect(() => {
+    const a = f.embarque, b = f.destino;
+    if (f.semDestino || a.lat == null || a.lng == null || b.lat == null || b.lng == null) return;
+    fetch(`/api/enderecos/rota?lat1=${a.lat}&lng1=${a.lng}&lat2=${b.lat}&lng2=${b.lng}`, { credentials: "same-origin" })
+      .then((r) => r.json()).then((r: { distanciaKm?: number }) => { if (r.distanciaKm != null) setF((x) => ({ ...x, distanciaKm: String(r.distanciaKm).replace(".", ",") })); }).catch(() => {});
+  }, [f.embarque, f.destino, f.semDestino]);
+
   const mudar = (p: Partial<typeof VAZIO>) => { setF({ ...f, ...p }); setMsg(null); };
   const enviar = async () => {
     setEnviando(true); setMsg(null);
     try {
       const km = Number(f.distanciaKm.replace(",", "."));
       const r = await apiCentral.pedir({
-        passageiro: { nome: f.nome, telefone: f.telefone }, embarque: { texto: f.embarque }, destino: f.semDestino ? undefined : { texto: f.destino },
+        passageiro: { nome: f.nome, telefone: f.telefone }, embarque: f.embarque, destino: f.semDestino ? undefined : f.destino,
         categoria: f.categoria, pagamento: f.pagamento, observacao: f.observacao, distanciaKm: km > 0 ? km : undefined, cupom: f.cupom || undefined,
       });
       let texto = `Corrida ${r.corrida.os} criada para ${f.nome}.`;
@@ -74,14 +83,14 @@ export default function SolicitarCorrida() {
             <label>Telefone com DDD<input value={f.telefone} inputMode="tel" onChange={(e) => mudar({ telefone: mascaraTelefone(e.target.value) })} required /></label>
             {!!op.dados?.locais.length && (
               <label>Embarque em um local do totem<small>Opcional: preenche o endereço.</small>
-                <select value="" onChange={(e) => { const l = op.dados!.locais.find((x) => x.id === e.target.value); if (l) mudar({ embarque: l.endereco.texto }); }}>
+                <select value="" onChange={(e) => { const l = op.dados!.locais.find((x) => x.id === e.target.value); if (l) mudar({ embarque: { ...l.endereco } }); }}>
                   <option value="">Escolher...</option>{op.dados.locais.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
                 </select>
               </label>
             )}
-            <label>Embarque (rua, número e bairro)<input value={f.embarque} onChange={(e) => mudar({ embarque: e.target.value })} required maxLength={200} /></label>
+            <CampoEndereco rotulo="Embarque (rua, número e bairro)" valor={f.embarque} onChange={(p) => mudar({ embarque: p })} required />
             <label className="check"><input type="checkbox" checked={f.semDestino} onChange={(e) => mudar({ semDestino: e.target.checked })} /> Sem destino (o passageiro informa ao motorista)</label>
-            {!f.semDestino && <label>Destino<input value={f.destino} onChange={(e) => mudar({ destino: e.target.value })} required maxLength={200} /></label>}
+            {!f.semDestino && <CampoEndereco rotulo="Destino" valor={f.destino} onChange={(p) => mudar({ destino: p })} required />}
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
               <label>Categoria
                 <select value={f.categoria} onChange={(e) => mudar({ categoria: e.target.value })} disabled={!op.dados?.categorias.length}>

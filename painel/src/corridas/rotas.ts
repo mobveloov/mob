@@ -2,6 +2,7 @@
 // cancelar e avaliar. A empresa vem do usuário logado.
 
 import { Router, type Request, type Response } from "express";
+import { rota } from "../enderecos/index.ts";
 import { atribuirMotorista, avaliar, cancelarCorrida, criarCorridaPropria, estimarPreco, distanciaEstimada, listarProprias, mudarStatus, STATUS_TEXTO, type StatusProprio } from "./index.ts";
 
 export const rotasCorridasProprias = Router();
@@ -12,11 +13,16 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
 const emp = (req: Request) => req.ctx!.empresaId;
 const quem = (req: Request) => req.ctx!.usuario.email;
 
-rotasCorridasProprias.get("/estimativa", ok((req, res) => {
+rotasCorridasProprias.get("/estimativa", ok(async (req, res) => {
   const num = (k: string) => (req.query[k] == null || req.query[k] === "" ? undefined : Number(req.query[k]));
   const lat1 = num("latEmbarque"), lng1 = num("lngEmbarque"), lat2 = num("latDestino"), lng2 = num("lngDestino");
-  const km = num("distanciaKm") ?? distanciaEstimada({ texto: "", lat: lat1, lng: lng1 }, { texto: "", lat: lat2, lng: lng2 });
-  res.json(estimarPreco(emp(req), { categoria: String(req.query.categoria ?? ""), distanciaKm: km ?? null }));
+  let km = num("distanciaKm") ?? null, minutos: number | null = null;
+  if (km == null && lat1 != null && lng1 != null && lat2 != null && lng2 != null) {
+    const r = await rota({ lat: lat1, lng: lng1 }, { lat: lat2, lng: lng2 });
+    km = r.distanciaKm; minutos = r.minutos;
+  }
+  km ??= distanciaEstimada({ texto: "", lat: lat1, lng: lng1 }, { texto: "", lat: lat2, lng: lng2 });
+  res.json(estimarPreco(emp(req), { categoria: String(req.query.categoria ?? ""), distanciaKm: km ?? null, minutos }));
 }));
 
 rotasCorridasProprias.get("/:id", ok((req, res) => {

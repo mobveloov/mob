@@ -18,6 +18,7 @@ import Analise from "./paginas/Analise";
 import MarcaAparencia from "./paginas/MarcaAparencia";
 import Integracoes from "./paginas/Integracoes";
 import Usuarios from "./paginas/Usuarios";
+import Enderecos from "./paginas/Enderecos";
 import { BotConversas, BotWhatsApp } from "./bot";
 import { LocaisTotem, SolicitarCorrida } from "./totem";
 import { CrmCampanhas, CrmJornadas, CrmPublico } from "./crm";
@@ -101,7 +102,7 @@ const PAGINAS: Record<string, JSX.Element> = {
   ...Object.fromEntries(CADASTROS.map((c) => [c.funcao, <TelaCadastro key={c.id} id={c.id} />])),
   solicitar: <SolicitarCorrida />, totem: <LocaisTotem />, bot: <BotWhatsApp />, conversas: <BotConversas />,
   "crm-publico": <CrmPublico />, "crm-campanhas": <CrmCampanhas />, "crm-jornadas": <CrmJornadas />,
-  marca: <MarcaAparencia />, integracoes: <Integracoes />, usuarios: <Usuarios />,
+  marca: <MarcaAparencia />, enderecos: <Enderecos />, integracoes: <Integracoes />, usuarios: <Usuarios />,
 };
 const SO_ADMIN = new Set(["marca", "integracoes", "usuarios"]);
 

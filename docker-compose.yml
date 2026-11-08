@@ -1,0 +1,22 @@
+# Sobe o painel no Docker:  docker compose up -d --build   →  http://localhost:8787 (ou a porta de PAINEL_PORTA)
+# As chaves (opcionais) ficam no arquivo painel/.env (copie de painel/.env.example). Nada de chave aqui.
+services:
+  painel:
+    build: .
+    container_name: mob-painel
+    ports:
+      - "${PAINEL_PORTA:-8787}:8787"
+    env_file:
+      - path: painel/.env
+        required: false
+    environment:
+      DADOS_DIR: /dados
+      # Endereços do CNEFE (opcional): pasta com os arquivos <UF>.tsv.gz.
+      CNEFE_DIR: /cnefe
+    volumes:
+      - painel-dados:/dados
+      - ${CNEFE_PASTA:-./sem-cnefe}:/cnefe:ro
+    restart: unless-stopped
+
+volumes:
+  painel-dados:

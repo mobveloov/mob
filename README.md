@@ -28,6 +28,16 @@ Para produção: `npm run build` e depois `npm start` (abre em http://localhost:
 
 Testes: `npm test` (na pasta `painel`).
 
+### No Docker
+
+Na pasta raiz do projeto:
+
+```bash
+docker compose up -d --build
+```
+
+O painel abre em http://localhost:8787 (troque a porta com `PAINEL_PORTA`). Os dados ficam no volume `painel-dados`. As chaves opcionais vêm de `painel/.env`. Para ligar a base de endereços, rode com `CNEFE_PASTA=D:/CNEFE_Brasil` (veja `docs/ENDERECOS.md`).
+
 ## Como configurar as chaves
 
 Há dois lugares, e nenhum vai para o Git:
@@ -72,5 +82,6 @@ Cada empresa troca nome, logo, ícones, cores, fonte, textos, domínio, nome do 
 - [`docs/COMO_FUNCIONA.md`](docs/COMO_FUNCIONA.md): peças, IA, isolamento entre empresas, decisões e o que falta testar.
 - [`docs/ANALISE_PAINEIS.md`](docs/ANALISE_PAINEIS.md): o que tem em cada painel original e a matriz de funções.
 - [`docs/MARCA_E_WHITELABEL.md`](docs/MARCA_E_WHITELABEL.md): marca, empresa nova e app do celular.
+- [`docs/ENDERECOS.md`](docs/ENDERECOS.md): base de endereços do IBGE (CNEFE), sugestões de rua e número, distância e preço.
 - [`docs/PLANO_FASES.md`](docs/PLANO_FASES.md): CRM, bot e totem, e a divisão em sessões.
 - [`docs/CONTRATO_MOTOR.md`](docs/CONTRATO_MOTOR.md): o que o motor oferece.

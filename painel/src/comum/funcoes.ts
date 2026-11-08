@@ -54,6 +54,7 @@ export const FUNCOES: Funcao[] = [
   { id: "bot", grupo: "Atendimento", nome: "Bot de WhatsApp", rota: "/bot", emA: false, emB: false, situacao: "pronto" },
   { id: "totem", grupo: "Atendimento", nome: "Totem", rota: "/totem", emA: false, emB: false, situacao: "pronto" },
   { id: "marca", grupo: "Configurações", nome: "Marca e aparência", rota: "/marca", emA: true, emB: false, situacao: "pronto" },
+  { id: "enderecos", grupo: "Configurações", nome: "Endereços", rota: "/enderecos", emA: false, emB: false, situacao: "pronto" },
   { id: "integracoes", grupo: "Configurações", nome: "Integrações", rota: "/integracoes", emA: true, emB: true, situacao: "pronto" },
   { id: "usuarios", grupo: "Configurações", nome: "Usuários", rota: "/usuarios", emA: true, emB: true, situacao: "pronto" },
 ];

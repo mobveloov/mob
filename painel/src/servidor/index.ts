@@ -21,6 +21,7 @@ import { encerrarSemMotorista } from "../corridas/index.ts";
 import { rotasBot } from "../bot/rotas.ts";
 import { rotasTotem } from "../totem/rotas.ts";
 import { router as rotasCrm } from "../crm/rotas.ts";
+import { rotasEnderecos } from "../enderecos/rotas.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -373,6 +374,7 @@ app.post("/api/empresas", exigirPapel(), ok((req, res) => {
 app.use("/api/cadastros", rotasCadastros);
 app.use("/api/corridas-proprias", rotasCorridasProprias);
 app.use("/api/crm", rotasCrm);
+app.use("/api/enderecos", rotasEnderecos);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 
