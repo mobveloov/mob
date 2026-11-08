@@ -378,6 +378,16 @@ app.use("/api/enderecos", rotasEnderecos);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 
+// Erro que escapou (JSON malformado, corpo grande demais...): resposta curta em JSON, sem caminho de arquivo nem pilha.
+app.use((err: unknown, req: Request, res: Response, next: express.NextFunction) => {
+  if (res.headersSent) return next(err);
+  const e = err as { status?: number; statusCode?: number; type?: string; message?: string };
+  const status = Number(e.status ?? e.statusCode) || 500;
+  if (status >= 500) console.error("[painel]", req.method, req.path.replace(/\/webhook\/.*/, "/webhook/…"), e.message ?? err);
+  const erro = e.type === "entity.parse.failed" ? "Dados mal formatados." : e.type === "entity.too.large" ? "Dados grandes demais." : status >= 500 ? "Erro no servidor. Tente de novo." : "Pedido inválido.";
+  res.status(status).json({ erro });
+});
+
 // Produção: serve o painel compilado (npm run build).
 const dist = path.resolve("dist");
 if (fs.existsSync(dist)) {
@@ -386,6 +396,8 @@ if (fs.existsSync(dist)) {
 }
 
 if (process.env.NODE_ENV !== "test") {
+  // Promessa sem tratamento em algum módulo (bot, CRM, totem): registra e segue, em vez de derrubar o painel.
+  process.on("unhandledRejection", (e) => console.error("[painel] erro sem tratamento:", e instanceof Error ? e.message : e));
   const porta = Number(process.env.PAINEL_API_PORTA) || 8787;
   app.listen(porta, () => console.log(`Painel (API) em http://localhost:${porta}`));
   // A cada minuto: corrida sem motorista há mais de 20 min vira "não atendida".

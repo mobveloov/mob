@@ -60,7 +60,7 @@ export function provedorEvolution(cred: A.CredWhatsApp, f: typeof fetch = fetch)
         return { ok: false, erro: `O WhatsApp recusou (HTTP ${r.status}).`, temporario };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        return { ok: false, erro: /URL|https/.test(msg) ? msg : "Sem resposta do WhatsApp.", temporario: !/URL|https/.test(msg) };
+        return { ok: false, erro: /endere[çc]o|URL|https/i.test(msg) ? msg : "Sem resposta do WhatsApp.", temporario: !/endere[çc]o|URL|https/i.test(msg) };
       }
     },
     async pendencias() {
@@ -73,7 +73,7 @@ export function provedorEvolution(cred: A.CredWhatsApp, f: typeof fetch = fetch)
         const d = (await r.json().catch(() => ({}))) as { instance?: { state?: string } };
         return d.instance?.state && d.instance.state !== "open" ? ["O WhatsApp da instância não está conectado. Leia o QR code na sua instância."] : [];
       } catch (e) {
-        return [e instanceof Error && /URL|https/.test(e.message) ? e.message : "Não consegui falar com a instância."];
+        return [e instanceof Error && /endere[çc]o|URL|https/i.test(e.message) ? e.message : "Não consegui falar com a instância."];
       }
     },
   };

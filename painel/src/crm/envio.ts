@@ -26,8 +26,23 @@ const nomeEmpresa = (empresaId: string) => D.marca(empresaId).nomeExibido || D.e
 
 // ------------------------------------------------------------------ campanhas
 
+/**
+ * Disparos e rodadas em andamento. Sem esta trava, dois cliques em "Disparar" (ou o clique e o agendamento ao mesmo
+ * tempo) passavam juntos pela conferência do estado e cada pessoa recebia a mensagem duas vezes.
+ */
+const emAndamento = new Set<string>();
+async function sozinho<T>(chave: string, ocupado: () => T, fn: () => Promise<T>): Promise<T> {
+  if (emAndamento.has(chave)) return ocupado();
+  emAndamento.add(chave);
+  try { return await fn(); } finally { emAndamento.delete(chave); }
+}
+
 /** Põe a campanha na fila. Devolve quantas mensagens entraram. */
-export async function dispararCampanha(empresaId: string, campanhaId: string, agora = Date.now()): Promise<number> {
+export function dispararCampanha(empresaId: string, campanhaId: string, agora = Date.now()): Promise<number> {
+  return sozinho(`campanha:${empresaId}:${campanhaId}`, () => { throw new Error("Esta campanha já está sendo disparada."); }, () => disparar(empresaId, campanhaId, agora));
+}
+
+async function disparar(empresaId: string, campanhaId: string, agora: number): Promise<number> {
   const c = A.campanhas(empresaId).find((x) => x.id === campanhaId);
   if (!c) throw new Error("Campanha não encontrada.");
   if (c.estado !== "rascunho" && c.estado !== "agendada") throw new Error("Esta campanha já foi disparada.");
@@ -104,7 +119,12 @@ export const mascarar = (t: string) => (t.length > 6 ? `${t.slice(0, 4)}••�
  * Roda uma jornada: quem atende ao gatilho, às regras e ainda não recebeu desde a última corrida entra na fila.
  * "sem-corrida": sem corrida há pelo menos X dias. "cancelou": a última corrida foi cancelada há no máximo X dias.
  */
-export async function rodarJornada(empresaId: string, j: Jornada, agora = Date.now()): Promise<number> {
+export function rodarJornada(empresaId: string, j: Jornada, agora = Date.now()): Promise<number> {
+  // Rodada em andamento (trabalhador e botão "Rodar" juntos): a segunda não põe ninguém na fila de novo.
+  return sozinho(`jornada:${empresaId}:${j.id}`, () => 0, () => rodar(empresaId, j, agora));
+}
+
+async function rodar(empresaId: string, j: Jornada, agora: number): Promise<number> {
   if (!j.texto.trim()) return 0;
   const cupom = conferirCupom(empresaId, j.cupom, true);
   const { contatos } = await publico(empresaId, j.publico.tipo);
