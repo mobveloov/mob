@@ -1,0 +1,34 @@
+/* Estilo só do app do motorista: mapa (Leaflet), menu da conta, barras de progresso e selos. */
+.mapa-real { width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--borda); background: #e8efe9; position: relative; z-index: 0; isolation: isolate; }
+.oferta .mapa-real { border-radius: 12px; }
+.pino { background: none; border: 0; }
+.pino-bola { display: block; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45); box-sizing: border-box; }
+.pino-rotulo { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(-50%); white-space: nowrap; font: 600 11px/1.2 var(--fonte); color: #1f2937; background: rgba(255,255,255,.92); padding: 1px 5px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.mapa-centralizar { background: #fff; border: 2px solid rgba(0,0,0,.2); border-radius: 6px; padding: 4px 8px; font: 600 12px var(--fonte); cursor: pointer; color: #1f2937; }
+
+.selo { display: inline-block; align-self: flex-start; background: #fff4d6; color: #7a4b00; border-radius: 999px; padding: .2rem .7rem; font-size: .85rem; font-weight: 700; }
+.selo.ok { background: #e7f6ee; color: #14532d; }
+.selo.ruim { background: #fdecea; color: #8a1f14; }
+.selo.neutro { background: #eef2f1; color: var(--suave); }
+
+.paradas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.paradas li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.paradas li.feita { opacity: .55; text-decoration: line-through; }
+.paradas a { white-space: nowrap; font-weight: 600; color: var(--cor); text-decoration: none; font-size: .9rem; }
+
+.menu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; }
+.menu li + li { border-top: 1px solid var(--borda); }
+.menu button { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: .95rem 1rem; text-align: left; cursor: pointer; font-weight: 600; }
+.menu button small { color: var(--suave); font-weight: 400; }
+.voltar { align-self: flex-start; }
+
+.barra { height: 10px; border-radius: 999px; background: #e5ebe9; overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--cor); border-radius: 999px; }
+.codigo { font-size: 1.6rem; font-weight: 800; letter-spacing: .2em; text-align: center; }
+.lista li.clicavel { cursor: pointer; }
+.valor-mais { color: #15803d; font-weight: 700; }
+.valor-menos { color: var(--perigo); font-weight: 700; }
+.escolhas { display: flex; flex-direction: column; gap: .4rem; }
+.escolhas label { flex-direction: row; align-items: center; gap: .6rem; color: var(--texto); font-size: 1rem; background: #fff; border: 1px solid var(--borda); border-radius: 10px; padding: .7rem .8rem; }
+.escolhas input { width: auto; }
+.oferta .cartao { max-height: 100vh; overflow-y: auto; }
