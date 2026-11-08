@@ -23,3 +23,6 @@ google-services*.json
 *.apk
 *.aab
 referencia/
+
+# Acesso do ambiente de teste (senha): só no computador
+ACESSO_TESTE.txt
