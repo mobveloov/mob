@@ -47,6 +47,26 @@ Há dois lugares, e nenhum vai para o Git:
 
 Sem nenhuma chave de IA, o relatório sai com os números e os alertas, sem os textos.
 
+## O que depende de você
+
+O painel funciona sem nada disto: estes itens só ligam as partes reais. Enquanto não chegam, nada fica travado.
+
+| O quê | Para quê | Onde colocar |
+|---|---|---|
+| Ícone oficial da UP Corridas (PNG quadrado, 1024×1024) | Ícone dos apps e do painel. Hoje o ícone é provisório. | `tenants/up-corridas/assets/icone.png` |
+| Nomes dos pacotes: `br.com.upcorridas.central`, `.passageiro` e `.motorista` | Identificam cada app na loja. Não mudam depois de publicar. | `tenants/up-corridas/brand.json` (`app`) |
+| Domínio do painel com https | Endereço que os apps e o WhatsApp usam. Hoje há um palpite: `painel.upcorridas.com.br`. | `brand.json` (`app.urlPainel`, `dominios`) e `PUBLICO_URL` no `.env` |
+| E-mail e telefone de suporte | Aparecem nas telas e nos apps. | Tela **Marca e aparência** |
+| Servidor de WhatsApp (Evolution API) e o celular da empresa para ler o QR | Bot, CRM e código de login dos apps. Sem ele, o envio é simulado. | `WHATSAPP_EVOLUTION_URL` e `WHATSAPP_EVOLUTION_TOKEN` no `.env`; QR na tela **Bot de WhatsApp** |
+| Projeto Firebase da empresa (`google-services.json` e conta de serviço) | Notificação no celular (push). | `tenants/up-corridas/firebase/` (fora do Git) e `FIREBASE_SERVICO_<EMPRESA>` (veja `docs/APPS.md`) |
+| Chave de assinatura dos APKs (keystore) e conta no Google Play | Publicar os apps na loja. | `APP_KEYSTORE` e as senhas por variável de ambiente (veja `docs/MARCA_E_WHITELABEL.md`) |
+| Um celular Android | Testar os APKs de verdade: GPS, áudio e notificação. | — |
+| Chaves de IA (opcional) | Análise do relatório e frases livres no bot. Sem elas, o resto funciona. | Tela **Integrações** ou `.env` |
+| Credenciais reais do Sistema A ou do Sistema B (opcional) | Puxar corridas desses sistemas. Para o Sistema A, informe também a latitude e a longitude de um ponto da cidade. | Tela **Integrações** |
+| Servidor de rotas OSRM (opcional) | Distância pelas ruas, em vez da linha reta × 1,3. | `OSRM_URL` no `.env` |
+
+Nenhum desses itens foi testado de verdade ainda: tudo foi testado com versões simuladas.
+
 ## O que tem em cada tela
 
 - **Painel:** indicadores do período, alertas, horários, dias, categorias, pagamentos, cancelamentos e top motoristas.

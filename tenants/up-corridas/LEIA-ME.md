@@ -21,9 +21,11 @@ Se quiser, salve também a tela de abertura em `assets/abertura.png`.
 
 | Campo em `brand.json` | Valor de agora | O que é |
 |---|---|---|
-| `app.pacote` | `br.com.upcorridas.central` | Identificador do app na loja. Não muda depois de publicar. |
+| `app.pacote` | `br.com.upcorridas.central` (painel). Os apps usam `br.com.upcorridas.passageiro` e `br.com.upcorridas.motorista`. | Identificador de cada app na loja. Não muda depois de publicar. |
 | `app.urlPainel` | `https://painel.upcorridas.com.br` | Endereço que o app abre. Troque pelo endereço real do painel. |
 | `dominios` | vazio | Domínio próprio do painel, se tiver. |
 | `textos.suporteEmail` e `textos.suporteTelefone` | vazios | Contato de suporte mostrado nas telas. |
+
+A lista completa do que depende de você está no `README.md`, na seção "O que depende de você".
 
 Depois de confirmar, a marca também pode ser ajustada pela tela **Configurações → Marca e aparência**, sem mexer em código.
