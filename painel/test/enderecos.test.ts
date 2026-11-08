@@ -74,6 +74,7 @@ test("corrida com endereço em texto ganha ponto, distância e preço", async ()
   assert.ok((c.estimativa.valor ?? 0) > 5);
   const loc = await R.criarCorridaPropria(e1, { passageiro: { nome: "Bia", telefone: "11912345678" }, embarque: { texto: "Localização enviada", lat: -21.0009, lng: -48.0001 }, categoria: "Carro", pagamento: "Pix", canal: "bot" });
   assert.match(loc.embarque.texto, /^Rua das Flores, 200 - Centro, Cidade Teste\/SP \(localização\)$/);
+  (await import("../src/servidor/banco.ts")).fecharBanco(); // no Windows, arquivo aberto não apaga
   fs.rmSync(DADOS, { recursive: true, force: true });
   fs.rmSync(CNEFE, { recursive: true, force: true });
 });

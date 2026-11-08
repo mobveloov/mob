@@ -314,8 +314,9 @@ test("rotas: contagem antes de salvar, disparo, relatório, segredos escondidos 
     assert.equal(rel.corpo.falhas, 0);
     assert.ok(enviadas.every((t) => t.includes("VOLTA10")));
     assert.ok(rel.corpo.itens.every((i: { telefone: string }) => i.telefone.includes("•")), "telefone mascarado");
-    assert.ok(fs.existsSync(path.join(DADOS, "empresas", um, "crm", "fila.json")));
-    assert.ok(!fs.existsSync(path.join(DADOS, "empresas", dois, "crm", "fila.json")));
+    // A fila fica no banco, separada por empresa.
+    assert.ok(A.fila(um).length > 0);
+    assert.equal(A.fila(dois).length, 0, "a outra empresa não vê a fila");
 
     // Cancelar: pendentes viram canceladas
     const can = await pedir(`/api/crm/campanhas/${id}/cancelar`, cA, "POST", {});
@@ -356,6 +357,7 @@ test("rotas: contagem antes de salvar, disparo, relatório, segredos escondidos 
     // Nada de marca de terceiros nas respostas
     assert.ok(!MARCAS.test(JSON.stringify([pub.corpo, rel.corpo, cfg.corpo])));
   } finally {
+    srv.closeAllConnections(); // não espera as conexões abertas (o teste não fica parado se algo falhar)
     srv.close();
     W.definirProvedorDeTeste(null);
   }

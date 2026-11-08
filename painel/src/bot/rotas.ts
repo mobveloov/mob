@@ -115,7 +115,7 @@ const resumo = (c: Conversa) => {
 
 rotasBot.get("/conversas", ok((req, res) => {
   const busca = String(req.query.busca ?? "").trim().toLowerCase();
-  const lista = Object.values(A.conversas(ctx(req).empresaId))
+  const lista = Object.values(A.conversas(ctx(req).empresaId, busca ? undefined : 300))
     .filter((c) => !busca || c.nome.toLowerCase().includes(busca) || c.id.includes(soDigitos(busca) || "\u0000"))
     .sort((a, b) => b.atualizadaEm.localeCompare(a.atualizadaEm))
     .slice(0, 300)

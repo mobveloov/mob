@@ -11,12 +11,16 @@ services:
         required: false
     environment:
       DADOS_DIR: /dados
+      # Banco do painel (SQLite, roda junto, sem servidor separado): conversas do bot e fila do CRM.
+      BANCO_ARQUIVO: /banco/painel.db
       # Endereços do CNEFE (opcional): pasta com os arquivos <UF>.tsv.gz.
       CNEFE_DIR: /cnefe
     volumes:
       - painel-dados:/dados
+      - painel-banco:/banco
       - ${CNEFE_PASTA:-./sem-cnefe}:/cnefe:ro
     restart: unless-stopped
 
 volumes:
   painel-dados:
+  painel-banco:

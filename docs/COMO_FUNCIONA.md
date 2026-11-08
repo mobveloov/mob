@@ -82,6 +82,16 @@ A análise do projeto anterior foi usada **só como referência de leitura**. O 
 
 Detalhes do Claude: SDK oficial `@anthropic-ai/sdk`, esforço `medium` no relatório e `low` no chat. Em Sonnet/Opus vai `fallbacks: "default"` (se o filtro de segurança recusar, a própria Anthropic tenta outro modelo). Recusa ou resposta cortada passam para o plano B.
 
+## Onde os dados ficam
+
+- **Banco do painel (SQLite):** guarda as conversas do bot e a fila de envio do CRM. Ele já vem dentro do Node, não precisa de servidor separado nem de chave.
+  - O caminho fica em `BANCO_ARQUIVO`. Se ficar vazio, usa `DADOS_DIR/painel.db`.
+  - Cada linha guarda a empresa, e toda consulta filtra por ela.
+  - Gravar uma conversa ou uma mensagem da fila mexe só naquela linha. Antes, o arquivo inteiro era reescrito a cada mensagem.
+- **Migração automática:** na primeira vez que uma empresa usa o bot ou o CRM, o `conversas.json` e o `fila.json` antigos entram no banco. Depois, o arquivo vira `.json.migrado`; fica guardado, não é apagado. Se o arquivo estiver estragado, nada muda, e o painel tenta de novo depois.
+- **Arquivos JSON por empresa (`DADOS_DIR/empresas/<id>/`):** cadastros, corridas próprias, marca, integrações, campanhas, jornadas e configurações.
+- **No Docker:** o banco fica no volume `painel-banco`, e os arquivos no volume `painel-dados`.
+
 ## Multiempresa e isolamento
 
 - Cada empresa tem a sua pasta em `DADOS_DIR` (`painel/dados/`, fora do Git): marca, integrações, **segredos** (credenciais e chaves de IA, arquivo com permissão restrita), imagens e planilhas.
