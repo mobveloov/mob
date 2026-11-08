@@ -224,7 +224,9 @@ test("isolamento: uma empresa não vê a marca, as integrações nem as corridas
     assert.ok(c.corpo.total > 0);
     assert.equal(c.corpo.corridas[0].origemNome, "Dados de exemplo");
   } finally {
+    srv.closeAllConnections();
     srv.close();
+    (await import("../src/servidor/banco.ts")).fecharBanco(); // no Windows, arquivo aberto não apaga
     fs.rmSync(DADOS, { recursive: true, force: true });
   }
 });

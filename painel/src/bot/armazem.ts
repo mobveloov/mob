@@ -1,12 +1,13 @@
 // Onde o bot guarda os dados de cada empresa: dados/empresas/<id>/bot/ (fora do Git).
 //   config.json      provedor e instância (sem segredos)
-//   conversas.json   conversas e mensagens
+//   (conversas e mensagens ficam no banco do painel: servidor/banco.ts)
 // URL e token do provedor e o segredo do webhook ficam nos segredos da empresa (segredos.json),
 // na chave "bot-whatsapp". Nunca vão para o navegador.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { banco, migrarUmaVez } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import type { ConfigBot, Conversa } from "./tipos.ts";
 
@@ -77,23 +78,61 @@ export function segredoConfere(empresaId: string, recebido: string): boolean {
 
 // ------------------------------------------------------------------ conversas
 
+// Conversas ficam no banco (tabela bot_conversas, uma linha por conversa). O conversas.json antigo é migrado
+// na primeira vez que a empresa usa o bot e vira conversas.json.migrado.
 const arqConversas = (empresaId: string) => path.join(pasta(empresaId), "conversas.json");
-export const conversas = (empresaId: string): Record<string, Conversa> => ler(arqConversas(empresaId), {});
-export const conversa = (empresaId: string, id: string): Conversa | null => conversas(empresaId)[id] ?? null;
+
+function prontoParaUsar(empresaId: string) {
+  pasta(empresaId); // valida o id da empresa
+  migrarUmaVez(empresaId, "bot_conversas", arqConversas(empresaId), (conteudo) => {
+    const todas = (conteudo && typeof conteudo === "object" ? conteudo : {}) as Record<string, Conversa>;
+    let n = 0;
+    for (const c of Object.values(todas)) if (c && typeof c.id === "string") { gravarConversa(empresaId, c); n++; }
+    return n;
+  });
+}
+
+function gravarConversa(empresaId: string, c: Conversa) {
+  banco().prepare(`INSERT INTO bot_conversas (empresa, id, atualizada, aberta, dados) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (empresa, id) DO UPDATE SET atualizada = excluded.atualizada, aberta = excluded.aberta, dados = excluded.dados`)
+    .run(empresaId, c.id, c.atualizadaEm ?? new Date().toISOString(), c.corrida?.grupo === "aberta" ? 1 : 0, JSON.stringify(c));
+}
+
+const lerLinha = (r: unknown) => JSON.parse(String((r as { dados: string }).dados)) as Conversa;
+
+/** Todas as conversas da empresa (mais novas primeiro). `limite` corta a lista. */
+export function conversas(empresaId: string, limite?: number): Record<string, Conversa> {
+  prontoParaUsar(empresaId);
+  const sql = `SELECT dados FROM bot_conversas WHERE empresa = ? ORDER BY atualizada DESC${limite ? " LIMIT ?" : ""}`;
+  const linhas = limite ? banco().prepare(sql).all(empresaId, limite) : banco().prepare(sql).all(empresaId);
+  return Object.fromEntries(linhas.map((r) => { const c = lerLinha(r); return [c.id, c]; }));
+}
+
+/** Só as conversas com corrida aberta (o aviso de status olha estas). */
+export function conversasComCorridaAberta(empresaId: string): Conversa[] {
+  prontoParaUsar(empresaId);
+  return banco().prepare("SELECT dados FROM bot_conversas WHERE empresa = ? AND aberta = 1").all(empresaId).map(lerLinha);
+}
+
+export function conversa(empresaId: string, id: string): Conversa | null {
+  prontoParaUsar(empresaId);
+  const r = banco().prepare("SELECT dados FROM bot_conversas WHERE empresa = ? AND id = ?").get(empresaId, id);
+  return r ? lerLinha(r) : null;
+}
 
 export function novaConversa(id: string, nome: string): Conversa {
   const agora = new Date().toISOString();
   return { id, nome: nome || id, etapa: "inicio", rascunho: {}, historico: [], mensagens: [], vistas: [], naoLidas: 0, criadaEm: agora, atualizadaEm: agora };
 }
 
+/** Grava só esta conversa (antes o arquivo inteiro era reescrito a cada mensagem). */
 export function salvarConversa(empresaId: string, c: Conversa) {
-  const todas = conversas(empresaId);
+  prontoParaUsar(empresaId);
   c.mensagens = c.mensagens.slice(-MAX_MENSAGENS);
   c.historico = c.historico.slice(-MAX_HISTORICO);
   c.vistas = c.vistas.slice(-200);
   c.atualizadaEm = new Date().toISOString();
-  todas[c.id] = c;
-  gravar(arqConversas(empresaId), todas);
+  gravarConversa(empresaId, c);
 }
 
 // ------------------------------------------------------------------ trava por conversa

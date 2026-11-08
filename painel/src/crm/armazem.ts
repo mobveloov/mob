@@ -3,7 +3,7 @@
 //   listas.json      listas e segmentos
 //   campanhas.json   campanhas
 //   jornadas.json    jornadas (gatilhos)
-//   fila.json        fila de envio (mensagens pendentes, enviadas e com falha)
+//   (a fila de envio fica no banco do painel: servidor/banco.ts)
 //   contatos.json    marcações por pessoa (não quer receber)
 //   config.json      ritmo de envio e provedor de WhatsApp (sem segredos)
 //   ritmo.json       estado do lote e da pausa do WhatsApp
@@ -15,6 +15,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
 import { CONFIG_PADRAO, type Campanha, type ConfigEnvio, type ItemFila, type Jornada, type Lista } from "./tipos.ts";
@@ -43,15 +44,89 @@ export const salvarCampanhas = (e: string, l: Campanha[]) => gravar(e, "campanha
 export const jornadas = (e: string) => ler<Jornada[]>(e, "jornadas.json", []);
 export const salvarJornadas = (e: string, l: Jornada[]) => gravar(e, "jornadas.json", l);
 
-export const fila = (e: string) => ler<ItemFila[]>(e, "fila.json", []);
-/** Lê, muda e grava a fila de uma vez (sem espera no meio: nada se perde entre dois pedidos). */
+// Fila de envio: no banco (tabela crm_fila, uma linha por mensagem). O fila.json antigo é migrado na primeira vez
+// que a empresa usa o CRM e vira fila.json.migrado.
+const NOVENTA_DIAS = 90 * 86_400_000;
+
+function filaPronta(e: string) {
+  const arq = path.join(pasta(e), "fila.json"); // pasta() valida o id da empresa
+  migrarUmaVez(e, "crm_fila", arq, (conteudo) => {
+    const itens = Array.isArray(conteudo) ? (conteudo as ItemFila[]).filter((i) => i && typeof i.id === "string") : [];
+    gravarItens(e, itens);
+    return itens.length;
+  });
+}
+
+function gravarItens(e: string, itens: ItemFila[]) {
+  const st = banco().prepare(`INSERT INTO crm_fila (empresa, id, origem, estado, proxima_em, criado_em, enviado_em, dados) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (empresa, id) DO UPDATE SET origem = excluded.origem, estado = excluded.estado, proxima_em = excluded.proxima_em,
+      criado_em = excluded.criado_em, enviado_em = excluded.enviado_em, dados = excluded.dados`);
+  for (const i of itens) st.run(e, i.id, i.origem?.id ?? "", i.estado, i.proximaEm ?? 0, i.criadoEm ?? 0, i.enviadoEm ?? null, JSON.stringify(i));
+}
+
+const lerItem = (r: unknown) => JSON.parse(String((r as { dados: string }).dados)) as ItemFila;
+
+/** Guarda no máximo 90 dias de mensagens já resolvidas. */
+function podar(e: string) {
+  banco().prepare("DELETE FROM crm_fila WHERE empresa = ? AND estado <> 'pendente' AND COALESCE(enviado_em, criado_em) <= ?").run(e, Date.now() - NOVENTA_DIAS);
+}
+
+/** Fila inteira da empresa (relatórios e telas). */
+export function fila(e: string): ItemFila[] {
+  filaPronta(e);
+  return banco().prepare("SELECT dados FROM crm_fila WHERE empresa = ? ORDER BY criado_em, id").all(e).map(lerItem);
+}
+
+/** Mensagens de uma campanha ou jornada. */
+export function filaDaOrigem(e: string, origemId: string): ItemFila[] {
+  filaPronta(e);
+  return banco().prepare("SELECT dados FROM crm_fila WHERE empresa = ? AND origem = ? ORDER BY criado_em, id").all(e, origemId).map(lerItem);
+}
+
+/** Põe mensagens novas na fila (tudo ou nada). */
+export function adicionarNaFila(e: string, itens: ItemFila[]) {
+  if (!itens.length) return;
+  filaPronta(e);
+  transacao(() => gravarItens(e, itens));
+}
+
+/** Próxima pendente que já pode sair (fora das campanhas pausadas). */
+export function proximaPendente(e: string, agora: number, pausadas: Set<string>): ItemFila | null {
+  filaPronta(e);
+  const fora = [...pausadas];
+  const r = banco().prepare(`SELECT dados FROM crm_fila WHERE empresa = ? AND estado = 'pendente' AND proxima_em <= ?
+    ${fora.length ? `AND origem NOT IN (${fora.map(() => "?").join(",")})` : ""} ORDER BY proxima_em, criado_em LIMIT 1`).get(e, agora, ...fora);
+  return r ? lerItem(r) : null;
+}
+
+/** Muda uma mensagem só (lê e grava juntas: nada se perde entre dois pedidos). */
+export function alterarItem<T>(e: string, id: string, fn: (i: ItemFila | null) => T): T {
+  filaPronta(e);
+  return transacao(() => {
+    const r = banco().prepare("SELECT dados FROM crm_fila WHERE empresa = ? AND id = ?").get(e, id);
+    const item = r ? lerItem(r) : null;
+    const antes = item && JSON.stringify(item);
+    const out = fn(item);
+    if (item && JSON.stringify(item) !== antes) gravarItens(e, [item]);
+    return out;
+  });
+}
+
+/** Lê, muda e grava a fila de uma vez (só as mensagens que mudaram são regravadas). */
 export function alterarFila<T>(e: string, fn: (f: ItemFila[]) => T): T {
-  const f = fila(e);
-  const r = fn(f);
-  // Guarda no máximo 90 dias de mensagens já resolvidas.
-  const limite = Date.now() - 90 * 86_400_000;
-  gravar(e, "fila.json", f.filter((i) => i.estado === "pendente" || (i.enviadoEm ?? i.criadoEm) > limite));
-  return r;
+  filaPronta(e);
+  return transacao(() => {
+    const f = banco().prepare("SELECT dados FROM crm_fila WHERE empresa = ? ORDER BY criado_em, id").all(e).map(lerItem);
+    const antes = new Map(f.map((i) => [i.id, JSON.stringify(i)]));
+    const r = fn(f);
+    const mudaram = f.filter((i) => antes.get(i.id) !== JSON.stringify(i));
+    gravarItens(e, mudaram);
+    const ficaram = new Set(f.map((i) => i.id));
+    const del = banco().prepare("DELETE FROM crm_fila WHERE empresa = ? AND id = ?");
+    for (const id of antes.keys()) if (!ficaram.has(id)) del.run(e, id);
+    podar(e);
+    return r;
+  });
 }
 
 export const optOuts = (e: string) => ler<Record<string, string>>(e, "contatos.json", {});
