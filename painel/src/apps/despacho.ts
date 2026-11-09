@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, atribuirMotorista, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
-import { ehFavorito, podeAtender } from "./extras.ts";
+import { filtrosDoDespacho } from "./extras.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -176,6 +176,7 @@ export function despachar(empresaId: string) {
   const agora = Date.now();
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
+  const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
   let n = 0;
   for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
@@ -183,7 +184,7 @@ export function despachar(empresaId: string) {
     for (const [id, p] of e.online) {
       if (busy.has(id) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
-      if (!podeAtender(empresaId, c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
+      if (!filtros.podeAtender(c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
@@ -192,7 +193,7 @@ export function despachar(empresaId: string) {
       // Sem coordenada no embarque: vai para quem está online há mais tempo.
       const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
       // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
-      const fav = ehFavorito(empresaId, c.passageiro.telefone, id), favMelhor = !!melhor && ehFavorito(empresaId, c.passageiro.telefone, melhor.id);
+      const fav = filtros.ehFavorito(c.passageiro.telefone, id), favMelhor = !!melhor && filtros.ehFavorito(c.passageiro.telefone, melhor.id);
       if (!melhor || (fav && !favMelhor) || (fav === favMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))) melhor = { id, km };
     }
     if (!melhor) continue;

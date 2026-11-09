@@ -73,6 +73,26 @@ function novoCodigo(empresaId: string): string {
 const doCodigo = (empresaId: string, codigo: string) =>
   banco().prepare("SELECT papel, chave FROM app_pessoas WHERE empresa = ? AND codigo = ?").get(empresaId, codigo.toUpperCase()) as { papel: PapelApp; chave: string } | undefined;
 
+/**
+ * Foto das preferências de todos (uma consulta só), para uma rodada do despacho. Antes, cada par corrida x motorista
+ * consultava o banco (a carga de 500 corridas ficou 4 vezes mais lenta).
+ */
+export function filtrosDoDespacho(empresaId: string) {
+  const mot = new Map<string, Pessoa>(), pas = new Map<string, Pessoa>();
+  for (const r of banco().prepare("SELECT papel, chave, dados FROM app_pessoas WHERE empresa = ?").all(empresaId) as Array<{ papel: PapelApp; chave: string; dados: string }>) {
+    (r.papel === "motorista" ? mot : pas).set(r.chave, { ...PESSOA_VAZIA, ...JSON.parse(r.dados) });
+  }
+  return {
+    podeAtender(c: CorridaPropria, motoristaId: string) {
+      const m = mot.get(motoristaId);
+      if (m?.bloqueados.includes(c.passageiro.telefone)) return false;
+      if (m?.categorias.length && !m.categorias.some((x) => normal(x) === normal(c.categoria))) return false;
+      return !pas.get(c.passageiro.telefone)?.bloqueados.includes(motoristaId);
+    },
+    ehFavorito: (telefone: string, motoristaId: string) => !!pas.get(telefone)?.favoritos.includes(motoristaId),
+  };
+}
+
 /** O motorista pode atender esta corrida? (bloqueio de qualquer um dos lados e categorias que ele escolheu) */
 export function podeAtender(empresaId: string, c: CorridaPropria, motoristaId: string): boolean {
   const m = linhaPessoa(empresaId, "motorista", motoristaId);
