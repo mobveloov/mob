@@ -1,0 +1,84 @@
+# Apps: contrato da API (versão 2, para as telas de docs/APPS_TELAS.md)
+
+Todas as rotas ficam em `/api/apps/<empresa>/...`. As marcadas com 🔒 exigem o token: `Authorization: Bearer <token>`. As rotas que já existiam continuam valendo (veja `painel/src/apps/rotas.ts` e `extras.ts`). Aqui está só o que **muda** ou é **novo**.
+
+Erro: o HTTP vem com status 4xx e o corpo `{ "erro": "texto para mostrar" }`.
+
+## Conta e login (passageiro e motorista)
+
+| Rota | Corpo | Resposta |
+|---|---|---|
+| `GET /cidades` | — | `{ cidades: [{ id, nome, uf }] }`: cidades atendidas pela empresa (vêm de Endereços). Sem nenhuma, a lista vem vazia e o app pula a tela. |
+| `POST /conta/existe` | `{ papel, login }` (telefone ou e-mail) | `{ existe: boolean, temSenha: boolean, mascarado: "k***@gmail.com" }` |
+| `POST /conta/entrar` | `{ papel, login, senha }` | `{ token, eu }`. Limite: 8 erros em 10 min por login. |
+| `POST /conta/criar` (passageiro) | `{ papel: "passageiro", nome, genero, telefone, email, senha, cidadeId? }` | `{ token, eu }`. Telefone ou e-mail repetido devolve erro. |
+| `POST /conta/criar` (motorista) | `{ papel: "motorista", nome, cpf, telefone, email, nascimento, genero, chavePix, senha, cidadeId? }` | `{ token, eu }`. Cria o motorista com a situação **"Aguardando aprovação"**. Ele entra, completa o cadastro, mas **não fica online** até a central aprovar. |
+| `POST /conta/esqueci` | `{ papel, login }` | Manda o código pelo WhatsApp (e devolve `codigoTeste` no ambiente de teste) |
+| `POST /conta/nova-senha` | `{ papel, login, codigo, senha }` | `{ token, eu }` |
+| 🔒 `POST /conta/senha` | `{ atual, nova }` | `{ ok }` |
+| 🔒 `POST /conta/excluir` | `{ senha }` | `{ ok }`: pede a exclusão, que a central conclui. A sessão é encerrada. |
+| 🔒 `GET /eu` | — | Agora traz também: `foto` (URL ou null), `email`, `genero`, `cidadeId`, `situacao` (do cadastro). Para o motorista, traz também `aprovado` e as `pendencias` (lista do que falta no cadastro). |
+| 🔒 `POST /foto` | corpo cru `image/jpeg` ou `image/png`, até 3 MB | `{ foto }` (URL). Foto de perfil, que no motorista é a foto do rosto. |
+| 🔒 `GET /foto/:papel/:chave` | — | A imagem. Só abre para quem está numa corrida aberta com essa pessoa, para a própria pessoa ou para a central. |
+
+O login por código (`/entrar/codigo` e `/entrar`) continua funcionando.
+
+## Passageiro
+
+| Rota | Corpo | Resposta |
+|---|---|---|
+| 🔒 `GET /lugares` | — | `{ casa: Ponto\|null, trabalho: Ponto\|null, favoritos: [{ id, nome, ponto }], recentes: [Ponto] }`. Recentes: os últimos 8 destinos, sem repetir. |
+| 🔒 `POST /lugares` | `{ tipo: "casa"\|"trabalho"\|"favorito", nome?, ponto }` | o mesmo do GET |
+| 🔒 `POST /lugares/:id/remover` | — | o mesmo do GET |
+| 🔒 `GET /opcionais` | — | `{ opcionais: [{ id, nome }] }` (porta-malas grande, encomenda, carro adaptado, à disposição) |
+| 🔒 `GET /motivos-cancelamento` | — | `{ motivos: ["Motorista demorou muito", ...] }`, da empresa |
+| 🔒 `GET /etiquetas-avaliacao` | — | `{ boas: [...], ruins: [...] }` (ex.: "Carro limpo", "Direção segura" / "Carro sujo", "Direção perigosa") |
+| 🔒 `POST /corridas` | também aceita `valorOferecido` (número; não pode ficar abaixo do mínimo da categoria nem passar de 3× a estimativa) e `opcionais: [ids]` | a corrida com `valorOferecido` |
+| 🔒 `POST /corridas/:id/oferta` | `{ valor }` | Muda o valor oferecido enquanto procura. |
+| 🔒 `GET /corridas/:id/contraofertas` | — | `{ contraofertas: [{ id, valor, motorista: { nome, nota, viagens, veiculo, placa, foto }, distanciaKm, expira }] }` |
+| 🔒 `POST /corridas/:id/contraofertas/:oferta/aceitar` | — | A corrida fica com esse motorista e esse valor. As outras ofertas são encerradas. |
+| 🔒 `POST /corridas/:id/rota` | `{ paradas?: [Ponto], destino?: Ponto }` | Edita a rota com a corrida aberta. Recalcula a estimativa e avisa o motorista. |
+| 🔒 `POST /corridas/:id/avaliar` | também aceita `etiquetas: [texto]` | |
+| 🔒 `GET /corridas?filtro=todas\|finalizadas\|canceladas\|andamento&de=AAAA-MM-DD&ate=AAAA-MM-DD` | — | lista filtrada |
+
+A corrida do passageiro agora traz também:
+- `motorista`: `{ nome, foto, nota, viagens, veiculo, cor, placa, telefone }`;
+- `distanciaMotoristaKm` e `minutosMotorista` (estimados);
+- `chegando`: boolean, menos de 500 m;
+- `valorOferecido`, `opcionais` e `mensagensNaoLidas`.
+
+## Motorista
+
+| Rota | Corpo | Resposta |
+|---|---|---|
+| 🔒 `GET /corridas-abertas` | — | `{ disponiveis: [...], pendentes: [...], programadas: [...] }`. **Disponíveis**: corridas procurando motorista dentro do raio, que ele pode pegar (aceitar direto ou mandar contra-oferta). **Pendentes**: as dele que ainda não começaram. **Programadas**: agendadas que ele pode assumir antes da hora. |
+| 🔒 `POST /corridas/:id/pegar` | — | Aceita uma disponível ou programada, se ainda estiver livre. |
+| 🔒 `POST /corridas/:id/contraoferta` | `{ valor }` | Manda a contra-oferta ao passageiro. Vale 60 s. |
+| 🔒 `GET /ofertas` | — | A chamada atual agora traz também `valorOferecido`, `opcionais`, a `nota` do passageiro, `paradas` e `agendadaPara`. |
+| 🔒 `POST /macaneta` | `{ modo: "taximetro"\|"destino", categoria, destino?: Ponto, lat, lng, passageiro?: { nome, telefone } }` | Cria a corrida de rua já com ele e já **em andamento** (canal "Maçaneta"). |
+| 🔒 `POST /posicao` | (já existia) | Na Maçaneta em modo taxímetro, soma a distância percorrida (ignora saltos acima de 300 m em 5 s). |
+| 🔒 `POST /corridas/:id/status` finalizada | | Na Maçaneta com taxímetro, o valor sai da distância percorrida e do tempo, pela tarifa da categoria. |
+| 🔒 `GET /ganhos?periodo=mes&mes=AAAA-MM` ou `periodo=semana` | — | `{ total, viagens, minutosOnline, minutosEmViagem, porDia: [{ dia, valor }], porPagamento: [{ pagamento, valor, corridas }], viagens: [{ id, os, em, valor, passageiro, pagamento, embarque, destino }] }` |
+| 🔒 `GET /cadastro` | — | `{ dados: { nome, cpf, telefone, email, nascimento, genero, chavePix }, endereco: { cep, rua, numero, semNumero, complemento, bairro, uf, cidade }, foto, situacao, pendencias: [texto] }` |
+| 🔒 `POST /cadastro/dados` e `POST /cadastro/endereco` | os campos acima | o mesmo do GET |
+| 🔒 `GET /cep/:cep` | — | `{ rua, bairro, cidade, uf }` pela base de endereços (CNEFE), quando houver. Sem base: 404 e o app deixa preencher à mão. |
+| 🔒 `GET /veiculos` | — | `{ veiculos: [{ id, modelo, placa, cor, ano, cnh, validadeCnh, ativo, situacao }] }` |
+| 🔒 `POST /veiculos` e `POST /veiculos/:id` | `{ modelo, placa, cor, ano, cnh, validadeCnh }` | `{ veiculos }`. Placa no padrão antigo ou Mercosul. |
+| 🔒 `POST /veiculos/:id/ativar` e `POST /veiculos/:id/excluir` | — | `{ veiculos }` |
+| 🔒 `GET /documentos` | (já existia) | Os tipos agora são: `cnh` (CNH frente e verso), `residencia`, `crlv`, `lateralEsquerda` e `lateralDireita`. |
+| 🔒 `GET /preferencias` e `POST /preferencias` | também `pagamentos: [texto]` (os que aceita) e `filtros: [ids de opcionais]` (o que oferece) | |
+| 🔒 `GET /suporte` | — | `{ mensagens: [{ id, de: "eu"\|"central", texto?, audio?, em }] }`: chat com a central |
+| 🔒 `POST /suporte` | `{ texto }` | `{ mensagem }`. Aceita áudio pelo mesmo jeito do chat da corrida: `POST /suporte/audio`. |
+| 🔒 `GET /contatos` | — | `{ whatsapp, telefone, site, termosUrl, privacidadeUrl }`, da marca da empresa |
+
+## Despacho com valor oferecido
+
+- **Oferta:** a corrida vai para os motoristas com o `valorOferecido`. Cada motorista pode **aceitar** pelo valor ou mandar **contra-oferta**.
+- **Contra-oferta:** aparece para o passageiro, que escolhe uma. A primeira aceita leva a corrida. As outras recebem o aviso "oferta encerrada".
+- **Filtros:** um motorista que não oferece um opcional pedido não recebe a corrida. Um motorista que não aceita a forma de pagamento escolhida também não recebe.
+
+## Painel (central)
+
+- **Motoristas aguardando aprovação:** a tela mostra os dados, a foto, o endereço, o veículo e os documentos, com os botões Aprovar e Recusar (com motivo).
+- **Chat de suporte:** lista de conversas com motoristas e passageiros, para responder com texto.
+- **Configurações dos apps:** motivos de cancelamento, etiquetas de avaliação, opcionais e os contatos (WhatsApp, telefone, site, links de termos e privacidade).

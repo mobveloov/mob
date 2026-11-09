@@ -26,3 +26,8 @@ referencia/
 
 # Acesso do ambiente de teste (senha): só no computador
 ACESSO_TESTE.txt
+
+# Prints dos apps de referência (só para estudo; podem ter dados pessoais)
+/apk motorista/
+/apk passageiro/
+/prints*/
