@@ -162,7 +162,7 @@ export function ofertaParaApp(empresaId: string, o: Oferta) {
   if (!c) return null;
   return {
     id: o.id, expira: o.expira, segundos: Math.max(0, Math.round((o.expira - Date.now()) / 1000)), distanciaKm: o.distanciaKm,
-    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome },
+    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null },
   };
 }
 

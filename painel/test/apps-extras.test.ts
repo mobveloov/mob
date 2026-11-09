@@ -86,11 +86,16 @@ test("preparo: login e motoristas online", async () => {
 
 test("paradas: entram no preço pela rota e aparecem para o motorista; no máximo 3", async () => {
   const sem = await chamar("GET", `/api/apps/${E}/estimativa?categoria=Carro&latEmbarque=${EMB.lat}&lngEmbarque=${EMB.lng}&latDestino=${DEST.lat}&lngDestino=${DEST.lng}`, undefined, tp);
-  const id = await corridaAte(tp, tm, perto.id, "a_caminho", { paradas: [PARADA] });
+  const pedido = await chamar("POST", `/api/apps/${E}/corridas`, { pedidoId: "parada-oferta-1", embarque: EMB, destino: DEST, categoria: "Carro", pagamento: "Pix", paradas: [PARADA] }, tp);
+  const oferta = await chamar("GET", `/api/apps/${E}/estado`, undefined, tm);
+  assert.equal(oferta.corpo.oferta.corrida.paradas[0].texto, "Rua C, 3", "a oferta já mostra as paradas ao motorista");
+  await chamar("POST", `/api/apps/${E}/ofertas/${oferta.corpo.oferta.id}/aceitar`, {}, tm);
+  const id = pedido.corpo.corrida.id as string;
   const c = R.listarProprias(E).find((x) => x.id === id)!;
   assert.equal(c.paradas?.length, 1);
   assert.ok(c.estimativa.valor! > sem.corpo.valor, "com parada fica mais caro (caminho maior)");
   const m = await chamar("GET", `/api/apps/${E}/corridas/${id}`, undefined, tm);
+  assert.ok(R.listarProprias(E).find((x) => x.id === id), "a corrida existe");
   assert.equal(m.corpo.corrida.paradas[0].texto, "Rua C, 3");
   await chamar("POST", `/api/apps/${E}/corridas/${id}/cancelar`, { motivo: "teste" }, tp);
   const muitas = await chamar("POST", `/api/apps/${E}/corridas`, { pedidoId: "muitas-paradas-1", embarque: EMB, destino: DEST, categoria: "Carro", pagamento: "Pix", paradas: [PARADA, PARADA, PARADA, PARADA] }, tp);
