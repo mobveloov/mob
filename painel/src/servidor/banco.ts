@@ -54,6 +54,19 @@ export function banco(): Banco {
       PRIMARY KEY (empresa, id));
     CREATE INDEX IF NOT EXISTS corridas_proprias_os ON corridas_proprias (empresa, os_num);
     CREATE INDEX IF NOT EXISTS corridas_proprias_status ON corridas_proprias (empresa, status);
+    CREATE TABLE IF NOT EXISTS app_pessoas (
+      empresa TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, codigo TEXT NOT NULL, indicado_por TEXT NOT NULL DEFAULT '', dados TEXT NOT NULL,
+      PRIMARY KEY (empresa, papel, chave));
+    CREATE INDEX IF NOT EXISTS app_pessoas_codigo ON app_pessoas (empresa, codigo);
+    CREATE INDEX IF NOT EXISTS app_pessoas_indicado ON app_pessoas (empresa, papel, indicado_por);
+    CREATE TABLE IF NOT EXISTS carteira (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, valor REAL NOT NULL, descricao TEXT NOT NULL,
+      corrida_id TEXT, em TEXT NOT NULL, por TEXT NOT NULL, PRIMARY KEY (empresa, id));
+    CREATE INDEX IF NOT EXISTS carteira_pessoa ON carteira (empresa, papel, chave, em);
+    CREATE TABLE IF NOT EXISTS saques (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, motorista TEXT NOT NULL, situacao TEXT NOT NULL, em TEXT NOT NULL, dados TEXT NOT NULL,
+      PRIMARY KEY (empresa, id));
+    CREATE INDEX IF NOT EXISTS saques_motorista ON saques (empresa, motorista, situacao);
   `);
   aberto = { arquivo, db };
   return db;

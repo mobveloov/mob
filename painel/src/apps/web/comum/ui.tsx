@@ -137,6 +137,38 @@ function TocarAudio({ corridaId, m }: { corridaId: string; m: Mensagem }) {
   return url ? <audio controls preload="metadata" src={url} /> : <span className="dica">Carregando áudio…</span>;
 }
 
+/** Voz em português do Brasil do aparelho (ou null se não houver). As vozes podem chegar depois de abrir a tela. */
+function useVozPtBr() {
+  const [voz, setVoz] = useState<SpeechSynthesisVoice | null>(null);
+  useEffect(() => {
+    const s = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    if (!s) return;
+    const escolher = () => {
+      const vozes = s.getVoices();
+      setVoz(vozes.find((v) => v.lang.replace("_", "-").toLowerCase() === "pt-br") ?? null);
+    };
+    escolher();
+    s.addEventListener?.("voiceschanged", escolher);
+    return () => { s.removeEventListener?.("voiceschanged", escolher); s.cancel(); };
+  }, []);
+  return voz;
+}
+
+function BotaoOuvir({ texto, voz }: { texto: string; voz: SpeechSynthesisVoice }) {
+  const [falando, setFalando] = useState(false);
+  const ouvir = () => {
+    const s = window.speechSynthesis;
+    s.cancel();
+    if (falando) { setFalando(false); return; }
+    const f = new SpeechSynthesisUtterance(texto);
+    f.voice = voz; f.lang = voz.lang;
+    f.onend = f.onerror = () => setFalando(false);
+    setFalando(true);
+    s.speak(f);
+  };
+  return <button type="button" className="botao-link ouvir" style={{ padding: "0 .2rem", fontSize: ".8rem", color: "inherit", opacity: 0.85 }} aria-label={falando ? "Parar de ler a mensagem" : "Ouvir a mensagem"} onClick={ouvir}>{falando ? "Parar" : "Ouvir"}</button>;
+}
+
 export function Chat({ corridaId, papel, mensagens, aberto, fechar }: { corridaId: string; papel: Papel; mensagens: Mensagem[]; aberto: boolean; fechar: () => void }) {
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState("");
@@ -144,6 +176,7 @@ export function Chat({ corridaId, papel, mensagens, aberto, fechar }: { corridaI
   const [segundos, setSegundos] = useState(0);
   const gravador = useRef(new Gravador());
   const fim = useRef<HTMLDivElement>(null);
+  const voz = useVozPtBr();
   useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth" }); }, [mensagens.length]);
   useEffect(() => {
     if (!gravando) return;
@@ -180,6 +213,7 @@ export function Chat({ corridaId, papel, mensagens, aberto, fechar }: { corridaI
           <div key={m.id} className={`balao ${m.de === papel ? "meu" : "dele"}`}>
             {m.de !== papel && <small>{m.nome}</small>}
             {m.texto && <p>{m.texto}</p>}
+            {m.texto && voz && <BotaoOuvir texto={m.texto} voz={voz} />}
             {m.audio && <TocarAudio corridaId={corridaId} m={m} />}
             <time>{new Date(m.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</time>
           </div>

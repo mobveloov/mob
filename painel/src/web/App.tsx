@@ -20,6 +20,8 @@ import Integracoes from "./paginas/Integracoes";
 import Usuarios from "./paginas/Usuarios";
 import Enderecos from "./paginas/Enderecos";
 import AppsCentral from "./apps/AppsCentral";
+import Carteiras from "./apps/Carteiras";
+import DocumentosMotoristas from "./apps/DocumentosMotoristas";
 import { BotWhatsApp, ConversasWhatsApp } from "./bot";
 import { LocaisTotem, SolicitarCorrida } from "./totem";
 import { CrmCampanhas, CrmJornadas, CrmPublico } from "./crm";
@@ -107,7 +109,7 @@ const PAGINAS: Record<string, JSX.Element> = {
   producao: <Motoristas />, nps: <Avaliacoes />, financeiro: <Financeiro />, estatisticas: <Estatisticas />, analise: <Analise />,
   // Cadastros (motoristas, passageiros, veículos, conveniadas, categorias, cupons, áreas, punições, ocorrências, objetos, desafios)
   ...Object.fromEntries(CADASTROS.map((c) => [c.funcao, <TelaCadastro key={c.id} id={c.id} />])),
-  solicitar: <SolicitarCorrida />, apps: <AppsCentral />, totem: <LocaisTotem />, bot: <BotWhatsApp />, conversas: <ConversasWhatsApp />,
+  solicitar: <SolicitarCorrida />, apps: <AppsCentral />, carteiras: <Carteiras />, documentos: <DocumentosMotoristas />, totem: <LocaisTotem />, bot: <BotWhatsApp />, conversas: <ConversasWhatsApp />,
   "crm-publico": <CrmPublico />, "crm-campanhas": <CrmCampanhas />, "crm-jornadas": <CrmJornadas />,
   marca: <MarcaAparencia />, enderecos: <Enderecos />, integracoes: <Integracoes />, usuarios: <Usuarios />,
 };

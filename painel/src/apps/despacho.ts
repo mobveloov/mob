@@ -10,7 +10,8 @@
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { atribuirMotorista, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
+import { aindaAgendada, atribuirMotorista, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
+import { filtrosDoDespacho } from "./extras.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -86,6 +87,11 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
       telefone: aberta && papel === "passageiro" ? c.telefoneMotorista : "",
     } : null,
     passageiro: { nome: c.passageiro.nome, telefone: aberta && papel === "motorista" ? c.passageiro.telefone : "" },
+    paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, comentario: c.comentario ?? "",
+    avaliacaoPassageiro: papel === "motorista" ? c.avaliacaoPassageiro ?? null : undefined,
+    taxaCancelamento: c.taxaCancelamento ?? null,
+    compartilhar: papel === "passageiro" && c.compartilhamento ? `acompanhar/${c.compartilhamento}` : null,
+    motoristaId: papel === "passageiro" ? c.motoristaId : undefined,
   };
 }
 
@@ -102,7 +108,7 @@ export function corridaDoApp(empresaId: string, id: string, papel: PapelApp, cha
 
 export function corridaAtual(empresaId: string, papel: PapelApp, chave: string): CorridaPropria | null {
   const l = listarProprias(empresaId).filter((c) => participa(c, papel, chave));
-  return l.filter((c) => ABERTA.has(c.status)).at(-1) ?? null;
+  return l.filter((c) => ABERTA.has(c.status) && !aindaAgendada(c)).at(-1) ?? null;
 }
 
 // ------------------------------------------------------------------ online e posição
@@ -156,7 +162,7 @@ export function ofertaParaApp(empresaId: string, o: Oferta) {
   if (!c) return null;
   return {
     id: o.id, expira: o.expira, segundos: Math.max(0, Math.round((o.expira - Date.now()) / 1000)), distanciaKm: o.distanciaKm,
-    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome },
+    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null },
   };
 }
 
@@ -170,13 +176,15 @@ export function despachar(empresaId: string) {
   const agora = Date.now();
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
+  const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
   let n = 0;
-  for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id)).sort((a, b) => a.solicitadaEm.localeCompare(b.solicitadaEm))) {
+  for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
     let melhor: { id: string; km: number | null } | null = null;
     for (const [id, p] of e.online) {
       if (busy.has(id) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
+      if (!filtros.podeAtender(c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
@@ -184,7 +192,9 @@ export function despachar(empresaId: string) {
       if (km != null && km > RAIO_KM()) continue;
       // Sem coordenada no embarque: vai para quem está online há mais tempo.
       const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
-      if (!melhor || (km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)) melhor = { id, km };
+      // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
+      const fav = filtros.ehFavorito(c.passageiro.telefone, id), favMelhor = !!melhor && filtros.ehFavorito(c.passageiro.telefone, melhor.id);
+      if (!melhor || (fav && !favMelhor) || (fav === favMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))) melhor = { id, km };
     }
     if (!melhor) continue;
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + OFERTA_MS(), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };

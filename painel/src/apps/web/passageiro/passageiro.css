@@ -1,0 +1,28 @@
+/* Estilos só do app do passageiro (mapa, paradas, telas da conta). */
+.mapa-real { width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--borda); position: relative; z-index: 0; isolation: isolate; background: #e8efe9; }
+.marca-ponto { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); color: #fff; font: 700 12px/20px system-ui, sans-serif; text-align: center; }
+.marca-embarque { background: var(--cor); color: var(--cor-texto); }
+.marca-parada { background: #d97706; }
+.marca-destino { background: #c0392b; }
+.marca-carro { width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 2px solid #1f2937; box-shadow: 0 2px 6px rgba(0,0,0,.35); font-size: 20px; line-height: 32px; text-align: center; }
+.tocar-mapa { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; font-size: .85rem; color: var(--suave); }
+.tocar-mapa button { border: 1px solid var(--borda); background: #fff; border-radius: 999px; padding: .35rem .8rem; cursor: pointer; font-weight: 600; }
+.tocar-mapa button.ativa { background: var(--cor); color: var(--cor-texto); border-color: var(--cor); }
+.parada { display: flex; gap: .4rem; align-items: flex-end; }
+.parada > :first-child { flex: 1; min-width: 0; }
+.parada .remover { flex: none; min-height: 46px; }
+.escolha { display: flex; border: 1px solid var(--borda); border-radius: 12px; overflow: hidden; background: #fff; }
+.escolha button { flex: 1; background: none; border: 0; padding: .7rem; font-weight: 600; cursor: pointer; color: var(--suave); }
+.escolha button.ativa { background: var(--cor); color: var(--cor-texto); }
+.lista li.clicavel { cursor: pointer; }
+.lista li .direita { text-align: right; }
+.menu { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.menu button { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--borda); padding: .95rem 1rem; text-align: left; cursor: pointer; font-weight: 600; }
+.menu button:last-child { border-bottom: 0; }
+.menu button small { color: var(--suave); font-weight: 400; }
+.codigo { font-size: 1.6rem; font-weight: 800; letter-spacing: .12em; text-align: center; color: var(--cor); }
+.barra { height: 10px; border-radius: 999px; background: var(--borda); overflow: hidden; }
+.barra > span { display: block; height: 100%; background: var(--cor); }
+.valor-mais { color: #15803d; font-weight: 700; }
+.valor-menos { color: var(--perigo); font-weight: 700; }
+textarea { resize: vertical; min-height: 80px; }

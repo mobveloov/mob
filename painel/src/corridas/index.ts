@@ -43,6 +43,10 @@ export interface NovaCorridaPropria {
   /** Distância informada por quem pediu (quando não há coordenadas). */
   distanciaKm?: number;
   cupom?: string;
+  /** Paradas no caminho, na ordem (no máximo 3). */
+  paradas?: Ponto[];
+  /** Corrida agendada: "AAAA-MM-DDTHH:MM" no horário de Brasília (de 15 min a 30 dias para frente). */
+  agendadaPara?: string;
 }
 
 export interface CorridaPropria {
@@ -71,6 +75,27 @@ export interface CorridaPropria {
   iniciadaEm: string | null;
   finalizadaEm: string | null;
   historico: Array<{ em: string; status: StatusProprio; por: string; nota?: string }>;
+  paradas?: Ponto[];
+  /** Agendada: quando buscar o motorista (padrão do painel: Brasília gravado como UTC). */
+  agendadaPara?: string | null;
+  /** Comentário do passageiro junto com a nota. */
+  comentario?: string;
+  /** Nota que o motorista deu ao passageiro. */
+  avaliacaoPassageiro?: { nota: number; comentario: string } | null;
+  /** Taxa cobrada do passageiro que cancelou depois do prazo (categoria). */
+  taxaCancelamento?: number | null;
+  /** Código do link público de acompanhamento ("compartilhar viagem"). */
+  compartilhamento?: string;
+  /** Quando o motorista foi atribuído (para a taxa de cancelamento). */
+  atribuidaEm?: string | null;
+}
+
+/** Hora de referência da corrida: a agendada (se houver) ou a do pedido. */
+export const horaDaCorrida = (c: CorridaPropria) => c.agendadaPara ?? c.solicitadaEm;
+
+/** Agendada para mais de 15 min à frente: ainda não procura motorista. */
+export function aindaAgendada(c: CorridaPropria, agora = agoraBr().getTime()) {
+  return !!c.agendadaPara && Date.parse(c.agendadaPara) - agora > 15 * 60_000;
 }
 
 // ------------------------------------------------------------------ armazenamento
@@ -186,11 +211,29 @@ const soDigitos = (s: string) => String(s ?? "").replace(/\D/g, "");
 
 /** Pede uma corrida própria. Endereço só em texto ganha coordenada pelo CNEFE (se houver); distância e tempo pela rota (OSRM, se houver). */
 export async function criarCorridaPropria(empresaId: string, pedido: NovaCorridaPropria, por = "sistema"): Promise<CorridaPropria> {
-  const n: NovaCorridaPropria = { ...pedido, embarque: completarPonto(empresaId, pedido.embarque) ?? pedido.embarque, destino: completarPonto(empresaId, pedido.destino) };
+  const pedidas = (pedido.paradas ?? []).filter((p) => String(p?.texto ?? "").trim());
+  if (pedidas.length > 3) throw new Error("No máximo 3 paradas.");
+  const paradas = pedidas.map((p) => completarPonto(empresaId, { ...p, texto: String(p.texto).trim().slice(0, 200) })!);
+  const n: NovaCorridaPropria = { ...pedido, paradas, embarque: completarPonto(empresaId, pedido.embarque) ?? pedido.embarque, destino: completarPonto(empresaId, pedido.destino) };
+  let agendadaPara: string | null = null;
+  if (pedido.agendadaPara) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(pedido.agendadaPara));
+    if (!m) throw new Error("Data do agendamento inválida.");
+    agendadaPara = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])).toISOString();
+    const falta = Date.parse(agendadaPara) - agoraBr().getTime();
+    if (falta < 15 * 60_000) throw new Error("Agende com pelo menos 15 minutos de antecedência.");
+    if (falta > 30 * 86_400_000) throw new Error("Agende para no máximo 30 dias.");
+  }
   let minutos: number | null = null;
-  if (n.distanciaKm == null && n.embarque?.lat != null && n.embarque.lng != null && n.destino?.lat != null && n.destino.lng != null) {
-    const r = await rota({ lat: n.embarque.lat, lng: n.embarque.lng }, { lat: n.destino.lat, lng: n.destino.lng });
-    n.distanciaKm = r.distanciaKm; minutos = r.minutos;
+  // Distância pela rota: embarque -> paradas -> destino (só quando todos os pontos têm coordenada).
+  const pontos = [n.embarque, ...paradas, n.destino].filter(Boolean) as Ponto[];
+  if (n.distanciaKm == null && n.destino && pontos.every((p) => p.lat != null && p.lng != null)) {
+    let km = 0, min = 0;
+    for (let i = 1; i < pontos.length; i++) {
+      const r = await rota({ lat: pontos[i - 1].lat!, lng: pontos[i - 1].lng! }, { lat: pontos[i].lat!, lng: pontos[i].lng! });
+      km += r.distanciaKm; min += r.minutos;
+    }
+    n.distanciaKm = arred(km); minutos = min;
   }
   return emFila(empresaId, () => {
     const nome = String(n.passageiro?.nome ?? "").trim().slice(0, 80);
@@ -207,8 +250,11 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
 
     const lista = listarProprias(empresaId);
     // Mesmo passageiro com corrida em aberto: não cria outra (proteção contra toque duplo).
-    const aberta = lista.find((c) => c.passageiro.telefone === telefone && GRUPO[c.status] === "aberta");
-    if (aberta) throw new Error(`Este passageiro já tem uma corrida em aberto (OS ${aberta.os}).`);
+    const doPassageiro = lista.filter((c) => c.passageiro.telefone === telefone && GRUPO[c.status] === "aberta");
+    if (!agendadaPara) {
+      const aberta = doPassageiro.find((c) => !aindaAgendada(c));
+      if (aberta) throw new Error(`Este passageiro já tem uma corrida em aberto (OS ${aberta.os}).`);
+    } else if (doPassageiro.filter((c) => aindaAgendada(c)).length >= 3) throw new Error("No máximo 3 corridas agendadas por passageiro.");
 
     const km = n.distanciaKm ?? distanciaEstimada(n.embarque, n.destino);
     const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos });
@@ -226,7 +272,10 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       valor: null, cupom: desconto ? String(n.cupom).toUpperCase() : "", desconto: desconto || null,
       canceladaPor: "", motivoCancelamento: "", avaliacao: null,
       solicitadaEm: agora, iniciadaEm: null, finalizadaEm: null,
-      historico: [{ em: agora, status: "procurando", por }],
+      historico: [{ em: agora, status: "procurando", por, ...(agendadaPara ? { nota: `Agendada para ${agendadaPara.slice(0, 16).replace("T", " ")}` } : {}) }],
+      ...(paradas.length ? { paradas } : {}),
+      ...(agendadaPara ? { agendadaPara } : {}),
+      compartilhamento: crypto.randomBytes(12).toString("base64url"),
     };
     gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
@@ -254,6 +303,7 @@ export function atribuirMotorista(empresaId: string, id: string, motoristaId: st
     if (m.status !== "Ativo") throw new Error("Este motorista não está ativo.");
     c.motoristaId = m.id; c.motorista = String(m.nome ?? ""); c.telefoneMotorista = String(m.telefone ?? "");
     const agora = agoraBr().toISOString();
+    c.atribuidaEm = agora;
     if (c.status === "procurando") c.status = "a_caminho";
     c.historico.push({ em: agora, status: c.status, por, nota: `Motorista: ${c.motorista}` });
   });
@@ -282,17 +332,38 @@ export function mudarStatus(empresaId: string, id: string, novo: StatusProprio, 
 export function cancelarCorrida(empresaId: string, id: string, quem: "Passageiro" | "Motorista" | "Central", motivo: string, por = "sistema") {
   return alterar(empresaId, id, (c) => {
     if (GRUPO[c.status] !== "aberta") throw new Error("Esta corrida já terminou.");
+    // Taxa: passageiro que cancela depois que o motorista aceitou e já passou a tolerância da categoria.
+    if (quem === "Passageiro" && c.motoristaId && (c.status === "a_caminho" || c.status === "no_local")) {
+      const cat = achar(categorias(empresaId), "nome", c.categoria);
+      const taxa = typeof cat?.taxaCancelamento === "number" ? cat.taxaCancelamento : 0;
+      const tolerancia = typeof cat?.toleranciaCancelamento === "number" ? cat.toleranciaCancelamento : 2;
+      const desde = Date.parse(c.atribuidaEm ?? c.historico.find((h) => h.status === "a_caminho")?.em ?? c.solicitadaEm);
+      if (taxa > 0 && agoraBr().getTime() - desde > tolerancia * 60_000) c.taxaCancelamento = arred(taxa);
+    }
     c.status = "cancelada"; c.canceladaPor = quem; c.motivoCancelamento = String(motivo ?? "").slice(0, 200);
     c.historico.push({ em: agoraBr().toISOString(), status: "cancelada", por, nota: `${quem}: ${c.motivoCancelamento}` });
   });
 }
 
-export function avaliar(empresaId: string, id: string, nota: number, por = "sistema") {
+export function avaliar(empresaId: string, id: string, nota: number, por = "sistema", comentario = "") {
   return alterar(empresaId, id, (c) => {
     if (c.status !== "finalizada") throw new Error("Só dá para avaliar corrida finalizada.");
     if (!(nota >= 1 && nota <= 5)) throw new Error("A nota vai de 1 a 5.");
     c.avaliacao = Math.round(nota);
+    const t = String(comentario ?? "").replace(/[<>]/g, "").trim().slice(0, 500);
+    if (t) c.comentario = t;
     c.historico.push({ em: agoraBr().toISOString(), status: c.status, por, nota: `Avaliação ${c.avaliacao}` });
+  });
+}
+
+/** Nota do motorista para o passageiro (1 a 5), só em corrida finalizada, uma vez. */
+export function avaliarPassageiro(empresaId: string, id: string, nota: number, comentario = "", por = "sistema") {
+  return alterar(empresaId, id, (c) => {
+    if (c.status !== "finalizada") throw new Error("Só dá para avaliar corrida finalizada.");
+    if (!(nota >= 1 && nota <= 5)) throw new Error("A nota vai de 1 a 5.");
+    if (c.avaliacaoPassageiro) throw new Error("Você já avaliou este passageiro.");
+    c.avaliacaoPassageiro = { nota: Math.round(nota), comentario: String(comentario ?? "").replace(/[<>]/g, "").trim().slice(0, 500) };
+    c.historico.push({ em: agoraBr().toISOString(), status: c.status, por, nota: `Nota do passageiro ${c.avaliacaoPassageiro.nota}` });
   });
 }
 
@@ -300,7 +371,7 @@ export function avaliar(empresaId: string, id: string, nota: number, por = "sist
 export function encerrarSemMotorista(empresaId: string, minutos = 20) {
   return emFila(empresaId, () => {
     const limite = agoraBr().getTime() - minutos * 60_000;
-    const mudadas = listarProprias(empresaId).filter((c) => c.status === "procurando" && Date.parse(c.solicitadaEm) < limite).map((x) => {
+    const mudadas = listarProprias(empresaId).filter((c) => c.status === "procurando" && Date.parse(horaDaCorrida(c)) < limite).map((x) => {
       const c = structuredClone(x);
       c.status = "nao_atendida"; c.historico.push({ em: agoraBr().toISOString(), status: "nao_atendida", por: "sistema" });
       return c;
@@ -320,7 +391,9 @@ export function corridaPropriaParaPainel(c: CorridaPropria, origemNome = "Própr
     solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm, finalizadaEm: c.finalizadaEm,
     categoria: c.categoria, pagamento: c.pagamento, canal: CANAL_TEXTO[c.canal] ?? c.canal,
     motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, passageiro: c.passageiro.nome, telefonePassageiro: c.passageiro.telefone,
-    embarque: c.embarque.texto, destino: c.destino?.texto ?? "", observacao: c.observacao,
+    embarque: c.embarque.texto, destino: c.destino?.texto ?? "",
+    observacao: [c.paradas?.length ? `Paradas: ${c.paradas.map((p) => p.texto).join(" → ")}` : "", c.agendadaPara ? `Agendada para ${c.agendadaPara.slice(8, 10)}/${c.agendadaPara.slice(5, 7)} ${c.agendadaPara.slice(11, 16)}` : "", c.observacao].filter(Boolean).join(" · "),
+    programada: !!c.agendadaPara,
     valor: c.valor, valorEstimado: c.estimativa.valor, valorSemDesconto: c.valor != null && c.desconto ? arred(c.valor + c.desconto) : c.valor,
     desconto: c.desconto, cupom: c.cupom, distanciaKm: c.estimativa.distanciaKm, avaliacao: c.avaliacao,
     canceladaPor: c.canceladaPor, motivoCancelamento: c.motivoCancelamento,

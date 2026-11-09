@@ -1,8 +1,16 @@
 {
   "produto": "Central UP Corridas",
   "nomeExibido": "UP Corridas",
-  "assistente": { "nome": "Assistente UP", "tom": "direto, cordial e prático" },
-  "cores": { "primaria": "#FFC400", "secundaria": "#000000", "fundo": "#F5F5F2", "texto": "#111111" },
+  "assistente": {
+    "nome": "Assistente UP",
+    "tom": "direto, cordial e prático"
+  },
+  "cores": {
+    "primaria": "#FFC400",
+    "secundaria": "#000000",
+    "fundo": "#F5F5F2",
+    "texto": "#111111"
+  },
   "fonte": "Montserrat",
   "tema": "sistema",
   "arquivos": {
@@ -20,5 +28,17 @@
   },
   "dominios": [],
   "mostrarOrigem": true,
-  "app": { "nome": "UP Corridas", "pacote": "br.com.upcorridas.central", "urlPainel": "https://painel.upcorridas.com.br" }
+  "app": {
+    "nome": "UP Corridas",
+    "pacote": "br.com.upcorridas.central",
+    "urlPainel": "https://painel.upcorridas.com.br",
+    "passageiro": {
+      "nome": "UP Corridas",
+      "pacote": "br.com.upcorridas.passageiro"
+    },
+    "motorista": {
+      "nome": "UP Corridas Motorista",
+      "pacote": "br.com.upcorridas.motorista"
+    }
+  }
 }
