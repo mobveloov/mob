@@ -1,19 +1,18 @@
 // App do motorista: entrar pelo telefone, ficar online com GPS (em segundo plano no APK), receber a chamada da
-// corrida e aceitar ou recusar, navegar até o embarque e o destino, chegar, iniciar e finalizar (com troco),
-// chat com texto e áudio, ligar, desistir ou cancelar, SOS, ganhos e histórico.
+// corrida (com paradas e agendamento) e aceitar ou recusar, mapa com a viagem, navegar até o embarque, cada parada
+// e o destino, chegar, iniciar e finalizar (com troco), nota para o passageiro, objeto esquecido, chat com texto e
+// áudio, ligar, desistir ou cancelar, SOS, ganhos, carteira e saque, histórico, documentos, preferências,
+// desafios, notificações e ajuda.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api, ErroApi, hora, ligarPush, observarPosicao, posicaoAgora, reais, telefoneBonito, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
-import { Abas, Aviso, Carregando, ServidorTeste, Cartao, Chat, Entrar, MapaSimples, mensagemDeErro, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Abas, Aviso, Carregando, ServidorTeste, Cartao, Chat, Entrar, mensagemDeErro, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Mapa, type PontoMapa } from "./Mapa";
+import { Ajuda, Carteira, DepoisDaCorrida, DetalheCorrida, Desafios, Documentos, Notificacoes, Preferencias, SaldoCarteira, temAjuda } from "./Telas";
+import { diaHora, linkNavegar, type Corrida, type Eu, type Oferta, type Ponto } from "./tipos";
 
-interface Ponto { texto: string; lat?: number; lng?: number }
-interface Corrida {
-  id: string; os: string; status: string; statusTexto: string; aberta: boolean; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string; observacao: string;
-  estimativa: { valor: number | null; distanciaKm: number | null; minutos: number | null }; valor: number | null; desconto: number | null; solicitadaEm: string; finalizadaEm: string | null;
-  passageiro: { nome: string; telefone: string };
-}
-interface Oferta { id: string; expira: number; segundos: number; distanciaKm: number | null; corrida: { id: string; os: string; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string; observacao: string; estimativa: Corrida["estimativa"]; passageiro: string } }
-interface Eu { nome: string; telefone: string; veiculo: string; placa: string; categorias: string; validadeCnh: string | null; validadeLicenciamento: string | null }
+type Aba = "inicio" | "ganhos" | "historico" | "conta";
+type TelaConta = "" | "carteira" | "documentos" | "preferencias" | "desafios" | "notificacoes" | "ajuda";
 
 export default function App() {
   const { marca, erro } = useMarca();
@@ -31,9 +30,11 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [posicao, setPosicao] = useState<Posicao | null>(null);
   const [corrida, setCorrida] = useState<Corrida | null>(null);
   const [oferta, setOferta] = useState<Oferta | null>(null);
+  const [terminada, setTerminada] = useState<Corrida | null>(null);
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [chat, setChat] = useState(false);
-  const [aba, setAba] = useState<"inicio" | "ganhos" | "historico" | "conta">("inicio");
+  const [aba, setAba] = useState<Aba>("inicio");
+  const [telaConta, setTelaConta] = useState<TelaConta>("");
   const [conectado, setConectado] = useState(false);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
@@ -104,6 +105,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, [online]);
   const posicaoRef = useRef<Posicao | null>(null);
   posicaoRef.current = posicao;
+  // Offline: pega a posição uma vez, só para mostrar no mapa da tela inicial.
+  useEffect(() => { void posicaoAgora().then((p) => setPosicao((a) => a ?? p)).catch(() => undefined); }, []);
 
   const alternarOnline = async () => {
     setErro("");
@@ -116,6 +119,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   };
   useEffect(() => { void api<{ online: boolean }>("/eu").then((r) => { if (r.online) setOnline(true); }).catch(() => undefined); }, []);
 
+  const mudarAba = (a: Aba) => { setAba(a); if (a === "conta") setTelaConta(""); };
+
   if (!eu) return <Carregando />;
   if (chat && corrida) return <Chat corridaId={corrida.id} papel="motorista" mensagens={mensagens} aberto={corrida.aberta} fechar={() => setChat(false)} />;
 
@@ -125,43 +130,63 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         <strong>{marca.nome}</strong>
         <span className="situacao">{!conectado ? "Reconectando…" : online ? (corrida ? "Em corrida" : "Online") : "Offline"}</span>
       </header>
-      {oferta && <Chamada oferta={oferta} aceitar={async () => {
-        try { const r = await api<{ corrida: Corrida }>(`/ofertas/${oferta.id}/aceitar`, { corpo: {} }); setCorrida(r.corrida); setAba("inicio"); } catch (e) { setAviso(mensagemDeErro(e)); }
+      {oferta && <Chamada oferta={oferta} posicao={posicao} aceitar={async () => {
+        try { const r = await api<{ corrida: Corrida }>(`/ofertas/${oferta.id}/aceitar`, { corpo: {} }); setCorrida(r.corrida.aberta ? r.corrida : null); setTerminada(null); setAba("inicio"); } catch (e) { setAviso(mensagemDeErro(e)); }
         setOferta(null);
       }} recusar={async () => { await api(`/ofertas/${oferta.id}/recusar`, { corpo: {} }).catch(() => undefined); setOferta(null); }} />}
       {aba === "inicio" ? (
-        corrida ? <EmCorrida corrida={corrida} posicao={posicao} mudou={(c) => setCorrida(c?.aberta ? c : null)} abrirChat={() => setChat(true)} naoLidas={mensagens.filter((m) => m.de !== "motorista").length} marca={marca} avisar={setAviso} />
-          : (
-            <div className="tela">
-              <Cartao className="interruptor">
-                <div><h2 style={{ margin: 0 }}>{online ? "Você está online" : "Você está offline"}</h2><p className="dica">{online ? "Aguardando chamadas perto de você." : "Fique online para receber chamadas."}</p></div>
-                <button className={`botao ${online ? "secundario" : ""}`} onClick={() => void alternarOnline()}>{online ? "Ficar offline" : "Ficar online"}</button>
-              </Cartao>
-              {posicao && <MapaSimples pontos={[{ ...posicao, rotulo: "Você", tipo: "eu" }]} />}
-              <Aviso texto={aviso} tipo="info" />
-              <Aviso texto={erro} />
-              <Avisos eu={eu} />
-            </div>
-          )
-      ) : aba === "ganhos" ? <Ganhos /> : aba === "historico" ? <Historico /> : (
-        <Conta eu={eu} marca={marca} sair={async () => { await api("/sair", { corpo: {} }).catch(() => undefined); setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />
-      )}
-      <Abas abas={[["inicio", corrida ? "Corrida" : "Início"], ["ganhos", "Ganhos"], ["historico", "Histórico"], ["conta", "Conta"]]} atual={aba} mudar={setAba} />
+        corrida ? <EmCorrida corrida={corrida} posicao={posicao} mudou={(c) => setCorrida(c?.aberta ? c : null)} finalizou={(c) => { setCorrida(null); setTerminada(c); }}
+          abrirChat={() => setChat(true)} naoLidas={mensagens.filter((m) => m.de !== "motorista").length} marca={marca} avisar={setAviso} />
+          : terminada ? <DepoisDaCorrida corrida={terminada} fim={() => setTerminada(null)} />
+            : (
+              <div className="tela">
+                <Cartao className="interruptor">
+                  <div><h2 style={{ margin: 0 }}>{online ? "Você está online" : "Você está offline"}</h2><p className="dica">{online ? "Aguardando chamadas perto de você." : "Fique online para receber chamadas."}</p></div>
+                  <button className={`botao ${online ? "secundario" : ""}`} onClick={() => void alternarOnline()}>{online ? "Ficar offline" : "Ficar online"}</button>
+                </Cartao>
+                {posicao ? <Mapa pontos={[{ ...posicao, rotulo: "Você", tipo: "eu" }]} altura={300} /> : <p className="dica centro">Ligue a localização para ver o mapa.</p>}
+                <Aviso texto={aviso} tipo="info" />
+                <Aviso texto={erro} />
+                <Avisos eu={eu} />
+              </div>
+            )
+      ) : aba === "ganhos" ? <Ganhos abrirCarteira={() => { setAba("conta"); setTelaConta("carteira"); }} />
+        : aba === "historico" ? <Historico />
+          : <Conta eu={eu} marca={marca} tela={telaConta} mudarTela={setTelaConta} sair={async () => { await api("/sair", { corpo: {} }).catch(() => undefined); setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />}
+      <Abas abas={[["inicio", corrida ? "Corrida" : "Início"], ["ganhos", "Ganhos"], ["historico", "Histórico"], ["conta", "Conta"]]} atual={aba} mudar={mudarAba} />
     </div>
   );
 }
 
-function Chamada({ oferta: o, aceitar, recusar }: { oferta: Oferta; aceitar: () => void; recusar: () => void }) {
+/** Pontos da viagem em ordem: embarque, paradas e destino. */
+function pontosDaViagem(c: { embarque: Ponto; paradas?: Ponto[]; destino: Ponto | null }): PontoMapa[] {
+  const l: PontoMapa[] = [];
+  const pos = (p: Ponto) => (p.lat != null && p.lng != null ? { lat: p.lat, lng: p.lng } : null);
+  const e = pos(c.embarque); if (e) l.push({ ...e, rotulo: "Embarque", tipo: "embarque" });
+  (c.paradas ?? []).forEach((p, i) => { const x = pos(p); if (x) l.push({ ...x, rotulo: `Parada ${i + 1}`, tipo: "parada" }); });
+  const d = c.destino && pos(c.destino); if (d) l.push({ ...d, rotulo: "Destino", tipo: "destino" });
+  return l;
+}
+
+function SeloAgendada({ quando }: { quando?: string | null }) {
+  return quando ? <span className="selo">Agendada para {diaHora(quando)}</span> : null;
+}
+
+function Chamada({ oferta: o, posicao, aceitar, recusar }: { oferta: Oferta; posicao: Posicao | null; aceitar: () => void; recusar: () => void }) {
   const [resta, setResta] = useState(Math.max(0, Math.round((o.expira - Date.now()) / 1000)));
   useEffect(() => { const t = setInterval(() => setResta(Math.max(0, Math.round((o.expira - Date.now()) / 1000))), 500); return () => clearInterval(t); }, [o.expira]);
   const c = o.corrida;
+  const viagem = pontosDaViagem(c);
   return (
     <div className="oferta" role="dialog" aria-label="Nova chamada">
       <Cartao>
         <h2>Nova corrida · {c.categoria}</h2>
+        <SeloAgendada quando={c.agendadaPara} />
         <div className="contador">{resta}s</div>
+        {viagem.length > 0 && <Mapa pontos={[...viagem, ...(posicao ? [{ ...posicao, rotulo: "Você", tipo: "eu" as const }] : [])]} caminho={viagem} ate={[posicao, viagem[0]]} altura={170} />}
         <dl className="dados">
           <dt>Embarque</dt><dd>{c.embarque.texto}{o.distanciaKm != null ? ` (${o.distanciaKm} km de você)` : ""}</dd>
+          {(c.paradas ?? []).map((p, i) => <Fragment key={i}><dt>Parada {i + 1}</dt><dd>{p.texto}</dd></Fragment>)}
           {c.destino && <><dt>Destino</dt><dd>{c.destino.texto}</dd></>}
           <dt>Valor</dt><dd><strong>{reais(c.estimativa.valor)}</strong>{c.estimativa.distanciaKm != null ? ` · ${c.estimativa.distanciaKm} km` : ""}</dd>
           <dt>Pagamento</dt><dd>{c.pagamento}</dd>
@@ -177,23 +202,24 @@ function Chamada({ oferta: o, aceitar, recusar }: { oferta: Oferta; aceitar: () 
   );
 }
 
-/** Abre o app de mapas do aparelho com o endereço (link geo:, qualquer app de navegação). */
-function linkNavegar(p: Ponto) {
-  if (p.lat != null && p.lng != null) return `geo:${p.lat},${p.lng}?q=${p.lat},${p.lng}(${encodeURIComponent(p.texto)})`;
-  return `geo:0,0?q=${encodeURIComponent(p.texto)}`;
-}
+// Parada em que o motorista está (guardada no aparelho, para não perder se o app fechar).
+const chaveParada = (id: string) => `parada-${id}`;
+const lerParada = (id: string) => { try { return Number(localStorage.getItem(chaveParada(id))) || 0; } catch { return 0; } };
+const gravarParada = (id: string, n: number) => { try { localStorage.setItem(chaveParada(id), String(n)); } catch { /* sem armazenamento */ } };
 
-function EmCorrida({ corrida: c, posicao, mudou, abrirChat, naoLidas, marca, avisar }: { corrida: Corrida; posicao: Posicao | null; mudou: (c: Corrida | null) => void; abrirChat: () => void; naoLidas: number; marca: MarcaApp; avisar: (s: string) => void }) {
+function EmCorrida({ corrida: c, posicao, mudou, finalizou, abrirChat, naoLidas, marca, avisar }: { corrida: Corrida; posicao: Posicao | null; mudou: (c: Corrida | null) => void; finalizou: (c: Corrida) => void; abrirChat: () => void; naoLidas: number; marca: MarcaApp; avisar: (s: string) => void }) {
   const [erro, setErro] = useState("");
   const [finalizar, setFinalizar] = useState(false);
   const [valor, setValor] = useState(c.estimativa.valor != null ? String(Math.max(0, c.estimativa.valor - (c.desconto ?? 0)).toFixed(2)) : "");
   const [recebido, setRecebido] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [parada, setParada] = useState(() => lerParada(c.id));
+  const paradas = c.paradas ?? [];
   const status = async (s: string, extra: Record<string, unknown> = {}) => {
     setErro(""); setOcupado(true);
     try {
       const r = await api<{ corrida: Corrida }>(`/corridas/${c.id}/status`, { corpo: { status: s, ...extra } });
-      if (s === "finalizada") { avisar(`Corrida finalizada: ${reais(r.corrida.valor)}.`); mudou(null); } else mudou(r.corrida);
+      if (s === "finalizada") { try { localStorage.removeItem(chaveParada(c.id)); } catch { /* sem armazenamento */ } finalizou(r.corrida); } else mudou(r.corrida);
     } catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
   };
   const cancelar = async () => {
@@ -205,14 +231,17 @@ function EmCorrida({ corrida: c, posicao, mudou, abrirChat, naoLidas, marca, avi
     if (!confirm("Avisar a central agora que você precisa de ajuda?")) return;
     try { await api(`/corridas/${c.id}/sos`, { corpo: posicao ?? {} }); avisar("A central foi avisada. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
   };
-  const alvo = c.status === "em_andamento" && c.destino ? c.destino : c.embarque;
+  const passouParada = () => { const n = parada + 1; setParada(n); gravarParada(c.id, n); };
+
+  // Próximo ponto: embarque até iniciar; depois cada parada, na ordem, e o destino.
+  const emViagem = c.status === "em_andamento";
+  const naParada = emViagem && parada < paradas.length;
+  const alvo = !emViagem ? c.embarque : naParada ? paradas[parada] : c.destino ?? c.embarque;
+  const nomeAlvo = !emViagem ? "o embarque" : naParada ? `a parada ${parada + 1}` : c.destino ? "o destino" : "o embarque";
   const valorFinal = Number(valor.replace(",", "."));
   const troco = Number(recebido.replace(",", ".")) - valorFinal;
-  const pontos = [
-    ...(c.embarque.lat != null ? [{ lat: c.embarque.lat, lng: c.embarque.lng!, rotulo: "Embarque", tipo: "embarque" as const }] : []),
-    ...(c.destino?.lat != null ? [{ lat: c.destino.lat, lng: c.destino.lng!, rotulo: "Destino", tipo: "destino" as const }] : []),
-    ...(posicao ? [{ ...posicao, rotulo: "Você", tipo: "carro" as const }] : []),
-  ];
+  const viagem = pontosDaViagem(c);
+  const pontos: PontoMapa[] = [...viagem, ...(posicao ? [{ ...posicao, rotulo: "Você", tipo: "carro" as const }] : [])];
 
   if (finalizar) return (
     <form className="tela" onSubmit={(e) => { e.preventDefault(); void status("finalizada", { valor: valorFinal }); }}>
@@ -237,8 +266,10 @@ function EmCorrida({ corrida: c, posicao, mudou, abrirChat, naoLidas, marca, avi
 
   return (
     <div className="tela">
+      {pontos.length > 0 && <Mapa pontos={pontos} caminho={viagem} ate={[posicao, alvo]} altura={260} />}
       <Cartao>
         <div className="status">{c.statusTexto}</div>
+        <SeloAgendada quando={c.agendadaPara} />
         <dl className="dados">
           <dt>OS</dt><dd>{c.os}</dd>
           <dt>Passageiro</dt><dd>{c.passageiro.nome}</dd>
@@ -248,17 +279,31 @@ function EmCorrida({ corrida: c, posicao, mudou, abrirChat, naoLidas, marca, avi
           <dt>Valor</dt><dd>{reais(c.estimativa.valor != null ? c.estimativa.valor - (c.desconto ?? 0) : null)}</dd>
           {c.observacao && <><dt>Obs.</dt><dd>{c.observacao}</dd></>}
         </dl>
+        {paradas.length > 0 && (
+          <>
+            <strong>Paradas</strong>
+            <ul className="paradas">
+              {paradas.map((p, i) => (
+                <li key={i} className={emViagem && i < parada ? "feita" : ""}>
+                  <span>{i + 1}. {p.texto}</span>
+                  <a href={linkNavegar(p)}>Navegar</a>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </Cartao>
-      {pontos.length > 0 && <MapaSimples pontos={pontos} />}
       <div className="acoes">
-        <a className="botao secundario" style={{ textAlign: "center", textDecoration: "none" }} href={linkNavegar(alvo)}>Navegar até {c.status === "em_andamento" ? "o destino" : "o embarque"}</a>
+        <a className="botao secundario" style={{ textAlign: "center", textDecoration: "none" }} href={linkNavegar(alvo)}>Navegar até {nomeAlvo}</a>
         <button className="botao secundario" onClick={abrirChat}>Mensagens{naoLidas ? ` (${naoLidas})` : ""}</button>
         {c.passageiro.telefone && <a className="botao secundario" style={{ textAlign: "center", textDecoration: "none" }} href={`tel:${c.passageiro.telefone}`}>Ligar</a>}
       </div>
       <Aviso texto={erro} />
       {c.status === "a_caminho" && <button className="botao grande" disabled={ocupado} onClick={() => void status("no_local")}>Cheguei no embarque</button>}
       {c.status === "no_local" && <button className="botao grande" disabled={ocupado} onClick={() => void status("em_andamento")}>Iniciar viagem</button>}
-      {c.status === "em_andamento" && <button className="botao grande" disabled={ocupado} onClick={() => setFinalizar(true)}>Finalizar viagem</button>}
+      {naParada && <button className="botao grande" onClick={passouParada}>Saí da parada {parada + 1}</button>}
+      {emViagem && !naParada && <button className="botao grande" disabled={ocupado} onClick={() => setFinalizar(true)}>Finalizar viagem</button>}
+      {emViagem && parada > 0 && <button className="botao-link" onClick={() => { const n = parada - 1; setParada(n); gravarParada(c.id, n); }}>Voltar uma parada</button>}
       <div className="acoes">
         <button className="botao secundario" onClick={() => void cancelar()}>{c.status === "a_caminho" ? "Desistir" : "Cancelar"}</button>
         <button className="botao sos" onClick={() => void sos()}>SOS</button>
@@ -271,11 +316,11 @@ function EmCorrida({ corrida: c, posicao, mudou, abrirChat, naoLidas, marca, avi
 function Avisos({ eu }: { eu: Eu }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const vencidos = [["CNH", eu.validadeCnh], ["Licenciamento", eu.validadeLicenciamento]].filter(([, v]) => v && String(v) < hoje);
-  return vencidos.length ? <Aviso texto={`Documento vencido: ${vencidos.map(([n]) => n).join(" e ")}. Atualize com a central.`} /> : null;
+  return vencidos.length ? <Aviso texto={`Documento vencido: ${vencidos.map(([n]) => n).join(" e ")}. Envie o novo em Conta > Documentos.`} /> : null;
 }
 
 interface Soma { corridas: number; valor: number; km: number }
-function Ganhos() {
+function Ganhos({ abrirCarteira }: { abrirCarteira: () => void }) {
   const [g, setG] = useState<{ hoje: Soma; semana: Soma; mes: Soma; ultimas: Array<{ id: string; os: string; valor: number | null; pagamento: string; finalizadaEm: string | null; destino: string }> } | null>(null);
   useEffect(() => { void api<NonNullable<typeof g>>("/ganhos").then(setG).catch(() => undefined); }, []);
   if (!g) return <Carregando />;
@@ -285,6 +330,7 @@ function Ganhos() {
       <h1>Ganhos</h1>
       {bloco("Hoje", g.hoje)}
       <div className="linha">{bloco("7 dias", g.semana)}{bloco("30 dias", g.mes)}</div>
+      <SaldoCarteira abrir={abrirCarteira} />
       <h2>Últimas corridas</h2>
       <ul className="lista">{g.ultimas.map((c) => <li key={c.id}><span>{hora(c.finalizadaEm)}<br /><small className="dica">{c.destino || `OS ${c.os}`}</small></span><span style={{ textAlign: "right" }}><strong>{reais(c.valor)}</strong><br /><small className="dica">{c.pagamento}</small></span></li>)}</ul>
     </div>
@@ -293,18 +339,43 @@ function Ganhos() {
 
 function Historico() {
   const [lista, setLista] = useState<Corrida[] | null>(null);
-  useEffect(() => { void api<{ corridas: Corrida[] }>("/corridas").then((r) => setLista(r.corridas)).catch(() => setLista([])); }, []);
+  const [aberta, setAberta] = useState<Corrida | null>(null);
+  const buscar = useCallback(() => api<{ corridas: Corrida[] }>("/corridas").then((r) => setLista(r.corridas)).catch(() => setLista([])), []);
+  useEffect(() => { void buscar(); }, [buscar]);
+  if (aberta) return <DetalheCorrida corrida={aberta} voltar={() => { setAberta(null); void buscar(); }} />;
   if (!lista) return <Carregando />;
   return (
     <div className="tela">
       <h1>Histórico</h1>
       {!lista.length && <p className="dica">Nenhuma corrida ainda.</p>}
-      <ul className="lista">{lista.map((c) => <li key={c.id}><span><strong>{hora(c.solicitadaEm)}</strong><br /><small className="dica">{c.embarque.texto}</small></span><span style={{ textAlign: "right" }}>{c.statusTexto}<br /><strong>{c.valor != null ? reais(c.valor) : ""}</strong></span></li>)}</ul>
+      <ul className="lista">
+        {lista.map((c) => (
+          <li key={c.id} className="clicavel" role="button" tabIndex={0} onClick={() => setAberta(c)} onKeyDown={(e) => { if (e.key === "Enter") setAberta(c); }}>
+            <span><strong>{hora(c.solicitadaEm)}</strong><br /><small className="dica">{c.embarque.texto}</small></span>
+            <span style={{ textAlign: "right" }}>{c.statusTexto}<br /><strong>{c.valor != null ? reais(c.valor) : ""}</strong>{c.status === "finalizada" && !c.avaliacaoPassageiro && <><br /><small className="dica">Dar nota ›</small></>}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function Conta({ eu, marca, sair }: { eu: Eu; marca: MarcaApp; sair: () => void }) {
+function Conta({ eu, marca, tela, mudarTela, sair }: { eu: Eu; marca: MarcaApp; tela: TelaConta; mudarTela: (t: TelaConta) => void; sair: () => void }) {
+  const voltar = () => mudarTela("");
+  if (tela === "carteira") return <Carteira voltar={voltar} />;
+  if (tela === "documentos") return <Documentos voltar={voltar} />;
+  if (tela === "preferencias") return <Preferencias voltar={voltar} />;
+  if (tela === "desafios") return <Desafios voltar={voltar} marca={marca} />;
+  if (tela === "notificacoes") return <Notificacoes voltar={voltar} />;
+  if (tela === "ajuda" && temAjuda(marca)) return <Ajuda voltar={voltar} marca={marca} />;
+  const itens: Array<[TelaConta, string, string]> = [
+    ["carteira", "Carteira", "Saldo, extrato e saque"],
+    ["documentos", "Documentos", "CNH, veículo e outros"],
+    ["preferencias", "Preferências de corrida", "Tipos de corrida"],
+    ["desafios", "Desafios e indicações", "Metas e seu código"],
+    ["notificacoes", "Notificações", "Avisos da central"],
+    ...(temAjuda(marca) ? [["ajuda", "Ajuda", "Fale com a central"] as [TelaConta, string, string]] : []),
+  ];
   return (
     <div className="tela">
       <h1>Conta</h1>
@@ -318,11 +389,9 @@ function Conta({ eu, marca, sair }: { eu: Eu; marca: MarcaApp; sair: () => void 
         </dl>
         <p className="dica">Para mudar seus dados, fale com a central.</p>
       </Cartao>
-      <Cartao>
-        <h2>Central</h2>
-        {marca.suporte.telefone && <a className="botao secundario" style={{ textAlign: "center", textDecoration: "none" }} href={`tel:${marca.suporte.telefone.replace(/\D/g, "")}`}>Ligar para a central</a>}
-        {marca.suporte.email && <p className="dica">E-mail: {marca.suporte.email}</p>}
-      </Cartao>
+      <ul className="menu">
+        {itens.map(([id, nome, dica]) => <li key={id}><button type="button" onClick={() => mudarTela(id)}><span>{nome}<br /><small>{dica}</small></span><span aria-hidden>›</span></button></li>)}
+      </ul>
       <button className="botao secundario" onClick={sair}>Sair</button>
     </div>
   );
