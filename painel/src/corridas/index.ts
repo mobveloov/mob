@@ -16,7 +16,7 @@ import { agoraBr, normal } from "../servidor/util.ts";
 import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
 
 export type StatusProprio = "procurando" | "a_caminho" | "no_local" | "em_andamento" | "finalizada" | "cancelada" | "nao_atendida";
-export type Canal = "painel" | "bot" | "totem" | "app";
+export type Canal = "painel" | "bot" | "totem" | "app" | "macaneta";
 
 export const STATUS_TEXTO: Record<StatusProprio, string> = {
   procurando: "Procurando motorista", a_caminho: "Motorista a caminho", no_local: "Motorista no local", em_andamento: "Em andamento",
@@ -47,6 +47,12 @@ export interface NovaCorridaPropria {
   paradas?: Ponto[];
   /** Corrida agendada: "AAAA-MM-DDTHH:MM" no horário de Brasília (de 15 min a 30 dias para frente). */
   agendadaPara?: string;
+  /** Valor que o passageiro oferece (padrão: a estimativa da categoria). Não fica abaixo do mínimo da categoria nem passa de 3× a estimativa. */
+  valorOferecido?: number;
+  /** Ids dos opcionais pedidos (porta-malas grande, encomenda...). Só recebem a corrida motoristas que oferecem todos. */
+  opcionais?: string[];
+  /** Corrida de rua do motorista (Maçaneta): não cria o passageiro no cadastro de clientes. */
+  semCadastro?: boolean;
 }
 
 export interface CorridaPropria {
@@ -88,6 +94,13 @@ export interface CorridaPropria {
   compartilhamento?: string;
   /** Quando o motorista foi atribuído (para a taxa de cancelamento). */
   atribuidaEm?: string | null;
+  /** Valor que o passageiro oferece ou que foi combinado numa contra-oferta (bruto). */
+  valorOferecido?: number | null;
+  opcionais?: string[];
+  /** Etiquetas de elogio ou problema que o passageiro marcou na avaliação. */
+  etiquetas?: string[];
+  /** Maçaneta (corrida de rua): "taximetro" cobra pela distância e pelo tempo reais; "destino" pela rota. */
+  macaneta?: { modo: "taximetro" | "destino"; km: number; ultimaLat?: number; ultimaLng?: number; ultimaEm?: number };
 }
 
 /** Hora de referência da corrida: a agendada (se houver) ou a do pedido. */
@@ -258,7 +271,16 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
 
     const km = n.distanciaKm ?? distanciaEstimada(n.embarque, n.destino);
     const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos });
-    const desconto = descontoDoCupom(empresaId, n.cupom ?? "", est.valor, n.categoria);
+    let valorOferecido: number | undefined;
+    if (n.valorOferecido != null) {
+      const v = arred(Number(n.valorOferecido));
+      if (!(v > 0)) throw new Error("Valor oferecido inválido.");
+      const minimo = typeof cat?.valorMinimo === "number" ? cat.valorMinimo : 0;
+      if (v < minimo) throw new Error(`O valor não pode ficar abaixo de R$ ${minimo.toFixed(2).replace(".", ",")} (mínimo da categoria).`);
+      if (est.valor != null && v > est.valor * 3) throw new Error("O valor oferecido está muito acima do preço estimado.");
+      if (est.valor == null || v !== est.valor) valorOferecido = v;
+    }
+    const desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria);
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);
     const corrida: CorridaPropria = {
@@ -275,14 +297,19 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       historico: [{ em: agora, status: "procurando", por, ...(agendadaPara ? { nota: `Agendada para ${agendadaPara.slice(0, 16).replace("T", " ")}` } : {}) }],
       ...(paradas.length ? { paradas } : {}),
       ...(agendadaPara ? { agendadaPara } : {}),
+      ...(valorOferecido != null ? { valorOferecido } : {}),
+      ...(n.opcionais?.length ? { opcionais: n.opcionais.slice(0, 8) } : {}),
       compartilhamento: crypto.randomBytes(12).toString("base64url"),
     };
     gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
-    mesclar(empresaId, cadastroPorId("clientes")!, [{ nome, telefone, status: "Ativo" }], por);
+    if (!n.semCadastro) mesclar(empresaId, cadastroPorId("clientes")!, [{ nome, telefone, status: "Ativo" }], por);
     return corrida;
   });
 }
+
+/** Muda uma corrida com segurança (fila por empresa). Os apps usam para valor oferecido, rota editada, taxímetro etc. */
+export const alterarCorrida = (empresaId: string, id: string, fn: (c: CorridaPropria) => void): Promise<CorridaPropria> => alterar(empresaId, id, fn);
 
 function alterar(empresaId: string, id: string, fn: (c: CorridaPropria) => void): Promise<CorridaPropria> {
   return emFila(empresaId, () => {
@@ -319,7 +346,7 @@ export function mudarStatus(empresaId: string, id: string, novo: StatusProprio, 
     if (novo === "em_andamento") c.iniciadaEm = agora;
     if (novo === "finalizada") {
       c.finalizadaEm = agora;
-      const base = extra.valor ?? c.estimativa.valor;
+      const base = extra.valor ?? c.valorOferecido ?? c.estimativa.valor;
       if (base == null || !(base >= 0)) throw new Error("Informe o valor da corrida para finalizar.");
       c.valor = arred(Math.max(0, base - (c.desconto ?? 0)));
     }
@@ -383,7 +410,7 @@ export function encerrarSemMotorista(empresaId: string, minutos = 20) {
 
 // ------------------------------------------------------------------ para as telas e a análise
 
-const CANAL_TEXTO: Record<Canal, string> = { painel: "Central", bot: "WhatsApp", totem: "Totem", app: "App" };
+const CANAL_TEXTO: Record<Canal, string> = { painel: "Central", bot: "WhatsApp", totem: "Totem", app: "App", macaneta: "Maçaneta" };
 
 export function corridaPropriaParaPainel(c: CorridaPropria, origemNome = "Próprias"): CorridaPainel {
   return {

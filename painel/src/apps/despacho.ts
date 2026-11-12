@@ -10,9 +10,15 @@
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { aindaAgendada, atribuirMotorista, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
+import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { banco } from "../servidor/banco.ts";
+import { ajustes } from "./ajustes.ts";
+import { calcularComissao, regraDeComissao } from "./comissao.ts";
+import { estatisticas, urlDaFoto } from "./perfil.ts";
+import { pessoa } from "./extras.ts";
+import { naoLidas } from "./chat.ts";
 import { filtrosDoDespacho } from "./extras.ts";
-import { linhaReta } from "../enderecos/index.ts";
+import { enderecoDoPonto, linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { arquivo, gravar, ler } from "./armazem.ts";
@@ -32,7 +38,7 @@ const REOFERTA_MS = 2 * 60_000;
 const ABERTA_COM_MOTORISTA = new Set(["a_caminho", "no_local", "em_andamento"]);
 const ABERTA = new Set(["procurando", "a_caminho", "no_local", "em_andamento"]);
 
-interface Online { lat: number; lng: number; em: number; desde: number; /** último pedido do app (qualquer um) */ visto: number }
+interface Online { lat: number; lng: number; em: number; desde: number; /** último pedido do app (qualquer um) */ visto: number; /** até quando o tempo online já foi contado */ contado: number }
 
 /**
  * Motorista que fechou o app sem ficar offline: sem nenhum pedido do app há mais que isso e sem tempo real aberto,
@@ -56,11 +62,13 @@ interface Estado {
   vistos: Map<string, string>;
   /** Já passou a primeira volta do vigia (a primeira só anota, não avisa). */
   vigiado: boolean;
+  /** corridaId → contra-ofertas dos motoristas (valem 60 s). */
+  contraofertas: Map<string, Contraoferta[]>;
 }
 const estados = new Map<string, Estado>();
 function estado(empresaId: string): Estado {
   let e = estados.get(empresaId);
-  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), vistos: new Map(), vigiado: false }));
+  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
   return e;
 }
 /** Só para os testes. */
@@ -85,14 +93,31 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
       nome: c.motorista, veiculo: String(m?.veiculo ?? ""), placa: String(m?.placa ?? ""),
       // Telefone só enquanto a corrida está aberta, e só para quem está nela.
       telefone: aberta && papel === "passageiro" ? c.telefoneMotorista : "",
+      foto: urlDaFoto(empresaId, "motorista", c.motoristaId), cor: pessoa(empresaId, "motorista", c.motoristaId).veiculos.find((v) => v.ativo)?.cor ?? "",
+      ...estatisticas(empresaId, "motorista", c.motoristaId),
     } : null,
-    passageiro: { nome: c.passageiro.nome, telefone: aberta && papel === "motorista" ? c.passageiro.telefone : "" },
+    passageiro: {
+      nome: c.passageiro.nome, telefone: aberta && papel === "motorista" ? c.passageiro.telefone : "",
+      ...(papel === "motorista" ? { foto: urlDaFoto(empresaId, "passageiro", c.passageiro.telefone), nota: estatisticas(empresaId, "passageiro", c.passageiro.telefone).nota, corridas: estatisticas(empresaId, "passageiro", c.passageiro.telefone).viagens } : {}),
+    },
+    canal: c.canal, valorOferecido: c.valorOferecido ?? null, opcionais: c.opcionais ?? [], etiquetas: c.etiquetas ?? [],
+    modo: c.macaneta?.modo, distanciaPercorridaKm: c.macaneta ? c.macaneta.km : undefined,
+    ...(papel === "passageiro" ? { ...aproximacao(empresaId, c), mensagensNaoLidas: aberta ? naoLidas(empresaId, c.id, "passageiro") : 0 } : {}),
     paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, comentario: c.comentario ?? "",
     avaliacaoPassageiro: papel === "motorista" ? c.avaliacaoPassageiro ?? null : undefined,
     taxaCancelamento: c.taxaCancelamento ?? null,
     compartilhar: papel === "passageiro" && c.compartilhamento ? `acompanhar/${c.compartilhamento}` : null,
     motoristaId: papel === "passageiro" ? c.motoristaId : undefined,
   };
+}
+
+/** Passageiro: quanto falta para o motorista chegar ao embarque (estimado pela posição dele). */
+function aproximacao(empresaId: string, c: CorridaPropria) {
+  if (!c.motoristaId || (c.status !== "a_caminho" && c.status !== "no_local")) return { distanciaMotoristaKm: null, minutosMotorista: null, chegando: c.status === "no_local" };
+  const p = estado(empresaId).online.get(c.motoristaId);
+  if (!p || c.embarque.lat == null || c.embarque.lng == null) return { distanciaMotoristaKm: null, minutosMotorista: null, chegando: c.status === "no_local" };
+  const km = linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng });
+  return { distanciaMotoristaKm: arred(km, 1), minutosMotorista: Math.max(1, Math.round(km * 2.5)), chegando: km < 0.5 || c.status === "no_local" };
 }
 
 /** A corrida só aparece para quem está nela: o passageiro dono ou o motorista atribuído. */
@@ -117,7 +142,10 @@ export function ficarOnline(empresaId: string, motoristaId: string, lat: number,
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new Error("Posição inválida. Ligue o GPS.");
   const e = estado(empresaId);
   const antes = e.online.get(motoristaId);
-  e.online.set(motoristaId, { lat, lng, em: Date.now(), desde: antes?.desde ?? Date.now(), visto: Date.now() });
+  const agora = Date.now();
+  const o: Online = { lat, lng, em: agora, desde: antes?.desde ?? agora, visto: agora, contado: antes?.contado ?? agora };
+  e.online.set(motoristaId, o);
+  contarOnline(empresaId, motoristaId, o);
   if (!antes) despachar(empresaId);
 }
 
@@ -136,6 +164,34 @@ export function atualizarPosicao(empresaId: string, motoristaId: string, lat: nu
   ficarOnline(empresaId, motoristaId, lat, lng);
   const c = corridaAtual(empresaId, "motorista", motoristaId);
   if (c && ABERTA_COM_MOTORISTA.has(c.status)) emitir(empresaId, passageiroAlvo(c), "posicao", { corridaId: c.id, lat, lng, em: Date.now() });
+  if (c?.macaneta?.modo === "taximetro" && c.status === "em_andamento") somarTaximetro(empresaId, c.id, lat, lng);
+}
+
+/** Soma o tempo online do dia (a cada posição; lacunas de mais de 2 min não contam). */
+function contarOnline(empresaId: string, motoristaId: string, o: Online) {
+  const agora = Date.now();
+  const delta = Math.min(agora - o.contado, 120_000);
+  o.contado = agora;
+  if (delta < 1000) return;
+  try {
+    banco().prepare(`INSERT INTO app_online (empresa, motorista, dia, segundos) VALUES (?, ?, ?, ?)
+      ON CONFLICT (empresa, motorista, dia) DO UPDATE SET segundos = segundos + excluded.segundos`).run(empresaId, motoristaId, agoraBr().toISOString().slice(0, 10), Math.round(delta / 1000));
+  } catch { /* contagem é só estatística */ }
+}
+
+/** Maçaneta em modo taxímetro: soma a distância andada (ignora saltos de mais de 300 m em 5 s e tremidas de GPS). */
+function somarTaximetro(empresaId: string, corridaId: string, lat: number, lng: number) {
+  void alterarCorrida(empresaId, corridaId, (x) => {
+    const m = x.macaneta;
+    if (!m) return;
+    const agora = Date.now();
+    if (m.ultimaLat != null && m.ultimaLng != null && m.ultimaEm) {
+      const metros = linhaReta({ lat: m.ultimaLat, lng: m.ultimaLng }, { lat, lng }) * 1000;
+      const seg = Math.max((agora - m.ultimaEm) / 1000, 1);
+      if (metros >= 5 && metros / seg <= 60) m.km = arred(m.km + metros / 1000, 3);
+    }
+    m.ultimaLat = lat; m.ultimaLng = lng; m.ultimaEm = agora;
+  }).catch(() => undefined);
 }
 
 export function posicaoDoMotorista(empresaId: string, motoristaId: string) {
@@ -145,7 +201,8 @@ export function posicaoDoMotorista(empresaId: string, motoristaId: string) {
 
 // ------------------------------------------------------------------ oferta
 
-const ocupados = (lista: CorridaPropria[]) => new Set(lista.filter((c) => c.motoristaId && ABERTA_COM_MOTORISTA.has(c.status)).map((c) => c.motoristaId!));
+// Corrida agendada para daqui a dias, mesmo com motorista, não deixa ele ocupado agora.
+const ocupados = (lista: CorridaPropria[]) => new Set(lista.filter((c) => c.motoristaId && ABERTA_COM_MOTORISTA.has(c.status) && !aindaAgendada(c)).map((c) => c.motoristaId!));
 
 /** O motorista pode levar essa categoria? Campo "categorias" vazio no cadastro = todas. */
 function habilitado(cadastro: Record<string, unknown> | undefined, categoria: string) {
@@ -157,12 +214,35 @@ export function ofertaDoMotorista(empresaId: string, motoristaId: string) {
   return [...estado(empresaId).ofertas.values()].find((o) => o.motoristaId === motoristaId && o.expira > Date.now()) ?? null;
 }
 
+/** Valor da corrida para o motorista: bruto (o que o passageiro paga), taxa da central e líquido (o que sobra para ele). */
+export function valoresDaCorrida(empresaId: string, c: CorridaPropria, motoristaId?: string) {
+  const base = c.valorOferecido ?? c.estimativa.valor;
+  if (base == null) return { valorBruto: null as number | null, taxaCentral: null as number | null, valorLiquido: null as number | null, ganhoPorKm: null as number | null };
+  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(base - (c.desconto ?? 0))), motoristaId);
+  const km = c.estimativa.distanciaKm;
+  return { valorBruto: co.valorBruto, taxaCentral: co.taxaCentral, valorLiquido: co.valorLiquido, ganhoPorKm: km && km > 0 ? arred(co.valorLiquido / km) : null };
+}
+
+/** O que a tela de chamada mostra além do básico: valores, nota do passageiro, tempo até ele, opcionais. */
+function extrasDaChamada(empresaId: string, c: CorridaPropria, motoristaId: string, distanciaKm: number | null) {
+  const est = estatisticas(empresaId, "passageiro", c.passageiro.telefone);
+  const nomes = new Map(ajustes(empresaId).opcionais.map((o) => [o.id, o.nome]));
+  return {
+    valorOferecido: c.valorOferecido ?? null, opcionais: (c.opcionais ?? []).map((id) => nomes.get(id) ?? id),
+    nota: est.nota, viagens: est.viagens,
+    minutosAteEmbarque: distanciaKm != null ? Math.max(1, Math.round(distanciaKm * 2.5)) : null,
+    distanciaViagemKm: c.estimativa.distanciaKm,
+    ...valoresDaCorrida(empresaId, c, motoristaId), regraComissao: regraDeComissao(empresaId, c.categoria, motoristaId),
+  };
+}
+
 export function ofertaParaApp(empresaId: string, o: Oferta) {
   const c = listarProprias(empresaId).find((x) => x.id === o.corridaId);
   if (!c) return null;
+  const extras = extrasDaChamada(empresaId, c, o.motoristaId, o.distanciaKm);
   return {
-    id: o.id, expira: o.expira, segundos: Math.max(0, Math.round((o.expira - Date.now()) / 1000)), distanciaKm: o.distanciaKm,
-    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null },
+    id: o.id, expira: o.expira, segundos: Math.max(0, Math.round((o.expira - Date.now()) / 1000)), distanciaKm: o.distanciaKm, ...extras,
+    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, ...extras },
   };
 }
 
@@ -268,6 +348,11 @@ export function vigiar(empresaId: string) {
   const primeiraVez = !e.vigiado;
   e.vigiado = true;
   const limite = agoraBr().getTime() - 24 * 3600_000;
+  // Chamada pendente de corrida que já não procura motorista (aceita por outro, cancelada, contra-oferta aceita): some, sempre.
+  if (e.ofertas.size) {
+    const porId = new Map(lista.map((c) => [c.id, c]));
+    for (const o of [...e.ofertas.values()]) if (porId.get(o.corridaId)?.status !== "procurando") { e.ofertas.delete(o.id); emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id }); }
+  }
   for (const c of lista) {
     if (!ABERTA.has(c.status) && Date.parse(c.solicitadaEm) < limite) continue;
     const a = assinatura(c), antes = e.vistos.get(c.id);
@@ -334,6 +419,150 @@ export function iniciarApps(intervaloMs = 2000) {
   relogio.unref();
 }
 
+// ------------------------------------------------------------------ corridas abertas, pegar e contra-oferta
+
+export interface Contraoferta { id: string; corridaId: string; motoristaId: string; valor: number; expira: number; distanciaKm: number | null }
+const CONTRA_MS = 60_000;
+
+/** Valor mínimo da categoria (o passageiro e o motorista não passam abaixo disso). */
+export const descontoPeloValor = (empresaId: string, c: CorridaPropria, valor: number) => descontoDoCupom(empresaId, c.cupom, valor, c.categoria);
+export const minimoDaCategoria = (empresaId: string, nome: string) => {
+  const c = listar(empresaId, cadastroPorId("categorias")!).find((x) => normal(String(x.nome ?? "")) === normal(nome));
+  return typeof c?.valorMinimo === "number" ? c.valorMinimo : 0;
+};
+
+const kmAteEmbarque = (e: Estado, motoristaId: string, c: CorridaPropria): number | null => {
+  const p = e.online.get(motoristaId);
+  return p && c.embarque.lat != null && c.embarque.lng != null ? arred(linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }), 1) : null;
+};
+
+function dadosDaLista(empresaId: string, c: CorridaPropria, motoristaId: string, km: number | null) {
+  return {
+    id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
+    estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null,
+    status: c.status, statusTexto: STATUS_TEXTO[c.status], solicitadaEm: c.solicitadaEm, distanciaKm: km, ...extrasDaChamada(empresaId, c, motoristaId, km),
+  };
+}
+
+/** As três abas do motorista: Disponíveis (pode pegar já), Pendentes (aceitas que ainda não começaram) e Programadas (agendadas). */
+export function corridasAbertas(empresaId: string, motoristaId: string) {
+  const e = estado(empresaId);
+  const lista = listarProprias(empresaId);
+  const cad = motorista(empresaId, motoristaId);
+  const filtros = filtrosDoDespacho(empresaId);
+  const pode = (c: CorridaPropria) => !!cad && cad.status === "Ativo" && filtros.podeAtender(c, motoristaId) && habilitado(cad, c.categoria);
+  const noRaio = (c: CorridaPropria) => { const km = kmAteEmbarque(e, motoristaId, c); return km == null || km <= RAIO_KM(); };
+  const procurando = lista.filter((c) => c.status === "procurando" && pode(c) && noRaio(c));
+  const porDistancia = (a: CorridaPropria, b: CorridaPropria) => (kmAteEmbarque(e, motoristaId, a) ?? Infinity) - (kmAteEmbarque(e, motoristaId, b) ?? Infinity);
+  const item = (c: CorridaPropria) => dadosDaLista(empresaId, c, motoristaId, kmAteEmbarque(e, motoristaId, c));
+  return {
+    disponiveis: procurando.filter((c) => !aindaAgendada(c)).sort(porDistancia).slice(0, 30).map(item),
+    pendentes: lista.filter((c) => c.motoristaId === motoristaId && (c.status === "a_caminho" || c.status === "no_local")).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b))).map(item),
+    programadas: procurando.filter((c) => aindaAgendada(c)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b))).slice(0, 30).map(item),
+  };
+}
+
+/** Pega uma corrida da lista (disponível ou programada) se ainda estiver livre. */
+export async function pegarCorrida(empresaId: string, motoristaId: string, corridaId: string): Promise<CorridaPropria> {
+  const e = estado(empresaId);
+  if (!e.online.has(motoristaId)) throw new Error("Fique online para pegar corridas.");
+  const lista = listarProprias(empresaId);
+  const c = lista.find((x) => x.id === corridaId);
+  if (!c || c.status !== "procurando") throw new Error("Esta corrida não está mais disponível.");
+  if (!aindaAgendada(c) && ocupados(lista).has(motoristaId)) throw new Error("Termine a corrida em andamento antes de pegar outra.");
+  const cad = motorista(empresaId, motoristaId);
+  if (!cad || !filtrosDoDespacho(empresaId).podeAtender(c, motoristaId) || !habilitado(cad, c.categoria)) throw new Error("Esta corrida não é para você.");
+  const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
+  if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
+  e.contraofertas.delete(c.id);
+  vigiar(empresaId);
+  return feita;
+}
+
+/** O motorista propõe outro valor (bruto) para uma corrida que procura motorista. Vale 60 s. */
+export function registrarContraoferta(empresaId: string, motoristaId: string, corridaId: string, valorBruto: unknown): Contraoferta {
+  const e = estado(empresaId);
+  if (!e.online.has(motoristaId)) throw new Error("Fique online para mandar uma contra-oferta.");
+  const lista = listarProprias(empresaId);
+  const c = lista.find((x) => x.id === corridaId);
+  if (!c || c.status !== "procurando") throw new Error("Esta corrida não está mais disponível.");
+  if (ocupados(lista).has(motoristaId)) throw new Error("Termine a corrida em andamento antes.");
+  const cad = motorista(empresaId, motoristaId);
+  if (!cad || cad.status !== "Ativo" || !filtrosDoDespacho(empresaId).podeAtender(c, motoristaId) || !habilitado(cad, c.categoria)) throw new Error("Esta corrida não é para você.");
+  const valor = arred(Number(valorBruto));
+  const base = c.valorOferecido ?? c.estimativa.valor;
+  if (!(valor > 0)) throw new Error("Valor inválido.");
+  if (valor < minimoDaCategoria(empresaId, c.categoria)) throw new Error("O valor está abaixo do mínimo da categoria.");
+  if (base != null && valor > base * 3) throw new Error("O valor está muito acima do oferecido.");
+  const o: Contraoferta = { id: crypto.randomUUID(), corridaId, motoristaId, valor, expira: Date.now() + CONTRA_MS, distanciaKm: kmAteEmbarque(e, motoristaId, c) };
+  const outras = (e.contraofertas.get(corridaId) ?? []).filter((x) => x.motoristaId !== motoristaId && x.expira > Date.now());
+  e.contraofertas.set(corridaId, [...outras, o]);
+  emitir(empresaId, passageiroAlvo(c), "contraoferta", { corridaId, id: o.id, valor });
+  void avisar(empresaId, passageiroAlvo(c), { titulo: "Nova oferta de motorista", texto: `${cad.nome ?? "Um motorista"} oferece R$ ${valor.toFixed(2).replace(".", ",")}.`, dados: { tipo: "contraoferta", corridaId }, canal: "corridas" });
+  return o;
+}
+
+export const contraofertasDaCorrida = (empresaId: string, corridaId: string): Contraoferta[] =>
+  (estado(empresaId).contraofertas.get(corridaId) ?? []).filter((o) => o.expira > Date.now());
+
+/** O passageiro aceita uma contra-oferta: a corrida fica com esse motorista, no valor dele. */
+export async function aceitarContraoferta(empresaId: string, telefone: string, corridaId: string, ofertaId: string): Promise<CorridaPropria> {
+  const e = estado(empresaId);
+  const c = corridaDoApp(empresaId, corridaId, "passageiro", telefone);
+  if (c.status !== "procurando") throw new Error("A corrida já tem motorista.");
+  const o = contraofertasDaCorrida(empresaId, corridaId).find((x) => x.id === ofertaId);
+  if (!o) throw new Error("Esta oferta já venceu.");
+  if (!e.online.has(o.motoristaId) || ocupados(listarProprias(empresaId)).has(o.motoristaId)) throw new Error("Este motorista não está mais disponível.");
+  await alterarCorrida(empresaId, c.id, (x) => { x.valorOferecido = o.valor; x.desconto = descontoDoCupom(empresaId, x.cupom, o.valor, x.categoria) || null; });
+  const feita = await atribuirMotorista(empresaId, c.id, o.motoristaId, "contra-oferta aceita");
+  const outras = e.contraofertas.get(corridaId) ?? [];
+  e.contraofertas.delete(corridaId);
+  for (const x of outras) if (x.id !== o.id) emitir(empresaId, motoristaAlvo(x.motoristaId), "contraoferta_encerrada", { corridaId, id: x.id });
+  vigiar(empresaId);
+  return feita;
+}
+
+/** O passageiro mudou o valor oferecido: quem está com a chamada na tela recebe o valor novo. */
+export function atualizarOferta(empresaId: string, corridaId: string) {
+  const e = estado(empresaId);
+  for (const o of e.ofertas.values()) if (o.corridaId === corridaId) emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta", ofertaParaApp(empresaId, o));
+}
+
+// ------------------------------------------------------------------ maçaneta (corrida de rua)
+
+/** O motorista pega um passageiro na rua: a corrida já nasce com ele e já em andamento. */
+export async function criarMacaneta(empresaId: string, motoristaId: string, d: { modo: "taximetro" | "destino"; categoria: string; destino?: Ponto; lat: number; lng: number; passageiro?: { nome?: string; telefone?: string } }): Promise<CorridaPropria> {
+  const e = estado(empresaId);
+  if (!e.online.has(motoristaId)) throw new Error("Fique online para abrir uma corrida.");
+  const lista = listarProprias(empresaId);
+  if (ocupados(lista).has(motoristaId)) throw new Error("Você já está em uma corrida.");
+  const cad = motorista(empresaId, motoristaId);
+  if (!cad || cad.status !== "Ativo") throw new Error("Seu cadastro ainda não foi aprovado.");
+  if (d.modo === "destino" && !d.destino?.texto?.trim()) throw new Error("Informe o destino.");
+  const fone = String(d.passageiro?.telefone ?? "").replace(/\D/g, "");
+  const temFone = fone.length >= 10 && fone.length <= 13;
+  // Sem telefone do passageiro: um número só deste motorista (a corrida não entra no cadastro de passageiros).
+  const telefone = temFone ? fone : `00${crypto.createHash("sha256").update(motoristaId).digest("hex").replace(/\D/g, "").padEnd(9, "7").slice(0, 9)}`;
+  const aqui = enderecoDoPonto(empresaId, d.lat, d.lng);
+  const nova = await criarCorridaPropria(empresaId, {
+    passageiro: { nome: String(d.passageiro?.nome ?? "").trim() || "Passageiro de rua", telefone },
+    embarque: { texto: aqui?.texto ?? "Embarque na rua (posição do motorista)", lat: d.lat, lng: d.lng },
+    destino: d.modo === "destino" ? d.destino : undefined, categoria: d.categoria, pagamento: "Dinheiro", canal: "macaneta", semCadastro: !temFone,
+  }, "maçaneta");
+  await atribuirMotorista(empresaId, nova.id, motoristaId, "maçaneta");
+  await mudarStatus(empresaId, nova.id, "em_andamento", {}, "maçaneta");
+  const feita = await alterarCorrida(empresaId, nova.id, (x) => { x.macaneta = { modo: d.modo, km: 0, ultimaLat: d.lat, ultimaLng: d.lng, ultimaEm: Date.now() }; });
+  vigiar(empresaId);
+  return feita;
+}
+
+/** Valor final da maçaneta em taxímetro: tarifa da categoria sobre a distância e o tempo reais. */
+export function valorDoTaximetro(empresaId: string, c: CorridaPropria): number | null {
+  if (c.macaneta?.modo !== "taximetro") return null;
+  const minutos = c.iniciadaEm ? Math.max(1, Math.round((agoraBr().getTime() - Date.parse(c.iniciadaEm)) / 60_000)) : null;
+  return estimarPreco(empresaId, { categoria: c.categoria, distanciaKm: c.macaneta.km, minutos }).valor;
+}
+
 // ------------------------------------------------------------------ ganhos e central
 
 export function ganhos(empresaId: string, motoristaId: string) {
@@ -345,6 +574,44 @@ export function ganhos(empresaId: string, motoristaId: string) {
   return {
     hoje: soma(fin.filter((c) => c.finalizadaEm!.slice(0, 10) === hoje)), semana: soma(desde(7)), mes: soma(desde(30)),
     ultimas: fin.slice(-20).reverse().map((c) => ({ id: c.id, os: c.os, valor: c.valor, pagamento: c.pagamento, finalizadaEm: c.finalizadaEm, destino: c.destino?.texto ?? "" })),
+  };
+}
+
+/** Ganhos de uma semana (segunda a domingo) ou de um mês, com tempo online e em viagem, por dia e por forma de pagamento. */
+export function ganhosPeriodo(empresaId: string, motoristaId: string, periodo: "mes" | "semana", mesPedido?: string) {
+  const hoje = agoraBr();
+  const dia = (d: Date) => d.toISOString().slice(0, 10);
+  let inicio: Date, fim: Date;
+  if (periodo === "semana") {
+    inicio = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate() - ((hoje.getUTCDay() + 6) % 7)));
+    fim = new Date(inicio.getTime() + 6 * 86_400_000);
+  } else {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(mesPedido ?? ""));
+    const ano = m ? +m[1] : hoje.getUTCFullYear(), mes = m && +m[2] >= 1 && +m[2] <= 12 ? +m[2] - 1 : hoje.getUTCMonth();
+    inicio = new Date(Date.UTC(ano, mes, 1)); fim = new Date(Date.UTC(ano, mes + 1, 0));
+  }
+  const [de, ate] = [dia(inicio), dia(fim)];
+  const fin = listarProprias(empresaId).filter((c) => c.motoristaId === motoristaId && c.status === "finalizada" && c.finalizadaEm && c.finalizadaEm.slice(0, 10) >= de && c.finalizadaEm.slice(0, 10) <= ate);
+  const porDiaMapa = new Map<string, number>();
+  for (let t = inicio.getTime(); t <= fim.getTime(); t += 86_400_000) porDiaMapa.set(dia(new Date(t)), 0);
+  const porPag = new Map<string, { valor: number; corridas: number }>();
+  let total = 0, emViagem = 0;
+  for (const c of fin) {
+    const v = c.valor ?? 0;
+    total += v;
+    porDiaMapa.set(c.finalizadaEm!.slice(0, 10), (porDiaMapa.get(c.finalizadaEm!.slice(0, 10)) ?? 0) + v);
+    const g = porPag.get(c.pagamento) ?? { valor: 0, corridas: 0 };
+    porPag.set(c.pagamento, { valor: g.valor + v, corridas: g.corridas + 1 });
+    if (c.iniciadaEm) emViagem += Math.max(0, (Date.parse(c.finalizadaEm!) - Date.parse(c.iniciadaEm)) / 60_000);
+  }
+  let online = 0;
+  try { online = (banco().prepare("SELECT COALESCE(SUM(segundos), 0) AS s FROM app_online WHERE empresa = ? AND motorista = ? AND dia BETWEEN ? AND ?").get(empresaId, motoristaId, de, ate) as { s: number }).s / 60; } catch { /* sem contagem */ }
+  const lista = [...fin].sort((a, b) => b.finalizadaEm!.localeCompare(a.finalizadaEm!)).map((c) => ({ id: c.id, os: c.os, em: c.finalizadaEm, valor: c.valor, passageiro: c.passageiro.nome, pagamento: c.pagamento, embarque: c.embarque.texto, destino: c.destino?.texto ?? "" }));
+  return {
+    periodo, de, ate, total: arred(total), viagens: fin.length, minutosOnline: Math.round(online), minutosEmViagem: Math.round(emViagem),
+    porDia: [...porDiaMapa].map(([d, valor]) => ({ dia: d, valor: arred(valor) })),
+    porPagamento: [...porPag].map(([pagamento, g]) => ({ pagamento, valor: arred(g.valor), corridas: g.corridas })),
+    lista, realizadas: lista,
   };
 }
 
