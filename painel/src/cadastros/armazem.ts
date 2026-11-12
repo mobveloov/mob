@@ -103,6 +103,22 @@ export function atualizar(empresaId: string, cad: Cadastro, id: string, entrada:
   return lista[i];
 }
 
+/**
+ * Muda só alguns campos de um registro (os apps usam: o resto do registro fica como está).
+ * Cada campo passa pela mesma conferência do formulário; campo calculado ou desconhecido é ignorado.
+ */
+export function alterarCampos(empresaId: string, cad: Cadastro, id: string, mudancas: Record<string, unknown>, por: string): Registro {
+  const lista = [...listar(empresaId, cad)]; // cópia: o cache é só leitura
+  const i = lista.findIndex((r) => r.id === id);
+  if (i < 0) throw new Error(`${cad.singular[0].toUpperCase()}${cad.singular.slice(1)} não encontrado.`);
+  const dados: Record<string, Valor> = {};
+  for (const c of cad.campos) if (!c.calculado && c.chave in mudancas) dados[c.chave] = limparCampo(c, mudancas[c.chave]);
+  conferirUnico(cad, lista, { ...lista[i], ...dados }, id);
+  lista[i] = { ...lista[i], ...dados, atualizadoEm: new Date().toISOString(), atualizadoPor: por };
+  gravar(empresaId, cad, lista);
+  return lista[i];
+}
+
 export function remover(empresaId: string, cad: Cadastro, id: string) {
   const lista = listar(empresaId, cad);
   if (!lista.some((r) => r.id === id)) throw new Error("Registro não encontrado.");
