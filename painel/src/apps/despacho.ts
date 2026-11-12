@@ -47,6 +47,16 @@ export function marcarVisto(empresaId: string, motoristaId: string) {
 }
 export interface Oferta { id: string; corridaId: string; motoristaId: string; expira: number; distanciaKm: number | null }
 
+/** O que aconteceu com uma oferta (para a auditoria "ondas de envio" da central, em src/operacao). */
+export type FimOferta = "oferecida" | "aceitou" | "recusou" | "expirou" | "saiu";
+type OuvinteOferta = (empresaId: string, o: Oferta, fim: FimOferta) => void;
+const ouvintesOferta: OuvinteOferta[] = [];
+/** Registra quem quer saber de cada oferta (criada, aceita, recusada, vencida). */
+export const aoMudarOferta = (f: OuvinteOferta) => { if (!ouvintesOferta.includes(f)) ouvintesOferta.push(f); };
+function avisarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
+  for (const f of ouvintesOferta) { try { f(empresaId, o, fim); } catch (e) { console.error("[apps] ouvinte de oferta:", e instanceof Error ? e.message : e); } }
+}
+
 interface Estado {
   online: Map<string, Online>;
   ofertas: Map<string, Oferta>;
@@ -124,7 +134,7 @@ export function ficarOnline(empresaId: string, motoristaId: string, lat: number,
 export function ficarOffline(empresaId: string, motoristaId: string) {
   const e = estado(empresaId);
   e.online.delete(motoristaId);
-  for (const o of [...e.ofertas.values()]) if (o.motoristaId === motoristaId) passarOferta(empresaId, o);
+  for (const o of [...e.ofertas.values()]) if (o.motoristaId === motoristaId) passarOferta(empresaId, o, "saiu");
 }
 
 export const estaOnline = (empresaId: string, motoristaId: string) => estado(empresaId).online.has(motoristaId);
@@ -199,6 +209,7 @@ export function despachar(empresaId: string) {
     if (!melhor) continue;
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + OFERTA_MS(), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
+    avisarOferta(empresaId, o, "oferecida");
     comOferta.add(melhor.id);
     emitir(empresaId, motoristaAlvo(melhor.id), "oferta", ofertaParaApp(empresaId, o));
     void avisar(empresaId, motoristaAlvo(melhor.id), {
@@ -210,9 +221,10 @@ export function despachar(empresaId: string) {
   return n;
 }
 
-function passarOferta(empresaId: string, o: Oferta) {
+function passarOferta(empresaId: string, o: Oferta, fim: FimOferta = "expirou") {
   const e = estado(empresaId);
   e.ofertas.delete(o.id);
+  avisarOferta(empresaId, o, fim);
   const t = e.tentados.get(o.corridaId) ?? new Map<string, number>();
   t.set(o.motoristaId, Date.now());
   e.tentados.set(o.corridaId, t);
@@ -222,7 +234,7 @@ function passarOferta(empresaId: string, o: Oferta) {
 export function recusar(empresaId: string, motoristaId: string, ofertaId: string) {
   const o = estado(empresaId).ofertas.get(ofertaId);
   if (!o || o.motoristaId !== motoristaId) throw new Error("Esta chamada já passou.");
-  passarOferta(empresaId, o);
+  passarOferta(empresaId, o, "recusou");
   despachar(empresaId);
 }
 
@@ -235,6 +247,7 @@ export async function aceitar(empresaId: string, motoristaId: string, ofertaId: 
   if (!c || c.status !== "procurando") throw new Error("Esta corrida não está mais disponível.");
   const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
   if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
+  avisarOferta(empresaId, o, "aceitou");
   e.tentados.delete(c.id);
   vigiar(empresaId);
   return feita;
@@ -313,7 +326,7 @@ function limparMemoria(empresaId: string, e: Estado, agora: number) {
 export function ciclo(empresaId: string) {
   const e = estado(empresaId);
   const agora = Date.now();
-  for (const o of [...e.ofertas.values()]) if (o.expira <= agora) passarOferta(empresaId, o);
+  for (const o of [...e.ofertas.values()]) if (o.expira <= agora) passarOferta(empresaId, o, "expirou");
   for (const [id, p] of e.online) if (agora - p.em > 2 * POSICAO_MS) e.online.delete(id);
   limparMemoria(empresaId, e, agora);
   vigiar(empresaId);
