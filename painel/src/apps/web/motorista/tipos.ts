@@ -23,7 +23,7 @@ export interface DadosChamada {
   valorOferecido?: number | null; opcionais?: string[]; nota?: number | null; viagens?: number | null;
   /** Calculados no servidor: bruto (o que o passageiro paga), taxa da central e líquido (o que o motorista recebe). */
   valorBruto?: number | null; taxaCentral?: number | null; valorLiquido?: number | null; ganhoPorKm?: number | null;
-  regraComissao?: { tipo: "Percentual" | "Valor fixo" | ""; valor: number } | null;
+  tabelaLiquido?: Array<{ valor: number; bruto: number; taxa: number; liquido: number }>;
   minutosAteEmbarque?: number | null; distanciaViagemKm?: number | null;
 }
 export interface Oferta { id: string; expira: number; segundos: number; distanciaKm: number | null; corrida: DadosChamada }

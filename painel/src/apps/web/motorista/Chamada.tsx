@@ -13,13 +13,10 @@ import { diaHora, distanciaTexto, nomePassageiro, notaPassageiro, valorDe, type 
 const PASSO = 1;
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
-/** Mesma conta do servidor (apps/comissao.ts): percentual ou valor fixo, sem passar do bruto, em centavos. */
-export function liquidoDe(bruto: number, regra?: DadosChamada["regraComissao"] | null) {
-  const b = centavos(Math.max(0, bruto));
-  let taxa = 0;
-  if (regra && regra.valor > 0) taxa = regra.tipo === "Percentual" ? (b * Math.min(regra.valor, 100)) / 100 : regra.tipo === "Valor fixo" ? regra.valor : 0;
-  taxa = centavos(Math.min(Math.max(taxa, 0), b));
-  return { bruto: b, taxa, liquido: centavos(b - taxa) };
+/** Líquido de um valor proposto: vem da tabela que o servidor mandou (com a comissão do painel: percentual, fixo, faixas ou regra do motorista). */
+export function liquidoDe(valor: number, tabela?: DadosChamada["tabelaLiquido"] | null) {
+  const l = tabela?.find((x) => Math.abs(x.valor - valor) < 0.005);
+  return l ? { bruto: l.bruto, taxa: l.taxa, liquido: l.liquido } : null;
 }
 
 export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = true, aceitar, recusar, rotuloRecusar = "Recusar", erro }: {
@@ -27,7 +24,6 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
   aceitar: (valor: number | null, contraoferta: boolean) => Promise<void> | void; recusar: () => void; rotuloRecusar?: string; erro?: string;
 }) {
   const base = valorDe(c);                       // valor da corrida antes do cupom (é o que a contra-oferta muda)
-  const desconto = Math.max(0, c.estimativa?.valor != null && c.valorBruto != null && base != null ? base - c.valorBruto : 0);
   const [valor, setValor] = useState(base);
   const [ocupado, setOcupado] = useState(false);
   const [resta, setResta] = useState(() => (expira ? Math.max(0, Math.round((expira - Date.now()) / 1000)) : 0));
@@ -50,14 +46,20 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
 
   const contra = valor != null && base != null && Math.abs(valor - base) >= 0.01;
   // Valor do servidor enquanto não mexeu; ao mexer, a mesma conta feita aqui com a regra de comissão que ele mandou.
-  const v = valor == null ? null : liquidoDe(valor - desconto, c.regraComissao);
+  const v = valor == null ? null : liquidoDe(valor, c.tabelaLiquido);
   const bruto = contra || c.valorBruto == null ? v?.bruto ?? null : c.valorBruto;
   const taxa = contra || c.taxaCentral == null ? v?.taxa ?? null : c.taxaCentral;
   const liquido = contra || c.valorLiquido == null ? v?.liquido ?? null : c.valorLiquido;
   const km = c.distanciaViagemKm ?? c.estimativa?.distanciaKm ?? null;
   const porKm = liquido != null && km ? centavos(liquido / km) : c.ganhoPorKm ?? null;
   const nota = notaPassageiro(c);
-  const mudar = (d: number) => setValor((x) => (x == null ? x : Math.max(1, centavos(x + d))));
+  // Só dá para propor os valores da tabela do servidor (de R$ 5 a menos até R$ 10 a mais, e nunca abaixo do mínimo da categoria).
+  const valores = (c.tabelaLiquido ?? []).map((x) => x.valor);
+  const mudar = (d: number) => setValor((x) => {
+    if (x == null) return x;
+    const novo = centavos(x + d);
+    return valores.length && (novo < Math.min(...valores) || novo > Math.max(...valores)) ? x : Math.max(1, novo);
+  });
   const confirmar = async () => { setOcupado(true); try { await aceitar(valor, contra); } finally { setOcupado(false); } };
 
   return (
