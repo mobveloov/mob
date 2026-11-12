@@ -90,6 +90,10 @@ export default function MarcaAparencia() {
               {txt("E-mail de suporte", m.textos.suporteEmail, (v) => set("textos", { ...m.textos, suporteEmail: v }))}
               {txt("Telefone de suporte", m.textos.suporteTelefone, (v) => set("textos", { ...m.textos, suporteTelefone: v }))}
               {txt("Rodapé do relatório", m.textos.rodapeRelatorio, (v) => set("textos", { ...m.textos, rodapeRelatorio: v }))}
+              {txt("WhatsApp de suporte (com DDD)", m.textos.suporteWhatsapp, (v) => set("textos", { ...m.textos, suporteWhatsapp: v }))}
+              {txt("Site de suporte (abrir chamado)", m.textos.suporteSite, (v) => set("textos", { ...m.textos, suporteSite: v }))}
+              {txt("Link dos Termos de uso", m.textos.termosUrl, (v) => set("textos", { ...m.textos, termosUrl: v }))}
+              {txt("Link da Política de privacidade", m.textos.privacidadeUrl, (v) => set("textos", { ...m.textos, privacidadeUrl: v }))}
               {txt("Domínios próprios (separe por vírgula)", m.dominios.join(", "), (v) => set("dominios", v.split(",").map((x) => x.trim()).filter(Boolean)), "Ex.: painel.suaempresa.com.br. Aponte o DNS para o servidor do painel.")}
               <label className="check"><input type="checkbox" checked={m.mostrarOrigem} onChange={(e) => set("mostrarOrigem", e.target.checked)} /> Mostrar a etiqueta de origem nas corridas</label>
             </div>

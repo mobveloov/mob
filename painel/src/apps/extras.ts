@@ -20,7 +20,9 @@ import { banco, transacao } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
+import { ajustes } from "./ajustes.ts";
 import { arquivo, num, txt } from "./armazem.ts";
+import type { Lugares, Veiculo } from "./perfil.ts";
 import type { PapelApp, SessaoApp } from "./sessoes.ts";
 import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
 
@@ -42,8 +44,25 @@ export interface Pessoa {
   /** Prêmios de desafios já pagos (id do desafio). */
   premios: string[];
   documentos: Record<string, Documento>;
+  /** Senha do app (scrypt "sal:hash"). Vazia: a conta só entra por código. */
+  senha: string;
+  /** Nome do arquivo da foto de perfil (no motorista, a foto do rosto). */
+  foto: string;
+  cidadeId: string;
+  /** Pedido de exclusão da conta (a central conclui). */
+  exclusaoPedidaEm: string;
+  /** Passageiro: casa, trabalho e favoritos. */
+  lugares: Lugares;
+  /** Motorista: formas de pagamento que aceita (vazio = todas) e opcionais que oferece (ids). */
+  pagamentos: string[];
+  filtros: string[];
+  /** Motorista: veículos cadastrados (um ativo). */
+  veiculos: Veiculo[];
 }
-const PESSOA_VAZIA: Pessoa = { email: "", favoritos: [], bloqueados: [], categorias: [], codigo: "", indicadoPor: "", premios: [], documentos: {} };
+const PESSOA_VAZIA: Pessoa = {
+  email: "", favoritos: [], bloqueados: [], categorias: [], codigo: "", indicadoPor: "", premios: [], documentos: {},
+  senha: "", foto: "", cidadeId: "", exclusaoPedidaEm: "", lugares: { casa: null, trabalho: null, favoritos: [] }, pagamentos: [], filtros: [], veiculos: [],
+};
 
 function linhaPessoa(empresaId: string, papel: PapelApp, chave: string): Pessoa | null {
   const r = banco().prepare("SELECT dados FROM app_pessoas WHERE empresa = ? AND papel = ? AND chave = ?").get(empresaId, papel, chave) as { dados: string } | undefined;
@@ -76,6 +95,13 @@ function novoCodigo(empresaId: string): string {
 const doCodigo = (empresaId: string, codigo: string) =>
   banco().prepare("SELECT papel, chave FROM app_pessoas WHERE empresa = ? AND codigo = ?").get(empresaId, codigo.toUpperCase()) as { papel: PapelApp; chave: string } | undefined;
 
+/** Forma de pagamento aceita e opcionais pedidos: o motorista tem que oferecer tudo o que o passageiro pediu. */
+export function atendeAsExigencias(m: Pessoa | null | undefined, c: CorridaPropria): boolean {
+  if (m?.pagamentos.length && !m.pagamentos.some((x) => normal(x) === normal(c.pagamento))) return false;
+  if (c.opcionais?.length && !c.opcionais.every((o) => m?.filtros.includes(o))) return false;
+  return true;
+}
+
 /**
  * Foto das preferências de todos (uma consulta só), para uma rodada do despacho. Antes, cada par corrida x motorista
  * consultava o banco (a carga de 500 corridas ficou 4 vezes mais lenta).
@@ -90,6 +116,7 @@ export function filtrosDoDespacho(empresaId: string) {
       const m = mot.get(motoristaId);
       if (m?.bloqueados.includes(c.passageiro.telefone)) return false;
       if (m?.categorias.length && !m.categorias.some((x) => normal(x) === normal(c.categoria))) return false;
+      if (!atendeAsExigencias(m, c)) return false;
       return !pas.get(c.passageiro.telefone)?.bloqueados.includes(motoristaId);
     },
     ehFavorito: (telefone: string, motoristaId: string) => !!pas.get(telefone)?.favoritos.includes(motoristaId),
@@ -101,6 +128,7 @@ export function podeAtender(empresaId: string, c: CorridaPropria, motoristaId: s
   const m = linhaPessoa(empresaId, "motorista", motoristaId);
   if (m?.bloqueados.includes(c.passageiro.telefone)) return false;
   if (m?.categorias.length && !m.categorias.some((x) => normal(x) === normal(c.categoria))) return false;
+  if (!atendeAsExigencias(m, c)) return false;
   const p = linhaPessoa(empresaId, "passageiro", c.passageiro.telefone);
   return !p?.bloqueados.includes(motoristaId);
 }
@@ -213,7 +241,17 @@ export function saldos(empresaId: string) {
 
 // ====================================================================== documentos do motorista
 
-export const TIPOS_DOCUMENTO: Record<string, string> = { cnh: "CNH", veiculo: "Documento do veículo (CRLV)", foto: "Foto do rosto", residencia: "Comprovante de residência" };
+/** Documentos que o app aceita: os configurados no painel (Gerais do App) e as fotos das laterais do veículo. */
+export const tiposDoApp = (empresaId: string): Record<string, string> => ({
+  ...tiposDeDocumento(empresaId),
+  lateralEsquerda: "Foto da lateral esquerda do veículo", lateralDireita: "Foto da lateral direita do veículo",
+});
+export const TIPOS_DOCUMENTO: Record<string, string> = {
+  cnh: "CNH (frente e verso)", residencia: "Comprovante de residência", crlv: "CRLV do veículo",
+  lateralEsquerda: "Foto da lateral esquerda do veículo", lateralDireita: "Foto da lateral direita do veículo",
+  /** Do app antigo; continuam valendo. */
+  veiculo: "Documento do veículo (CRLV)", foto: "Foto do rosto",
+};
 const MIME_DOC: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf" };
 export const MAX_DOC = 5 * 1024 * 1024;
 
@@ -225,7 +263,7 @@ function cabecalhoDoc(ext: string, b: Uint8Array) {
 }
 
 export function enviarDocumento(empresaId: string, motoristaId: string, tipo: string, mime: string, bytes: Uint8Array): Documento {
-  if (!tiposDeDocumento(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
+  if (!tiposDoApp(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
   const ext = MIME_DOC[String(mime).split(";")[0].trim().toLowerCase()];
   if (!ext) throw new Error("Envie uma foto (JPG ou PNG) ou um PDF.");
   if (!bytes?.length || bytes.length > MAX_DOC) throw new Error("Arquivo vazio ou maior que 5 MB.");
@@ -245,7 +283,7 @@ export function enviarDocumento(empresaId: string, motoristaId: string, tipo: st
 }
 
 export function arquivoDoDocumento(empresaId: string, motoristaId: string, tipo: string): { caminho: string; mime: string } | null {
-  if (!/^[\w-]{6,64}$/.test(motoristaId) || !tiposDeDocumento(empresaId)[tipo]) return null;
+  if (!/^[\w-]{6,64}$/.test(motoristaId) || !tiposDoApp(empresaId)[tipo]) return null;
   const d = linhaPessoa(empresaId, "motorista", motoristaId)?.documentos[tipo];
   if (!d) return null;
   const caminho = arquivo(empresaId, "documentos", motoristaId, d.arquivo);
@@ -253,7 +291,7 @@ export function arquivoDoDocumento(empresaId: string, motoristaId: string, tipo:
 }
 
 export function avaliarDocumento(empresaId: string, motoristaId: string, tipo: string, aprovado: boolean, motivo = ""): Documento {
-  if (!tiposDeDocumento(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
+  if (!tiposDoApp(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
   const p = linhaPessoa(empresaId, "motorista", motoristaId);
   const d = p?.documentos[tipo];
   if (!p || !d) throw new Error("Documento não encontrado.");
@@ -457,15 +495,20 @@ rotasExtras.get("/preferencias", so("motorista"), ok((req, res) => {
   const habilitadas = String(cad?.categorias ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const todas = listar(empresaId, cadastroPorId("categorias")!).filter((c) => c.ativa !== false).map((c) => String(c.nome));
   const podem = habilitadas.length ? todas.filter((c) => habilitadas.some((h) => normal(h) === normal(c))) : todas;
-  res.json({ podem, escolhidas: pessoa(empresaId, "motorista", sessao.chave).categorias });
+  const p = pessoa(empresaId, "motorista", sessao.chave);
+  const aj = ajustes(empresaId);
+  res.json({ podem, escolhidas: p.categorias, pagamentos: p.pagamentos, filtros: p.filtros, pagamentosDisponiveis: aj.pagamentos, filtrosDisponiveis: aj.opcionais });
 }));
 rotasExtras.post("/preferencias", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const escolhidas = Array.isArray(req.body?.categorias) ? req.body.categorias.map((x: unknown) => txt(x, 60)).filter(Boolean).slice(0, 20) : [];
   const p = pessoa(empresaId, "motorista", sessao.chave);
   p.categorias = escolhidas;
+  const aj = ajustes(empresaId);
+  if (Array.isArray(req.body?.pagamentos)) p.pagamentos = req.body.pagamentos.map((x: unknown) => txt(x, 40)).filter((x: string) => aj.pagamentos.includes(x));
+  if (Array.isArray(req.body?.filtros)) p.filtros = req.body.filtros.map((x: unknown) => txt(x, 20)).filter((x: string) => aj.opcionais.some((o) => o.id === x));
   salvarPessoa(empresaId, "motorista", sessao.chave, p);
-  res.json({ escolhidas });
+  res.json({ escolhidas, pagamentos: p.pagamentos, filtros: p.filtros });
 }));
 
 // Carteira
@@ -488,7 +531,7 @@ rotasExtras.post("/saques", so("motorista"), ok((req, res) => {
 rotasExtras.get("/documentos", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const docs = pessoa(empresaId, "motorista", sessao.chave).documentos;
-  res.json({ tipos: tiposDeDocumento(empresaId), documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
+  res.json({ tipos: tiposDoApp(empresaId), documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
 }));
 rotasExtras.post("/documentos/:tipo", so("motorista"), (req, res, next) => {
   if (Number(req.headers["content-length"] ?? 0) > MAX_DOC) return res.status(413).json({ erro: "Arquivo maior que 5 MB." });
@@ -582,7 +625,7 @@ rotasExtrasCentral.post("/saques/:id/:acao", exigirPapel("admin"), ok((req, res)
   if (acao !== "pagar" && acao !== "recusar") throw new Error("Ação inválida.");
   res.json({ saque: resolverSaque(emp(req), req.params.id, acao === "pagar", quem(req), txt(req.body?.motivo, 200)) });
 }));
-rotasExtrasCentral.get("/documentos", ok((req, res) => res.json({ tipos: tiposDeDocumento(emp(req)), motoristas: documentosDosMotoristas(emp(req)) })));
+rotasExtrasCentral.get("/documentos", ok((req, res) => res.json({ tipos: tiposDoApp(emp(req)), motoristas: documentosDosMotoristas(emp(req)) })));
 rotasExtrasCentral.get("/documentos/:motoristaId/:tipo", ok((req, res) => {
   const a = arquivoDoDocumento(emp(req), req.params.motoristaId, req.params.tipo);
   if (!a) return res.status(404).json({ erro: "Documento não encontrado." });

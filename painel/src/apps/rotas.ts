@@ -17,7 +17,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import fs from "node:fs";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
+import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
 import { buscarEndereco, enderecoDoPonto, rota } from "../enderecos/index.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
@@ -25,6 +25,9 @@ import { num, txt } from "./armazem.ts";
 import { arquivoDoAudio, enviarAudio, enviarTexto, maxAudioBytes, mensagens } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
+import { ajustes } from "./ajustes.ts";
+import { euCompleto } from "./perfil.ts";
+import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
 import { registrarCotacao } from "../operacao/radar.ts";
@@ -104,16 +107,20 @@ r.post("/entrar", ok((req, res) => {
   const papel = req.body?.papel as PapelApp;
   if (!PAPEIS.includes(papel)) throw new Error("App inválido.");
   const { token, sessao } = entrar(req.params.empresa, papel, String(req.body?.telefone ?? ""), String(req.body?.codigo ?? ""));
-  res.json({ token, eu: eu(req.params.empresa, sessao) });
+  res.json({ token, eu: euCompleto(req.params.empresa, sessao) });
 }));
 
 // ------------------------------------------------------------------ com token
+
+// Cidades, login com senha, criar conta e esqueci a senha (versão 2, sem token).
+r.use(rotasPublicasV2);
 
 // Link público de acompanhar a viagem (sem token).
 r.use(rotasPublicasExtras);
 
 r.use(exigirApp);
 r.use(rotasExtras);
+r.use(rotasV2);
 
 r.post("/sair", ok((req, res) => {
   if (ctx(req).sessao.papel === "motorista") P.ficarOffline(ctx(req).empresaId, ctx(req).sessao.chave);
@@ -123,9 +130,9 @@ r.post("/sair", ok((req, res) => {
 
 r.get("/eu", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
-  res.json({ eu: eu(empresaId, sessao), online: sessao.papel === "motorista" ? P.estaOnline(empresaId, sessao.chave) : undefined });
+  res.json({ eu: euCompleto(empresaId, sessao), online: sessao.papel === "motorista" ? P.estaOnline(empresaId, sessao.chave) : undefined });
 }));
-r.post("/eu", so("passageiro"), ok((req, res) => res.json({ eu: salvarNomePassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body?.nome ?? "")) })));
+r.post("/eu", so("passageiro"), ok((req, res) => { salvarNomePassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body?.nome ?? "")); res.json({ eu: euCompleto(ctx(req).empresaId, ctx(req).sessao) }); }));
 
 r.post("/push", ok((req, res) => { registrarToken(ctx(req).empresaId, alvo(req), String(req.body?.token ?? "")); res.json({ ok: true }); }));
 
@@ -244,6 +251,8 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
       categoria: txt(b.categoria, 60), pagamento, canal: "app",
       observacao: txt(b.observacao, 300), cupom: txt(b.cupom, 30), paradas,
       agendadaPara: typeof b.agendadaPara === "string" && b.agendadaPara ? b.agendadaPara : undefined,
+      valorOferecido: num(b.valorOferecido) ?? undefined,
+      opcionais: Array.isArray(b.opcionais) ? b.opcionais.map((x: unknown) => txt(x, 20)).filter((x: string) => ajustes(empresaId).opcionais.some((o) => o.id === x)).slice(0, 8) : undefined,
     }, "app do passageiro");
   });
   P.despachar(empresaId);
@@ -252,7 +261,13 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
 
 r.get("/corridas", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
-  const l = listarProprias(empresaId).filter((c) => P.participa(c, sessao.papel, sessao.chave)).slice(-50).reverse();
+  const filtro = String(req.query.filtro ?? "todas");
+  const de = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.de ?? "")) ? String(req.query.de) : "", ate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.ate ?? "")) ? String(req.query.ate) : "";
+  const ABERTAS = new Set(["procurando", "a_caminho", "no_local", "em_andamento"]);
+  const l = listarProprias(empresaId).filter((c) => P.participa(c, sessao.papel, sessao.chave))
+    .filter((c) => filtro === "finalizadas" ? c.status === "finalizada" : filtro === "canceladas" ? c.status === "cancelada" || c.status === "nao_atendida" : filtro === "andamento" ? ABERTAS.has(c.status) : true)
+    .filter((c) => (!de || c.solicitadaEm.slice(0, 10) >= de) && (!ate || c.solicitadaEm.slice(0, 10) <= ate))
+    .slice(-100).reverse();
   res.json({ corridas: l.map((c) => P.corridaParaApp(empresaId, c, sessao.papel)) });
 }));
 
@@ -282,7 +297,10 @@ r.post("/corridas/:id/cancelar", ok(async (req, res) => {
 r.post("/corridas/:id/avaliar", so("passageiro"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
-  const feita = await avaliar(empresaId, c.id, Number(req.body?.nota), "app do passageiro", txt(req.body?.comentario, 500));
+  let feita = await avaliar(empresaId, c.id, Number(req.body?.nota), "app do passageiro", txt(req.body?.comentario, 500));
+  const a = ajustes(empresaId), validas = new Set([...a.etiquetasBoas, ...a.etiquetasRuins]);
+  const etiquetas = Array.isArray(req.body?.etiquetas) ? req.body.etiquetas.map((x: unknown) => txt(x, 60)).filter((x: string) => validas.has(x)).slice(0, 6) : [];
+  if (etiquetas.length) feita = await alterarCorrida(empresaId, c.id, (x) => { x.etiquetas = etiquetas; });
   res.json({ corrida: P.corridaParaApp(empresaId, feita, "passageiro") });
 }));
 
@@ -292,8 +310,10 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   const c = P.corridaDoApp(empresaId, req.params.id, "motorista", sessao.chave);
   const novo = String(req.body?.status ?? "");
   if (!STATUS_DO_MOTORISTA.has(novo)) throw new Error("Status inválido.");
-  const valor = num(req.body?.valor);
+  let valor = num(req.body?.valor);
   if (valor != null && (valor < 0 || valor > 10_000)) throw new Error("Valor inválido.");
+  // Maçaneta em taxímetro: o valor sai da distância e do tempo reais, pela tarifa da categoria.
+  if (novo === "finalizada") { const taxi = P.valorDoTaximetro(empresaId, c); if (taxi != null) valor = taxi; }
   const feita = await mudarStatus(empresaId, c.id, novo as never, { valor }, "app do motorista");
   aposFinalizar(empresaId, feita); // pago com saldo: passa da carteira do passageiro para a do motorista
   P.vigiar(empresaId);
@@ -381,6 +401,8 @@ const posicao = (req: Request) => {
 };
 
 r.post("/online", so("motorista"), ok((req, res) => {
+  const cadastro = listar(ctx(req).empresaId, cadastroPorId("motoristas")!).find((m) => m.id === ctx(req).sessao.chave);
+  if (cadastro?.status !== "Ativo") throw new Error("Seu cadastro ainda está em análise. Você poderá ficar online depois que a central aprovar.");
   const p = posicao(req);
   P.ficarOnline(ctx(req).empresaId, ctx(req).sessao.chave, p.lat, p.lng);
   res.json({ online: true });
@@ -404,6 +426,7 @@ r.use((_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }))
 
 // ------------------------------------------------------------------ central (painel, com login do painel)
 
+rotasAppsCentral.use(rotasV2Central);
 rotasAppsCentral.get("/motoristas", ok((req, res) => res.json({ motoristas: P.motoristasOnline(req.ctx!.empresaId) })));
 rotasAppsCentral.get("/alertas", ok((req, res) => res.json({ alertas: P.alertas(req.ctx!.empresaId).slice(-200).reverse() })));
 rotasAppsCentral.post("/alertas/:id/resolver", exigirPapel("admin", "operador"), ok((req, res) => res.json({ alerta: P.resolverAlerta(req.ctx!.empresaId, req.params.id, req.ctx!.usuario.email) })));
