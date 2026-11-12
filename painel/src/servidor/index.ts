@@ -25,6 +25,7 @@ import { rotasEnderecos } from "../enderecos/rotas.ts";
 import { rotasApps, rotasAppsCentral } from "../apps/rotas.ts";
 import { rotasExtrasCentral } from "../apps/extras.ts";
 import { iniciarApps } from "../apps/despacho.ts";
+import { rotasConfig } from "../config/rotas.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -388,6 +389,7 @@ app.use("/api/crm", rotasCrm);
 app.use("/api/enderecos", rotasEnderecos);
 app.use("/api/apps-central", rotasAppsCentral);
 app.use("/api/apps-central", rotasExtrasCentral);
+app.use("/api/config", rotasConfig);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 

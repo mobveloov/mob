@@ -12,6 +12,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, atribuirMotorista, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import { filtrosDoDespacho } from "./extras.ts";
+import { regrasDespacho, transbordoPermitido } from "../config/despacho.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -176,6 +177,7 @@ export function despachar(empresaId: string) {
   const agora = Date.now();
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
+  const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
   let n = 0;
   for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
@@ -189,15 +191,18 @@ export function despachar(empresaId: string) {
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
       const km = c.embarque.lat != null && c.embarque.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) : null;
-      if (km != null && km > RAIO_KM()) continue;
+      if (km != null && km > (process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000)) continue;
+      if (!transbordoPermitido(empresaId, cad.cidade, c.categoria)) continue; // Config › Transbordos
       // Sem coordenada no embarque: vai para quem está online há mais tempo.
       const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
       // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
       const fav = filtros.ehFavorito(c.passageiro.telefone, id), favMelhor = !!melhor && filtros.ehFavorito(c.passageiro.telefone, melhor.id);
+      const fila = regras.metodo === "fila_virtual";
+      if (fila && melhor && !(fav && !favMelhor) && fav === favMelhor) { if (p.desde < e.online.get(melhor.id)!.desde) melhor = { id, km }; continue; }
       if (!melhor || (fav && !favMelhor) || (fav === favMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))) melhor = { id, km };
     }
     if (!melhor) continue;
-    const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + OFERTA_MS(), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
+    const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
     comOferta.add(melhor.id);
     emitir(empresaId, motoristaAlvo(melhor.id), "oferta", ofertaParaApp(empresaId, o));
