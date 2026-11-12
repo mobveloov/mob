@@ -36,6 +36,7 @@ export interface CorridaPropria {
 /** Empresa escolhida pelo usuário da plataforma (troca de empresa). */
 let empresaEscolhida = "";
 export const escolherEmpresa = (id: string) => { empresaEscolhida = id; };
+export const empresaEscolhidaAgora = () => empresaEscolhida;
 
 export class ErroApi extends Error { constructor(msg: string, public status: number) { super(msg); } }
 

@@ -145,3 +145,21 @@ export function criarUsuario(u: { email: string; nome: string; senha: string; em
 export function removerUsuario(id: string, empresaId: string) {
   gravar(arqUsuarios(), listarUsuarios().filter((u) => !(u.id === id && u.empresaId === empresaId)), true);
 }
+
+/** Muda nome, e-mail, papel e (se vier) a senha de um usuário da empresa (tela Equipe). */
+export function atualizarUsuario(id: string, empresaId: string, d: { email?: string; nome?: string; senha?: string; papel?: Papel }): Usuario {
+  const lista = listarUsuarios().map((u) => ({ ...u }));
+  const u = lista.find((x) => x.id === id && x.empresaId === empresaId);
+  if (!u) throw new Error("Usuário não encontrado.");
+  if (d.email != null) {
+    const email = d.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("E-mail inválido.");
+    if (lista.some((x) => x.id !== id && x.email === email)) throw new Error("Já existe um usuário com este e-mail.");
+    u.email = email;
+  }
+  if (d.nome != null) u.nome = d.nome.trim().slice(0, 80) || u.email;
+  if (d.senha) { if (d.senha.length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres."); u.hash = hashSenha(d.senha); }
+  if (d.papel && u.papel !== "plataforma") u.papel = d.papel;
+  gravar(arqUsuarios(), lista, true);
+  return u;
+}

@@ -20,6 +20,7 @@ import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
 import { arquivo, num, txt } from "./armazem.ts";
 import type { PapelApp, SessaoApp } from "./sessoes.ts";
+import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
 
 const arred = (n: number) => Math.round(n * 100) / 100;
 const hojeIso = () => agoraBr().toISOString().slice(0, 10);
@@ -278,16 +279,16 @@ export function desafios(empresaId: string, papel: PapelApp, chave: string): Pro
   const hoje = hojeIso();
   const p = pessoa(empresaId, papel, chave);
   const corridas = listarProprias(empresaId);
-  const lista = listar(empresaId, cadastroPorId("desafios")!).filter((d) => d.ativo === true && String(d.inicio ?? "") <= hoje && (!d.fim || String(d.fim) >= hoje));
+  const lista = listar(empresaId, cadastroPorId("desafios")!).filter((d) => d.ativo === true && d.cancelado !== true && String(d.inicio ?? "") <= hoje && (!d.fim || String(d.fim) >= hoje));
   const out: Progresso[] = [];
   for (const d of lista) {
     const tipo = String(d.tipo ?? "");
     const ini = String(d.inicio ?? "0000"), fim = d.fim ? String(d.fim) : "9999";
     let feito = 0;
-    if (tipo === "Desafio de corridas") {
+    if (TIPOS_DESAFIO_CORRIDA.includes(tipo)) {
       if (papel !== "motorista") continue;
       const cats = String(d.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
-      feito = corridas.filter((c) => c.motoristaId === chave && c.status === "finalizada" && (c.finalizadaEm ?? "").slice(0, 10) >= ini && (c.finalizadaEm ?? "").slice(0, 10) <= fim
+      feito = corridas.filter((c) => c.motoristaId === chave && contaParaDesafio(tipo, c) && (c.finalizadaEm ?? "").slice(0, 10) >= ini && (c.finalizadaEm ?? "").slice(0, 10) <= fim
         && (!cats.length || cats.includes(normal(c.categoria)))).length;
     } else if (tipo === "Indicação de passageiro" || tipo === "Indicação de motorista") {
       const papelIndicado: PapelApp = tipo === "Indicação de passageiro" ? "passageiro" : "motorista";
@@ -298,7 +299,7 @@ export function desafios(empresaId: string, papel: PapelApp, chave: string): Pro
     const meta = Number(d.meta) || 0;
     const premio = typeof d.premio === "number" ? d.premio : null;
     let ganho = p.premios.includes(d.id);
-    if (!ganho && meta > 0 && feito >= meta && premio && premio > 0) {
+    if (!ganho && meta > 0 && feito >= meta && premio && premio > 0 && d.aprovacao !== "Manual") { // manual: a central aprova em Desafios
       lancar(empresaId, papel, chave, premio, `Prêmio: ${String(d.nome)}`, "sistema");
       p.premios = [...p.premios, d.id];
       salvarPessoa(empresaId, papel, chave, p);

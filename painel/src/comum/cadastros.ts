@@ -32,7 +32,10 @@ export interface Cadastro {
   operadorEdita?: boolean;
 }
 
-const STATUS_PESSOA = ["Ativo", "Inativo", "Bloqueado", "Aguardando aprovação"];
+/** Situações do motorista (iguais às abas da tela Motoristas). "Aguardando aprovação" fica por compatibilidade (conta como análise). */
+export const SITUACOES_MOTORISTA = ["Ativo", "Em análise", "Fila de espera", "Bloqueado", "Rejeitado", "Inativo", "Lixeira", "Aguardando aprovação"];
+/** Nível (prioridade de toque): quem é oferecido primeiro no despacho. */
+export const NIVEIS_MOTORISTA = ["Prioritário", "Secundário", "Reserva"];
 
 export const CADASTROS: Cadastro[] = [
   {
@@ -44,7 +47,20 @@ export const CADASTROS: Cadastro[] = [
       { chave: "telefone", rotulo: "Telefone", tipo: "telefone", obrigatorio: true },
       { chave: "cpf", rotulo: "CPF", tipo: "cpf" },
       { chave: "email", rotulo: "E-mail", tipo: "email" },
-      { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: STATUS_PESSOA, obrigatorio: true },
+      { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: SITUACOES_MOTORISTA, obrigatorio: true },
+      { chave: "nascimento", rotulo: "Nascimento", tipo: "data" },
+      { chave: "genero", rotulo: "Sexo", tipo: "selecao", opcoes: ["Masculino", "Feminino"] },
+      { chave: "nivel", rotulo: "Prioridade de toque", tipo: "selecao", opcoes: NIVEIS_MOTORISTA },
+      { chave: "endereco", rotulo: "Endereço", tipo: "texto" },
+      { chave: "numero", rotulo: "Nº", tipo: "texto" },
+      { chave: "cep", rotulo: "CEP", tipo: "texto" },
+      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
+      { chave: "chavePix", rotulo: "Chave PIX", tipo: "texto" },
+      { chave: "cnhNumero", rotulo: "CNH Nº", tipo: "texto" },
+      { chave: "fantasma", rotulo: "Modo fantasma (oculto no mapa)", tipo: "booleano" },
+      { chave: "cobranca", rotulo: "Cobrança da central", tipo: "selecao", opcoes: ["Padrão", "Personalizado", "Isento"], dica: "Padrão = comissão da categoria; Isento = não paga; Personalizado = vale no lugar da comissão da categoria." },
+      { chave: "cobrancaTipo", rotulo: "Modelo de cobrança", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"] },
+      { chave: "cobrancaValor", rotulo: "Valor da cobrança", tipo: "numero" },
       { chave: "categorias", rotulo: "Categorias habilitadas", tipo: "texto", dica: "Separe por vírgula." },
       { chave: "veiculo", rotulo: "Veículo (modelo e cor)", tipo: "texto" },
       { chave: "placa", rotulo: "Placa", tipo: "texto" },
@@ -71,6 +87,12 @@ export const CADASTROS: Cadastro[] = [
       { chave: "cpf", rotulo: "CPF", tipo: "cpf" },
       { chave: "email", rotulo: "E-mail", tipo: "email" },
       { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Inativo", "Bloqueado", "Suspenso"], obrigatorio: true },
+      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: ["Masculino", "Feminino", "Outro"] },
+      { chave: "dispositivo", rotulo: "Dispositivo", tipo: "selecao", opcoes: ["Android", "iOS", "Não identificado"] },
+      { chave: "origemCadastro", rotulo: "Origem", tipo: "selecao", opcoes: ["App", "Painel", "Motorista"] },
+      { chave: "motoristaOrigem", rotulo: "Motorista (origem)", tipo: "texto", dica: "Id do motorista que cadastrou (origem Motorista)." },
+      { chave: "avaliouApp", rotulo: "Avaliou o app?", tipo: "selecao", opcoes: ["Pendente", "Avaliou", "Não quis avaliar", "Adiou"] },
+      { chave: "notaApp", rotulo: "Nota para o app", tipo: "numero" },
       { chave: "conveniada", rotulo: "Empresa conveniada", tipo: "texto" },
       { chave: "enderecoFavorito", rotulo: "Endereço favorito", tipo: "texto" },
       { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
@@ -92,6 +114,8 @@ export const CADASTROS: Cadastro[] = [
       { chave: "ano", rotulo: "Ano", tipo: "numero" },
       { chave: "categoria", rotulo: "Categoria", tipo: "texto" },
       { chave: "motorista", rotulo: "Motorista", tipo: "texto" },
+      { chave: "motoristaId", rotulo: "Motorista proprietário (id)", tipo: "texto" },
+      { chave: "emUso", rotulo: "Em uso", tipo: "booleano", dica: "Cada motorista tem um veículo em uso; os outros ficam guardados." },
       { chave: "validadeLicenciamento", rotulo: "Validade do licenciamento", tipo: "data" },
       { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Em manutenção", "Inativo"], obrigatorio: true },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
@@ -99,15 +123,17 @@ export const CADASTROS: Cadastro[] = [
     colunas: ["placa", "modelo", "cor", "ano", "categoria", "motorista", "validadeLicenciamento", "status"],
   },
   {
-    id: "conveniadas", funcao: "empresas", nome: "Empresas conveniadas", singular: "empresa conveniada",
+    id: "conveniadas", funcao: "empresas", nome: "Empresas", singular: "empresa",
     descricao: "Empresas que pagam corridas faturadas, com centro de custo e limite.",
     chaveUnica: "cnpj",
     campos: [
-      { chave: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
+      { chave: "nome", rotulo: "Nome Fantasia", tipo: "texto", obrigatorio: true },
+      { chave: "razaoSocial", rotulo: "Razão Social", tipo: "texto" },
       { chave: "cnpj", rotulo: "CNPJ", tipo: "texto" },
-      { chave: "contato", rotulo: "Contato", tipo: "texto" },
+      { chave: "contato", rotulo: "Responsável", tipo: "texto" },
       { chave: "telefone", rotulo: "Telefone", tipo: "telefone" },
-      { chave: "email", rotulo: "E-mail", tipo: "email" },
+      { chave: "email", rotulo: "E-mail Responsável", tipo: "email" },
+      { chave: "cidade", rotulo: "Cidade Sede", tipo: "texto" },
       { chave: "centrosCusto", rotulo: "Centros de custo", tipo: "texto", dica: "Separe por vírgula." },
       { chave: "limiteMensal", rotulo: "Limite mensal", tipo: "dinheiro" },
       { chave: "desconto", rotulo: "Desconto (%)", tipo: "numero" },
@@ -139,7 +165,7 @@ export const CADASTROS: Cadastro[] = [
     colunas: ["nome", "bandeirada", "valorKm", "valorMinuto", "valorMinimo", "ativa", "origem", "corridas"],
   },
   {
-    id: "cupons", funcao: "cupons", nome: "Cupons e descontos", singular: "cupom",
+    id: "cupons", funcao: "cupons", nome: "Cupons", singular: "cupom",
     descricao: "Cupons de desconto (usados no bot, no totem e nas campanhas). O uso nas corridas aparece em Estatísticas.",
     chaveUnica: "codigo",
     campos: [
@@ -147,7 +173,11 @@ export const CADASTROS: Cadastro[] = [
       { chave: "descricao", rotulo: "Descrição", tipo: "texto" },
       { chave: "tipoDesconto", rotulo: "Tipo", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"], obrigatorio: true },
       { chave: "valor", rotulo: "Valor do desconto", tipo: "numero", obrigatorio: true },
-      { chave: "valorMaximo", rotulo: "Desconto máximo", tipo: "dinheiro" },
+      { chave: "valorMaximo", rotulo: "Teto Máx (R$)", tipo: "dinheiro" },
+      { chave: "cidade", rotulo: "Cidade", tipo: "texto", dica: "Vazio = todas." },
+      { chave: "clienteTelefone", rotulo: "Cliente exclusivo (VIP)", tipo: "telefone", dica: "Vazio = liberado para todos." },
+      { chave: "clienteNome", rotulo: "Nome do cliente VIP", tipo: "texto" },
+      { chave: "minimoCorrida", rotulo: "Mínimo da corrida", tipo: "dinheiro" },
       { chave: "inicio", rotulo: "Vale a partir de", tipo: "data" },
       { chave: "fim", rotulo: "Vale até", tipo: "data" },
       { chave: "limiteUsos", rotulo: "Limite de usos", tipo: "numero" },
@@ -219,17 +249,23 @@ export const CADASTROS: Cadastro[] = [
     colunas: ["data", "descricao", "os", "passageiro", "motorista", "situacao"],
   },
   {
-    id: "desafios", funcao: "desafios", nome: "Desafios e indicações", singular: "desafio",
+    id: "desafios", funcao: "desafios", nome: "Desafios", singular: "desafio",
     descricao: "Metas com prêmio para motoristas e recompensas por indicação.",
     chaveUnica: "nome",
     campos: [
       { chave: "nome", rotulo: "Nome", tipo: "texto", obrigatorio: true },
-      { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["Desafio de corridas", "Indicação de motorista", "Indicação de passageiro"], obrigatorio: true },
+      { chave: "tipo", rotulo: "Tipo", tipo: "selecao", opcoes: ["Desafio de corridas", "Corridas pendentes aceitas", "Corridas maçaneta", "Indicação de motorista", "Indicação de passageiro"], obrigatorio: true },
       { chave: "meta", rotulo: "Meta (nº de corridas ou indicações)", tipo: "numero", obrigatorio: true },
       { chave: "premio", rotulo: "Prêmio", tipo: "dinheiro" },
       { chave: "inicio", rotulo: "Início", tipo: "data", obrigatorio: true },
       { chave: "fim", rotulo: "Fim", tipo: "data" },
+      { chave: "horaInicio", rotulo: "Hora de início", tipo: "texto" },
+      { chave: "horaFim", rotulo: "Hora final", tipo: "texto" },
       { chave: "categorias", rotulo: "Categorias", tipo: "texto", dica: "Vazio = todas." },
+      { chave: "aprovacao", rotulo: "Aprovação da recompensa", tipo: "selecao", opcoes: ["Automático", "Manual"] },
+      { chave: "corridasMin", rotulo: "Finalizaram no mínimo (corridas)", tipo: "numero" },
+      { chave: "corridasMax", rotulo: "Finalizaram no máximo (corridas)", tipo: "numero" },
+      { chave: "cancelado", rotulo: "Cancelado", tipo: "booleano" },
       { chave: "ativo", rotulo: "Ativo", tipo: "booleano" },
       { chave: "regras", rotulo: "Regras", tipo: "textoLongo" },
     ],
