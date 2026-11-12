@@ -43,16 +43,17 @@ try {
   await page.fill('input[type="email"]', EMAIL);
   await page.fill('input[type="password"]', SENHA);
   await page.click('button:has-text("Entrar")');
-  await page.waitForSelector("nav a", { timeout: 15_000 });
-  const rotas = await page.$$eval("nav a", (as) => [...new Set(as.map((a) => new URL(a.href).pathname))]);
+  await page.waitForSelector("nav", { timeout: 15_000 });
+  const rotas = await page.$$eval("header a[href], nav a[href]", (as) => [...new Set(as.map((a) => new URL(a.href).pathname).filter((r) => r.startsWith("/") && !r.startsWith("/apps") && !r.startsWith("/api")))]);
   console.log(`Painel: ${rotas.length} telas no menu.`);
   for (const rota of rotas) {
     onde.atual = rota;
     await page.goto(BASE + rota, { waitUntil: "networkidle" });
     await page.waitForTimeout(400);
-    const titulo = (await page.locator("main h1, h1").first().textContent().catch(() => ""))?.trim();
+    const titulo = (await page.locator("main h1, h1, main h2").first().textContent({ timeout: 4000 }).catch(() => ""))?.trim();
     if (!titulo) falhas.push(`${rota}: tela sem título (não abriu?)`);
     if (await page.locator("text=Página não encontrada").count()) falhas.push(`${rota}: "Página não encontrada"`);
+    if (await page.locator("text=Em construção").count()) falhas.push(`${rota}: ainda "Em construção"`);
     // Clica nos botões seguros, um por um (abre gavetas, abas, filtros), fechando o que abrir.
     const botoes = await page.locator("main button:visible").all();
     let clicados = 0;
