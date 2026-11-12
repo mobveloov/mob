@@ -12,6 +12,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import express, { type Request, type Response } from "express";
 import { cadastroPorId } from "../comum/cadastros.ts";
+import { configDosApps, tiposDeDocumento } from "../config/apps.ts";
+import { mensagensDaPessoa, receberDaPessoa } from "../config/comunicacao.ts";
 import { criar, listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, avaliarPassageiro, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import { banco, transacao } from "../servidor/banco.ts";
@@ -223,7 +225,7 @@ function cabecalhoDoc(ext: string, b: Uint8Array) {
 }
 
 export function enviarDocumento(empresaId: string, motoristaId: string, tipo: string, mime: string, bytes: Uint8Array): Documento {
-  if (!TIPOS_DOCUMENTO[tipo]) throw new Error("Tipo de documento inválido.");
+  if (!tiposDeDocumento(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
   const ext = MIME_DOC[String(mime).split(";")[0].trim().toLowerCase()];
   if (!ext) throw new Error("Envie uma foto (JPG ou PNG) ou um PDF.");
   if (!bytes?.length || bytes.length > MAX_DOC) throw new Error("Arquivo vazio ou maior que 5 MB.");
@@ -243,7 +245,7 @@ export function enviarDocumento(empresaId: string, motoristaId: string, tipo: st
 }
 
 export function arquivoDoDocumento(empresaId: string, motoristaId: string, tipo: string): { caminho: string; mime: string } | null {
-  if (!/^[\w-]{6,64}$/.test(motoristaId) || !TIPOS_DOCUMENTO[tipo]) return null;
+  if (!/^[\w-]{6,64}$/.test(motoristaId) || !tiposDeDocumento(empresaId)[tipo]) return null;
   const d = linhaPessoa(empresaId, "motorista", motoristaId)?.documentos[tipo];
   if (!d) return null;
   const caminho = arquivo(empresaId, "documentos", motoristaId, d.arquivo);
@@ -251,7 +253,7 @@ export function arquivoDoDocumento(empresaId: string, motoristaId: string, tipo:
 }
 
 export function avaliarDocumento(empresaId: string, motoristaId: string, tipo: string, aprovado: boolean, motivo = ""): Documento {
-  if (!TIPOS_DOCUMENTO[tipo]) throw new Error("Tipo de documento inválido.");
+  if (!tiposDeDocumento(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
   const p = linhaPessoa(empresaId, "motorista", motoristaId);
   const d = p?.documentos[tipo];
   if (!p || !d) throw new Error("Documento não encontrado.");
@@ -382,6 +384,11 @@ rotasPublicasExtras.get("/acompanhar/:codigo", (req, res) => {
 /** Rotas com o token do app. */
 export const rotasExtras = express.Router({ mergeParams: true });
 
+const pessoaNome = (empresaId: string, papel: PapelApp, chave: string) =>
+  String(listar(empresaId, cadastroPorId(papel === "motorista" ? "motoristas" : "clientes")!).find((x) => (papel === "motorista" ? x.id : String(x.telefone)) === chave)?.nome ?? "");
+rotasExtras.get("/config", ok((req, res) => res.json(configDosApps(ctx(req).empresaId))));
+rotasExtras.get("/central/mensagens", ok((req, res) => { const { empresaId, sessao } = ctx(req); res.json({ mensagens: mensagensDaPessoa(empresaId, sessao.papel, sessao.chave) }); }));
+rotasExtras.post("/central/mensagens", ok((req, res) => { const { empresaId, sessao } = ctx(req); res.json({ mensagem: receberDaPessoa(empresaId, sessao.papel, sessao.chave, pessoaNome(empresaId, sessao.papel, sessao.chave), String(req.body?.texto ?? "")) }); }));
 rotasExtras.get("/perfil", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const p = pessoa(empresaId, sessao.papel, sessao.chave);
@@ -481,7 +488,7 @@ rotasExtras.post("/saques", so("motorista"), ok((req, res) => {
 rotasExtras.get("/documentos", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const docs = pessoa(empresaId, "motorista", sessao.chave).documentos;
-  res.json({ tipos: TIPOS_DOCUMENTO, documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
+  res.json({ tipos: tiposDeDocumento(empresaId), documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
 }));
 rotasExtras.post("/documentos/:tipo", so("motorista"), (req, res, next) => {
   if (Number(req.headers["content-length"] ?? 0) > MAX_DOC) return res.status(413).json({ erro: "Arquivo maior que 5 MB." });
@@ -575,7 +582,7 @@ rotasExtrasCentral.post("/saques/:id/:acao", exigirPapel("admin"), ok((req, res)
   if (acao !== "pagar" && acao !== "recusar") throw new Error("Ação inválida.");
   res.json({ saque: resolverSaque(emp(req), req.params.id, acao === "pagar", quem(req), txt(req.body?.motivo, 200)) });
 }));
-rotasExtrasCentral.get("/documentos", ok((req, res) => res.json({ tipos: TIPOS_DOCUMENTO, motoristas: documentosDosMotoristas(emp(req)) })));
+rotasExtrasCentral.get("/documentos", ok((req, res) => res.json({ tipos: tiposDeDocumento(emp(req)), motoristas: documentosDosMotoristas(emp(req)) })));
 rotasExtrasCentral.get("/documentos/:motoristaId/:tipo", ok((req, res) => {
   const a = arquivoDoDocumento(emp(req), req.params.motoristaId, req.params.tipo);
   if (!a) return res.status(404).json({ erro: "Documento não encontrado." });

@@ -158,6 +158,8 @@ export const CADASTROS: Cadastro[] = [
       { chave: "dinamicaMaxima", rotulo: "Fator dinâmico máximo", tipo: "numero" },
       { chave: "taxaCancelamento", rotulo: "Taxa de cancelamento", tipo: "dinheiro", dica: "Cobrada do passageiro que cancela depois que o motorista aceitou. Vazio = sem taxa." },
       { chave: "toleranciaCancelamento", rotulo: "Tolerância para cancelar sem taxa (min)", tipo: "numero", dica: "Padrão: 2 minutos." },
+      { chave: "comissaoTipo", rotulo: "Comissão da central (tipo)", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"], dica: "Como a central cobra do motorista em cada corrida desta categoria." },
+      { chave: "comissaoValor", rotulo: "Comissão da central (valor)", tipo: "numero", dica: "Percentual (ex.: 10 = 10%) ou valor fixo em reais, conforme o tipo." },
       { chave: "ativa", rotulo: "Ativa", tipo: "booleano" },
       { chave: "origem", rotulo: "Origem", tipo: "texto", calculado: true },
       { chave: "corridas", rotulo: "Corridas (30 dias)", tipo: "numero", calculado: true },

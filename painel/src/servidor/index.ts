@@ -31,6 +31,7 @@ import { calcularIndicadores, datasDoPeriodo, diaBrasilia, PERIODOS, type Period
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar as listarCadastro } from "../cadastros/armazem.ts";
 import { normal } from "./util.ts";
+import { rotasConfig } from "../config/rotas.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -439,6 +440,7 @@ app.use("/api/apps-central", rotasAppsCentral);
 app.use("/api/operacao", rotasOperacao);
 app.use("/api/apps-central", rotasExtrasCentral);
 app.use("/api/gestao", rotasGestao);
+app.use("/api/config", rotasConfig);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 

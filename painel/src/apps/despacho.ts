@@ -13,6 +13,7 @@ import { listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, atribuirMotorista, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import { filtrosDoDespacho } from "./extras.ts";
 import { fantasmas, regrasDoDespacho } from "../gestao/regras.ts";
+import { regrasDespacho, transbordoPermitido } from "../config/despacho.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -187,8 +188,9 @@ export function despachar(empresaId: string) {
   const agora = Date.now();
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
+  const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
-  const regras = regrasDoDespacho(empresaId, cadastro); // punição, cerca eletrônica, saldo mínimo e nível
+  const gestao = regrasDoDespacho(empresaId, cadastro); // punição, cerca eletrônica, saldo mínimo e nível
   let n = 0;
   for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
@@ -200,19 +202,22 @@ export function despachar(empresaId: string) {
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
-      if (!regras.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
+      if (!gestao.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
       const km = c.embarque.lat != null && c.embarque.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) : null;
-      if (km != null && km > RAIO_KM()) continue;
+      if (km != null && km > (process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000)) continue;
+      if (!transbordoPermitido(empresaId, cad.cidade, c.categoria)) continue; // Config › Transbordos
       // Sem coordenada no embarque: vai para quem está online há mais tempo.
       const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
       // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
       const fav = filtros.ehFavorito(c.passageiro.telefone, id), favMelhor = !!melhor && filtros.ehFavorito(c.passageiro.telefone, melhor.id);
-      // Depois do favorito, o nível (prioritário, secundário, reserva); depois, o mais perto.
-      const nv = regras.nivel(id), nvMelhor = melhor ? regras.nivel(melhor.id) : 0;
+      // Depois do favorito, o nível (prioritário, secundário, reserva). Com a fila virtual ligada (Config › Regras de
+      // Despacho), entre iguais vence quem está online há mais tempo; senão, o mais perto.
+      const nv = gestao.nivel(id), nvMelhor = melhor ? gestao.nivel(melhor.id) : 0;
+      if (regras.metodo === "fila_virtual" && melhor && fav === favMelhor && nv === nvMelhor) { if (p.desde < e.online.get(melhor.id)!.desde) melhor = { id, km }; continue; }
       if (!melhor || (fav && !favMelhor) || (fav === favMelhor && (nv < nvMelhor || (nv === nvMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))))) melhor = { id, km };
     }
     if (!melhor) continue;
-    const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + OFERTA_MS(), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
+    const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
     avisarOferta(empresaId, o, "oferecida");
     comOferta.add(melhor.id);

@@ -4,6 +4,7 @@
 //
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
+import { aplicarDinamica } from "../config/dinamica.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -176,7 +177,7 @@ const categorias = (empresaId: string) => listar(empresaId, cadastroPorId("categ
 const achar = (l: Registro[], campo: string, v: string) => l.find((r) => normal(String(r[campo] ?? "")) === normal(v));
 
 /** Preço pela tarifa da categoria. Sem tarifa cadastrada: valor null (o operador combina). */
-export function estimarPreco(empresaId: string, p: { categoria: string; distanciaKm?: number | null; minutos?: number | null }) {
+export function estimarPreco(empresaId: string, p: { categoria: string; distanciaKm?: number | null; minutos?: number | null; embarque?: Ponto }) {
   const cat = achar(categorias(empresaId), "nome", p.categoria);
   const km = p.distanciaKm ?? null;
   const minutos = p.minutos ?? (km != null ? arred(km * 2.5, 0) : null);
@@ -187,6 +188,9 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
   const h = agoraBr().getUTCHours();
   if ((h >= 23 || h < 6) && n("tarifaNoturna")) valor *= 1 + n("tarifaNoturna") / 100;
   valor = Math.max(valor, n("valorMinimo"));
+  // Tarifas dinâmicas (Config › Tarifas Dinâmicas) ligadas à categoria: horário, área no mapa e alta demanda.
+  const demanda = listarProprias(empresaId).filter((x) => x.status === "procurando" || x.status === "a_caminho" || x.status === "no_local" || x.status === "em_andamento").length;
+  valor = aplicarDinamica(empresaId, { categoria: String(cat.nome), valor: arred(valor), embarque: p.embarque, demanda }).valor;
   return { valor: arred(valor), distanciaKm: km, minutos, categoria: String(cat.nome) };
 }
 
@@ -257,7 +261,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     } else if (doPassageiro.filter((c) => aindaAgendada(c)).length >= 3) throw new Error("No máximo 3 corridas agendadas por passageiro.");
 
     const km = n.distanciaKm ?? distanciaEstimada(n.embarque, n.destino);
-    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos });
+    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos, embarque: n.embarque });
     const desconto = descontoDoCupom(empresaId, n.cupom ?? "", est.valor, n.categoria);
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);
