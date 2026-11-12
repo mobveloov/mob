@@ -88,9 +88,14 @@ export function Avaliar({ corrida, fechar }: { corrida: Corrida; fechar: () => v
   const [erro, setErro] = useState("");
   const [enviada, setEnviada] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const [etiquetas, setEtiquetas] = useState<{ boas: string[]; ruins: string[] }>({ boas: [], ruins: [] });
+  const [marcadas, setMarcadas] = useState<string[]>([]);
+  useEffect(() => { void api<{ boas: string[]; ruins: string[] }>("/etiquetas-avaliacao").then(setEtiquetas).catch(() => undefined); }, []);
+  useEffect(() => { setMarcadas([]); }, [nota >= 4]);
+  const sugeridas = nota === 0 ? [] : nota >= 4 ? etiquetas.boas : etiquetas.ruins;
   const enviar = async () => {
     setErro(""); setOcupado(true);
-    try { await api(`/corridas/${corrida.id}/avaliar`, { corpo: { nota, comentario: comentario.trim() || undefined } }); setEnviada(true); }
+    try { await api(`/corridas/${corrida.id}/avaliar`, { corpo: { nota, comentario: comentario.trim() || undefined, etiquetas: marcadas } }); setEnviada(true); }
     catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
   };
   if (enviada) {
@@ -108,6 +113,11 @@ export function Avaliar({ corrida, fechar }: { corrida: Corrida; fechar: () => v
       <p className="numero-grande">{reais(corrida.valor)}</p>
       <p>Como foi a viagem com {corrida.motorista?.nome ?? "o motorista"}?</p>
       <Estrelas valor={nota} aoEscolher={setNota} />
+      {sugeridas.length > 0 && (
+        <div className="pilulas" style={{ justifyContent: "center" }}>
+          {sugeridas.map((e) => <button key={e} type="button" className={marcadas.includes(e) ? "ativa" : ""} onClick={() => setMarcadas((l) => (l.includes(e) ? l.filter((x) => x !== e) : [...l, e]))}>{e}</button>)}
+        </div>
+      )}
       <label style={{ width: "100%", textAlign: "left" }}>Comentário (se quiser)
         <textarea value={comentario} maxLength={500} placeholder="Conte como foi" onChange={(e) => setComentario(e.target.value)} />
       </label>
