@@ -20,7 +20,11 @@ export interface Corrida {
 export interface DadosChamada {
   id: string; os: string; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string; observacao: string; estimativa: Estimativa;
   passageiro: string | { nome: string; nota?: number | null }; paradas?: Ponto[]; agendadaPara?: string | null;
-  valorOferecido?: number | null; opcionais?: string[]; nota?: number | null;
+  valorOferecido?: number | null; opcionais?: string[]; nota?: number | null; viagens?: number | null;
+  /** Calculados no servidor: bruto (o que o passageiro paga), taxa da central e líquido (o que o motorista recebe). */
+  valorBruto?: number | null; taxaCentral?: number | null; valorLiquido?: number | null; ganhoPorKm?: number | null;
+  regraComissao?: { tipo: "Percentual" | "Valor fixo" | ""; valor: number } | null;
+  minutosAteEmbarque?: number | null; distanciaViagemKm?: number | null;
 }
 export interface Oferta { id: string; expira: number; segundos: number; distanciaKm: number | null; corrida: DadosChamada }
 
