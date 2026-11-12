@@ -20,7 +20,7 @@ export type TipoIntegracao = "sistema-a" | "sistema-b" | "arquivo" | "exemplo";
 export interface Integracao { id: string; tipo: TipoIntegracao; nome: string; ativa: boolean }
 export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean }
 export type Papel = "plataforma" | "admin" | "operador";
-export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string }
+export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string; telefone?: string }
 export interface Segredos { integracoes: Record<string, Record<string, string>>; ia: Record<string, string> }
 
 const ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
@@ -144,4 +144,30 @@ export function criarUsuario(u: { email: string; nome: string; senha: string; em
 
 export function removerUsuario(id: string, empresaId: string) {
   gravar(arqUsuarios(), listarUsuarios().filter((u) => !(u.id === id && u.empresaId === empresaId)), true);
+}
+
+/** Muda os dados do próprio usuário (tela Alterar Senha). Senha nova só com pelo menos 8 caracteres. */
+export function atualizarUsuario(id: string, d: { nome?: string; email?: string; telefone?: string; senha?: string }): Usuario {
+  const lista = listarUsuarios();
+  const atual = lista.find((u) => u.id === id);
+  if (!atual) throw new Error("Usuário não encontrado.");
+  const novo: Usuario = { ...atual };
+  if (d.nome !== undefined) {
+    const nome = d.nome.replace(/[<>]/g, "").trim().slice(0, 80);
+    if (nome.length < 2) throw new Error("Informe o nome.");
+    novo.nome = nome;
+  }
+  if (d.email !== undefined) {
+    const email = d.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("E-mail inválido.");
+    if (lista.some((x) => x.email === email && x.id !== id)) throw new Error("Já existe um usuário com este e-mail.");
+    novo.email = email;
+  }
+  if (d.telefone !== undefined) novo.telefone = d.telefone.replace(/[^\d()+\s-]/g, "").trim().slice(0, 20);
+  if (d.senha !== undefined) {
+    if (d.senha.length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres.");
+    novo.hash = hashSenha(d.senha);
+  }
+  gravar(arqUsuarios(), lista.map((u) => (u.id === id ? novo : u)), true);
+  return novo;
 }
