@@ -54,7 +54,7 @@ A corrida do passageiro agora traz também:
 | 🔒 `GET /corridas-abertas` | — | `{ disponiveis: [...], pendentes: [...], programadas: [...] }`. **Disponíveis**: corridas procurando motorista dentro do raio, que ele pode pegar (aceitar direto ou mandar contra-oferta). **Pendentes**: as dele que ainda não começaram. **Programadas**: agendadas que ele pode assumir antes da hora. |
 | 🔒 `POST /corridas/:id/pegar` | — | Aceita uma disponível ou programada, se ainda estiver livre. |
 | 🔒 `POST /corridas/:id/contraoferta` | `{ valor }` | Manda a contra-oferta ao passageiro. Vale 60 s. |
-| 🔒 `GET /ofertas` | — | A chamada atual agora traz também `valorOferecido`, `opcionais`, a `nota` do passageiro, `paradas` e `agendadaPara`. |
+| 🔒 `GET /ofertas` | — | A chamada atual agora traz também: `valorOferecido`, `opcionais`, a `nota` e as `viagens` do passageiro, `observacao`, `paradas`, `agendadaPara`, `minutosAteEmbarque`, `distanciaViagemKm` e o **valor**, calculado no servidor: `valorBruto`, `taxaCentral` (comissão da categoria: percentual ou valor fixo; vale também a regra do motorista, se ele tiver uma própria), `valorLiquido = valorBruto − taxaCentral` e `ganhoPorKm` (líquido ÷ km da viagem). A contra-oferta continua sendo em valor bruto, e o app mostra o líquido correspondente. |
 | 🔒 `POST /macaneta` | `{ modo: "taximetro"\|"destino", categoria, destino?: Ponto, lat, lng, passageiro?: { nome, telefone } }` | Cria a corrida de rua já com ele e já **em andamento** (canal "Maçaneta"). |
 | 🔒 `POST /posicao` | (já existia) | Na Maçaneta em modo taxímetro, soma a distância percorrida (ignora saltos acima de 300 m em 5 s). |
 | 🔒 `POST /corridas/:id/status` finalizada | | Na Maçaneta com taxímetro, o valor sai da distância percorrida e do tempo, pela tarifa da categoria. |
@@ -70,6 +70,12 @@ A corrida do passageiro agora traz também:
 | 🔒 `GET /suporte` | — | `{ mensagens: [{ id, de: "eu"\|"central", texto?, audio?, em }] }`: chat com a central |
 | 🔒 `POST /suporte` | `{ texto }` | `{ mensagem }`. Aceita áudio pelo mesmo jeito do chat da corrida: `POST /suporte/audio`. |
 | 🔒 `GET /contatos` | — | `{ whatsapp, telefone, site, termosUrl, privacidadeUrl }`, da marca da empresa |
+
+## Comissão da central (por categoria)
+
+- **Onde fica:** em Categorias, no painel, há dois campos novos: "Comissão da central", com o tipo (percentual ou valor fixo) e o valor. Se o motorista tiver uma regra de cobrança própria (Personalizado ou Isento), ela vale no lugar.
+- **Cálculo:** `taxaCentral = percentual × bruto ÷ 100` ou o valor fixo, sem passar do valor bruto. `valorLiquido = bruto − taxa`. Os valores são arredondados em centavos.
+- **Teste:** o cálculo tem teste próprio (percentual, valor fixo, isento, motorista com regra própria e arredondamento).
 
 ## Despacho com valor oferecido
 
