@@ -27,6 +27,7 @@ import * as P from "./despacho.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
+import { registrarCotacao } from "../operacao/radar.ts";
 import { entrar, eu, pedirCodigo, sair, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
 export const rotasApps = express.Router();
@@ -193,7 +194,10 @@ r.get("/estimativa", ok(async (req, res) => {
     km = rr.distanciaKm; minutos = rr.minutos;
   }
   km ??= distanciaEstimada({ texto: "", ...a } as never, { texto: "", ...b } as never);
-  res.json(estimarPreco(ctx(req).empresaId, { categoria: txt(q.categoria, 60), distanciaKm: km, minutos }));
+  const est = estimarPreco(ctx(req).empresaId, { categoria: txt(q.categoria, 60), distanciaKm: km, minutos });
+  // Radar de intenções (Recuperação de Vendas): guarda a cotação do passageiro para ver quem cotou e não pediu.
+  if (ctx(req).sessao.papel === "passageiro") registrarCotacao(ctx(req).empresaId, ctx(req).sessao.chave, { embarque: a, destino: b, categoria: est.categoria ?? txt(q.categoria, 60), valor: est.valor, distanciaKm: est.distanciaKm });
+  res.json(est);
 }));
 
 // ------------------------------------------------------------------ corridas

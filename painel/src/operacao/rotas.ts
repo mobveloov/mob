@@ -1,0 +1,205 @@
+// Rotas da operação de corridas da central (/api/operacao): grupo Corridas do painel.
+// Registrar DEPOIS do app.use("/api", exigirLogin) do index.ts. A empresa vem SEMPRE do login (req.ctx).
+//
+//   GET  /historico                    histórico com filtros avançados (paginado; ?todas=1 para a planilha)
+//   GET  /corridas/:id                 detalhe (repasses, financeiro, datas)
+//   GET  /corridas/:id/raiox           auditoria: ondas de envio, timeline técnica, motoristas da região
+//   GET  /corridas/:id/rastreio        rastreio (posição do motorista e link de compartilhar)
+//   GET  /corridas/:id/recibo          recibo em HTML
+//   GET  /corridas/:id/chat            chat da corrida (marca como lido)
+//   POST /corridas/:id/reenviar        nova corrida igual (cancelada ou não atendida)
+//   POST /corridas/:id/cancelar        cancelar pela central, passageiro, motorista ou erro
+//   PUT  /corridas/:id                 editar a OS
+//   GET  /monitoramento, /mapa, /ocorrencias, /programadas, /pendencias, /objetos, /recuperacao, /passageiro, /motoristas
+//   POST /solicitar                    nova solicitação (com paradas, agendamento, motorista e valor manual)
+
+import fs from "node:fs";
+import { Router, type Request, type Response } from "express";
+import { arquivoDoAudio } from "../apps/chat.ts";
+import { aposCancelar } from "../apps/extras.ts";
+import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
+import { exigirPapel } from "../servidor/sessao.ts";
+import { agoraBr } from "../servidor/util.ts";
+import "./ondas.ts"; // liga o registro das ofertas do despacho
+import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
+import * as S from "./servico.ts";
+
+export const rotasOperacao = Router();
+
+const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
+  try { await fn(req, res); } catch (e) {
+    const msg = e instanceof Error ? e.message : "Erro.";
+    if (!res.headersSent) res.status(/não encontrad/i.test(msg) ? 404 : 400).json({ erro: msg });
+  }
+};
+const emp = (req: Request) => req.ctx!.empresaId;
+const quem = (req: Request) => req.ctx!.usuario.email;
+const q = (req: Request, k: string, max = 120) => String(req.query[k] ?? "").trim().slice(0, max);
+const pag = (req: Request) => Number(req.query.pagina) || 1;
+const central = exigirPapel("admin", "operador");
+const dataOk = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "");
+const horaOk = (s: string) => (/^\d{2}:\d{2}$/.test(s) ? s : "");
+const num = (v: unknown) => (v === "" || v == null ? undefined : typeof v === "number" ? v : Number(String(v).replace(/\./g, "").replace(",", ".")));
+const ponto = (v: unknown) => {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const lat = Number(o.lat), lng = Number(o.lng);
+  return { texto: String(o.texto ?? "").slice(0, 200), ...(Number.isFinite(lat) && Number.isFinite(lng) && o.lat != null && o.lng != null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : {}) };
+};
+
+// ------------------------------------------------------------------ histórico
+
+rotasOperacao.get("/historico", ok(async (req, res) => {
+  const f: S.FiltroHistorico = {
+    rapido: S.RAPIDOS[q(req, "rapido")] ? q(req, "rapido") : undefined, os: q(req, "os", 30), cidade: q(req, "cidade"), categoria: q(req, "categoria"),
+    endereco: q(req, "endereco"), nomePax: q(req, "nomePax"), cpfPax: q(req, "cpfPax", 20), telPax: q(req, "telPax", 20), motorista: q(req, "motorista"),
+    dataIni: dataOk(q(req, "dataIni")), dataFim: dataOk(q(req, "dataFim")), horaIni: horaOk(q(req, "horaIni")), horaFim: horaOk(q(req, "horaFim")),
+    pagamento: q(req, "pagamento"), origem: q(req, "origem"), status: q(req, "status"), fonte: q(req, "fonte", 60),
+  };
+  const r = await S.historico(emp(req), f);
+  if (req.query.todas === "1") return res.json({ corridas: r.corridas.slice(0, 5000), filtroBase: r.filtroBase });
+  const porPagina = 30;
+  const paginas = Math.max(1, Math.ceil(r.corridas.length / porPagina));
+  const pagina = Math.min(Math.max(1, pag(req)), paginas);
+  const itens = r.corridas.slice((pagina - 1) * porPagina, pagina * porPagina);
+  res.json({
+    avisos: r.avisos, stats: r.stats, opcoes: r.opcoes, filtroBase: r.filtroBase, pagina, paginas, total: r.corridas.length,
+    corridas: itens.map((c) => ({ ...c, alerta: r.alerta(c) })), status: S.STATUS_FILTRO,
+  });
+}));
+
+// ------------------------------------------------------------------ uma corrida
+
+rotasOperacao.get("/corridas/:id", ok((req, res) => res.json(S.detalhe(emp(req), req.params.id))));
+rotasOperacao.get("/corridas/:id/raiox", ok((req, res) => res.json(S.raioX(emp(req), req.params.id))));
+rotasOperacao.get("/corridas/:id/rastreio", ok((req, res) => res.json(S.rastreio(emp(req), req.params.id, `${req.protocol}://${req.get("host")}`))));
+rotasOperacao.get("/corridas/:id/recibo", ok((req, res) => res.json({ html: S.recibo(emp(req), req.params.id) })));
+rotasOperacao.get("/corridas/:id/chat", ok((req, res) => res.json({ mensagens: S.chat(emp(req), req.params.id) })));
+rotasOperacao.get("/corridas/:id/chat/audio/:audio", ok((req, res) => {
+  const c = S.acharPropria(emp(req), req.params.id);
+  const a = arquivoDoAudio(emp(req), c.id, req.params.audio);
+  if (!a) return res.status(404).json({ erro: "Áudio não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.send(fs.readFileSync(a.caminho));
+}));
+
+rotasOperacao.post("/corridas/:id/reenviar", central, ok(async (req, res) => {
+  const c = S.acharPropria(emp(req), req.params.id);
+  if (c.status !== "cancelada" && c.status !== "nao_atendida") throw new Error("Só dá para reenviar corrida cancelada ou não atendida.");
+  const nova = await criarCorridaPropria(emp(req), {
+    passageiro: { ...c.passageiro }, embarque: { ...c.embarque }, destino: c.destino ? { ...c.destino } : undefined, paradas: (c.paradas ?? []).map((p) => ({ ...p })),
+    categoria: c.categoria, pagamento: c.pagamento, canal: "painel", cupom: c.cupom || undefined,
+    observacao: [c.observacao, `Reenvio da OS ${c.os}`].filter(Boolean).join(" · "),
+  }, quem(req));
+  res.json({ corrida: { id: nova.id, os: nova.os } });
+}));
+
+const ORIGEM_CANCEL: Record<string, "Central" | "Passageiro" | "Motorista" | "Sistema"> = { central: "Central", passageiro: "Passageiro", motorista: "Motorista", sistema: "Sistema" };
+rotasOperacao.post("/corridas/:id/cancelar", central, ok(async (req, res) => {
+  const origem = ORIGEM_CANCEL[String(req.body?.origem ?? "")];
+  if (!origem) throw new Error("Escolha quem pediu o cancelamento.");
+  const rotulo = origem === "Sistema" ? "erro / outros" : origem.toLowerCase();
+  const motivo = String(req.body?.motivo ?? "").trim().slice(0, 200) || `Cancelamento pelo painel (${rotulo})`;
+  const c = await cancelarCorrida(emp(req), S.acharPropria(emp(req), req.params.id).id, origem, motivo, quem(req));
+  try { aposCancelar(emp(req), c); } catch (e) { console.error("[operacao] taxa:", e instanceof Error ? e.message : e); }
+  res.json({ corrida: { id: c.id, os: c.os, status: c.status } });
+}));
+
+rotasOperacao.put("/corridas/:id", central, ok(async (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const e: EdicaoCorrida = {};
+  if (typeof b.status === "string" && b.status) e.status = b.status as StatusProprio;
+  if (typeof b.motoristaId === "string") e.motoristaId = b.motoristaId;
+  if (typeof b.nome === "string" || typeof b.telefone === "string") e.passageiro = { nome: b.nome as string | undefined, telefone: b.telefone as string | undefined };
+  if (typeof b.embarque === "string") e.embarque = b.embarque;
+  if (typeof b.destino === "string") e.destino = b.destino;
+  if ("valorInicial" in b) e.valorInicial = num(b.valorInicial) ?? null;
+  if ("valorFinal" in b) e.valorFinal = num(b.valorFinal) ?? null;
+  if (typeof b.pagamento === "string") e.pagamento = b.pagamento;
+  const c = await editarCorridaPropria(emp(req), S.acharPropria(emp(req), req.params.id).id, e, quem(req));
+  res.json({ corrida: { id: c.id, os: c.os, status: c.status } });
+}));
+
+// ------------------------------------------------------------------ telas
+
+rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20) }))));
+rotasOperacao.get("/mapa", ok((req, res) => res.json(S.mapa(emp(req)))));
+rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
+  const h = Number(req.query.horas);
+  res.json(await S.ocorrencias(emp(req), h > 0 && h <= 72 ? h : 1, pag(req)));
+}));
+
+const FILTROS_PROG: S.FiltroProgramadas[] = ["hoje", "amanha", "futuras", "todas"];
+rotasOperacao.get("/programadas", ok((req, res) => {
+  const f = FILTROS_PROG.includes(q(req, "filtro") as S.FiltroProgramadas) ? (q(req, "filtro") as S.FiltroProgramadas) : "futuras";
+  res.json(S.programadas(emp(req), f, q(req, "busca"), pag(req)));
+}));
+rotasOperacao.put("/programadas/:id", central, ok(async (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const c = S.acharPropria(emp(req), req.params.id);
+  if (!c.agendadaPara) throw new Error("Esta corrida não é programada.");
+  const e: EdicaoCorrida = {};
+  if (typeof b.dataHora === "string" && b.dataHora && b.dataHora.slice(0, 16) !== c.agendadaPara.slice(0, 16)) e.agendadaPara = b.dataHora;
+  if ("valor" in b) { const v = num(b.valor) ?? null; if (v !== c.estimativa.valor) e.valorInicial = v; }
+  if (typeof b.observacao === "string" && b.observacao !== c.observacao) e.observacao = b.observacao;
+  const nova = await editarCorridaPropria(emp(req), c.id, e, quem(req));
+  res.json({ corrida: { id: nova.id, os: nova.os } });
+}));
+
+const SIT: Array<S.SituacaoPendencia | "todos"> = ["pendente", "paga", "abonada", "todos"];
+rotasOperacao.get("/pendencias", ok((req, res) => {
+  const s = SIT.includes(q(req, "status") as S.SituacaoPendencia) ? (q(req, "status") as S.SituacaoPendencia | "todos") : "pendente";
+  res.json(S.pendencias(emp(req), s, q(req, "busca"), pag(req)));
+}));
+rotasOperacao.post("/pendencias/:id/:acao", exigirPapel("admin"), ok((req, res) => {
+  const acao = req.params.acao;
+  if (acao !== "baixar" && acao !== "abonar") throw new Error("Ação inválida.");
+  res.json({ pendencia: S.resolverPendencia(emp(req), req.params.id, acao, quem(req)) });
+}));
+
+rotasOperacao.get("/objetos", ok((req, res) => {
+  const s = ["todos", "pendente", "resolvido"].includes(q(req, "status")) ? (q(req, "status") as "todos") : "todos";
+  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req)));
+}));
+rotasOperacao.post("/objetos/:id/status", central, ok((req, res) => res.json({ registro: S.alternarObjeto(emp(req), req.params.id, quem(req)) })));
+rotasOperacao.delete("/objetos/:id", central, ok((req, res) => { S.apagarObjeto(emp(req), req.params.id); res.json({ ok: true }); }));
+
+rotasOperacao.get("/recuperacao", ok((req, res) => {
+  const aba = ABAS_RADAR.includes(q(req, "aba") as AbaRadar) ? (q(req, "aba") as AbaRadar) : "passageiros";
+  const hoje = agoraBr().toISOString().slice(0, 10);
+  const inicio = dataOk(q(req, "inicio")) || hoje, fim = dataOk(q(req, "fim")) || inicio;
+  res.json({ aba, inicio, fim, ...radar(emp(req), aba, inicio, fim) });
+}));
+rotasOperacao.post("/recuperacao/contato", central, ok((req, res) => res.json({ contato: registrarContato(emp(req), String(req.body?.chave ?? ""), quem(req)) })));
+
+// ------------------------------------------------------------------ nova solicitação
+
+rotasOperacao.get("/passageiro", ok((req, res) => res.json(S.buscarPassageiro(emp(req), { telefone: q(req, "telefone", 20), cpf: q(req, "cpf", 20) }))));
+rotasOperacao.get("/motoristas", ok((req, res) => res.json({ motoristas: S.opcoesMotoristas(emp(req)) })));
+
+rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const pass = (b.passageiro ?? {}) as Record<string, unknown>;
+  const exig = Array.isArray(b.exigencias) ? b.exigencias.map((x) => String(x).replace(/[<>]/g, "").slice(0, 60)).slice(0, 10) : [];
+  const observacao = [
+    String(b.observacao ?? ""), b.complemento ? `Complemento: ${String(b.complemento).slice(0, 80)}` : "", b.referencia ? `Referência: ${String(b.referencia).slice(0, 120)}` : "",
+    exig.length ? `Exigências: ${exig.join(", ")}` : "",
+  ].filter((x) => x.trim()).join(" · ");
+  const c = await criarCorridaPropria(emp(req), {
+    passageiro: { nome: String(pass.nome ?? ""), telefone: String(pass.telefone ?? "") }, embarque: ponto(b.embarque),
+    destino: b.destino ? ponto(b.destino) : undefined, paradas: Array.isArray(b.paradas) ? b.paradas.map(ponto) : [],
+    categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
+    cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
+  }, quem(req));
+  const avisos: string[] = [];
+  const valor = num(b.valor);
+  if (valor != null && valor !== c.estimativa.valor) {
+    try { await editarCorridaPropria(emp(req), c.id, { valorInicial: valor }, quem(req)); } catch (e) { avisos.push(`Valor não mudou: ${e instanceof Error ? e.message : e}`); }
+  }
+  if (typeof b.motoristaId === "string" && b.motoristaId) {
+    try { await atribuirMotorista(emp(req), c.id, b.motoristaId, quem(req)); } catch (e) { avisos.push(`Motorista não atribuído: ${e instanceof Error ? e.message : e}`); }
+  }
+  res.json({ corrida: { id: c.id, os: c.os, valor: valor ?? c.estimativa.valor }, avisos });
+}));
+
+rotasOperacao.use((_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
