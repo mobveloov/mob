@@ -96,7 +96,16 @@ Esta especificação saiu dos prints dos apps de referência. Ela descreve **lay
    - botões no mapa: "✋ Maçaneta" (corrida de rua), filtros (preferências) e centralizar;
    - barra de baixo: Mapa | situação ("Você está offline" / "Procurando…", com a barra de progresso) | Corridas.
 4. **Corridas:** abas "Disp. (n)" (corridas abertas que ele pode pegar), "Pend. (n)" (aceitas que ainda não começaram) e "Prog. (n)" (agendadas). Quando vazio: "Nenhuma corrida no momento…".
-5. **Chamada:** som e vibração, com aviso insistente a cada 5 s. Cartão com o valor, a distância até o embarque, embarque, paradas e destino, categoria, pagamento e a nota do passageiro. Botões **Recusar** e **Aceitar**, e a opção de **contra-oferta** (− e + no valor).
+5. **Chamada (oferta do passageiro):**
+   - **Topo:** "Oferta do passageiro" e um contador redondo de segundos.
+   - **Valor:** o **LÍQUIDO** (o que o motorista recebe) fica GRANDE no centro, com − e + para a contra-oferta. Logo abaixo, menor, vem o **bruto** e a taxa da central ("Bruto R$ 14,00 · taxa R$ 2,10"). O líquido é o bruto menos a comissão da central daquela categoria.
+   - **Ganho por km:** a etiqueta "Ganhe R$ x/km" é calculada pelo líquido.
+   - **Três números em colunas:** o tempo até o passageiro ("1 min até você"), a nota do passageiro e o número de viagens dele.
+   - **Observação do passageiro:** numa faixa amarela, quando houver.
+   - **Endereços:** embarque e destino (e as paradas), com a distância da viagem.
+   - **Pagamento:** a forma de pagamento e a categoria.
+   - **Botões:** **RECUSAR** (contornado, vermelho) e **ACEITAR R$ <líquido>** (cheio, na cor da marca).
+   - **Alertas:** som e vibração, com aviso insistente a cada 5 s.
 6. **Em corrida:**
    - faixa de navegação no topo, com a seta e "23 m · Dirija na direção…" (vem do serviço de rotas, se houver) e o botão de mudo;
    - cartão do passageiro: foto, nota, número de corridas, Chat e Ligar, e "Ver perfil";

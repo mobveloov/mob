@@ -94,8 +94,8 @@ export function sanearMarca(entrada: unknown, base: Marca = MARCA_PADRAO): Marca
 export function variaveisTema(m: Marca, escuro: boolean): Record<string, string> {
   const { primaria, secundaria, fundo, texto } = m.cores;
   const base = escuro
-    ? { "--fundo": "#0d1524", "--cartao": "#15213a", "--texto": "#e6ebf3", "--suave": "#93a1b8", "--borda": "#26364f" }
-    : { "--fundo": fundo, "--cartao": "#ffffff", "--texto": texto, "--suave": `color-mix(in srgb, ${texto} 60%, ${fundo})`, "--borda": `color-mix(in srgb, ${texto} 12%, ${fundo})` };
+    ? { "--fundo": "#0b1121", "--cartao": "#1e293b", "--texto": "#f1f5f9", "--suave": "#94a3b8", "--borda": "#334155", "--barra": "#151e32", "--barra-borda": "#2a3b55" }
+    : { "--fundo": fundo, "--cartao": "#ffffff", "--texto": texto, "--suave": `color-mix(in srgb, ${texto} 60%, ${fundo})`, "--borda": `color-mix(in srgb, ${texto} 10%, ${fundo})`, "--barra": "#ffffff", "--barra-borda": `color-mix(in srgb, ${texto} 7%, #ffffff)` };
   return { ...base, "--primaria": primaria, "--primaria-txt": contraste(primaria), "--menu": secundaria, "--menu-txt": contraste(secundaria) === "#ffffff" ? "#d5dcea" : "#1c2434", "--fonte": `"${m.fonte}", system-ui, sans-serif` };
 }
 

@@ -23,8 +23,13 @@ import { rotasTotem } from "../totem/rotas.ts";
 import { router as rotasCrm } from "../crm/rotas.ts";
 import { rotasEnderecos } from "../enderecos/rotas.ts";
 import { rotasApps, rotasAppsCentral } from "../apps/rotas.ts";
+import { rotasOperacao } from "../operacao/rotas.ts";
 import { rotasExtrasCentral } from "../apps/extras.ts";
 import { iniciarApps } from "../apps/despacho.ts";
+import { calcularIndicadores, datasDoPeriodo, diaBrasilia, PERIODOS, type Periodo } from "./indicadores.ts";
+import { cadastroPorId } from "../comum/cadastros.ts";
+import { listar as listarCadastro } from "../cadastros/armazem.ts";
+import { normal } from "./util.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -143,7 +148,7 @@ const admin = exigirPapel("admin");
 app.get("/api/sessao", ok((req, res) => {
   const { usuario, empresaId } = ctx(req);
   res.json({
-    usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel },
+    usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, telefone: usuario.telefone ?? "", papel: usuario.papel },
     empresa: D.empresa(empresaId), marca: D.marca(empresaId),
     empresas: usuario.papel === "plataforma" ? D.listarEmpresas() : undefined,
   });
@@ -184,6 +189,29 @@ app.get("/api/motoristas", ok(async (req, res) => {
     avisos: r.avisos,
     motoristas: [...m.values()].map((x) => ({ nome: x.nome, corridas: x.corridas, finalizadas: x.finalizadas, canceladas: x.canceladas, taxaCancelamento: x.corridas ? arr((x.canceladas / x.corridas) * 100, 1) : 0, faturamento: arr(x.faturamento), km: arr(x.km, 1), nota: x.notas.length ? arr(x.notas.reduce((a, b) => a + b, 0) / x.notas.length) : null, ultima: x.ultima || null }))
       .sort((a, b) => b.finalizadas - a.finalizadas || b.corridas - a.corridas),
+  });
+}));
+
+/** Painel "Indicadores": cartões e comparativos do período (com a variação contra o período anterior). */
+app.get("/api/indicadores", ok(async (req, res) => {
+  const { empresaId } = ctx(req);
+  const q = req.query as Record<string, string | undefined>;
+  const periodo: Periodo = PERIODOS.includes(q.periodo as Periodo) ? (q.periodo as Periodo) : "hoje";
+  const p = datasDoPeriodo(periodo, q.inicio, q.fim);
+  const cidade = normal(q.cidade ?? "");
+  const [atual, anterior] = await Promise.all([
+    buscarCorridas(empresaId, { inicio: p.inicio, fim: p.fim }),
+    buscarCorridas(empresaId, { inicio: p.antInicio, fim: p.antFim }),
+  ]);
+  const daCidade = <T,>(l: T[]) => (cidade ? l.filter((c) => normal((c as { cidade?: unknown }).cidade) === cidade) : l);
+  const cidades = [...new Set([...atual.corridas, ...anterior.corridas].map((c) => c.cidade.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  // Passageiros cadastrados no período (cadastro de passageiros da empresa).
+  const cad = cadastroPorId("clientes");
+  const pax = cad ? daCidade(listarCadastro(empresaId, cad)).map((r) => diaBrasilia(String(r.criadoEm))) : [];
+  const conta = (de: string, ate: string) => pax.filter((d) => d && d >= de && d <= ate).length;
+  res.json({
+    avisos: atual.avisos, cidades,
+    indicadores: calcularIndicadores(daCidade(atual.corridas), daCidade(anterior.corridas), p, { atual: conta(p.inicio, p.fim), anterior: conta(p.antInicio, p.antFim) }),
   });
 }));
 
@@ -358,6 +386,26 @@ app.post("/api/planilhas", admin, express.raw({ type: "*/*", limit: "20mb" }), o
   res.json({ ok: true, total: r.corridas.length });
 }));
 
+// ------------------------------------------------------------------ minha conta (Alterar Senha)
+
+app.put("/api/conta", ok((req, res) => {
+  const b = req.body ?? {};
+  const u = D.atualizarUsuario(ctx(req).usuario.id, { nome: String(b.nome ?? ""), email: String(b.email ?? ""), telefone: String(b.telefone ?? "") });
+  res.json({ ok: true, usuario: { id: u.id, nome: u.nome, email: u.email, telefone: u.telefone ?? "", papel: u.papel } });
+}));
+
+app.post("/api/conta/senha", ok((req, res) => {
+  const { usuario } = ctx(req);
+  const b = req.body ?? {};
+  const atual = String(b.atual ?? ""), nova = String(b.nova ?? ""), confirmar = String(b.confirmar ?? "");
+  if (!podeTentar(req.ip ?? "", usuario.email)) return res.status(429).json({ erro: "Muitas tentativas. Espere alguns minutos." });
+  if (!D.senhaConfere(atual, usuario.hash)) { errouLogin(req.ip ?? "", usuario.email); return res.status(400).json({ erro: "A senha atual está errada." }); }
+  if (nova !== confirmar) return res.status(400).json({ erro: "A confirmação não é igual à nova senha." });
+  if (nova === atual) return res.status(400).json({ erro: "A nova senha precisa ser diferente da atual." });
+  D.atualizarUsuario(usuario.id, { senha: nova });
+  res.json({ ok: true });
+}));
+
 // ------------------------------------------------------------------ usuários e empresas
 
 app.get("/api/usuarios", admin, ok((req, res) => {
@@ -387,6 +435,7 @@ app.use("/api/corridas-proprias", rotasCorridasProprias);
 app.use("/api/crm", rotasCrm);
 app.use("/api/enderecos", rotasEnderecos);
 app.use("/api/apps-central", rotasAppsCentral);
+app.use("/api/operacao", rotasOperacao);
 app.use("/api/apps-central", rotasExtrasCentral);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
