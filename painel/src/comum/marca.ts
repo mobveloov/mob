@@ -20,7 +20,11 @@ export interface Marca {
   tema: Tema;
   /** Nomes dos arquivos enviados (ficam na pasta da empresa). Vazio = sem imagem. */
   arquivos: { logoClaro: string; logoEscuro: string; favicon: string; iconeApp: string; abertura: string };
-  textos: { saudacao: string; suporteEmail: string; suporteTelefone: string; rodapeRelatorio: string };
+  textos: {
+    saudacao: string; suporteEmail: string; suporteTelefone: string; rodapeRelatorio: string;
+    /** Contatos que aparecem nos apps (Fale conosco, termos e privacidade). */
+    suporteWhatsapp: string; suporteSite: string; termosUrl: string; privacidadeUrl: string;
+  };
   /** Domínios próprios ou subdomínios (ex.: "painel.rotafacil.com.br"). */
   dominios: string[];
   /** Mostrar a etiqueta de origem (qual sistema trouxe a corrida). */
@@ -42,7 +46,7 @@ export const MARCA_PADRAO: Marca = {
   fonte: "Plus Jakarta Sans",
   tema: "sistema",
   arquivos: { logoClaro: "", logoEscuro: "", favicon: "", iconeApp: "", abertura: "" },
-  textos: { saudacao: "Olá! Bom trabalho hoje.", suporteEmail: "", suporteTelefone: "", rodapeRelatorio: "" },
+  textos: { saudacao: "Olá! Bom trabalho hoje.", suporteEmail: "", suporteTelefone: "", rodapeRelatorio: "", suporteWhatsapp: "", suporteSite: "", termosUrl: "", privacidadeUrl: "" },
   dominios: [],
   mostrarOrigem: true,
   app: { nome: "Painel de Corridas", pacote: "", urlPainel: "" },
@@ -52,6 +56,13 @@ const COR = /^#[0-9a-fA-F]{6}$/;
 const texto = (v: unknown, max: number, padrao: string) => (typeof v === "string" ? v.replace(/[<>]/g, "").trim().slice(0, max) : padrao);
 const cor = (v: unknown, padrao: string) => (typeof v === "string" && COR.test(v) ? v.toLowerCase() : padrao);
 const arquivo = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,80}$/.test(v) ? v : "");
+/** Link http(s) sem espaço nem aspas; vazio apaga; outra coisa mantém o anterior. */
+const link = (v: unknown, padrao: string | undefined) => {
+  if (typeof v !== "string") return padrao ?? "";
+  const s = v.trim();
+  if (!s) return "";
+  return /^https?:\/\/[^\s"'<>]{3,300}$/.test(s) ? s : padrao ?? "";
+};
 const obj = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 
 /** Limpa uma marca vinda de fora (formulário, brand.json). Campo inválido volta ao padrão. */
@@ -78,6 +89,10 @@ export function sanearMarca(entrada: unknown, base: Marca = MARCA_PADRAO): Marca
       suporteEmail: texto(t.suporteEmail, 120, base.textos.suporteEmail),
       suporteTelefone: texto(t.suporteTelefone, 40, base.textos.suporteTelefone),
       rodapeRelatorio: texto(t.rodapeRelatorio, 200, base.textos.rodapeRelatorio),
+      suporteWhatsapp: typeof t.suporteWhatsapp === "string" ? t.suporteWhatsapp.replace(/\D/g, "").slice(0, 15) : base.textos.suporteWhatsapp ?? "",
+      suporteSite: link(t.suporteSite, base.textos.suporteSite),
+      termosUrl: link(t.termosUrl, base.textos.termosUrl),
+      privacidadeUrl: link(t.privacidadeUrl, base.textos.privacidadeUrl),
     },
     dominios: (Array.isArray(m.dominios) ? m.dominios : base.dominios)
       .map((d) => String(d).trim().toLowerCase()).filter((d) => /^[a-z0-9.-]{3,120}$/.test(d)).slice(0, 10),

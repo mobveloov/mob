@@ -156,6 +156,26 @@ export function salvarConfig(empresaId: string, c: ConfigEnderecos): ConfigEnder
   for (const m of limpo.municipios) indice(m); // já começa a preparar
   return limpo;
 }
+/** Cidades atendidas pela empresa (escolhidas em Endereços), com nome e UF. */
+export function cidadesAtendidas(empresaId: string): Municipio[] {
+  return lerConfig(empresaId).municipios.map((cod) => nomeMunicipio(cod));
+}
+
+/**
+ * Rua, bairro e cidade de um CEP, pela base de endereços das cidades da empresa. Só acha quando a base tem o CEP
+ * (o arquivo do CNEFE em uso nem sempre traz). Sem base ou sem o CEP: null (o app deixa preencher à mão).
+ */
+export function buscarCep(empresaId: string, cepBruto: string): { rua: string; bairro: string; cidade: string; uf: string } | null {
+  const cep = String(cepBruto ?? "").replace(/\D/g, "");
+  if (cep.length !== 8 || !temCnefe()) return null;
+  for (const cod of lerConfig(empresaId).municipios) {
+    const ix = indice(cod);
+    const r = ix?.ruas.find((x) => x.cep.replace(/\D/g, "") === cep);
+    if (ix && r) { const m = nomeMunicipio(cod); return { rua: titulo(`${r.tipo} ${r.nome}`.trim()), bairro: titulo(r.bairro), cidade: m.nome, uf: m.uf }; }
+  }
+  return null;
+}
+
 export function situacao(empresaId: string) {
   return {
     cnefe: temCnefe(), osrm: !!process.env.OSRM_URL?.trim(),

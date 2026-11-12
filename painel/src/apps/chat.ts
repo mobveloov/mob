@@ -63,21 +63,46 @@ export function enviarTexto(empresaId: string, corridaId: string, de: PapelApp, 
   return acrescentar(empresaId, corridaId, { id: crypto.randomUUID(), de, nome: nome.slice(0, 80), texto: t, em: agora() });
 }
 
-export function enviarAudio(empresaId: string, corridaId: string, de: PapelApp, nome: string, tipo: string, bytes: Uint8Array, segundos?: number): Mensagem {
+/** Confere (tipo, tamanho e começo do arquivo) e guarda um áudio na pasta da empresa. Usado pelo chat da corrida e pelo chat com a central. */
+export function salvarArquivoDeAudio(empresaId: string, tipo: string, bytes: Uint8Array, segundos?: number): { id: string; mime: string; bytes: number; segundos: number | null } {
   const mime = String(tipo ?? "").split(";")[0].trim().toLowerCase();
   const ext = TIPOS_AUDIO[mime];
   if (!ext) throw new Error("Tipo de áudio não aceito.");
   if (!bytes?.length) throw new Error("Áudio vazio.");
   if (bytes.length > maxAudioBytes()) throw new Error(`Áudio grande demais (máximo ${Math.round(maxAudioBytes() / 1024)} KB).`);
   if (!cabecalhoConfere(ext, bytes)) throw new Error("O arquivo não é um áudio válido.");
+  const id = crypto.randomUUID();
+  fs.mkdirSync(arquivo(empresaId, "chat", "audio"), { recursive: true });
+  fs.writeFileSync(arquivo(empresaId, "chat", "audio", `${id}.${ext}`), bytes, { mode: 0o600 });
+  const seg = segundos != null && Number.isFinite(segundos) && segundos > 0 && segundos < 600 ? Math.round(segundos) : null;
+  return { id, mime: MIME_DA_EXT[ext], bytes: bytes.length, segundos: seg };
+}
+
+/** Arquivo de um áudio pelo id (quem chama confere antes que o áudio é da pessoa certa). */
+export function caminhoDoAudio(empresaId: string, audioId: string, mime: string): { caminho: string; mime: string } | null {
+  if (!idCorridaValido(audioId)) return null;
+  const ext = Object.entries(MIME_DA_EXT).find(([, v]) => v === mime)?.[0];
+  if (!ext) return null;
+  const caminho = arquivo(empresaId, "chat", "audio", `${audioId}.${ext}`);
+  return fs.existsSync(caminho) ? { caminho, mime } : null;
+}
+
+export function enviarAudio(empresaId: string, corridaId: string, de: PapelApp, nome: string, tipo: string, bytes: Uint8Array, segundos?: number): Mensagem {
   const l = mensagens(empresaId, corridaId);
   if (l.filter((m) => m.audio).length >= MAX_AUDIOS) throw new Error("Esta corrida já tem áudios demais.");
-  const id = crypto.randomUUID();
-  const destino = arquivo(empresaId, "chat", "audio", `${id}.${ext}`);
-  fs.mkdirSync(arquivo(empresaId, "chat", "audio"), { recursive: true });
-  fs.writeFileSync(destino, bytes, { mode: 0o600 });
-  const seg = segundos != null && Number.isFinite(segundos) && segundos > 0 && segundos < 600 ? Math.round(segundos) : null;
-  return acrescentar(empresaId, corridaId, { id: crypto.randomUUID(), de, nome: nome.slice(0, 80), audio: { id, mime: MIME_DA_EXT[ext], bytes: bytes.length, segundos: seg }, em: agora() });
+  const audio = salvarArquivoDeAudio(empresaId, tipo, bytes, segundos);
+  return acrescentar(empresaId, corridaId, { id: crypto.randomUUID(), de, nome: nome.slice(0, 80), audio, em: agora() });
+}
+
+// ------------------------------------------------------------------ mensagens não lidas (só na memória: zera quando o servidor reinicia)
+
+const leituras = new Map<string, number>();
+/** Chamado quando a pessoa abre ou busca o chat: tudo até agora conta como lido. */
+export const marcarLida = (empresaId: string, corridaId: string, papel: PapelApp) => { leituras.set(`${empresaId}|${corridaId}|${papel}`, Date.now()); };
+export function naoLidas(empresaId: string, corridaId: string, papel: PapelApp): number {
+  if (!idCorridaValido(corridaId)) return 0;
+  const desde = leituras.get(`${empresaId}|${corridaId}|${papel}`) ?? 0;
+  return mensagens(empresaId, corridaId).filter((m) => m.de !== papel && Date.parse(m.em) > desde).length;
 }
 
 /** Arquivo do áudio, só se ele for desta corrida. */

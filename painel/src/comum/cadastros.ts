@@ -33,6 +33,7 @@ export interface Cadastro {
 }
 
 const STATUS_PESSOA = ["Ativo", "Inativo", "Bloqueado", "Aguardando aprovação"];
+export const GENEROS = ["Feminino", "Masculino", "Outro", "Prefiro não informar"];
 
 export const CADASTROS: Cadastro[] = [
   {
@@ -50,9 +51,19 @@ export const CADASTROS: Cadastro[] = [
       { chave: "placa", rotulo: "Placa", tipo: "texto" },
       { chave: "anoVeiculo", rotulo: "Ano do veículo", tipo: "numero" },
       { chave: "viatura", rotulo: "Número da viatura", tipo: "texto" },
+      { chave: "cnh", rotulo: "Número da CNH", tipo: "texto" },
       { chave: "validadeCnh", rotulo: "Validade da CNH", tipo: "data" },
       { chave: "validadeLicenciamento", rotulo: "Validade do licenciamento", tipo: "data" },
+      { chave: "nascimento", rotulo: "Nascimento", tipo: "data" },
+      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: GENEROS },
+      { chave: "chavePix", rotulo: "Chave Pix", tipo: "texto" },
+      { chave: "cep", rotulo: "CEP", tipo: "texto" },
+      { chave: "rua", rotulo: "Rua", tipo: "texto" },
+      { chave: "numero", rotulo: "Número", tipo: "texto", dica: "S/N quando não tem número." },
+      { chave: "complemento", rotulo: "Complemento", tipo: "texto" },
+      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
       { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
+      { chave: "uf", rotulo: "UF", tipo: "texto" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
       { chave: "origem", rotulo: "Origem", tipo: "texto", calculado: true },
       { chave: "corridas", rotulo: "Corridas (30 dias)", tipo: "numero", calculado: true },
@@ -71,6 +82,7 @@ export const CADASTROS: Cadastro[] = [
       { chave: "cpf", rotulo: "CPF", tipo: "cpf" },
       { chave: "email", rotulo: "E-mail", tipo: "email" },
       { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Inativo", "Bloqueado", "Suspenso"], obrigatorio: true },
+      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: GENEROS },
       { chave: "conveniada", rotulo: "Empresa conveniada", tipo: "texto" },
       { chave: "enderecoFavorito", rotulo: "Endereço favorito", tipo: "texto" },
       { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
