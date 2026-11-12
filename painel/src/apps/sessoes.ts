@@ -50,7 +50,8 @@ function impedimento(empresaId: string, papel: PapelApp, telefone: string): stri
   if (papel === "motorista") {
     const m = motoristaDoTelefone(empresaId, telefone);
     if (!m) return "Este telefone não está no cadastro de motoristas. Fale com a central.";
-    if (m.status !== "Ativo") return "Seu cadastro de motorista não está ativo. Fale com a central.";
+    // "Aguardando aprovação" entra no app para completar o cadastro (mas não fica online até a central aprovar).
+    if (m.status !== "Ativo" && m.status !== "Aguardando aprovação") return "Seu cadastro de motorista não está ativo. Fale com a central.";
     return null;
   }
   const c = clienteDoTelefone(empresaId, telefone);
@@ -98,6 +99,11 @@ export function entrar(empresaId: string, papel: PapelApp, telefoneBruto: string
     throw new Error("Código errado.");
   }
   codigos.delete(k);
+  return criarSessao(empresaId, papel, telefone);
+}
+
+/** Abre a sessão (token) de quem já provou quem é: com o código do WhatsApp ou com a senha. */
+export function criarSessao(empresaId: string, papel: PapelApp, telefone: string): { token: string; sessao: SessaoApp } {
   const erro = impedimento(empresaId, papel, telefone);
   if (erro) throw new Error(erro);
   const chave = papel === "motorista" ? motoristaDoTelefone(empresaId, telefone)!.id : telefone;
