@@ -1,19 +1,19 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { LogOut, Moon, Sparkles, Sun } from "lucide-react";
-import { FUNCOES, GRUPOS } from "../comum/funcoes.ts";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { ChevronDown, KeyRound, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { FUNCOES, GRUPOS, type Funcao, type Grupo } from "../comum/funcoes.ts";
 import { MARCA_PADRAO, variaveisTema, type Marca } from "../comum/marca.ts";
 import { api, ErroApi, escolherEmpresa, urlImagem, type Sessao } from "./api";
 import Entrar from "./paginas/Entrar";
 import Painel from "./paginas/Painel";
 import ConsultarCorridas from "./paginas/ConsultarCorridas";
 import Acompanhamento from "./paginas/Acompanhamento";
-import Motoristas from "./paginas/Motoristas";
 import Avaliacoes from "./paginas/Avaliacoes";
+import AlterarSenha from "./paginas/AlterarSenha";
+import { EmConstrucao } from "./componentes/ui";
+import { TELAS_ENTREGUES } from "./telas/registro";
 import TelaCadastro from "./cadastros/TelaCadastro";
-import { CADASTROS } from "../comum/cadastros.ts";
 import Financeiro from "./paginas/Financeiro";
-import Estatisticas from "./paginas/Estatisticas";
 import Analise from "./paginas/Analise";
 import MarcaAparencia from "./paginas/MarcaAparencia";
 import Integracoes from "./paginas/Integracoes";
@@ -56,16 +56,15 @@ function usaEscuro(m: Marca): boolean {
   const escolha = ler("tema");
   if (escolha === "escuro") return true;
   if (escolha === "claro") return false;
-  if (m.tema === "escuro") return true;
-  if (m.tema === "claro") return false;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  // Escuro por padrão (como na referência); só fica claro se a pessoa ou a marca escolherem.
+  return m.tema !== "claro";
 }
 
 export default function App() {
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [marca, setMarca] = useState<Marca>(MARCA_PADRAO);
   const [estado, setEstado] = useState<"carregando" | "entrar" | "configurar" | "pronto" | "erro">("carregando");
-  const [escuro, setEscuro] = useState(false);
+  const [escuro, setEscuro] = useState(true);
   const [empresaPublica, setEmpresaPublica] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
@@ -104,65 +103,157 @@ export default function App() {
   );
 }
 
-const PAGINAS: Record<string, JSX.Element> = {
-  painel: <Painel />, corridas: <ConsultarCorridas />, acompanhamento: <Acompanhamento />, programadas: <ConsultarCorridas key="programadas" programadas />,
-  producao: <Motoristas />, nps: <Avaliacoes />, financeiro: <Financeiro />, estatisticas: <Estatisticas />, analise: <Analise />,
-  // Cadastros (motoristas, passageiros, veículos, conveniadas, categorias, cupons, áreas, punições, ocorrências, objetos, desafios)
-  ...Object.fromEntries(CADASTROS.map((c) => [c.funcao, <TelaCadastro key={c.id} id={c.id} />])),
-  solicitar: <SolicitarCorrida />, apps: <AppsCentral />, carteiras: <Carteiras />, documentos: <DocumentosMotoristas />, totem: <LocaisTotem />, bot: <BotWhatsApp />, conversas: <ConversasWhatsApp />,
+// ------------------------------------------------------------------ telas por id do menu
+// Telas provisórias: apontam para a tela nossa mais parecida que já existe. As frentes entregam as telas
+// novas em src/web/telas/<grupo>/index.tsx (TELAS_CADASTRO, TELAS_CORRIDAS, TELAS_DEMAIS); o que chegar
+// por lá passa na frente (ver src/web/telas/registro.ts). O que não tiver tela mostra "Em construção".
+const cad = (id: string) => <TelaCadastro key={id} id={id} />;
+const PROVISORIAS: Record<string, JSX.Element> = {
+  painel: <Painel />, "alterar-senha": <AlterarSenha />,
+  motoristas: cad("motoristas"), passageiros: cad("clientes"), veiculos: cad("veiculos"), equipe: <Usuarios />,
+  cupons: cad("cupons"), empresas: cad("conveniadas"), areas: cad("areas"), punicoes: cad("punicoes"), desafios: cad("desafios"),
+  solicitar: <SolicitarCorrida />, monitoramento: <Acompanhamento />, historico: <ConsultarCorridas />, ocorrencias: cad("ocorrencias"),
+  programadas: <ConsultarCorridas key="programadas" programadas />, objetos: cad("objetos"),
+  carteiras: <Carteiras />, relatorios: <Financeiro />, conversas: <ConversasWhatsApp />, notificacoes: cad("notificacoes"),
+  categorias: cad("categorias"), integracoes: <Integracoes />, avaliacoes: <Avaliacoes />,
+  // Telas próprias (grupo "Mais")
   "crm-publico": <CrmPublico />, "crm-campanhas": <CrmCampanhas />, "crm-jornadas": <CrmJornadas />,
-  marca: <MarcaAparencia />, enderecos: <Enderecos />, integracoes: <Integracoes />, usuarios: <Usuarios />,
+  bot: <BotWhatsApp />, totem: <LocaisTotem />, analise: <Analise />, apps: <AppsCentral />, documentos: <DocumentosMotoristas />,
+  enderecos: <Enderecos />, marca: <MarcaAparencia />,
 };
-const SO_ADMIN = new Set(["marca", "integracoes", "usuarios"]);
+const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <EmConstrucao titulo={f.nome} sub="Em breve nesta versão do painel." />;
+
+// ------------------------------------------------------------------ menu
+
+const rotuloFuncao = (f: Funcao, assistente: string) => (f.id === "analise" ? `Análise com ${assistente}` : f.nome);
+const iniciais = (nome: string) => (nome.trim().charAt(0) || "?").toUpperCase();
+const CARGO: Record<string, string> = { plataforma: "Plataforma", admin: "Gestor", operador: "Operador" };
+
+/** Itens de um grupo, separados por seção (títulos pequenos no menu suspenso). */
+function porSecao(itens: Funcao[]) {
+  const m = new Map<string, Funcao[]>();
+  for (const f of itens) { const k = f.secao ?? ""; m.set(k, [...(m.get(k) ?? []), f]); }
+  return [...m.entries()];
+}
 
 function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; trocarTema: () => void; trocarEmpresa: (id: string) => void; sair: () => void }) {
   const { sessao, marca } = useSessao();
   const local = useLocation();
+  const [aberto, setAberto] = useState(false);
+  const [grupoMobile, setGrupoMobile] = useState<Grupo | null>(null);
+  const [fechado, setFechado] = useState<string | null>(null);
   const admin = sessao.usuario.papel !== "operador";
-  const logo = escuro ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro;
-  // Só entra no menu o que já funciona. O que ainda falta fica listado em docs/ANALISE_PAINEIS.md.
-  const funcoes = FUNCOES.filter((f) => (f.situacao === "pronto" || f.situacao === "parcial") && (admin || !SO_ADMIN.has(f.id)));
-  useEffect(() => { window.scrollTo(0, 0); }, [local.pathname]);
+  const logoArq = escuro ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro || marca.arquivos.logoEscuro;
+  const logo = logoArq ? <img src={urlImagem(sessao.empresa.id, logoArq)} alt={marca.produto} /> : <span className="logo-texto">{marca.produto}</span>;
+  const funcoes = FUNCOES.filter((f) => admin || !f.soAdmin);
+  const grupos = GRUPOS.map((g) => ({ g, itens: funcoes.filter((f) => f.grupo === g) })).filter((x) => x.itens.length);
+  const nomeUsuario = sessao.usuario.nome || sessao.usuario.email;
+  const ativoGrupo = (itens: Funcao[]) => itens.some((f) => (f.rota === "/" ? local.pathname === "/" : local.pathname === f.rota || local.pathname.startsWith(`${f.rota}/`)));
+  useEffect(() => { window.scrollTo(0, 0); setAberto(false); }, [local.pathname]);
+
+  const linkItem = (f: Funcao) => (
+    <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `dropdown-item ${isActive ? "ativo" : ""}`} onClick={() => setFechado(f.grupo)}>
+      <span>{rotuloFuncao(f, marca.assistente.nome)}</span>{f.novo && <span className="etiqueta-novo">NOVO</span>}
+    </NavLink>
+  );
+
+  const usuarioMenu = (
+    <div className="nav-grupo usuario">
+      <button className="usuario-botao" aria-haspopup="menu">
+        <span className="avatar">{iniciais(nomeUsuario)}</span>
+        <span className="usuario-nome"><strong>{nomeUsuario}</strong><small>{CARGO[sessao.usuario.papel]}</small></span>
+        <ChevronDown size={14} className="seta" />
+      </button>
+      <div className="nav-dropdown direita">
+        <div className="usuario-topo"><small>Conectado como</small><strong>{sessao.usuario.email}</strong></div>
+        {sessao.empresas && (
+          <label className="usuario-empresa">Empresa
+            <select value={sessao.empresa.id} onChange={(e) => trocarEmpresa(e.target.value)}>{sessao.empresas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}</select>
+          </label>
+        )}
+        <NavLink to="/alterar-senha" className="dropdown-item"><KeyRound size={16} /> Alterar Senha</NavLink>
+        <div className="separador" />
+        <button className="dropdown-item sair" onClick={sair}><LogOut size={16} /> Sair do Sistema</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="app">
-      <aside className="menu">
-        <div className="marca">
-          {logo ? <img src={urlImagem(sessao.empresa.id, logo)} alt={marca.produto} /> : <span className="marca-nome">{marca.produto}</span>}
+      {/* Menu do topo (computador) */}
+      <header className="barra-topo">
+        <div className="barra-centro">
+          <Link to="/" className="logo-topo" aria-label={marca.produto}>{logo}</Link>
+          <span className="divisor-v" />
+          <nav className="nav-itens" aria-label="Menu principal">
+            {grupos.map(({ g, itens }) => {
+              if (itens.length === 1 && g !== "Mais") {
+                const f = itens[0];
+                return <NavLink key={g} to={f.rota} end className={({ isActive }) => `nav-link ${isActive ? "ativo" : ""}`}>{f.nome}</NavLink>;
+              }
+              return (
+                <div key={g} className={`nav-grupo ${fechado === g ? "fechar" : ""}`} onMouseLeave={() => setFechado(null)}>
+                  <button className={`nav-link ${ativoGrupo(itens) ? "ativo" : ""}`} aria-haspopup="menu">{g}<ChevronDown size={13} className="seta" /></button>
+                  <div className="nav-dropdown">
+                    {porSecao(itens).map(([secao, lista]) => (
+                      <div key={secao}>{secao && <div className="dropdown-header">{secao}</div>}{lista.map(linkItem)}</div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </nav>
         </div>
+        <div className="barra-lado">
+          <button className="botao-tema" onClick={trocarTema} aria-label="Alternar Tema" title="Alternar Tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
+          {usuarioMenu}
+        </div>
+      </header>
+
+      {/* Barra do celular com hambúrguer */}
+      <header className="barra-celular">
+        <button className="hamburguer" onClick={() => setAberto(true)} aria-label="Abrir menu"><Menu size={24} /></button>
+        <Link to="/" className="logo-topo" aria-label={marca.produto}>{logo}</Link>
+        <Link to="/alterar-senha" className="avatar" aria-label="Minha conta">{iniciais(nomeUsuario)}</Link>
+      </header>
+      {aberto && <div className="cortina" onClick={() => setAberto(false)} />}
+      <aside className={`lateral ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
+        <div className="lateral-topo"><strong>{marca.produto}</strong><button onClick={() => setAberto(false)} aria-label="Fechar menu"><X size={22} /></button></div>
         <nav>
-          {GRUPOS.map((g) => {
-            const itens = funcoes.filter((f) => f.grupo === g);
-            if (!itens.length) return null;
+          {grupos.map(({ g, itens }) => {
+            if (itens.length === 1 && g !== "Mais") {
+              return <NavLink key={g} to={itens[0].rota} end className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span>{itens[0].nome}</span></NavLink>;
+            }
+            const abre = grupoMobile === g;
             return (
-              <div key={g} className="grupo">
-                <span className="grupo-nome">{g}</span>
-                {itens.map((f) => (
-                  <NavLink key={f.id} to={f.rota} end={f.rota === "/"} className={({ isActive }) => (isActive ? "ativo" : "")}>
-                    <span>{f.id === "analise" ? `Análise com ${marca.assistente.nome}` : f.nome}</span>
-                  </NavLink>
-                ))}
+              <div key={g}>
+                <button className="mobile-link" onClick={() => setGrupoMobile(abre ? null : g)} aria-expanded={abre}><span>{g}</span><ChevronDown size={16} className={abre ? "girar" : ""} /></button>
+                {abre && (
+                  <div className="mobile-sub">
+                    {porSecao(itens).map(([secao, lista]) => (
+                      <div key={secao}>
+                        {secao && <div className="mobile-secao">{secao}</div>}
+                        {lista.map((f) => <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `mobile-sublink ${isActive ? "ativo" : ""}`}>{rotuloFuncao(f, marca.assistente.nome)}</NavLink>)}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
+          <div className="lateral-pref">
+            <p>Preferências</p>
+            <NavLink to="/alterar-senha" className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span><KeyRound size={16} /> Alterar Senha</span></NavLink>
+            <button className="mobile-link" onClick={trocarTema}><span>{escuro ? <Sun size={16} /> : <Moon size={16} />} Alternar Tema</span></button>
+          </div>
         </nav>
+        <div className="lateral-rodape"><button onClick={sair}><LogOut size={18} /> Sair do Sistema</button></div>
       </aside>
-      <main>
-        <header className="topo">
-          <span className="saudacao">{marca.textos.saudacao}</span>
-          {sessao.empresas && (
-            <label className="fonte">
-              <span>Empresa</span>
-              <select value={sessao.empresa.id} onChange={(e) => trocarEmpresa(e.target.value)}>
-                {sessao.empresas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-              </select>
-            </label>
-          )}
-          <span className="selo info" title="Assistente de análise de corridas"><Sparkles size={14} /> {marca.assistente.nome}</span>
-          <button className="icone" onClick={trocarTema} aria-label="Alternar tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
-          <button className="icone" onClick={sair} aria-label="Sair" title={`Sair (${sessao.usuario.email})`}><LogOut size={18} /></button>
-        </header>
+
+      <main className="conteudo">
         <Routes>
-          {funcoes.filter((f) => PAGINAS[f.id]).map((f) => <Route key={f.id} path={f.rota} element={PAGINAS[f.id]} />)}
+          {funcoes.map((f) => <Route key={f.id} path={f.rota} element={tela(f)} />)}
+          {funcoes.flatMap((f) => (f.antigas ?? []).map((a) => <Route key={a} path={a} element={<Navigate to={f.rota} replace />} />))}
           <Route path="*" element={<p className="vazio">Página não encontrada.</p>} />
         </Routes>
       </main>
