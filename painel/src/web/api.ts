@@ -36,6 +36,7 @@ export interface CorridaPropria {
 /** Empresa escolhida pelo usuário da plataforma (troca de empresa). */
 let empresaEscolhida = "";
 export const escolherEmpresa = (id: string) => { empresaEscolhida = id; };
+export const empresaEscolhidaAgora = () => empresaEscolhida;
 
 // Toda chamada à API do próprio painel leva a empresa escolhida (usuário da plataforma que troca de empresa),
 // inclusive as das telas que fazem o próprio fetch.

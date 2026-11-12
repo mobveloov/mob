@@ -12,6 +12,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, atribuirMotorista, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import { filtrosDoDespacho } from "./extras.ts";
+import { fantasmas, regrasDoDespacho } from "../gestao/regras.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -187,6 +188,7 @@ export function despachar(empresaId: string) {
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
+  const regras = regrasDoDespacho(empresaId, cadastro); // punição, cerca eletrônica, saldo mínimo e nível
   let n = 0;
   for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
@@ -198,13 +200,16 @@ export function despachar(empresaId: string) {
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
+      if (!regras.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
       const km = c.embarque.lat != null && c.embarque.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) : null;
       if (km != null && km > RAIO_KM()) continue;
       // Sem coordenada no embarque: vai para quem está online há mais tempo.
       const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
       // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
       const fav = filtros.ehFavorito(c.passageiro.telefone, id), favMelhor = !!melhor && filtros.ehFavorito(c.passageiro.telefone, melhor.id);
-      if (!melhor || (fav && !favMelhor) || (fav === favMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))) melhor = { id, km };
+      // Depois do favorito, o nível (prioritário, secundário, reserva); depois, o mais perto.
+      const nv = regras.nivel(id), nvMelhor = melhor ? regras.nivel(melhor.id) : 0;
+      if (!melhor || (fav && !favMelhor) || (fav === favMelhor && (nv < nvMelhor || (nv === nvMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))))) melhor = { id, km };
     }
     if (!melhor) continue;
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + OFERTA_MS(), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
@@ -367,7 +372,8 @@ export function motoristasOnline(empresaId: string) {
   const lista = listarProprias(empresaId);
   const busy = ocupados(lista);
   const cad = new Map(motoristas(empresaId).map((m) => [m.id, m]));
-  return [...e.online.entries()].map(([id, p]) => ({
+  const ocultos = fantasmas(empresaId); // modo fantasma: some do mapa, mas recebe corridas
+  return [...e.online.entries()].filter(([id]) => !ocultos.has(id)).map(([id, p]) => ({
     id, nome: String(cad.get(id)?.nome ?? ""), placa: String(cad.get(id)?.placa ?? ""), lat: p.lat, lng: p.lng, atualizadoEm: new Date(p.em).toISOString(),
     situacao: busy.has(id) ? "em corrida" : [...e.ofertas.values()].some((o) => o.motoristaId === id) ? "recebendo chamada" : "livre",
   }));
