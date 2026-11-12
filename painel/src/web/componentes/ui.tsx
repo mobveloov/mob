@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Hammer, X } from "lucide-react";
 import { diasAtrasIso, hojeIso, type Filtro } from "../api";
 
 export function Titulo({ titulo, sub, children }: { titulo: string; sub?: string; children?: ReactNode }) {
@@ -8,6 +8,20 @@ export function Titulo({ titulo, sub, children }: { titulo: string; sub?: string
       <div><h1>{titulo}</h1>{sub && <p>{sub}</p>}</div>
       <div className="acoes">{children}</div>
     </div>
+  );
+}
+
+/** Tela que ainda vai ser entregue: título certo (igual ao do menu) e um aviso. */
+export function EmConstrucao({ titulo, sub }: { titulo: string; sub?: string }) {
+  return (
+    <>
+      <Titulo titulo={titulo} sub={sub} />
+      <section className="cartao construcao">
+        <span className="ind-icone cor-ambar"><Hammer size={26} /></span>
+        <h2>Em construção</h2>
+        <p>Esta tela está sendo preparada e vai ficar igual às demais do painel. Enquanto isso, as outras telas do menu continuam funcionando normalmente.</p>
+      </section>
+    </>
   );
 }
 
