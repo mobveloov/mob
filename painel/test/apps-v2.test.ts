@@ -484,3 +484,28 @@ test("maçaneta: corrida de rua em taxímetro, com o valor pela distância andad
   // A corrida de rua aparece nos ganhos dele.
   assert.equal((await chamar("GET", `${API}/ganhos?periodo=mes`, undefined, tokBeto)).corpo.viagens, 1);
 });
+
+test("página de download: lista os APKs publicados e entrega o arquivo; outra empresa não vê", async () => {
+  const vazio = await chamar("GET", `${API}/apks`);
+  assert.equal(vazio.status, 200);
+  assert.equal(vazio.corpo.passageiro.existe, false); assert.equal(vazio.corpo.empresa, U.id);
+  assert.equal((await chamar("GET", `${API}/apks/passageiro`)).status, 404);
+  const pasta = path.join(DADOS, "empresas", U.id, "apps", "apks");
+  fs.mkdirSync(pasta, { recursive: true });
+  const conteudo = crypto.randomBytes(3000);
+  fs.writeFileSync(path.join(pasta, "motorista.apk"), conteudo);
+  fs.writeFileSync(path.join(pasta, "motorista.json"), JSON.stringify({ versao: "1.2", nome: "Via Nova Motorista" }));
+  const lista = (await chamar("GET", `${API}/apks`)).corpo;
+  assert.equal(lista.motorista.existe, true); assert.equal(lista.motorista.versao, "1.2"); assert.equal(lista.motorista.nome, "Via Nova Motorista");
+  assert.equal(lista.passageiro.existe, false);
+  const baixou = await chamar("GET", `${API}/apks/motorista`);
+  assert.equal(baixou.status, 200);
+  assert.equal(baixou.headers.get("content-type"), "application/vnd.android.package-archive");
+  assert.match(baixou.headers.get("content-disposition") ?? "", /^attachment; filename="[\w-]+\.apk"$/);
+  assert.deepEqual(Buffer.from(baixou.corpo as ArrayBuffer), conteudo);
+  assert.equal((await chamar("GET", `${API}/apks/../../etc/passwd`)).status, 404);
+  assert.equal((await chamar("GET", `${API}/apks/outro`)).status, 404);
+  // A outra empresa não enxerga o APK desta.
+  assert.equal((await chamar("GET", `/api/apps/${V.id}/apks`)).corpo.motorista.existe, false);
+  assert.equal((await chamar("GET", `/api/apps/${V.id}/apks/motorista`)).status, 404);
+});

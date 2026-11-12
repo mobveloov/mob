@@ -14,7 +14,7 @@ import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
 import { ajustes, contatos } from "./ajustes.ts";
-import { limitador, num, soDigitos, txt } from "./armazem.ts";
+import { arquivo, ler, limitador, num, soDigitos, txt } from "./armazem.ts";
 import { marcarLida } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { pessoa, salvarPessoa } from "./extras.ts";
@@ -22,6 +22,7 @@ import {
   arquivoDaFoto, ativarVeiculo, cadastroDoMotorista, criarContaMotorista, criarContaPassageiro, definirSenha, estatisticas, euCompleto, excluirVeiculo, localizar, lugares,
   mascarar, MAX_FOTO, pendenciasDoMotorista, removerLugar, salvarDadosDoMotorista, salvarEnderecoDoMotorista, salvarFoto, salvarLugar, salvarVeiculo, senhaConfere, temSenha, urlDaFoto, veiculos,
 } from "./perfil.ts";
+import * as D from "../servidor/dados.ts";
 import { arquivoDoAudioDoSuporte, audioParaCentral, conversasDoSuporte, escreverParaCentral, marcarSuporteLido, mensagensDoSuporte, naoLidasDoSuporte, responderPelaCentral } from "./suporte.ts";
 import { criarSessao, entrar, pedirCodigo, PAPEIS, sair, type PapelApp } from "./sessoes.ts";
 
@@ -109,6 +110,42 @@ rotasPublicasV2.post("/conta/nova-senha", ok((req, res) => {
   const { token, sessao } = entrar(emp(req), papel, c.telefone, String(req.body?.codigo ?? ""));
   definirSenha(emp(req), papel, c.chave, String(req.body?.senha ?? ""));
   res.json({ token, eu: euCompleto(emp(req), sessao) });
+}));
+
+// ---------------------------------------------------------------- APKs para baixar (página /apps/baixar/)
+
+const APPS_APK = ["passageiro", "motorista"] as const;
+const caminhoApk = (empresaId: string, app: string) => arquivo(empresaId, "apks", `${app}.apk`);
+const podeBaixar = limitador(60, 10 * 60_000);
+
+/** Quais APKs a empresa publicou (DADOS_DIR/empresas/<id>/apps/apks/<app>.apk, com <app>.json opcional: versão, nome e pacote). */
+rotasPublicasV2.get("/apks", ok((req, res) => {
+  const id = emp(req), m = D.marca(id);
+  const arq = (n: string) => (n ? `/api/publico/arquivo/${id}/${n}` : null);
+  const info = (app: (typeof APPS_APK)[number]) => {
+    const caminho = caminhoApk(id, app);
+    const extra = ler<{ versao?: string; nome?: string }>(arquivo(id, "apks", `${app}.json`), {});
+    const nomeBase = m.app.nome || m.nomeExibido;
+    const nome = extra.nome || (app === "motorista" ? `${nomeBase} Motorista` : nomeBase);
+    if (!fs.existsSync(caminho)) return { existe: false, nome };
+    const st = fs.statSync(caminho);
+    return { existe: true, nome, tamanhoMb: st.size / 1048576, versao: extra.versao, em: st.mtime.toISOString() };
+  };
+  res.json({ empresa: id, nome: m.nomeExibido, cores: m.cores, logo: arq(m.arquivos.logoClaro || m.arquivos.iconeApp), passageiro: info("passageiro"), motorista: info("motorista") });
+}));
+
+rotasPublicasV2.get("/apks/:app", ok((req, res) => {
+  if (!podeBaixar(`${emp(req)}|${req.ip}`)) throw demais("Muitos downloads. Espere um pouco.");
+  const app = String(req.params.app);
+  if (!(APPS_APK as readonly string[]).includes(app)) return res.status(404).json({ erro: "App não encontrado." });
+  const caminho = caminhoApk(emp(req), app);
+  if (!fs.existsSync(caminho)) return res.status(404).json({ erro: "Este app ainda não foi publicado." });
+  const nome = `${D.marca(emp(req)).nomeExibido}-${app}`.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || app;
+  res.setHeader("Content-Type", "application/vnd.android.package-archive");
+  res.setHeader("Content-Disposition", `attachment; filename="${nome}.apk"`);
+  res.setHeader("Content-Length", String(fs.statSync(caminho).size));
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  fs.createReadStream(caminho).pipe(res);
 }));
 
 // ====================================================================== com token
