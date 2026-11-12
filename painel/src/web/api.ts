@@ -37,6 +37,22 @@ export interface CorridaPropria {
 let empresaEscolhida = "";
 export const escolherEmpresa = (id: string) => { empresaEscolhida = id; };
 
+// Toda chamada à API do próprio painel leva a empresa escolhida (usuário da plataforma que troca de empresa),
+// inclusive as das telas que fazem o próprio fetch.
+if (typeof window !== "undefined" && !(window as unknown as { __empresaFetch?: boolean }).__empresaFetch) {
+  (window as unknown as { __empresaFetch?: boolean }).__empresaFetch = true;
+  const original = window.fetch.bind(window);
+  window.fetch = (entrada, init) => {
+    const url = typeof entrada === "string" ? entrada : entrada instanceof URL ? entrada.pathname : entrada.url;
+    if (empresaEscolhida && /^(\/|https?:\/\/[^/]+\/)api\//.test(url)) {
+      const headers = new Headers(init?.headers ?? (entrada instanceof Request ? entrada.headers : undefined));
+      if (!headers.has("X-Empresa")) headers.set("X-Empresa", empresaEscolhida);
+      return original(entrada, { ...init, headers });
+    }
+    return original(entrada, init);
+  };
+}
+
 export class ErroApi extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
 export async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
