@@ -33,6 +33,7 @@ interface Cidade { id: string; nome: string; uf: string }
 
 export function Entrar({ marca, aoEntrar }: { marca: MarcaApp; aoEntrar: () => void }) {
   const [passo, setPasso] = useState<Passo>("login");
+  const [ajuda, setAjuda] = useState(false);
   const [login, setLogin] = useState("");
   const [mascarado, setMascarado] = useState("");
   const [cidade, setCidade] = useState<Cidade | null>(null);
@@ -51,10 +52,13 @@ export function Entrar({ marca, aoEntrar }: { marca: MarcaApp; aoEntrar: () => v
   return (
     <div className="login">
       <div className="login-topo">
-        {whatsapp && <a className="pilula-ajuda" href={whatsapp} target="_blank" rel="noreferrer"><CircleHelp size={16} /> Ajuda</a>}
+        {whatsapp
+          ? <a className="pilula-ajuda" href={whatsapp} target="_blank" rel="noreferrer"><CircleHelp size={16} /> Ajuda</a>
+          : <button type="button" className="pilula-ajuda" onClick={() => setAjuda(!ajuda)}><CircleHelp size={16} /> Ajuda</button>}
         <Logo marca={marca} />
       </div>
       <div className="login-cartao">
+        {ajuda && <Aviso texto={`Precisa de ajuda? Fale com a central da ${marca.nome}.`} />}
         {passo === "login" && <PassoLogin login={login} setLogin={setLogin} seguir={(r) => {
           setMascarado(r.mascarado || login);
           if (r.semRota) setPasso("codigo");
