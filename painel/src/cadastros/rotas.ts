@@ -34,7 +34,7 @@ rotasCadastros.get("/:cadastro", ok((req, res) => {
   const busca = normal(req.query.busca);
   let l = listar(ctx(req).empresaId, c);
   if (busca) l = l.filter((r) => c.campos.some((f) => normal(r[f.chave]).includes(busca)));
-  res.json({ registros: l.sort((a, b) => String(a[c.colunas[0]] ?? "").localeCompare(String(b[c.colunas[0]] ?? ""), "pt-BR")) });
+  res.json({ registros: [...l].sort((a, b) => String(a[c.colunas[0]] ?? "").localeCompare(String(b[c.colunas[0]] ?? ""), "pt-BR")) });
 }));
 
 rotasCadastros.post("/:cadastro", ok((req, res) => {

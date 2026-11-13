@@ -6,7 +6,7 @@ import type { Marca } from "../comum/marca.ts";
 export type { CorridaPainel, Filtro, GrupoStatus, Marca };
 
 export interface Sessao {
-  usuario: { id: string; nome: string; email: string; papel: "plataforma" | "admin" | "operador" };
+  usuario: { id: string; nome: string; email: string; telefone?: string; papel: "plataforma" | "admin" | "operador" };
   empresa: { id: string; nome: string };
   marca: Marca;
   empresas?: Array<{ id: string; nome: string }>;
@@ -36,10 +36,27 @@ export interface CorridaPropria {
 /** Empresa escolhida pelo usuário da plataforma (troca de empresa). */
 let empresaEscolhida = "";
 export const escolherEmpresa = (id: string) => { empresaEscolhida = id; };
+export const empresaEscolhidaAgora = () => empresaEscolhida;
+
+// Toda chamada à API do próprio painel leva a empresa escolhida (usuário da plataforma que troca de empresa),
+// inclusive as das telas que fazem o próprio fetch.
+if (typeof window !== "undefined" && !(window as unknown as { __empresaFetch?: boolean }).__empresaFetch) {
+  (window as unknown as { __empresaFetch?: boolean }).__empresaFetch = true;
+  const original = window.fetch.bind(window);
+  window.fetch = (entrada, init) => {
+    const url = typeof entrada === "string" ? entrada : entrada instanceof URL ? entrada.pathname : entrada.url;
+    if (empresaEscolhida && /^(\/|https?:\/\/[^/]+\/)api\//.test(url)) {
+      const headers = new Headers(init?.headers ?? (entrada instanceof Request ? entrada.headers : undefined));
+      if (!headers.has("X-Empresa")) headers.set("X-Empresa", empresaEscolhida);
+      return original(entrada, { ...init, headers });
+    }
+    return original(entrada, init);
+  };
+}
 
 export class ErroApi extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
-async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
+export async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (empresaEscolhida) headers.set("X-Empresa", empresaEscolhida);
   const r = await fetch(url, { ...init, headers, credentials: "same-origin" });
@@ -47,7 +64,7 @@ async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
   if (!r.ok) throw new ErroApi((body as { erro?: string }).erro || `Erro ${r.status}`, r.status);
   return body as T;
 }
-const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+export const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 function q(f: Filtro) {
   const p = new URLSearchParams();
@@ -63,6 +80,9 @@ export const api = {
   sessao: () => pedir<Sessao>("/api/sessao"),
   corridas: (f: Filtro) => pedir<RespostaCorridas>(`/api/corridas?${q(f)}`),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  indicadores: (periodo: string, cidade: string, inicio?: string, fim?: string) => pedir<{ avisos: string[]; cidades: string[]; indicadores: any }>(`/api/indicadores?${new URLSearchParams({ periodo, cidade, ...(inicio ? { inicio } : {}), ...(fim ? { fim } : {}) })}`),
+  salvarConta: (d: { nome: string; email: string; telefone: string }) => pedir<{ ok: boolean; usuario: Sessao["usuario"] }>("/api/conta", json("PUT", d)),
+  trocarSenha: (d: { atual: string; nova: string; confirmar: string }) => pedir<{ ok: boolean }>("/api/conta/senha", json("POST", d)),
   estatisticas: (f: Filtro) => pedir<{ avisos: string[]; stats: any }>(`/api/estatisticas?${q(f)}`),
   motoristas: (f: Filtro) => pedir<{ avisos: string[]; motoristas: Motorista[] }>(`/api/motoristas?${q(f)}`),
   relatorio: (filtro: Filtro) => pedir<Relatorio>("/api/relatorio", json("POST", { filtro })),

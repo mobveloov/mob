@@ -20,7 +20,7 @@ export type TipoIntegracao = "sistema-a" | "sistema-b" | "arquivo" | "exemplo";
 export interface Integracao { id: string; tipo: TipoIntegracao; nome: string; ativa: boolean }
 export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean }
 export type Papel = "plataforma" | "admin" | "operador";
-export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string }
+export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string; telefone?: string }
 export interface Segredos { integracoes: Record<string, Record<string, string>>; ia: Record<string, string> }
 
 const ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
@@ -143,5 +143,51 @@ export function criarUsuario(u: { email: string; nome: string; senha: string; em
 }
 
 export function removerUsuario(id: string, empresaId: string) {
+  if (listarUsuarios().some((u) => u.id === id && u.empresaId === empresaId && u.papel === "plataforma")) throw new Error("O dono da plataforma não pode ser removido por aqui.");
   gravar(arqUsuarios(), listarUsuarios().filter((u) => !(u.id === id && u.empresaId === empresaId)), true);
+}
+
+/** Muda os dados do próprio usuário (tela Alterar Senha). Senha nova só com pelo menos 8 caracteres. */
+export function atualizarUsuario(id: string, d: { nome?: string; email?: string; telefone?: string; senha?: string }): Usuario {
+  const lista = listarUsuarios();
+  const atual = lista.find((u) => u.id === id);
+  if (!atual) throw new Error("Usuário não encontrado.");
+  const novo: Usuario = { ...atual };
+  if (d.nome !== undefined) {
+    const nome = d.nome.replace(/[<>]/g, "").trim().slice(0, 80);
+    if (nome.length < 2) throw new Error("Informe o nome.");
+    novo.nome = nome;
+  }
+  if (d.email !== undefined) {
+    const email = d.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("E-mail inválido.");
+    if (lista.some((x) => x.email === email && x.id !== id)) throw new Error("Já existe um usuário com este e-mail.");
+    novo.email = email;
+  }
+  if (d.telefone !== undefined) novo.telefone = d.telefone.replace(/[^\d()+\s-]/g, "").trim().slice(0, 20);
+  if (d.senha !== undefined) {
+    if (d.senha.length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres.");
+    novo.hash = hashSenha(d.senha);
+  }
+  gravar(arqUsuarios(), lista.map((u) => (u.id === id ? novo : u)), true);
+  return novo;
+}
+
+/** Muda nome, e-mail, papel e (se vier) a senha de um usuário da empresa (tela Equipe). */
+export function atualizarUsuarioDaEquipe(id: string, empresaId: string, d: { email?: string; nome?: string; senha?: string; papel?: Papel }): Usuario {
+  const lista = listarUsuarios().map((u) => ({ ...u }));
+  const u = lista.find((x) => x.id === id && x.empresaId === empresaId);
+  if (!u) throw new Error("Usuário não encontrado.");
+  if (u.papel === "plataforma") throw new Error("O dono da plataforma só muda os próprios dados pela tela Alterar Senha.");
+  if (d.email != null) {
+    const email = d.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("E-mail inválido.");
+    if (lista.some((x) => x.id !== id && x.email === email)) throw new Error("Já existe um usuário com este e-mail.");
+    u.email = email;
+  }
+  if (d.nome != null) u.nome = d.nome.trim().slice(0, 80) || u.email;
+  if (d.senha) { if (d.senha.length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres."); u.hash = hashSenha(d.senha); }
+  if (d.papel) u.papel = d.papel; // (o dono da plataforma já foi recusado acima)
+  gravar(arqUsuarios(), lista, true);
+  return u;
 }

@@ -4,6 +4,7 @@
 //
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
+import { aplicarDinamica } from "../config/dinamica.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -176,7 +177,7 @@ const categorias = (empresaId: string) => listar(empresaId, cadastroPorId("categ
 const achar = (l: Registro[], campo: string, v: string) => l.find((r) => normal(String(r[campo] ?? "")) === normal(v));
 
 /** Preço pela tarifa da categoria. Sem tarifa cadastrada: valor null (o operador combina). */
-export function estimarPreco(empresaId: string, p: { categoria: string; distanciaKm?: number | null; minutos?: number | null }) {
+export function estimarPreco(empresaId: string, p: { categoria: string; distanciaKm?: number | null; minutos?: number | null; embarque?: Ponto }) {
   const cat = achar(categorias(empresaId), "nome", p.categoria);
   const km = p.distanciaKm ?? null;
   const minutos = p.minutos ?? (km != null ? arred(km * 2.5, 0) : null);
@@ -187,6 +188,9 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
   const h = agoraBr().getUTCHours();
   if ((h >= 23 || h < 6) && n("tarifaNoturna")) valor *= 1 + n("tarifaNoturna") / 100;
   valor = Math.max(valor, n("valorMinimo"));
+  // Tarifas dinâmicas (Config › Tarifas Dinâmicas) ligadas à categoria: horário, área no mapa e alta demanda.
+  const demanda = listarProprias(empresaId).filter((x) => x.status === "procurando" || x.status === "a_caminho" || x.status === "no_local" || x.status === "em_andamento").length;
+  valor = aplicarDinamica(empresaId, { categoria: String(cat.nome), valor: arred(valor), embarque: p.embarque, demanda }).valor;
   return { valor: arred(valor), distanciaKm: km, minutos, categoria: String(cat.nome) };
 }
 
@@ -257,7 +261,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     } else if (doPassageiro.filter((c) => aindaAgendada(c)).length >= 3) throw new Error("No máximo 3 corridas agendadas por passageiro.");
 
     const km = n.distanciaKm ?? distanciaEstimada(n.embarque, n.destino);
-    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos });
+    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos, embarque: n.embarque });
     const desconto = descontoDoCupom(empresaId, n.cupom ?? "", est.valor, n.categoria);
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);
@@ -329,7 +333,7 @@ export function mudarStatus(empresaId: string, id: string, novo: StatusProprio, 
   });
 }
 
-export function cancelarCorrida(empresaId: string, id: string, quem: "Passageiro" | "Motorista" | "Central", motivo: string, por = "sistema") {
+export function cancelarCorrida(empresaId: string, id: string, quem: "Passageiro" | "Motorista" | "Central" | "Sistema", motivo: string, por = "sistema") {
   return alterar(empresaId, id, (c) => {
     if (GRUPO[c.status] !== "aberta") throw new Error("Esta corrida já terminou.");
     // Taxa: passageiro que cancela depois que o motorista aceitou e já passou a tolerância da categoria.
@@ -364,6 +368,107 @@ export function avaliarPassageiro(empresaId: string, id: string, nota: number, c
     if (c.avaliacaoPassageiro) throw new Error("Você já avaliou este passageiro.");
     c.avaliacaoPassageiro = { nota: Math.round(nota), comentario: String(comentario ?? "").replace(/[<>]/g, "").trim().slice(0, 500) };
     c.historico.push({ em: agoraBr().toISOString(), status: c.status, por, nota: `Nota do passageiro ${c.avaliacaoPassageiro.nota}` });
+  });
+}
+
+export interface EdicaoCorrida {
+  status?: StatusProprio;
+  /** "" tira o motorista. */
+  motoristaId?: string;
+  passageiro?: { nome?: string; telefone?: string };
+  embarque?: string;
+  destino?: string;
+  /** Valor inicial (estimativa). */
+  valorInicial?: number | null;
+  /** Valor final cobrado (ou a taxa, na cancelada). */
+  valorFinal?: number | null;
+  pagamento?: string;
+  observacao?: string;
+  /** "AAAA-MM-DDTHH:MM" (Brasília). Só para corrida agendada que ainda não começou. */
+  agendadaPara?: string;
+}
+
+/**
+ * Edição manual da OS pela central ("Editar OS"): corrige status, motorista, passageiro, rota, valores e pagamento.
+ * Tudo fica no histórico da corrida com quem mudou e o que mudou.
+ */
+export function editarCorridaPropria(empresaId: string, id: string, e: EdicaoCorrida, por = "sistema") {
+  return alterar(empresaId, id, (c) => {
+    const mudou: string[] = [];
+    const agora = agoraBr().toISOString();
+    if (e.passageiro?.nome != null) {
+      const nome = String(e.passageiro.nome).replace(/[<>]/g, "").trim().slice(0, 80);
+      if (!nome) throw new Error("Informe o nome do passageiro.");
+      if (nome !== c.passageiro.nome) { c.passageiro.nome = nome; mudou.push("passageiro"); }
+    }
+    if (e.passageiro?.telefone != null) {
+      const tel = soDigitos(e.passageiro.telefone);
+      if (tel.length < 10 || tel.length > 13) throw new Error("Telefone do passageiro precisa de DDD e número.");
+      if (tel !== c.passageiro.telefone) { c.passageiro.telefone = tel; mudou.push("telefone"); }
+    }
+    if (e.embarque != null) {
+      const t = String(e.embarque).replace(/[<>]/g, "").trim().slice(0, 200);
+      if (!t) throw new Error("Informe o endereço de embarque.");
+      if (t !== c.embarque.texto) { c.embarque = { texto: t }; mudou.push("origem"); }
+    }
+    if (e.destino != null) {
+      const t = String(e.destino).replace(/[<>]/g, "").trim().slice(0, 200);
+      if (t !== (c.destino?.texto ?? "")) { c.destino = t ? { texto: t } : undefined; mudou.push("destino"); }
+    }
+    const valor = (v: number | null | undefined, rotulo: string) => {
+      if (v != null && !(Number.isFinite(v) && v >= 0 && v <= 100000)) throw new Error(`${rotulo} inválido.`);
+      return v == null ? null : arred(v);
+    };
+    if (e.valorInicial !== undefined) {
+      const v = valor(e.valorInicial, "Valor inicial");
+      if (v !== c.estimativa.valor) { c.estimativa = { ...c.estimativa, valor: v }; mudou.push("valor inicial"); }
+    }
+    if (e.pagamento != null) {
+      const p = String(e.pagamento).replace(/[<>]/g, "").trim().slice(0, 40);
+      if (!p) throw new Error("Escolha a forma de pagamento.");
+      if (p !== c.pagamento) { c.pagamento = p; mudou.push("pagamento"); }
+    }
+    if (e.observacao != null) {
+      const o = String(e.observacao).replace(/[<>]/g, "").slice(0, 500);
+      if (o !== c.observacao) { c.observacao = o; mudou.push("observação"); }
+    }
+    if (e.agendadaPara != null) {
+      if (!c.agendadaPara || GRUPO[c.status] !== "aberta" || c.motoristaId) throw new Error("Só dá para mudar a data de agendamento antes de achar o motorista.");
+      const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(e.agendadaPara));
+      if (!m) throw new Error("Data do agendamento inválida.");
+      const nova = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])).toISOString();
+      const falta = Date.parse(nova) - agoraBr().getTime();
+      if (falta < 15 * 60_000) throw new Error("Agende com pelo menos 15 minutos de antecedência.");
+      if (falta > 30 * 86_400_000) throw new Error("Agende para no máximo 30 dias.");
+      if (nova !== c.agendadaPara) { c.agendadaPara = nova; mudou.push("agendamento"); }
+    }
+    if (e.motoristaId !== undefined && e.motoristaId !== (c.motoristaId ?? "")) {
+      if (!e.motoristaId) { c.motoristaId = null; c.motorista = ""; c.telefoneMotorista = ""; }
+      else {
+        const m = listar(empresaId, cadastroPorId("motoristas")!).find((x) => x.id === e.motoristaId);
+        if (!m) throw new Error("Motorista não encontrado.");
+        c.motoristaId = m.id; c.motorista = String(m.nome ?? ""); c.telefoneMotorista = String(m.telefone ?? ""); c.atribuidaEm = agora;
+      }
+      mudou.push("motorista");
+    }
+    if (e.status && e.status !== c.status) {
+      if (!(e.status in STATUS_TEXTO)) throw new Error("Status inválido.");
+      if (["a_caminho", "no_local", "em_andamento"].includes(e.status) && !c.motoristaId) throw new Error("Atribua um motorista antes.");
+      if (e.status === "procurando") { c.motoristaId = null; c.motorista = ""; c.telefoneMotorista = ""; }
+      if (e.status === "em_andamento" && !c.iniciadaEm) c.iniciadaEm = agora;
+      if (e.status === "finalizada" && !c.finalizadaEm) c.finalizadaEm = agora;
+      if (e.status === "cancelada" && !c.canceladaPor) { c.canceladaPor = "Central"; c.motivoCancelamento = "Edição manual da OS"; }
+      c.status = e.status;
+      mudou.push("status");
+    }
+    if (e.valorFinal !== undefined) {
+      const v = valor(e.valorFinal, "Valor final");
+      if (c.status === "cancelada") { if (v !== (c.taxaCancelamento ?? null)) { c.taxaCancelamento = v; mudou.push("taxa"); } }
+      else if (v !== c.valor) { c.valor = v; mudou.push("valor final"); }
+    }
+    if (c.status === "finalizada" && c.valor == null) c.valor = c.estimativa.valor;
+    if (!mudou.length) throw new Error("Nada mudou.");
+    c.historico.push({ em: agora, status: c.status, por, nota: `Edição manual: ${mudou.join(", ")}` });
   });
 }
 
