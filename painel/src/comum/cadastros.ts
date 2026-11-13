@@ -36,6 +36,8 @@ export interface Cadastro {
 export const SITUACOES_MOTORISTA = ["Ativo", "Em análise", "Fila de espera", "Bloqueado", "Rejeitado", "Inativo", "Lixeira", "Aguardando aprovação"];
 /** Nível (prioridade de toque): quem é oferecido primeiro no despacho. */
 export const NIVEIS_MOTORISTA = ["Prioritário", "Secundário", "Reserva"];
+/** Gêneros que os apps oferecem (iguais nos dois apps). */
+export const GENEROS = ["Masculino", "Feminino", "Outro", "Prefiro não dizer"];
 
 export const CADASTROS: Cadastro[] = [
   {
@@ -66,9 +68,19 @@ export const CADASTROS: Cadastro[] = [
       { chave: "placa", rotulo: "Placa", tipo: "texto" },
       { chave: "anoVeiculo", rotulo: "Ano do veículo", tipo: "numero" },
       { chave: "viatura", rotulo: "Número da viatura", tipo: "texto" },
+      { chave: "cnh", rotulo: "Número da CNH", tipo: "texto" },
       { chave: "validadeCnh", rotulo: "Validade da CNH", tipo: "data" },
       { chave: "validadeLicenciamento", rotulo: "Validade do licenciamento", tipo: "data" },
+      { chave: "nascimento", rotulo: "Nascimento", tipo: "data" },
+      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: GENEROS },
+      { chave: "chavePix", rotulo: "Chave Pix", tipo: "texto" },
+      { chave: "cep", rotulo: "CEP", tipo: "texto" },
+      { chave: "rua", rotulo: "Rua", tipo: "texto" },
+      { chave: "numero", rotulo: "Número", tipo: "texto", dica: "S/N quando não tem número." },
+      { chave: "complemento", rotulo: "Complemento", tipo: "texto" },
+      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
       { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
+      { chave: "uf", rotulo: "UF", tipo: "texto" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
       { chave: "origem", rotulo: "Origem", tipo: "texto", calculado: true },
       { chave: "corridas", rotulo: "Corridas (30 dias)", tipo: "numero", calculado: true },
@@ -87,7 +99,7 @@ export const CADASTROS: Cadastro[] = [
       { chave: "cpf", rotulo: "CPF", tipo: "cpf" },
       { chave: "email", rotulo: "E-mail", tipo: "email" },
       { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Inativo", "Bloqueado", "Suspenso"], obrigatorio: true },
-      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: ["Masculino", "Feminino", "Outro"] },
+      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: GENEROS },
       { chave: "dispositivo", rotulo: "Dispositivo", tipo: "selecao", opcoes: ["Android", "iOS", "Não identificado"] },
       { chave: "origemCadastro", rotulo: "Origem", tipo: "selecao", opcoes: ["App", "Painel", "Motorista"] },
       { chave: "motoristaOrigem", rotulo: "Motorista (origem)", tipo: "texto", dica: "Id do motorista que cadastrou (origem Motorista)." },
