@@ -20,6 +20,8 @@ export function periodo(chave: string, inicio = "", fim = ""): { inicio: string;
   switch (chave) {
     case "hoje": return { inicio: hoje, fim: hoje, rotulo: "Hoje" };
     case "ontem": { const o = dia(somar(h, -1)); return { inicio: o, fim: o, rotulo: "Ontem" }; }
+    case "ultimos_7": return { inicio: dia(somar(h, -6)), fim: hoje, rotulo: "Últimos 7 dias" };
+    case "ultimos_30": return { inicio: dia(somar(h, -29)), fim: hoje, rotulo: "Últimos 30 dias" };
     case "semana": { const ini = somar(h, -((h.getUTCDay() + 6) % 7)); return { inicio: dia(ini), fim: hoje, rotulo: "Esta Semana" }; }
     case "semana_passada": { const seg = somar(h, -((h.getUTCDay() + 6) % 7) - 7); return { inicio: dia(seg), fim: dia(somar(seg, 6)), rotulo: "Semana Passada" }; }
     case "mes": return { ...mes(h.getUTCFullYear(), h.getUTCMonth()), fim: hoje, rotulo: "Este Mês" };
@@ -43,7 +45,7 @@ function lancamentos(empresaId: string, de: string, ate: string, papel?: PapelCa
   return banco().prepare(sql).all(...args) as unknown as Linha[];
 }
 
-const pessoas = (empresaId: string) => {
+export const pessoas = (empresaId: string) => {
   const m = new Map<string, { nome: string; telefone: string; cidade: string; status: string }>();
   for (const x of listar(empresaId, cadastroPorId("motoristas")!)) m.set(`motorista|${x.id}`, { nome: String(x.nome ?? ""), telefone: String(x.telefone ?? ""), cidade: String(x.cidade ?? ""), status: String(x.status ?? "") });
   for (const x of listar(empresaId, cadastroPorId("clientes")!)) m.set(`passageiro|${String(x.telefone ?? "")}`, { nome: String(x.nome ?? ""), telefone: String(x.telefone ?? ""), cidade: String(x.cidade ?? ""), status: String(x.status ?? "") });

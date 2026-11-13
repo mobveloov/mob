@@ -83,10 +83,10 @@ export function Abas<T extends string>({ abas, valor, onChange }: { abas: Array<
   return <div className="dm-abas" role="tablist">{abas.map(([id, nome]) => <button key={id} role="tab" aria-selected={valor === id} className={valor === id ? "ativo" : ""} onClick={() => onChange(id)}>{nome}</button>)}</div>;
 }
 
-const PERIODOS: Array<[string, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["semana_passada", "Semana Passada"], ["mes_atual", "Mês Atual"], ["mes_passado", "Mês Passado"], ["ano_passado", "Ano Passado"]];
+const PERIODOS: Array<[string, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["semana_passada", "Semana Passada"], ["ultimos_7", "Últimos 7 dias"], ["ultimos_30", "Últimos 30 dias"], ["mes_atual", "Mês Atual"], ["mes_passado", "Mês Passado"], ["ano_passado", "Ano Passado"]];
 export interface PeriodoSel { chave: string; inicio: string; fim: string }
 export const PERIODO_MES: PeriodoSel = { chave: "mes_atual", inicio: "", fim: "" };
-export const textoPeriodo = (p: PeriodoSel) => (p.chave === "personalizado" ? `${p.inicio.split("-").reverse().join("/")} - ${p.fim.split("-").reverse().join("/")}` : (PERIODOS.find(([c]) => c === p.chave) ?? PERIODOS[3])[1]);
+export const textoPeriodo = (p: PeriodoSel) => (p.chave === "personalizado" ? `${p.inicio.split("-").reverse().join("/")} - ${p.fim.split("-").reverse().join("/")}` : (PERIODOS.find(([c]) => c === p.chave) ?? PERIODOS[5])[1]);
 export const queryPeriodo = (p: PeriodoSel) => `periodo=${p.chave}${p.chave === "personalizado" ? `&inicio=${p.inicio}&fim=${p.fim}` : ""}`;
 
 /** Filtro de período em lista suspensa (Hoje, Ontem, ... Personalizado). */

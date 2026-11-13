@@ -16,6 +16,7 @@ import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } fro
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { ativarDinamica, dinamicas, removerDinamica, salvarDinamica } from "./dinamica.ts";
+import { csvExtratoOnline, csvVisaoGeral, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
@@ -54,6 +55,24 @@ rotasConfig.post("/saques/:id/:acao", admin, ok((req, res) => {
   if (req.params.acao !== "pagar" && req.params.acao !== "recusar") throw new Error("Ação inválida.");
   res.json({ saque: resolverSaque(emp(req), req.params.id, req.params.acao === "pagar", quem(req), texto(req.body?.motivo, 200)) });
 }));
+// Financeiro no formato da Machine (mesma regra de acesso do restante do financeiro: leitura para quem está logado, escrita só do admin).
+const baixarCsv = (res: Response, nome: string, csv: string) => {
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${nome}-${agoraBr().toISOString().slice(0, 10)}.csv"`);
+  res.send(csv);
+};
+rotasConfig.get("/visao-geral", ok((req, res) => res.json(visaoGeral(emp(req), per(req)))));
+rotasConfig.get("/visao-geral/csv", ok((req, res) => baixarCsv(res, "visao-geral-financeiro", csvVisaoGeral(emp(req), per(req)))));
+rotasConfig.get("/extrato-central", ok((req, res) => res.json(extratoDaCentral(emp(req), per(req)))));
+rotasConfig.post("/extrato-central/recargas", admin, ok((req, res) => res.status(201).json({ pedido: pedirRecargaCentral(emp(req), Number(req.body?.valor), texto(req.body?.observacao, 200), quem(req)) })));
+rotasConfig.post("/extrato-central/recargas/:id/:acao", admin, ok((req, res) => {
+  if (!["confirmar", "cancelar"].includes(req.params.acao)) throw new Error("Ação inválida.");
+  res.json({ pedido: resolverPedidoRecarga(emp(req), req.params.id, req.params.acao === "confirmar", quem(req)) });
+}));
+const filtroTransacoes = (req: Request) => ({ tipo: q(req, "tipo"), status: q(req, "status"), repasse: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "repasse")) ? q(req, "repasse") : "", busca: q(req, "busca").slice(0, 80) });
+rotasConfig.get("/transacoes-online", ok((req, res) => res.json(extratoOnline(emp(req), per(req), filtroTransacoes(req)))));
+rotasConfig.get("/transacoes-online/csv", ok((req, res) => baixarCsv(res, "extrato-transacoes-online", csvExtratoOnline(emp(req), per(req), filtroTransacoes(req)))));
+rotasConfig.post("/transacoes-online/:id/status", admin, ok((req, res) => res.json(marcarTransacao(emp(req), req.params.id, String(req.body?.status ?? ""), texto(req.body?.motivo, 200), quem(req)))));
 rotasConfig.get("/recargas", ok((req, res) => res.json({ periodo: per(req), ...listaRecargas(emp(req), papelCart(q(req, "aba") || "motorista"), per(req)) })));
 rotasConfig.get("/relatorios/producao", ok((req, res) => {
   const p = periodo("personalizado", q(req, "inicio") || agoraBr().toISOString().slice(0, 8) + "01", q(req, "fim") || agoraBr().toISOString().slice(0, 10));
