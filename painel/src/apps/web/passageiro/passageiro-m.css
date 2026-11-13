@@ -76,13 +76,13 @@
 .dialogo-botoes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: .6rem; width: 100%; margin-top: .6rem; } .linha-botoes { display: flex; gap: .6rem; } .linha-botoes > * { flex: 1; }
 
 /* início */
-.inicio { position: fixed; inset: 0 0 calc(56px + env(safe-area-inset-bottom)) 0; background: #e8efe9; }
-.inicio-topo { position: absolute; z-index: 20; top: 0; left: 0; right: 0; padding: calc(.8rem + env(safe-area-inset-top)) .9rem 1rem; background: linear-gradient(var(--cor) 0 55%, transparent); color: var(--cor-texto); display: flex; flex-direction: column; gap: .8rem; border-radius: 0 0 26px 26px; background: var(--cor); }
+.inicio { position: fixed; inset: 0; background: #e8efe9; }
+.inicio-topo { position: absolute; z-index: 20; top: 0; left: 0; right: 0; padding: calc(.8rem + env(safe-area-inset-top)) .9rem 1rem; background: linear-gradient(var(--cor) 0 62%, transparent); color: var(--cor-texto); display: flex; flex-direction: column; gap: .8rem; padding-bottom: 1.6rem; }
 .inicio-ola { display: flex; align-items: center; gap: .7rem; } .inicio-ola > div { flex: 1; display: flex; flex-direction: column; } .inicio-ola small { opacity: .85; } .inicio-ola strong { font-size: 1.2rem; }
 .icone-botao.presente { background: rgba(255,255,255,.25); }
 .busca-inicio { display: flex; align-items: center; gap: .7rem; width: 100%; padding: .6rem .6rem .6rem .7rem; border-radius: 18px; border: 0; background: #fff; color: #111; text-align: left; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,.2); } .busca-texto { flex: 1; display: flex; flex-direction: column; } .busca-texto small { color: #667; }
 .botao-ir { padding: .55rem 1.1rem; border-radius: 12px; background: var(--cor); color: var(--cor-texto); font-weight: 800; }
-.atalhos { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; } .atalhos button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .6rem .3rem; border: 0; border-radius: 16px; background: rgba(255,255,255,.2); color: inherit; cursor: pointer; } .atalhos small { opacity: .85; font-size: .72rem; }
+.atalhos { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; } .atalhos button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .6rem .3rem; border: 0; border-radius: 16px; background: #fff; color: #111; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,.14); padding: .8rem .3rem; } .atalhos small { color: #8a8f8d; font-size: .72rem; } .atalhos .icone-redondo.claro { background: color-mix(in srgb, var(--cor) 22%, #fff); color: #111; }
 
 /* para onde / opções */
 .cartao-enderecos { background: var(--cartao); border: 1px solid var(--borda); border-radius: 18px; padding: .5rem; display: flex; flex-direction: column; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
@@ -142,3 +142,15 @@
 .acompanhar-baixo .cartao-motorista { background: transparent; border-radius: 0; padding: 0 0 .6rem; }
 .acompanhar-baixo .folha-detalhe { padding: 0; background: transparent; border-radius: 0; }
 .acompanhar-baixo .faixa-chegando { border-radius: 12px; }
+
+/* menu de baixo flutuante e telas de aba */
+.app { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.menu-baixo { position: fixed; z-index: 30; left: .8rem; right: .8rem; bottom: calc(.7rem + env(safe-area-inset-bottom)); display: flex; background: #fff; border-radius: 30px; padding: .55rem .4rem; box-shadow: 0 8px 28px rgba(0,0,0,.22); max-width: 540px; margin: 0 auto; color: #111; }
+.menu-baixo button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .25rem; border: 0; background: none; font: 700 .8rem/1 inherit; color: #111; cursor: pointer; padding: 0; }
+.menu-baixo .mb-icone { display: grid; place-items: center; width: 80px; max-width: 100%; height: 48px; border-radius: 20px; }
+.menu-baixo .ativa .mb-icone { background: var(--cor); color: var(--cor-texto); }
+.titulo-tela { margin: 0; padding-top: env(safe-area-inset-top); font-size: 1.7rem; }
+.pilulas button { border-radius: 999px; }
+.tela-carteira .secao-titulo { margin: .4rem 0 0; font-size: 1.1rem; }
+.cartao-saldo { border-radius: 24px; padding: 1.4rem; background: #111; color: #fff; display: flex; flex-direction: column; gap: .3rem; } .cartao-saldo small { color: #bbb; } .cartao-saldo strong { font-size: 2.2rem; } .cartao-saldo p { margin: .4rem 0 0; font-size: .8rem; color: #aaa; }
+.mapa-claro .leaflet-tile-pane { filter: grayscale(.85) brightness(1.06) contrast(.92); }

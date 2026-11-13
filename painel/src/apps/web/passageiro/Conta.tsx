@@ -97,6 +97,11 @@ function Favoritos() {
   );
 }
 
+/** Aba Carteira: "Sua Carteira" com o cartão preto de saldo e o histórico de movimentações. */
+export function CarteiraTela() {
+  return <div className="tela tela-carteira"><h1 className="titulo-tela">Sua Carteira</h1><Carteira /></div>;
+}
+
 function Carteira() {
   const [dados, setDados] = useState<{ saldo: number; extrato: Array<{ valor: number; descricao: string; em: string }>; recarga: string } | null>(null);
   const [erro, setErro] = useState("");
@@ -104,15 +109,15 @@ function Carteira() {
   if (!dados) return erro ? <Aviso texto={erro} /> : <Carregando />;
   return (
     <>
-      <Cartao className="centro">
-        <span className="dica">Seu saldo</span>
-        <span className="numero-grande">{reais(dados.saldo)}</span>
-        <p className="dica">Na hora de pedir, escolha “Saldo da carteira” para pagar com ele.</p>
-      </Cartao>
+      <section className="cartao-saldo">
+        <small>Saldo Disponível</small>
+        <strong>{reais(dados.saldo)}</strong>
+        <p>Na hora de pedir, escolha “Saldo da carteira” para pagar com ele.</p>
+      </section>
       {dados.recarga && <Aviso texto={dados.recarga} tipo="info" />}
+      <h2 className="secao-titulo">Histórico de Movimentações</h2>
       <Cartao>
-        <h2>Extrato</h2>
-        {!dados.extrato.length && <p className="dica">Nenhuma movimentação ainda.</p>}
+        {!dados.extrato.length && <div className="vazio"><strong>Sem movimentações</strong><p>Seu histórico de transações está limpo.</p></div>}
         <ul className="lista">{dados.extrato.map((x, i) => (
           <li key={i}>
             <span>{x.descricao}<br /><small className="dica">{dataCurta(x.em)}</small></span>
