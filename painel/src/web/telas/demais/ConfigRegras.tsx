@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { DescontosMatriz } from "./DescontosMatriz";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
@@ -174,6 +175,11 @@ function JanelaDinamica({ inicial, onFechar, onSalvo }: { inicial: any; onFechar
 // ------------------------------------------------------------------ Descontos
 
 export function Descontos() {
+  const [aba, setAba] = useState<"matriz" | "campanhas">("matriz");
+  return <><Abas abas={[["matriz", "Por forma de pagamento"], ["campanhas", "Por campanha"]]} valor={aba} onChange={setAba} />{aba === "matriz" ? <DescontosMatriz /> : <DescontosCampanhas />}</>;
+}
+
+function DescontosCampanhas() {
   const admin = useAdmin();
   const d = useCarregar(() => pedirConfig("/descontos"), []);
   const [filtro, setFiltro] = useState("Todos"), [busca, setBusca] = useState("");
@@ -186,7 +192,7 @@ export function Descontos() {
   const usos = todos.reduce((s, x) => s + x.usos, 0);
   return (
     <>
-      <Cab titulo="Descontos" sub="Promoções automáticas por categoria, forma de pagamento, dia e horário."><button className="botao" onClick={d.recarregar}>Atualizar</button>{admin && <button className="botao primario" onClick={() => setEdit({ nome: "", tipo: "percentual", valor: 0, teto: 0, minimo: 0, categoria: "", pagamento: "", dias: [], inicio: "", fim: "", horaInicio: "", horaFim: "", limiteTotal: 0, ativo: true })}><Plus size={14} /> Novo Desconto</button>}</Cab>
+      <Cab titulo="Descontos por campanha" sub="Promoções automáticas por categoria, forma de pagamento, dia e horário."><button className="botao" onClick={d.recarregar}>Atualizar</button>{admin && <button className="botao primario" onClick={() => setEdit({ nome: "", tipo: "percentual", valor: 0, teto: 0, minimo: 0, categoria: "", pagamento: "", dias: [], inicio: "", fim: "", horaInicio: "", horaFim: "", limiteTotal: 0, ativo: true })}><Plus size={14} /> Novo Desconto</button>}</Cab>
       <div className="dm-kpis"><div className="dm-kpi"><small>Total de Descontos</small><strong>{todos.length}</strong></div><div className="dm-kpi"><small>Usos Realizados</small><strong>{usos}</strong></div></div>
       <div className="dm-cartao dm-filtros"><div className="dm-pilulas">{["Todos", "Ativos", "Vencidos", "Pausados"].map((f) => <button key={f} className={filtro === f ? "ativo" : ""} onClick={() => setFiltro(f)}>{f}</button>)}</div><input placeholder="Buscar desconto..." value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar desconto" /></div>
       <Aviso erro={d.erro ?? msg?.erro} />
