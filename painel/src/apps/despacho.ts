@@ -288,6 +288,14 @@ export function despachar(empresaId: string) {
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
   const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
+  // Transbordo (motorista de outra cidade): o resultado só depende da cidade e da categoria, então vale por rodada.
+  const transbordos = new Map<string, boolean>();
+  const transbordoOk = (cidade: unknown, categoria: string) => {
+    const k = `${String(cidade ?? "")}|${categoria}`;
+    let v = transbordos.get(k);
+    if (v === undefined) { v = transbordoPermitido(empresaId, cidade, categoria); transbordos.set(k, v); }
+    return v;
+  };
   const gestao = regrasDoDespacho(empresaId, cadastro); // punição, cerca eletrônica, saldo mínimo e nível
   let n = 0;
   for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
@@ -303,7 +311,7 @@ export function despachar(empresaId: string) {
       if (!gestao.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
       const km = c.embarque.lat != null && c.embarque.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) : null;
       if (km != null && km > (process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000)) continue;
-      if (!transbordoPermitido(empresaId, cad.cidade, c.categoria)) continue; // Config › Transbordos
+      if (!transbordoOk(cad.cidade, c.categoria)) continue; // Config › Transbordos
       // Sem coordenada no embarque: vai para quem está online há mais tempo.
       const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
       // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
