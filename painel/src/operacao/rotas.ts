@@ -39,7 +39,7 @@ const pag = (req: Request) => Number(req.query.pagina) || 1;
 const central = exigirPapel("admin", "operador");
 const dataOk = (s: string) => (/^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "");
 const horaOk = (s: string) => (/^\d{2}:\d{2}$/.test(s) ? s : "");
-const num = (v: unknown) => (v === "" || v == null ? undefined : typeof v === "number" ? v : Number(String(v).replace(/\./g, "").replace(",", ".")));
+const num = (v: unknown) => (v === "" || v == null ? undefined : typeof v === "number" ? v : (() => { const t = String(v).trim(); return Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t); })());
 const ponto = (v: unknown) => {
   const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
   const lat = Number(o.lat), lng = Number(o.lng);

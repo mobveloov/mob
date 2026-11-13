@@ -3,7 +3,7 @@
 // Lista com filtros e contadores por situação, janela do motorista (Geral, Veículos, Financeiro, Documentos,
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
-import express, { type Router } from "express";
+import express, { type Request as Req, type Router } from "express";
 import { SITUACOES_MOTORISTA } from "../comum/cadastros.ts";
 import { atualizar, criar, remover, type Registro } from "../cadastros/armazem.ts";
 import { cancelarCorrida, listarProprias } from "../corridas/index.ts";
@@ -141,19 +141,23 @@ export function rotasMotoristas(r: Router) {
     res.json({ corridas: l.map((c) => ({ id: c.id, os: c.os, em: c.solicitadaEm, status: c.status, embarque: c.embarque.texto, passageiro: c.passageiro.nome, valor: c.valor })) });
   }));
 
+  // Taxa, saldo mínimo, saque e regra de cobrança do motorista: só administrador (operador não grava, nem sem querer).
+  const ehAdmin = (req: Req) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+  const semFinanceiro = (req: Req, d: Record<string, unknown>) => (ehAdmin(req) ? d : Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith("cobranca"))));
+
   r.post("/motoristas", ok((req, res) => {
     const e = emp(req), b = (req.body ?? {}) as Record<string, unknown>;
-    const dados = juntar(null, (b.dados ?? {}) as Record<string, unknown>, CAMPOS_MOTORISTA);
+    const dados = juntar(null, semFinanceiro(req, (b.dados ?? {}) as Record<string, unknown>), CAMPOS_MOTORISTA);
     if (!dados.status) dados.status = "Em análise";
     const m = criar(e, cad("motoristas"), dados, quem(req));
-    if (b.financeiro) salvarFinanceiro(e, m.id, b.financeiro as Record<string, unknown>);
+    if (b.financeiro && ehAdmin(req)) salvarFinanceiro(e, m.id, b.financeiro as Record<string, unknown>);
     res.json({ motorista: m });
   }));
 
   r.put("/motoristas/:id", ok((req, res) => {
     const e = emp(req), anterior = achar(e, req.params.id), b = (req.body ?? {}) as Record<string, unknown>;
-    const m = atualizar(e, cad("motoristas"), anterior.id, juntar(anterior, (b.dados ?? {}) as Record<string, unknown>, CAMPOS_MOTORISTA), quem(req));
-    if (b.financeiro) salvarFinanceiro(e, m.id, b.financeiro as Record<string, unknown>);
+    const m = atualizar(e, cad("motoristas"), anterior.id, juntar(anterior, semFinanceiro(req, (b.dados ?? {}) as Record<string, unknown>), CAMPOS_MOTORISTA), quem(req));
+    if (b.financeiro && ehAdmin(req)) salvarFinanceiro(e, m.id, b.financeiro as Record<string, unknown>);
     res.json({ motorista: m });
   }));
 

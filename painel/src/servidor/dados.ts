@@ -143,6 +143,7 @@ export function criarUsuario(u: { email: string; nome: string; senha: string; em
 }
 
 export function removerUsuario(id: string, empresaId: string) {
+  if (listarUsuarios().some((u) => u.id === id && u.empresaId === empresaId && u.papel === "plataforma")) throw new Error("O dono da plataforma não pode ser removido por aqui.");
   gravar(arqUsuarios(), listarUsuarios().filter((u) => !(u.id === id && u.empresaId === empresaId)), true);
 }
 
@@ -177,6 +178,7 @@ export function atualizarUsuarioDaEquipe(id: string, empresaId: string, d: { ema
   const lista = listarUsuarios().map((u) => ({ ...u }));
   const u = lista.find((x) => x.id === id && x.empresaId === empresaId);
   if (!u) throw new Error("Usuário não encontrado.");
+  if (u.papel === "plataforma") throw new Error("O dono da plataforma só muda os próprios dados pela tela Alterar Senha.");
   if (d.email != null) {
     const email = d.email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("E-mail inválido.");
@@ -185,7 +187,7 @@ export function atualizarUsuarioDaEquipe(id: string, empresaId: string, d: { ema
   }
   if (d.nome != null) u.nome = d.nome.trim().slice(0, 80) || u.email;
   if (d.senha) { if (d.senha.length < 8) throw new Error("A senha precisa de pelo menos 8 caracteres."); u.hash = hashSenha(d.senha); }
-  if (d.papel && u.papel !== "plataforma") u.papel = d.papel;
+  if (d.papel) u.papel = d.papel; // (o dono da plataforma já foi recusado acima)
   gravar(arqUsuarios(), lista, true);
   return u;
 }
