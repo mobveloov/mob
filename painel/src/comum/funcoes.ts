@@ -44,6 +44,9 @@ export const FUNCOES: Funcao[] = [
   { id: "pagamentos-pendentes", grupo: "Corridas", nome: "Pagamentos Pend.", rota: "/pagamentos-pendentes", antigas: ["/pendencias"] },
   { id: "objetos", grupo: "Corridas", nome: "Objetos Perdidos", rota: "/objetos" },
 
+  { id: "visao-geral", grupo: "Financeiro", secao: "Relatórios", nome: "Visão geral do financeiro", rota: "/visao-geral" },
+  { id: "extrato-central", grupo: "Financeiro", secao: "Relatórios", nome: "Extrato da central", rota: "/extrato-central" },
+  { id: "extrato-online", grupo: "Financeiro", secao: "Relatórios", nome: "Extrato de transações online", rota: "/extrato-online" },
   { id: "carteiras", grupo: "Financeiro", secao: "Transações", nome: "Carteiras", rota: "/carteiras" },
   { id: "extrato", grupo: "Financeiro", secao: "Transações", nome: "Extrato Geral", rota: "/extrato" },
   { id: "saques", grupo: "Financeiro", secao: "Transações", nome: "Saques", rota: "/saques" },

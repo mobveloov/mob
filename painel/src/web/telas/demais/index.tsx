@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 import "./demais.css";
 import { Carteiras, Extrato, Recargas, Relatorios, Saques } from "./Financeiro";
+import { ExtratoCentral, ExtratoOnline, VisaoGeral } from "./FinanceiroMachine";
 import { Conversas, Notificacoes } from "./Comunicacao";
 import { ConfigGerais } from "./ConfigGerais";
 import { Categorias } from "./Categorias";
@@ -12,6 +13,9 @@ import { Avaliacoes, ConfigNps } from "./Nps";
 import { CentralAjuda, Juridico, TermosApp } from "./TermosAjuda";
 
 export const TELAS_DEMAIS: Record<string, JSX.Element> = {
+  "visao-geral": <VisaoGeral />,
+  "extrato-central": <ExtratoCentral />,
+  "extrato-online": <ExtratoOnline />,
   carteiras: <Carteiras />,
   extrato: <Extrato />,
   saques: <Saques />,

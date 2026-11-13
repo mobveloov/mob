@@ -24,6 +24,12 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - Três telas do Editar Motorista da Machine, e as telas salvas em `J:\Usuarios\Rafael\Downloads\Central UP Corridas (13_11_2026 ...).html` (Machine) e `Up Corridas (13_11_2026 ...).html` (o nosso). 5 MB cada: leia por partes.
 - `scratchpad` = `C:\Users\Rafael\AppData\Local\Temp\claude\3fa4f47eab034a00\79073165-21d8-43f0-93ac-622662cf1729\scratchpad`.
 
+## Financeiro no formato da Machine (branch machine-finext)
+- **Visão geral do financeiro**, **Extrato da central** e **Extrato de transações online** (menu Financeiro › Relatórios), com dados reais da empresa: corridas, carteira e saques. Rotas em `/api/config/visao-geral`, `/extrato-central`, `/transacoes-online` (código em `painel/src/config/financeiro-visao.ts`).
+- Exportar (CSV) com proteção contra injeção de fórmula (apóstrofo em células que começam com `=`, `+`, `-` ou `@`).
+- **Recarregar saldo** só registra o pedido e o valor (sem gateway); o admin confirma ou cancela. Chargeback e estorno são marcações do admin, sem mexer na carteira. Leitura segue aberta a quem está logado e escrita só do admin, como o resto do financeiro.
+- Teste: `painel/test/financeiro-machine.test.ts`.
+
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
 - **Abonar ou baixar pendência** devolve o valor editado, não o debitado (`operacao/servico.ts`).
 - **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
