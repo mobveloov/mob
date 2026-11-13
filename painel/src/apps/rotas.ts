@@ -19,6 +19,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
 import { buscarEndereco, enderecoDoPonto, rota } from "../enderecos/index.ts";
+import { buscarFora, caminhoPelasRuas, pontoFora } from "../enderecos/externo.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
@@ -185,11 +186,27 @@ r.get("/opcoes", ok((req, res) => {
   res.json({ categorias, pagamentos: PAGAMENTOS });
 }));
 
-r.get("/enderecos", ok((req, res) => res.json(buscarEndereco(ctx(req).empresaId, txt(req.query.q, 120), 8))));
-r.get("/enderecos/ponto", ok((req, res) => {
+// Endereços: primeiro a base da empresa (CNEFE); se ela não achar (ou não estiver ligada), o OpenStreetMap, perto de quem pede.
+r.get("/enderecos", ok(async (req, res) => {
+  const q = txt(req.query.q, 120);
+  const base = buscarEndereco(ctx(req).empresaId, q, 8);
+  if (base.enderecos.length) return res.json(base);
+  const lat = num(req.query.lat), lng = num(req.query.lng);
+  const fora = await buscarFora(q, lat != null && lng != null ? { lat, lng } : null);
+  res.json({ enderecos: fora, aviso: fora.length || q.trim().length < 4 ? null : "Não achamos esse endereço. Confira a rua e o número, ou escolha no mapa." });
+}));
+r.get("/enderecos/ponto", ok(async (req, res) => {
   const lat = num(req.query.lat), lng = num(req.query.lng);
   if (lat == null || lng == null) throw new Error("Posição inválida.");
-  res.json({ endereco: enderecoDoPonto(ctx(req).empresaId, lat, lng) });
+  res.json({ endereco: enderecoDoPonto(ctx(req).empresaId, lat, lng) ?? await pontoFora(lat, lng) });
+}));
+
+// Caminho pelas ruas para desenhar no mapa: ?pontos=lat,lng;lat,lng (de 2 a 6 pontos, na ordem).
+r.get("/rota", ok(async (req, res) => {
+  const pts = String(req.query.pontos ?? "").split(";").slice(0, 6).map((p) => { const [a, b] = p.split(","); return { lat: Number(a), lng: Number(b) }; })
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (pts.length < 2) throw new Error("Informe pelo menos dois pontos.");
+  res.json(await caminhoPelasRuas(pts));
 }));
 
 r.get("/estimativa", ok(async (req, res) => {

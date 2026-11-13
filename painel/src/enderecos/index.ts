@@ -283,9 +283,21 @@ export function linhaReta(a: { lat: number; lng: number }, b: { lat: number; lng
   return 6371 * 2 * Math.asin(Math.sqrt(h));
 }
 
+/**
+ * Servidor de rotas (OSRM). OSRM_URL aponta para o servidor próprio. Sem ele, usa o OSRM público do OpenStreetMap,
+ * que serve SÓ PARA TESTE (sem garantia e com limite de uso): em produção suba um OSRM próprio. OSRM_PUBLICO=0 desliga
+ * o público (aí a distância volta a ser linha reta × 1,3). Nos testes automáticos não há chamada à internet.
+ */
+export function servidorOsrm(): string {
+  const proprio = process.env.OSRM_URL?.trim().replace(/\/+$/, "");
+  if (proprio) return proprio;
+  if (process.env.NODE_ENV === "test" || process.env.OSRM_PUBLICO === "0") return "";
+  return "https://router.project-osrm.org";
+}
+
 /** Distância (km) e tempo (min) pelas ruas, com OSRM; sem OSRM, linha reta × 1,3 e 2,5 min/km. */
 export async function rota(a: { lat: number; lng: number }, b: { lat: number; lng: number }): Promise<{ distanciaKm: number; minutos: number; pelasRuas: boolean }> {
-  const url = process.env.OSRM_URL?.trim().replace(/\/+$/, "");
+  const url = servidorOsrm();
   if (url) {
     try {
       const r = await fetch(`${url}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`, { signal: AbortSignal.timeout(4000) });
