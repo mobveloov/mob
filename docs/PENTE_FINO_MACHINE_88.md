@@ -81,7 +81,7 @@ Colunas: Função | Machine (o que a tela tem) | 88 | Nosso | Falta.
 | Alteração de dados da OS | Campo "Qual OS deseja alterar?" | ✔ (edição na janela da corrida) | parcial | Tela de busca por OS |
 | Objetos perdidos | Filtros motorista, OS, passageiro, período | ✔ | ✔ | Nada |
 | Entrega de voucher | Obter OS pendentes, selecionar, Registrar entrega | ✘ | ✘ | Tela inteira |
-| Mapa de engajamento | Mapa Motoristas/Passageiros/Histórico, 6 indicadores com faixas, Ajustar faixas | ✘ | ✘ | Tela inteira (prioridade 1) |
+| Mapa de engajamento | Mapa Motoristas/Passageiros/Histórico, 6 indicadores com faixas, Ajustar faixas | ✘ | ✔ feito (painel/src/engajamento e web/telas/engajamento) | Pronto |
 | Retorno e Ocorrências | Só no menu (página não salva) | ✔ | ✔ (Ocorrências) | Conferir quando houver a página |
 
 ### Financeiro
