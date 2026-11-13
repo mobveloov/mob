@@ -138,9 +138,9 @@ Colunas: Função | Machine (o que a tela tem) | 88 | Nosso | Falta.
 | Criar categoria | Ordem, ícone, capacidade, exibir, maçaneta, dinâmicas, impulsionamento, valor extra, segurança para mulheres, Negocia, solicitações imediatas x agendadas, vinculação de motoristas | ✔ (menos) | parcial | Itens citados na prioridade 13 |
 | Editar tarifa (extra) | Tarifa padrão, método de cálculo (tabela de KM, faixas), componentes, parada adicional, bônus de deslocamento | ✔ (Tabela Escalonada) | parcial | Edição por faixa de KM, extras como na Machine |
 | Tarifas dinâmicas | Mapa com áreas manuais e automáticas, automações, legenda, slider | ✔ (mapa, gatilho) | parcial | Automáticas, legenda, prioridade |
-| Descontos | Tabela por tipo de pagamento, via site, via aplicativo, máximo por empresa | parcial (página não salva) | parcial: modelo diferente | Matriz por pagamento e teto por empresa |
+| Descontos | Tabela por tipo de pagamento, via site, via aplicativo, máximo por empresa | parcial (página não salva) | feito: matriz por pagamento x site/app #1 a #4 e teto por empresa (aba "Por forma de pagamento"; campanhas mantidas) | A matriz ainda não é aplicada no cálculo do preço das corridas (`percentualDaMatriz` está pronta) |
 | Alterando Desconto | Por forma de pagamento: site e app #1 a #4 | ✘ | ✘ | Edição da matriz |
-| Integrações | Transações financeiras, condições, dados bancários, cartão, Pix, plano, destino, taxa | parcial (só Mercado Pago) | parcial | Dados bancários, plano, destino, taxa |
+| Integrações | Transações financeiras, condições, dados bancários, cartão, Pix, plano, destino, taxa | parcial (só Mercado Pago) | feito: aba "Transações financeiras" com dados bancários (só admin, mascarados), plano, quem recebe, taxa de cartão e Pix; Mercado Pago mantido | "Atualizar cadastro" só registra o pedido; não há provedor real conectado |
 | Configuração NPS | Ativar ou desativar para passageiros e para motoristas | ✔ (mais) | ✔ | Nada |
 | Avaliações (NPS) | Nota NPS, total, promotores, neutros, detratores, filtros, Exportar, "O que é NPS?" | parcial | parcial | Promotores/neutros/detratores, filtros, Exportar |
 | Termos de uso | Aplicativo passageiro, motorista, empresa parceira; padrão, próprio ou não mostrar | parcial | parcial | Escolha padrão/próprio, aba empresa |
