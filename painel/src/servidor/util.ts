@@ -41,3 +41,10 @@ export const isoDia = (d: Date) => d.toISOString().slice(0, 10);
 
 export const arred = (n: number, casas = 2) => Math.round(n * 10 ** casas) / 10 ** casas;
 export const pct = (parte: number, total: number) => (total > 0 ? arred((parte / total) * 100, 1) : 0);
+
+/** Protege contra injeção de fórmula na planilha: valor que começa com = + - @ (ou tabulação) ganha um apóstrofo na frente. */
+export function celulaCsv(v: unknown): string {
+  let s = String(v ?? "").replace(/\r?\n/g, " ");
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}

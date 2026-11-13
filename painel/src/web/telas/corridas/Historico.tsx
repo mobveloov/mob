@@ -8,10 +8,9 @@ import { RelatorioIa } from "../../componentes/RelatorioIa";
 import { Aviso, Paginacao, Selo, GRUPO_CLASSE, Janela, Vazio, dh, op, qs, reais, useDados, msgErro } from "./comum";
 import { JanelaCorrida, JanelaExterna } from "./JanelaCorrida";
 
-const ATALHOS: Array<[string, string]> = [["15min", "15m"], ["30min", "30m"], ["1h", "1h"], ["4h", "4h"], ["hoje", "Hoje"]];
-const VAZIO = { os: "", cidade: "", categoria: "", endereco: "", nomePax: "", cpfPax: "", telPax: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", origem: "", status: "", fonte: "" };
+const ATALHOS: Array<[string, string]> = [["15min", "15 minutos"], ["30min", "30 minutos"], ["1h", "1 hora"], ["2h", "2 horas"], ["3h", "3 horas"], ["4h", "4 horas"], ["hoje", "Hoje"]];
+const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "" };
 type Filtros = typeof VAZIO;
-const iconeStatus: Record<string, string> = { aguardando: "🟡", pendente: "🟠", andamento: "🔵", finalizada: "✅", cancelada_pax: "❌", cancelada_mot: "⛔", nao_atendida: "🕰️" };
 
 /** Dd/mm/aaaa -> aaaa-mm-dd (aceita também a data já no formato do campo de data). */
 const dataIso = (s: string) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s.trim()); return m ? `${m[3]}-${m[2]}-${m[1]}` : /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ""; };
@@ -42,8 +41,13 @@ export default function Historico({ programadas = false }: { programadas?: boole
   const s = dados?.stats;
 
   const todas = async (): Promise<CorridaPainel[]> => (await op<{ corridas: CorridaPainel[] }>(`/historico${qs({ ...consulta, todas: 1 })}`)).corridas;
+  /** Exportar: o servidor monta o CSV de tudo o que o filtro mostra (com proteção contra fórmula). Com outra fonte conectada, monta aqui. */
   async function planilha() {
-    try { baixar(`${nomeBase}.csv`, corridasCsv(await todas(), marca.mostrarOrigem), "text/csv;charset=utf-8"); } catch (e) { setErroEx(msgErro(e)); }
+    setErroEx(null);
+    try {
+      try { const r = await op<{ nome: string; csv: string }>(`/historico/exportar${qs(consulta)}`); baixar(r.nome, r.csv, "text/csv;charset=utf-8"); }
+      catch { baixar(`${nomeBase}.csv`, corridasCsv(await todas(), marca.mostrarOrigem), "text/csv;charset=utf-8"); }
+    } catch (e) { setErroEx(msgErro(e)); }
   }
   async function exportar() {
     setGerando(true); setErroEx(null);
@@ -67,8 +71,8 @@ export default function Historico({ programadas = false }: { programadas?: boole
       <div className="oc-topo">
         <h1>{programadas ? "Corridas programadas" : "Corridas"} {dados && <small>{dados.total} no filtro</small>}</h1>
         <div className="oc-fila">
-          <button className="oc-btn" onClick={planilha} disabled={!dados?.total}><FileDown size={16} /> Planilha</button>
-          <button className="oc-btn pri" onClick={exportar} disabled={gerando || !dados?.total}>{gerando ? <Loader2 size={16} className="gira" /> : <Sparkles size={16} />} {gerando ? `${marca.assistente.nome} analisando...` : "Exportar relatório"}</button>
+          <button className="oc-btn" onClick={planilha} disabled={!dados?.total}><FileDown size={16} /> Exportar</button>
+          <button className="oc-btn pri" onClick={exportar} disabled={gerando || !dados?.total}>{gerando ? <Loader2 size={16} className="gira" /> : <Sparkles size={16} />} {gerando ? `${marca.assistente.nome} analisando...` : `Relatório ${marca.assistente.nome}`}</button>
         </div>
       </div>
 
@@ -85,7 +89,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
           <label className="oc-sw"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Auto-Update</label>
         </div>
         <div className="oc-fila">
-          <span className="suave" style={{ fontWeight: 800 }}>PERÍODO:</span>
+          <span className="suave" style={{ fontWeight: 800 }}>Exibindo as últimas:</span>
           {ATALHOS.map(([k, r]) => <button key={k} className={`oc-chip ${!(f.dataIni || f.dataFim) && rapido === k ? "on" : ""}`} onClick={() => { setRapido(k); setF({ ...f, dataIni: "", dataFim: "" }); setPagina(1); }}>{r}</button>)}
           <button className="oc-x" onClick={() => setLegenda(true)} aria-label="Legenda"><HelpCircle size={18} /></button>
         </div>
@@ -109,15 +113,17 @@ export default function Historico({ programadas = false }: { programadas?: boole
         {dados && !dados.total && <Vazio>Nenhuma corrida encontrada.<br />Tente ajustar os filtros.</Vazio>}
         {!!dados?.total && <>
           <div className="oc-rola"><table>
-            <thead><tr><th>Data/Hora</th><th>ID</th><th>Origem</th><th>Passageiro</th><th>Motorista</th><th>Cidade</th><th>Status</th></tr></thead>
+            <thead><tr><th>Alerta</th><th>Data/Hora</th><th>Nº OS</th><th>Partida</th><th>Passageiro</th><th>Motorista</th><th>Empresa</th><th>Status</th></tr></thead>
             <tbody>
-              {dados.corridas.map((c: CorridaPainel & { alerta?: boolean }) => (
+              {dados.corridas.map((c: CorridaPainel & { alerta?: boolean; empresa?: string; osExterna?: string }) => (
                 <tr key={c.id} className="clic" onClick={() => setAberta(c)}>
+                  <td>{c.alerta ? <AlertTriangle size={14} color="var(--oc-alerta)" aria-label="Com alerta" /> : ""}</td>
                   <td>{dh(c.solicitadaEm)}</td>
-                  <td className="forte">{c.alerta && <AlertTriangle size={13} color="var(--oc-alerta)" />} {c.os}</td>
-                  <td><Selo>{c.canal || "—"}</Selo></td>
-                  <td>{c.passageiro || c.telefonePassageiro || "—"}<br /><small className="corta">{c.embarque}</small></td>
-                  <td>{c.motorista || "—"}</td><td>{c.cidade || "—"}</td>
+                  <td className="forte">{c.os}{c.osExterna && <><br /><small className="suave">ext. {c.osExterna}</small></>}</td>
+                  <td><span className="corta">{c.embarque || "—"}</span></td>
+                  <td>{c.passageiro || c.telefonePassageiro || "—"}</td>
+                  <td>{c.motorista || "—"}</td>
+                  <td>{c.empresa || "---"}</td>
                   <td><Selo tom={GRUPO_CLASSE[c.grupo]}>{c.statusTexto}</Selo>{(c.valor ?? c.valorEstimado) != null && <small> {reais(c.valor ?? c.valorEstimado)}</small>}</td>
                 </tr>
               ))}
@@ -131,23 +137,26 @@ export default function Historico({ programadas = false }: { programadas?: boole
           rodape={<><button className="oc-btn" type="button" onClick={limpar}><X size={14} /> Limpar</button><button className="oc-btn pri" type="button" onClick={aplicar}>Aplicar Filtros</button></>}>
           <form onSubmit={(e) => { e.preventDefault(); aplicar(); }} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <h3 className="suave" style={{ margin: 0 }}>Identificação</h3>
-            {campo("os", "Número da OS (ID)", "Ex: 1234")}
-            <h3 className="suave" style={{ margin: 0 }}>Localidade & Veículo</h3>
-            <div className="oc-grid2">{lista("cidade", "Cidade Base", op_?.cidades)}{lista("categoria", "Categoria", op_?.categorias)}</div>
-            {campo("endereco", "Endereço (Rua, Bairro...)", "Digite um trecho do endereço...")}
+            <div className="oc-grid2">{campo("os", "Número da OS", "Ex: 1234", "number")}{campo("osExterna", "Número externo da OS", "Ex: 5678")}</div>
+            <div className="oc-grid2">{lista("centralChamada", "Central chamada", op_?.centrais, "Selecione")}{lista("centralCorrida", "Central da corrida", op_?.centrais, "Selecione")}</div>
+            <h3 className="suave" style={{ margin: 0 }}>Empresa & Categoria</h3>
+            <div className="oc-grid2">{lista("empresa", "Empresa", op_?.empresas, "Selecione")}{lista("categoria", "Categoria", op_?.categorias, "Selecione")}</div>
             <h3 className="suave" style={{ margin: 0 }}>Pessoas Envolvidas</h3>
-            <div className="oc-grid3">{campo("nomePax", "Passageiro", "Nome completo...")}{campo("cpfPax", "CPF", "CPF")}{campo("telPax", "Telefone", "Telefone")}</div>
-            {campo("motorista", "Motorista", "Nome ou Placa do veículo...")}
-            <h3 className="suave" style={{ margin: 0 }}>Período Customizado</h3>
-            <div className="oc-grid2">{campo("dataIni", "Data Início", "", "date")}{campo("dataFim", "Data Fim", "", "date")}{campo("horaIni", "Hora Início", "00:00", "time")}{campo("horaFim", "Hora Fim", "23:59", "time")}</div>
+            <div className="oc-grid3">{campo("nomePax", "Nome do passageiro", "Nome completo...")}{campo("telPax", "Telefone do passageiro", "11 96123-4567")}{campo("cpfPax", "CPF do passageiro", "000.000.000-00")}</div>
+            {campo("endereco", "Endereço de partida", "Digite um trecho do endereço...")}
+            {campo("motorista", "Nome/VTR/Placa do motorista", "Nome ou placa do veículo...")}
+            <h3 className="suave" style={{ margin: 0 }}>Período</h3>
+            <div className="oc-grid2">{campo("dataIni", "Data inicial", "", "date")}{campo("horaIni", "Hora inicial", "00:00", "time")}{campo("dataFim", "Data final", "", "date")}{campo("horaFim", "Hora final", "23:59", "time")}</div>
             <h3 className="suave" style={{ margin: 0 }}>Operacional</h3>
             <div className="oc-grid2">
-              {lista("pagamento", "Pagamento", op_?.pagamentos, "Todos")}
-              {lista("origem", "Origem (Plataforma)", op_?.origens)}
-              <label className="oc-l">Status Atual<select value={rasc.status} onChange={(e) => setRasc({ ...rasc, status: e.target.value })}><option value="">Todos os Status</option>
-                {Object.entries(dados?.status ?? {}).map(([k, r]) => <option key={k} value={k}>{iconeStatus[k]} {String(r)}</option>)}</select></label>
+              {lista("pagamento", "Forma de pagamento", op_?.pagamentos, "Selecione")}
+              <label className="oc-l">Status<select value={rasc.status} onChange={(e) => setRasc({ ...rasc, status: e.target.value })}><option value="">Selecione</option>
+                {Object.entries(dados?.status ?? {}).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}</select></label>
+              {lista("urgencia", "Urgência", op_?.urgencias, "Selecione")}
+              {lista("via", "Corrida via", op_?.vias, "Selecione")}
               {marca.mostrarOrigem && (op_?.fontes?.length ?? 0) > 1 && lista("fonte", "Fonte dos dados", op_.fontes, "Todas")}
             </div>
+            <label className="oc-sw"><input type="checkbox" checked={rasc.cashback === "1"} onChange={(e) => setRasc({ ...rasc, cashback: e.target.checked ? "1" : "" })} /> Corridas que geraram cashback</label>
           </form>
         </Janela>
       )}

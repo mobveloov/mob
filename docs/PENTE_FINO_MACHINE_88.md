@@ -74,7 +74,7 @@ Colunas: Função | Machine (o que a tela tem) | 88 | Nosso | Falta.
 |---|---|---|---|---|
 | Solicitar nova corrida | Buscar cliente por telefone/CPF; nome; agendar; informação antes e depois do aceite e interna; pagamentos (Dinheiro, Crédito, Débito, Pix); categoria; enviar mais de um carro; só para o motorista X; partida com número, complemento, favoritar; destino e paradas; referência; valor estimado, final livre ou prefixado; mapa e satélite | ✔ (menos opções) | parcial | Informações do motorista, múltiplos carros, valor final livre/prefixado, exigências, favoritar |
 | Acompanhamento (Operação) | Filtros passageiro, telefone, motorista, partida, empresa; "Corridas pendentes de atendimento" | ✔ | ✔ | Nada relevante |
-| Consultar corridas | Nº OS e externo, central de chamada, central da corrida, empresa, categoria, passageiro (nome, telefone, CPF), partida, motorista, datas e horas, pagamento (10 formas), status (Distribuindo ... Em and...), urgência, "corrida via", cashback; atalhos 15 min a 4 h; Exportar | ✔ (filtros avançados, detalhe com Raio-X, repasses, chat) | parcial | Filtros listados ao lado, 2 h e 3 h |
+| Consultar corridas | Nº OS e externo, central de chamada, central da corrida, empresa, categoria, passageiro (nome, telefone, CPF), partida, motorista, datas e horas, pagamento (10 formas), status (Distribuindo ... Em and...), urgência, "corrida via", cashback; atalhos 15 min a 4 h; Exportar | ✔ igual| parcial | Feito: todos os filtros, 2 h e 3 h, Exportar (CSV seguro) e paginação no banco. Falta "Aguardando aceite/liberação, Pagamento pendente, Em negociação" (estados que não temos) |
 | Corridas programadas | Filtros central, empresa, OS, categoria, passageiro, motorista, datas, pagamento, status (Distribuída, Aguardando, Cancelada, Erro) | ✔ | parcial | Filtros e status de distribuição |
 | Mapa de motoristas | Gráfico de condutores, busca, lista (Motorista, Status, Categorias, Ações), Estatísticas, filtro de categorias, Opções | ✔ (Mapa Real-Time) | parcial | Gráfico de condutores, ações por linha |
 | Taxas de cancelamento | Taxas, Pendentes, Repassados, Resolvidos, Abonados; filtros OS, motorista, cliente, período; Exportar | ✔ (Pendências) | parcial | Estados Repassado e Resolvido, Exportar |
@@ -142,7 +142,7 @@ Colunas: Função | Machine (o que a tela tem) | 88 | Nosso | Falta.
 | Alterando Desconto | Por forma de pagamento: site e app #1 a #4 | ✘ | ✘ | Edição da matriz |
 | Integrações | Transações financeiras, condições, dados bancários, cartão, Pix, plano, destino, taxa | parcial (só Mercado Pago) | parcial | Dados bancários, plano, destino, taxa |
 | Configuração NPS | Ativar ou desativar para passageiros e para motoristas | ✔ (mais) | ✔ | Nada |
-| Avaliações (NPS) | Nota NPS, total, promotores, neutros, detratores, filtros, Exportar, "O que é NPS?" | parcial | parcial | Promotores/neutros/detratores, filtros, Exportar |
+| Avaliações (NPS) | Nota NPS, total, promotores, neutros, detratores, filtros, Exportar, "O que é NPS?" | ✔ igual| parcial | Feito: nota NPS, promotores/neutros/detratores, filtros, Exportar e "O que é NPS?" (notas de 1 a 5) |
 | Termos de uso | Aplicativo passageiro, motorista, empresa parceira; padrão, próprio ou não mostrar | parcial | parcial | Escolha padrão/próprio, aba empresa |
 | Personalização | Nome, cor principal, veículo no mapa, marca, estilo da tela, recursos, pré-visualização | ✘ | parcial: Marca e aparência | Estilo da tela, veículo no mapa, preview |
 | Política de privacidade (Ajuda) | Só no menu | ✔ | ✔ (Jurídico) | Nada |
