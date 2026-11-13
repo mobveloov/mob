@@ -4,17 +4,18 @@
 // cadastro, carteira, documentos, preferências, suporte, diagnóstico e configurações.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, Eye, EyeOff, Hand, LayoutGrid, LocateFixed, PowerOff, SlidersHorizontal, Hourglass } from "lucide-react";
+import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LayoutGrid, LocateFixed, Power, SlidersHorizontal } from "lucide-react";
 import { api, ErroApi, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
-import { Carregando, Chat, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
+import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Mapa } from "./Mapa";
 import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, HistoricoGanhos, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
-import { Dialogo, Pagina, Topo } from "./Pecas";
-import { Carteira, Desafios, Documentos, Notificacoes, Preferencias } from "./Telas";
+import { BarraBaixo, Dialogo } from "./Pecas";
+import { Carteira, Desafios, Notificacoes, Preferencias } from "./Telas";
 import { aplicarTema, useAjustes } from "./ajustes";
 import type { Corrida, Eu, Oferta } from "./tipos";
 
@@ -138,7 +139,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const recusar = async () => { if (oferta) await api(`/ofertas/${oferta.id}/recusar`, { corpo: {} }).catch(() => undefined); setOferta(null); };
 
   if (!eu) return <Carregando />;
-  if (chat && corrida) return <Chat corridaId={corrida.id} papel="motorista" mensagens={mensagens} aberto={corrida.aberta} fechar={() => setChat(false)} />;
+  if (chat && corrida) return <ChatCorrida corrida={corrida} mensagens={mensagens} fechar={() => setChat(false)} />;
 
   const chamada = oferta && (
     <Chamada key={oferta.id} dados={oferta.corrida} distanciaKm={oferta.distanciaKm} expira={oferta.expira} segundos={oferta.segundos} erro={erroOferta} aceitar={aceitar} recusar={() => void recusar()} />
@@ -156,66 +157,71 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   // Telas do menu.
   const voltar = () => setTela("");
-  const antiga = (titulo: string, filho: ReactNode) => <Pagina><Topo titulo={titulo} voltar={voltar} /><div className="conteudo">{filho}</div></Pagina>;
   const telas: Record<string, ReactNode> = {
-    corridas: <Corridas voltar={voltar} aoPegar={(c) => { setCorrida(c); setTela(""); }} />,
     macaneta: <Macaneta voltar={voltar} posicao={posicao} aoAbrir={(c) => { setCorrida(c); setTela(""); }} />,
     historico: <HistoricoGanhos voltar={voltar} />,
     veiculos: <MeusVeiculos voltar={voltar} />,
-    cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} />,
+    cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} irCarteira={() => setTela("carteira")} aoSairDaConta={() => { setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />,
     senha: <AlterarSenha voltar={voltar} />,
     config: <Configuracoes voltar={voltar} />,
     diagnostico: <Diagnostico voltar={voltar} eu={eu} conectado={conectado} posicao={posicao} online={online} />,
-    suporte: <Suporte voltar={voltar} />,
+    suporte: <Suporte voltar={voltar} marca={marca} />,
     fale: <FaleConosco voltar={voltar} marca={marca} />,
-    carteira: antiga("Carteira", <Carteira voltar={voltar} />),
-    documentos: antiga("Documentos", <Documentos voltar={voltar} />),
-    preferencias: antiga("Preferências de corrida", <Preferencias voltar={voltar} />),
-    desafios: antiga("Desafios e indicações", <Desafios voltar={voltar} marca={marca} />),
-    notificacoes: antiga("Notificações", <Notificacoes voltar={voltar} />),
+    carteira: <Carteira voltar={() => setTela("cadastro")} />,
+    preferencias: <Preferencias voltar={voltar} />,
+    desafios: <Desafios voltar={voltar} marca={marca} />,
+    notificacoes: <Notificacoes voltar={voltar} />,
   };
   if (tela && telas[tela]) return <>{telas[tela]}{chamada}</>;
 
-  // Início: mapa escuro, ganhos de hoje, INICIAR/PARAR e a barra de baixo.
+  // Início: mapa, ganhos de hoje, INICIAR/PARAR e a barra de baixo (igual à referência).
   const analise = eu.aprovado === false;
+  const barra = (ativa: "mapa" | "corridas") => (
+    <BarraBaixo ativa={ativa} online={online} procurando={conectado} aoMapa={() => setTela("")} aoCorridas={() => setTela("corridas")}>
+      {online && <button type="button" className="botao-onoff ligado" aria-label="Parar de receber corridas" onClick={() => setDialogo("offline")}><Power size={26} />PARAR</button>}
+    </BarraBaixo>
+  );
+  const dialogos = (
+    <>
+      {dialogo === "online" && <Dialogo icone={Power} titulo="Ficar Online" texto="Deseja se conectar e começar a receber solicitações de viagens agora?" cancelar={() => setDialogo("")} rotulo="Iniciar" confirmar={() => void ficarOnline()} />}
+      {dialogo === "offline" && <Dialogo icone={Power} perigo titulo="Ficar Offline" texto="Deseja parar de receber solicitações de viagens por enquanto?" cancelar={() => setDialogo("")} rotulo="Desligar" confirmar={() => void ficarOffline()} />}
+      {dialogo === "analise" && <Dialogo icone={Hourglass} titulo="Cadastro em análise" texto="Você poderá ficar online depois que a central aprovar o seu cadastro. Confira se falta algum documento." cancelar={() => setDialogo("")} rotuloCancelar="Fechar" rotulo="Ver cadastro" confirmar={() => { setDialogo(""); setTela("cadastro"); }} />}
+    </>
+  );
+  if (tela === "corridas") return <>{<Corridas barra={barra("corridas")} aoPegar={(c) => { setCorrida(c); setTela(""); }} />}{dialogos}{chamada}</>;
   return (
     <div className="inicio-m">
       <Mapa pontos={posicao ? [{ ...posicao, rotulo: "Você", tipo: "eu" }] : []} centralizar={centro} className="cheia" />
       <div className="inicio-topo">
-        <button type="button" className="redondo" aria-label="Menu" onClick={() => setMenu(true)}><LayoutGrid size={20} /></button>
+        <button type="button" className="mapa-botao" aria-label="Menu" onClick={() => setMenu(true)}><LayoutGrid size={22} fill="currentColor" /></button>
         <span className="pilula-ganhos">
-          <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} style={{ background: "none", border: 0, color: "inherit", display: "flex" }} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-          <button type="button" style={{ background: "none", border: 0, color: "inherit", fontWeight: 800 }} onClick={() => setTela("historico")}>{ajustes.esconderGanhos ? "R$ ••••" : reais(hoje ?? 0)} ›</button>
+          <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+          <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("historico")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
         </span>
-        <button type="button" className="redondo" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={20} /></button>
+        <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>
       </div>
 
       {(aviso || erro || analise) && (
-        <div style={{ position: "absolute", zIndex: 25, top: "calc(4.6rem + env(safe-area-inset-top))", left: ".6rem", right: ".6rem", display: "flex", flexDirection: "column", gap: ".4rem" }}>
-          {analise && <button type="button" className="aviso aviso-info" style={{ textAlign: "left", border: 0, cursor: "pointer" }} onClick={() => setTela("cadastro")}><Hourglass size={14} /> Cadastro em análise{eu.pendencias?.length ? `: falta ${eu.pendencias.length} item(ns). Toque para completar.` : ". A central vai avisar quando aprovar."}</button>}
-          {aviso && <button type="button" className="aviso aviso-ok" style={{ textAlign: "left", border: 0 }} onClick={() => setAviso("")}>{aviso}</button>}
-          {erro && <button type="button" className="aviso aviso-erro" style={{ textAlign: "left", border: 0 }} onClick={() => setErro("")}>{erro}</button>}
+        <div className="avisos-topo">
+          {analise && <button type="button" className="aviso aviso-info" style={{ background: "var(--m-card)" }} onClick={() => setTela("cadastro")}><Hourglass size={14} /> Cadastro em análise{eu.pendencias?.length ? `: falta ${eu.pendencias.length} item(ns). Toque para completar.` : ". A central vai avisar quando aprovar."}</button>}
+          {aviso && <button type="button" className="aviso aviso-ok" style={{ background: "var(--m-card)" }} onClick={() => setAviso("")}>{aviso}</button>}
+          {erro && <button type="button" className="aviso aviso-erro" style={{ background: "var(--m-card)" }} onClick={() => setErro("")}>{erro}</button>}
         </div>
       )}
 
-      <div className="inicio-lateral">
-        <button type="button" className="mapa-botao" style={{ position: "static" }} aria-label="Maçaneta" onClick={() => setTela("macaneta")}><Hand size={20} /></button>
-        <button type="button" className="mapa-botao" style={{ position: "static" }} aria-label="Preferências" onClick={() => setTela("preferencias")}><SlidersHorizontal size={20} /></button>
-        <button type="button" className="mapa-botao" style={{ position: "static" }} aria-label="Centralizar" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={20} /></button>
+      <div className="inicio-flutuantes">
+        {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
+        <div className="direita">
+          {online && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
+          <button type="button" className="mapa-botao" aria-label="Centralizar no mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={22} /></button>
+        </div>
+        {!online && <button type="button" className="botao-onoff" onClick={() => setDialogo(analise ? "analise" : "online")}>INICIAR</button>}
       </div>
 
-      <button type="button" className={`botao-onoff ${online ? "ligado" : ""}`} onClick={() => setDialogo(online ? "offline" : analise ? "analise" : "online")}>{online ? "PARAR" : "INICIAR"}</button>
-
-      <div className="barra-baixo">
-        <button type="button" className="ativa">Mapa</button>
-        <div className="estado">{online ? "Procurando corridas…" : "Você está offline"}{online && <div className="barra"><span style={{ width: conectado ? "100%" : "30%" }} /></div>}</div>
-        <button type="button" onClick={() => setTela("corridas")}>Corridas</button>
-      </div>
+      {barra("mapa")}
 
       {menu && <MenuLateral eu={eu} marca={marca} fechar={() => setMenu(false)} ir={setTela} sair={() => void sairDaConta()} />}
-      {dialogo === "online" && <Dialogo icone={LocateFixed} titulo="Ficar online" texto="Deseja se conectar e começar a receber solicitações de viagens agora?" cancelar={() => setDialogo("")} rotulo="Iniciar" confirmar={() => void ficarOnline()} />}
-      {dialogo === "offline" && <Dialogo icone={PowerOff} perigo titulo="Ficar offline" texto="Você deixa de receber solicitações de viagens." cancelar={() => setDialogo("")} rotulo="Desligar" confirmar={() => void ficarOffline()} />}
-      {dialogo === "analise" && <Dialogo icone={Hourglass} titulo="Cadastro em análise" texto="Você poderá ficar online depois que a central aprovar o seu cadastro. Confira se falta algum documento." cancelar={() => setDialogo("")} rotuloCancelar="Fechar" rotulo="Ver cadastro" confirmar={() => { setDialogo(""); setTela("cadastro"); }} />}
+      {dialogos}
       {chamada}
     </div>
   );

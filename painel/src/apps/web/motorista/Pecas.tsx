@@ -2,7 +2,7 @@
 // botão de deslizar, foto, itens de menu e a busca de dados com tratamento das rotas que ainda não existem.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, ChevronsRight, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Car, ChevronLeft, ChevronRight, ChevronsRight, MapPin, type LucideIcon } from "lucide-react";
 import { api, config, ErroApi, token, urlArquivo } from "../comum/api";
 import { mensagemDeErro } from "../comum/ui";
 import { iniciais } from "./tipos";
@@ -26,13 +26,30 @@ export function useBuscar<T>(caminho: string | null) {
 
 // ------------------------------------------------------------------ estrutura
 
-export function Topo({ titulo, subtitulo, voltar, contador, direita, plano }: { titulo: string; subtitulo?: string; voltar?: () => void; contador?: string; direita?: ReactNode; plano?: boolean }) {
+export function Topo({ titulo, subtitulo, voltar, contador, direita, estilo = "marca" }: { titulo: string; subtitulo?: ReactNode; voltar?: () => void; contador?: string; direita?: ReactNode; estilo?: "marca" | "escuro" | "esquerda" | "plano" }) {
   return (
-    <header className={`topo-m ${plano ? "plano" : ""}`}>
-      {voltar ? <button type="button" className="topo-voltar" aria-label="Voltar" onClick={voltar}><ChevronLeft size={22} /></button> : <span className="topo-vazio" />}
+    <header className={`topo-m ${estilo}`}>
+      {voltar ? <button type="button" className="topo-voltar" aria-label="Voltar" onClick={voltar}>{estilo === "esquerda" ? <ArrowLeft size={20} /> : <ChevronLeft size={22} />}</button> : <span className="topo-vazio" />}
       <div className="topo-titulo"><strong>{titulo}</strong>{subtitulo && <small>{subtitulo}</small>}</div>
       {contador ? <span className="topo-contador">{contador}</span> : direita ?? <span className="topo-vazio" />}
     </header>
+  );
+}
+
+/** Barra de baixo do início e das Corridas: Mapa | situação | Corridas (e o botão PARAR quando está online). */
+export function BarraBaixo({ ativa, online, procurando, aoMapa, aoCorridas, children }: { ativa: "mapa" | "corridas"; online: boolean; procurando?: boolean; aoMapa: () => void; aoCorridas: () => void; children?: ReactNode }) {
+  return (
+    <div className="folha-inicio">
+      <span className="puxador" />
+      {online ? <div className={`progresso ${procurando === false ? "parado" : ""}`} /> : null}
+      <p className="dica-inicio">{online ? "Você está online" : "Toque em INICIAR para receber viagens"}</p>
+      <div className="barra-baixo">
+        <button type="button" className={ativa === "mapa" ? "ativa" : ""} onClick={aoMapa}><MapPin size={24} fill={ativa === "mapa" ? "currentColor" : "none"} />Mapa</button>
+        <div className="estado">{online ? <><i /><i />Procurando…<i /><i /></> : "Você está offline"}</div>
+        <button type="button" className={ativa === "corridas" ? "ativa" : ""} onClick={aoCorridas}><Car size={24} />Corridas</button>
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -136,7 +153,7 @@ export function ItemMenu({ icone: I, titulo, texto, aoTocar, selo, perigo, direi
 export function Placa({ placa, pequena }: { placa: string; pequena?: boolean }) {
   const p = placa.toUpperCase().replace(/[^A-Z0-9]/g, "");
   const texto = p.length === 7 ? `${p.slice(0, 3)}-${p.slice(3)}` : placa.toUpperCase();
-  return <span className={`placa ${pequena ? "pequena" : ""}`}><span className="placa-faixa">BRASIL</span><span className="placa-texto">{texto || "—"}</span></span>;
+  return <span className={`placa ${pequena ? "pequena" : ""}`}><span className="placa-faixa">MERCOSUL</span><span className="placa-texto">{texto || "—"}</span></span>;
 }
 
 /** Imagem protegida (só abre com o token): baixa e mostra. */
