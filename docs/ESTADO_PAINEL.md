@@ -1,19 +1,30 @@
-# Estado do painel igual aos originais (13/11/2026)
+# Estado do painel (13/11/2026, fim do dia)
 
-## O que está pronto (PR #15)
-- Menu em cima, tema escuro, Indicadores e Alterar Senha.
-- Cadastro, Corridas, Financeiro, Comunicação, Config, Avaliações e Ajuda: as 51 telas do menu abrem, sem "Em construção" e sem erro no console.
-- Comissão da central na tela Categorias (`painel/src/config/comissao.ts`).
-- Testes: 133 no painel e 73 no motor. Carga de 500 corridas com bot, totem e CRM: 0 erros.
+## No main do GitHub (sem PR aberto)
+- **PR #15:** painel no formato do painel de referência (o "88"): menu no topo, tema escuro, Indicadores, e as telas de Cadastro, Corridas, Financeiro, Comunicação, Config, Avaliações e Ajuda. 51 telas, comissão da central, revisão final feita.
+- **PR #16:** apps v2 (passageiro e motorista iguais aos de referência, com mapa, valor líquido na chamada, página /apps/baixar/ e scripts/publicar-apks.mjs).
+- Antes: CRM, bot, totem, endereços (CNEFE), banco SQLite, apps, motor 3.2, UP Corridas como empresa 1.
+- **Testes:** 148 no painel e 73 no motor, todos passando. Carga de 500 corridas com bot, totem e CRM: 0 erros.
+- **No ar:** `https://up.veloov.com` (Docker do computador + túnel da Cloudflare). Apps de teste em `stadium-bedroom-repair-december.trycloudflare.com/apps/baixar/` (muda se o contêiner do túnel reiniciar).
 
-## Revisão final (feita com o Fable, só leitura)
-Não achou vazamento entre empresas. Corrigido neste PR:
-1. Administrador virava dono da plataforma trocando a senha dele pela tela Equipe.
-2. Operador mudava a cobrança e o financeiro do motorista.
-3. Valor digitado com ponto (30.50) virava R$ 3.050 em Editar OS e Programadas.
-4. Lista de cadastros com 2 ou mais registros dava erro (tela Avaliações).
+## MUDANÇA DE DIREÇÃO (pedido do usuário)
+A base agora é o painel **Machine** (completo, com dados). Do "88" entra só o que a Machine não tem. Mais CRM, bot, totem, Lélio e apps (abas a mais).
+Faltam muitas coisas no painel nosso, por exemplo o **Mapa de engajamento** da Machine.
+Também é preciso trazer as **casas** (endereços) do banco do mobveloov que não estão no CNEFE, como base extra de endereços do mob (arquivo de correções importável), sem ligar os dois sistemas. Fonte só para leitura: `D:\mobveloov-git\vps\cnefe\correcoes\`.
 
-## O que a revisão apontou e ainda falta (do mais para o menos importante)
+### Passos combinados
+1. **Pente fino** (uma passada com o Fable): tabela `docs/PENTE_FINO_MACHINE_88.md` com função | Machine | 88 | nosso | falta, cobrindo telas, abas, campos, colunas, filtros, botões, mapas, gráficos e relatórios. Mandar a tabela resumida à sessão principal ANTES de construir.
+2. **Construir** o que falta da Machine, tela por tela, igual a ela; depois o que só o 88 tem (Sonnet constrói, Haiku faz o mecânico).
+3. **Casas:** importar o arquivo de correções como base extra de endereços (`painel/src/enderecos`).
+4. Comparar cada tela com a da Machine no navegador, testes, carga, PRs, Docker.
+
+### Onde estão as fontes (só leitura, não vão para o Git)
+- Machine, 163 telas com dados: `Machine.rar` (já extraído na pasta `scratchpad\origmachine\Machine`, índice em `origmachine\indice.txt`).
+- Painel de referência, 46 telas sem dados: `88pop.com.br.zip` (extraído em `scratchpad\orig88`, resumo em `orig88\resumo.md`; servir com `python -I -m http.server 8820` dentro de `orig88\88pop.com.br`).
+- Três telas do Editar Motorista da Machine, e as telas salvas em `J:\Usuarios\Rafael\Downloads\Central UP Corridas (13_11_2026 ...).html` (Machine) e `Up Corridas (13_11_2026 ...).html` (o nosso). 5 MB cada: leia por partes.
+- `scratchpad` = `C:\Users\Rafael\AppData\Local\Temp\claude\3fa4f47eab034a00\79073165-21d8-43f0-93ac-622662cf1729\scratchpad`.
+
+## O que a revisão final apontou e ainda falta (pequeno e independente)
 - **Abonar ou baixar pendência** devolve o valor editado, não o debitado (`operacao/servico.ts`).
 - **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
 - **Saldo mínimo** existe em duas configurações (Regras de Crédito e gestão do motorista); só a da gestão vale no despacho.
@@ -30,5 +41,9 @@ Não achou vazamento entre empresas. Corrigido neste PR:
 - **Segurança de conta:** trocar o e-mail sem pedir a senha atual; trocar a senha não derruba as outras sessões.
 - **Sem uso ainda:** NPS dos apps, descontos automáticos no preço, vários campos de Regras de Despacho, senha de login dos apps, banners nos apps, cargos finos da Equipe.
 
-## Como retomar
-Cada item acima é pequeno e independente. Comece pelos quatro primeiros (dinheiro e permissão).
+
+## Outras sessões e regras
+- **Apps** (`local_18a941e0...`): dona dos apps v2; falta a opção "Negociação" por categoria.
+- **Sessão principal** (`local_5851c421...`): coordena e fala com o usuário.
+- Pastas `mob-igual-*` e `mob-v2-*` (git worktree) são sobras e podem ser removidas (`git worktree remove`).
+- Regra de modelos: Sonnet constrói, Haiku faz o mecânico, Fable só para a passada de auditoria e para bug difícil. Tudo em português.
