@@ -143,6 +143,7 @@ export function corridasCsv(lista: CorridaPainel[], comOrigem: boolean): string 
     ["Motorista", (c) => c.motorista], ["Forma de pagamento", (c) => c.pagamento], ["Canal", (c) => c.canal], ["Distância (km)", (c) => numero(c.distanciaKm, 2)],
     ["Valor", (c) => (c.valor == null ? "" : c.valor.toFixed(2).replace(".", ","))], ["Cancelada por", (c) => c.canceladaPor], ["Motivo do cancelamento", (c) => c.motivoCancelamento],
   ];
-  const esc = (v: unknown) => { const s = String(v ?? "").replace(/"/g, '""'); return /[;"\n]/.test(s) ? `"${s}"` : s; };
+  // Protege contra fórmula na planilha: valor que começa com = + - @ ganha um apóstrofo.
+  const esc = (v: unknown) => { let t = String(v ?? "").replace(/\r?\n/g, " "); if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`; t = t.replace(/"/g, '""'); return /[;"\n]/.test(t) ? `"${t}"` : t; };
   return "﻿" + [cols.map((c) => c[0]).join(";"), ...lista.map((c) => cols.map(([, f]) => esc(f(c))).join(";"))].join("\n");
 }

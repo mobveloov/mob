@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { raiz } from "./dados.ts";
+import { normal } from "./util.ts";
 
 // O SQLite do Node ainda avisa "experimental" ao abrir: tira só esse aviso do log.
 const avisoOriginal = process.emitWarning;
@@ -33,6 +34,9 @@ export function banco(): Banco {
   aberto?.db.close();
   fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
+  // Funções de busca para as consultas: texto sem acento nem maiúscula e só os dígitos (a busca de corridas roda no banco, sem carregar tudo).
+  db.function("norm", { deterministic: true }, (v) => normal(v));
+  db.function("dig", { deterministic: true }, (v) => String(v ?? "").replace(/\D/g, ""));
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA synchronous = NORMAL;
@@ -55,6 +59,7 @@ export function banco(): Banco {
       PRIMARY KEY (empresa, id));
     CREATE INDEX IF NOT EXISTS corridas_proprias_os ON corridas_proprias (empresa, os_num);
     CREATE INDEX IF NOT EXISTS corridas_proprias_status ON corridas_proprias (empresa, status);
+    CREATE INDEX IF NOT EXISTS corridas_proprias_data ON corridas_proprias (empresa, solicitada_em);
     CREATE TABLE IF NOT EXISTS app_pessoas (
       empresa TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, codigo TEXT NOT NULL, indicado_por TEXT NOT NULL DEFAULT '', dados TEXT NOT NULL,
       PRIMARY KEY (empresa, papel, chave));

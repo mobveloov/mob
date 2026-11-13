@@ -9,7 +9,7 @@ import { listar, atualizar, remover } from "../cadastros/armazem.ts";
 import { alertas, estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
 import { mensagens } from "../apps/chat.ts";
 import { extrato, lancar } from "../apps/extras.ts";
-import { corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
+import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import * as D from "../servidor/dados.ts";
 import { buscarCorridas } from "../servidor/fontes/index.ts";
@@ -40,25 +40,29 @@ export function acharPropria(empresaId: string, id: string): CorridaPropria {
 
 // ====================================================================== histórico (consultar corridas)
 
-export type StatusFiltro = "aguardando" | "pendente" | "andamento" | "finalizada" | "cancelada_pax" | "cancelada_mot" | "nao_atendida";
-export const STATUS_FILTRO: Record<StatusFiltro, string> = {
-  aguardando: "Aguardando Atendimento", pendente: "Pendente (Fila de Espera)", andamento: "Em Andamento (Indo/Viagem)",
-  finalizada: "Finalizada (Concluída)", cancelada_pax: "Cancelada (Pelo Passageiro)", cancelada_mot: "Cancelada (Pelo Motorista)", nao_atendida: "Não Atendida (Expirou)",
-};
-export const RAPIDOS: Record<string, number | "hoje"> = { "15min": 0.25, "30min": 0.5, "1h": 1, "4h": 4, hoje: "hoje" };
+export { RAPIDOS, STATUS_FILTRO, type StatusFiltro } from "./consulta.ts";
+import { RAPIDOS, STATUS_FILTRO, type FiltroConsulta, type StatusFiltro } from "./consulta.ts";
 
-export interface FiltroHistorico {
-  rapido?: string; os?: string; cidade?: string; categoria?: string; endereco?: string; nomePax?: string; cpfPax?: string; telPax?: string;
-  motorista?: string; fonte?: string; dataIni?: string; dataFim?: string; horaIni?: string; horaFim?: string; pagamento?: string; origem?: string; status?: string;
-}
+export interface FiltroHistorico extends FiltroConsulta { cidade?: string; fonte?: string }
 
 function statusDe(c: CorridaPainel): StatusFiltro {
   if (c.grupo === "finalizada") return "finalizada";
   if (c.grupo === "nao_atendida") return "nao_atendida";
   if (c.grupo === "cancelada") return /motorist/i.test(c.canceladaPor) ? "cancelada_mot" : "cancelada_pax";
-  if (/pend|espera/i.test(c.statusTexto)) return "pendente";
-  if (/procur|aguard|distribu/i.test(c.statusTexto)) return "aguardando";
+  if (/pend/i.test(c.statusTexto)) return "pendente";
+  if (c.programada && /procur|aguard|distribu|espera/i.test(c.statusTexto)) return "espera";
+  if (/procur|aguard|distribu|espera/i.test(c.statusTexto)) return "distribuindo";
+  if (/caminho|local/i.test(c.statusTexto)) return "a_caminho";
   return "andamento";
+}
+
+/** Listas dos filtros que não dependem de varrer as corridas (categorias do cadastro e canais de origem). */
+export function opcoesRapidas(empresaId: string) {
+  return {
+    cidades: [] as string[], fontes: [{ id: "propria", nome: "Próprias" }],
+    categorias: [...new Set(listar(empresaId, cadastroPorId("categorias")!).map((c) => String(c.nome ?? "")).filter(Boolean))].sort(),
+    origens: Object.values(CANAL_TEXTO),
+  };
 }
 
 /** Filtro base (vai para as fontes de corridas e para a análise com IA). */
@@ -93,7 +97,7 @@ export async function historico(empresaId: string, f: FiltroHistorico) {
     const de = f.horaIni || "00:00", ate = f.horaFim || "23:59";
     l = l.filter((c) => { const h = (c.solicitadaEm ?? "").slice(11, 16); return h >= de && h <= ate; });
   }
-  if (f.status && f.status in STATUS_FILTRO) l = l.filter((c) => statusDe(c) === f.status);
+  if (f.status && f.status in STATUS_FILTRO) l = l.filter((c) => f.status === "cancelada" ? c.grupo === "cancelada" : statusDe(c) === f.status);
   l = [...l].sort((a, b) => (b.solicitadaEm ?? "").localeCompare(a.solicitadaEm ?? ""));
   const moto = (c: CorridaPainel) => /moto/i.test(c.categoria);
   const abertas = l.filter((c) => c.grupo === "aberta");
