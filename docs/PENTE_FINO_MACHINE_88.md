@@ -35,7 +35,7 @@ Observações de contagem: os 73 títulos incluem formulários (Criar/Alterar), 
 14. **Alertas para empresas** (listar e criar, com tipo Urgente/Atenção/Aviso, duração e status) e **Central de notificações** (sino no topo, "somente não lidas").
 15. **Plantão** (listar, criar, gerenciar com motoristas) e **Ruas** (regras de via), mais área de risco/bloqueio e prioridade em Áreas.
 
-Fora das 15 (baixa prioridade, pensados para vários centros de franquia): Controle financeiro de centrais, Meus planos, Demonstrativo Mensal (cobrança da plataforma por central), seletor "Central principal e centrais associadas".
+**Decisão do usuário (13/11): vamos ter centrais, então estas entram no escopo, logo depois das 15:** Controle financeiro de centrais, Meus planos, Demonstrativo Mensal (cobrança da plataforma por central) e o seletor "Central principal e centrais associadas".
 
 ## Tabela 1: telas da Machine (73)
 
