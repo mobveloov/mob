@@ -21,7 +21,7 @@ const novoPedido = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 
 
 export function pontosDaRota(r: { embarque: { texto: string; lat?: number; lng?: number }; paradas?: Array<{ texto: string; lat?: number; lng?: number }>; destino: { texto: string; lat?: number; lng?: number } | null }): PontoMapa[] {
   return [
-    ...(temCoord(r.embarque) ? [{ lat: r.embarque.lat, lng: r.embarque.lng, tipo: "embarque" as const, rotulo: "Embarque", detalhe: ruaCurta(r.embarque) }] : []),
+    ...(temCoord(r.embarque) ? [{ lat: r.embarque.lat, lng: r.embarque.lng, tipo: "embarque" as const, rotulo: "Seu Local de Partida", detalhe: ruaCurta(r.embarque) }] : []),
     ...(r.paradas ?? []).filter(temCoord).map((p, i) => ({ lat: p.lat!, lng: p.lng!, tipo: "parada" as const, rotulo: `Parada ${i + 1}`, detalhe: ruaCurta(p) })),
     ...(temCoord(r.destino) ? [{ lat: r.destino.lat, lng: r.destino.lng, tipo: "destino" as const, rotulo: "Destino", detalhe: ruaCurta(r.destino) }] : []),
   ];

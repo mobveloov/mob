@@ -159,3 +159,17 @@
 .linha-endereco.ativa { outline: 0; background: transparent; } .linha-endereco.ativa small { color: var(--cor-forte, #b38600); }
 .marcador.bola { background: #1f2937; } .marcador.quadrado { background: var(--cor); color: var(--cor-texto); border-radius: 6px; }
 .cartao-enderecos { border: 0; border-radius: 22px; box-shadow: 0 6px 22px rgba(0,0,0,.12); }
+
+/* etiquetas dos pontos no mapa: cartão branco com texto escuro, ao lado do pino */
+.pino-etiqueta { position: absolute; left: 36px; top: -6px; display: flex; flex-direction: column; max-width: 190px; padding: 3px 9px; border-radius: 8px; background: #fff; color: #111; box-shadow: 0 2px 8px rgba(0,0,0,.25); white-space: nowrap; line-height: 1.15; text-align: left; font-family: inherit; }
+.pino-etiqueta small { font-size: .55rem; font-weight: 600; color: #667; } .pino-etiqueta b { font-size: .72rem; overflow: hidden; text-overflow: ellipsis; }
+/* opções da corrida: linhas planas com barra na cor da marca, botões - e + escuros */
+.categorias { gap: 0; margin: 0 -1rem; }
+.categoria { border: 0; border-radius: 0; border-left: 5px solid transparent; background: #fff; padding: .9rem 1rem; box-shadow: 0 1px 0 #eee; }
+.categoria.ativa { border-color: var(--cor); background: #fff; box-shadow: 0 3px 10px rgba(0,0,0,.12); }
+.categoria-icone { background: transparent; width: 56px; height: 40px; } .categoria-texto strong { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.redondo, .redondo.menos { background: #1f2937; color: #fff; width: 30px; height: 30px; } .redondo.cheio { width: 30px; height: 30px; }
+.seletor-pagamento { border: 0; background: transparent; font-weight: 800; font-size: 1.05rem; } .link-desconto { color: #16a34a; font-weight: 800; }
+.botao.pedir { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 999px; min-height: 58px; } .botao.pedir small { font-size: .7rem; font-weight: 600; letter-spacing: 0; text-transform: none; display: block; opacity: .85; }
+.valor-grande { font-size: 1.9rem; }
+.pino-destino .pino-etiqueta { left: auto; right: 36px; }
