@@ -26,6 +26,7 @@ import { rotasApps, rotasAppsCentral } from "../apps/rotas.ts";
 import { rotasOperacao } from "../operacao/rotas.ts";
 import { rotasExtrasCentral } from "../apps/extras.ts";
 import { rotasGestao } from "../gestao/rotas.ts";
+import { rotasEngajamento } from "../engajamento/rotas.ts";
 import { iniciarApps } from "../apps/despacho.ts";
 import { calcularIndicadores, datasDoPeriodo, diaBrasilia, PERIODOS, type Periodo } from "./indicadores.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
@@ -440,6 +441,7 @@ app.use("/api/apps-central", rotasAppsCentral);
 app.use("/api/operacao", rotasOperacao);
 app.use("/api/apps-central", rotasExtrasCentral);
 app.use("/api/gestao", rotasGestao);
+app.use("/api/engajamento", rotasEngajamento);
 app.use("/api/config", rotasConfig);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));

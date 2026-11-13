@@ -1,0 +1,46 @@
+/* Mapa de engajamento: usa o tema .oc das telas de Corridas e só acrescenta o que é próprio desta tela. */
+.eng-grade { display: grid; grid-template-columns: 380px 1fr; gap: 14px; align-items: start; }
+.eng-lateral .oc-card { margin-bottom: 10px; }
+.eng-titulo { display: flex; align-items: baseline; gap: 10px; }
+.eng-titulo strong { font-size: 28px; font-weight: 800; }
+.eng-titulo span { color: var(--oc-suave); font-weight: 700; }
+.eng-ind { padding: 0; overflow: hidden; }
+.eng-ind.aberto { border-color: var(--oc-pri); }
+.eng-ind-topo { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: var(--oc-txt); font: inherit; padding: 12px 14px; cursor: pointer; text-align: left; }
+.eng-ind-nome { flex: 1; font-weight: 800; }
+.eng-selo { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.eng-selo.bom { background: #22c55e26; color: #4ade80; }
+.eng-selo.aceitavel { background: #f59e0b26; color: #fbbf24; }
+.eng-selo.ruim { background: #ef444426; color: #f87171; }
+.eng-selo.vazio { background: var(--oc-card2); color: var(--oc-suave); }
+.eng-ind-corpo { padding: 0 14px 14px; }
+.eng-explica { font-size: 13px; color: var(--oc-suave); margin: 8px 0; line-height: 1.45; }
+.eng-explica b { color: var(--oc-txt); }
+.eng-faixa { border: 1px solid var(--oc-borda); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--oc-fundo); }
+.eng-faixa.on { border-color: var(--oc-pri); }
+.eng-faixa-topo { display: flex; align-items: center; gap: 8px; }
+.eng-faixa-topo i, .eng-legenda i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.eng-limite { margin-left: auto; font-size: 12px; color: var(--oc-suave); font-weight: 700; }
+.eng-barra { height: 6px; border-radius: 999px; background: var(--oc-borda); margin: 8px 0; overflow: hidden; }
+.eng-barra div { height: 100%; border-radius: 999px; }
+.eng-faixa-pe { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--oc-suave); }
+.eng-barra-mapa { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 8px; }
+.eng-visao, .eng-legenda, .eng-abas-ind, .eng-previa { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.eng-legenda .oc-chip { display: inline-flex; align-items: center; gap: 6px; }
+.eng-nota { font-size: 12px; color: var(--oc-suave); margin: 4px 2px 10px; }
+.eng-mapa { height: 560px; }
+.eng-dias { display: flex; align-items: flex-end; gap: 3px; height: 160px; }
+.eng-dia { flex: 1; min-width: 4px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; font-size: 10px; color: var(--oc-suave); text-align: center; }
+.eng-dia-barra { flex: 1; display: flex; align-items: flex-end; }
+.eng-dia-ped { width: 100%; background: var(--oc-borda); border-radius: 4px 4px 0 0; display: flex; align-items: flex-end; min-height: 2px; }
+.eng-dia-fin { width: 100%; background: #22c55e; border-radius: 4px 4px 0 0; }
+.eng-dia span { height: 14px; white-space: nowrap; overflow: visible; }
+.eng-ajuste { margin-bottom: 12px; }
+.eng-abas-ind { margin: 8px 0; }
+.eng-hist { display: flex; align-items: flex-end; gap: 3px; height: 120px; margin: 8px 0 12px; padding: 8px; border: 1px solid var(--oc-borda); border-radius: 12px; background: var(--oc-fundo); }
+.eng-hist-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.eng-hist-col div { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; }
+.eng-sliders { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 10px; }
+.eng-sliders input[type=range] { min-height: 24px; padding: 0; }
+.eng-previa { margin: 6px 0 12px; }
+@media (max-width: 900px) { .eng-grade { grid-template-columns: 1fr; } .eng-sliders { grid-template-columns: 1fr; } .eng-mapa { height: 380px; } }

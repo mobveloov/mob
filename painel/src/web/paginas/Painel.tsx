@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Calendar, ChevronDown, MapPin, Car, Smartphone, DollarSign, Receipt, Gauge, BarChart3, Users, Star, Info, TrendingUp, TrendingDown } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Calendar, ChevronDown, Map as IconeMapa, MapPin, Car, Smartphone, DollarSign, Receipt, Gauge, BarChart3, Users, Star, Info, TrendingUp, TrendingDown } from "lucide-react";
 import { api, dinheiro, numero } from "../api";
 import { useSessao } from "../App";
 import { Avisos, Titulo, useCarregar } from "../componentes/ui";
@@ -163,6 +164,7 @@ export default function Painel() {
     <>
       <Titulo titulo="Indicadores" sub="Visão geral da sua operação">
         <div className="filtro-topo">
+          <Link to="/engajamento" className="seletor-botao atalho-engajamento"><span><IconeMapa size={16} />Ver mapa de engajamento</span></Link>
           <Seletor classe="cidade" icone={<MapPin size={16} />} rotulo={cidade ? cidades.find((x) => x.toLowerCase() === cidade.toLowerCase()) ?? cidade : "Todas as cidades"}>
             {(fechar) => (
               <>

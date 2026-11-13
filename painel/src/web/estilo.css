@@ -392,3 +392,6 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 
 /* Logo da empresa na tela de entrada */
 .entrar .logo-entrar { display: block; max-width: 220px; max-height: 72px; margin: 0 auto 12px; object-fit: contain; }
+
+/* Atalho do Painel para o Mapa de engajamento */
+.atalho-engajamento { text-decoration: none; width: auto; white-space: nowrap; }
