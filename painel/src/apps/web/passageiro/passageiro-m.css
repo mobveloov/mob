@@ -177,3 +177,24 @@
 .resumo-rota > div { display: flex; gap: .6rem; }
 /* motivo do cancelamento: opções em cartões com borda, como na referência */
 .motivos { gap: .7rem; } .motivos button { border: 2px solid #eceeed !important; border-radius: 16px; padding: 1.05rem 1rem; background: #fff; } .motivos button.marcado { border-color: var(--cor) !important; }
+
+/* Minha Conta: topo na cor da marca, cartão do perfil com foto, cartão da carteira e grupos de itens */
+.minha-conta { background: #f4f5fa; min-height: 100vh; padding-bottom: 110px; }
+.conta-topo { background: var(--cor); color: var(--cor-texto); height: 170px; text-align: center; padding-top: calc(1.4rem + env(safe-area-inset-top)); position: relative; overflow: hidden; }
+.conta-topo::before, .conta-topo::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255,255,255,.14); } .conta-topo::before { width: 160px; height: 160px; right: -40px; top: -50px; } .conta-topo::after { width: 120px; height: 120px; left: -50px; bottom: -30px; }
+.conta-topo strong { position: relative; font-size: 1.05rem; }
+.conta-perfil { position: relative; margin: -76px 1rem 0; background: #fff; border-radius: 26px; padding: 62px 1rem 1.1rem; display: flex; flex-direction: column; align-items: center; gap: .3rem; box-shadow: 0 8px 24px rgba(20,30,60,.08); color: #111; }
+.conta-perfil h2 { margin: .2rem 0 0; font-size: 1.4rem; } .conta-perfil small { color: #8a8f98; letter-spacing: .04em; }
+.conta-foto { position: absolute; top: -52px; left: 50%; transform: translateX(-50%); border: 4px solid #fff; border-radius: 50%; box-shadow: 0 6px 18px rgba(0,0,0,.18); display: inline-flex; }
+.conta-perfil .botao-claro { align-self: center; margin-top: .5rem; padding: .6rem 1.4rem; font-weight: 800; color: #111; }
+.conta-carteira { margin: 1rem 1rem 0; border-radius: 24px; padding: 1.2rem; background: #111; color: #fff; display: flex; flex-direction: column; gap: .25rem; box-shadow: 0 10px 24px rgba(0,0,0,.2); position: relative; overflow: hidden; }
+.conta-carteira::after { content: ""; position: absolute; width: 150px; height: 150px; right: -40px; bottom: -60px; border-radius: 50%; background: color-mix(in srgb, var(--cor) 35%, transparent); }
+.conta-carteira > div { display: flex; align-items: center; gap: .6rem; } .conta-carteira > div button { margin-left: auto; border: 0; border-radius: 999px; padding: .35rem .8rem; background: rgba(255,255,255,.18); color: #fff; font-weight: 700; cursor: pointer; } .conta-carteira small { color: #b8bcc4; margin-top: .6rem; } .conta-saldo { font-size: 1.9rem; position: relative; z-index: 1; }
+.conta-secao { margin: 1.4rem 1.2rem .5rem; font-size: .78rem; letter-spacing: .14em; color: #8a8f98; }
+.conta-grupo { margin: 0 1rem; background: #fff; border-radius: 22px; box-shadow: 0 6px 20px rgba(20,30,60,.06); overflow: hidden; }
+.conta-item { width: 100%; display: flex; align-items: center; gap: .9rem; padding: .95rem 1rem; border: 0; background: none; text-align: left; cursor: pointer; color: #111; border-bottom: 1px solid #f0f1f5; font-family: inherit; } .conta-item:last-child { border-bottom: 0; }
+.conta-icone { width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; flex: none; } .conta-texto { flex: 1; display: flex; flex-direction: column; min-width: 0; } .conta-texto strong { font-size: 1rem; } .conta-texto small { color: #8a8f98; } .conta-seta { color: #b4b8c2; flex: none; }
+.conta-icone.azul { background: #e3edff; color: #2563eb; } .conta-icone.laranja { background: #ffe8d6; color: #ea580c; } .conta-icone.roxo { background: #ece3ff; color: #7c3aed; } .conta-icone.verde { background: #d9f6ea; color: #059669; } .conta-icone.amarelo { background: #fff0cc; color: #d97706; } .conta-icone.vermelho { background: #ffe0e0; color: #dc2626; }
+/* editar perfil */
+.editar-perfil .conteudo { gap: 1rem; } .perfil-foto { align-self: center; position: relative; display: inline-flex; cursor: pointer; } .perfil-foto .avatar { border: 4px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.18); } .perfil-foto .foto-camera { right: 4px; bottom: 4px; }
+.editar-perfil .conta-item { background: transparent; padding-left: 0; border: 0; }

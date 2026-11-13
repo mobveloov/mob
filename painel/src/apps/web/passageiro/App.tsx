@@ -125,13 +125,13 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   return (
     <div className="app">
-      {aba === "conta" && <header className="topo"><strong>{marca.nome}</strong><span className="situacao">{conectado ? `Olá, ${eu.nome.split(" ")[0]}` : "Reconectando…"}</span></header>}
+      
       {aviso && <div style={{ padding: "1rem 1rem 0", position: aba === "inicio" ? "fixed" : "static", zIndex: 40, top: aba === "inicio" ? "9rem" : undefined, left: 0, right: 0 }}><Aviso texto={aviso} tipo="info" /></div>}
       {aba === "inicio" ? <Inicio eu={eu} aqui={aqui} lugares={lugares} irPara={() => setFluxo({ tela: "paraonde", modo: "destino" })} atalho={(a) => void atalho(a)} indique={() => { setAba("conta"); }} />
         : aba === "agendadas" ? <Agendadas pedir={() => mudarAba("inicio")} />
           : aba === "historico" ? <Historico irAgendadas={() => mudarAba("agendadas")} />
             : aba === "carteira" ? <CarteiraTela />
-              : <Conta eu={eu} marca={marca} sair={async () => { await api("/sair", { corpo: {} }).catch(() => undefined); window.dispatchEvent(new Event("app-sair")); sair(); }} />}
+              : <Conta eu={eu} marca={marca} irPara={mudarAba} mudouEu={() => void carregar()} sair={async () => { await api("/sair", { corpo: {} }).catch(() => undefined); window.dispatchEvent(new Event("app-sair")); sair(); }} />}
       <MenuBaixo atual={aba === "agendadas" ? "historico" : aba} mudar={mudarAba}
         itens={[["inicio", "Início", <House size={26} />], ["historico", "Histórico", <Clock size={26} />], ["carteira", "Carteira", <Wallet size={26} />], ["conta", "Conta", <User size={26} />]]} />
     </div>

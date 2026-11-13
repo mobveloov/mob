@@ -32,7 +32,7 @@ import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
 import { registrarCotacao } from "../operacao/radar.ts";
-import { entrar, eu, pedirCodigo, sair, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
+import { entrar, eu, pedirCodigo, sair, salvarGeneroPassageiro, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
 export const rotasApps = express.Router();
 export const rotasAppsCentral = express.Router();
@@ -133,7 +133,7 @@ r.get("/eu", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   res.json({ eu: euCompleto(empresaId, sessao), online: sessao.papel === "motorista" ? P.estaOnline(empresaId, sessao.chave) : undefined });
 }));
-r.post("/eu", so("passageiro"), ok((req, res) => { salvarNomePassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body?.nome ?? "")); res.json({ eu: euCompleto(ctx(req).empresaId, ctx(req).sessao) }); }));
+r.post("/eu", so("passageiro"), ok((req, res) => { if (req.body?.nome !== undefined || req.body?.genero === undefined) salvarNomePassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body?.nome ?? "")); if (req.body?.genero !== undefined) salvarGeneroPassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body.genero)); res.json({ eu: euCompleto(ctx(req).empresaId, ctx(req).sessao) }); }));
 
 r.post("/push", ok((req, res) => { registrarToken(ctx(req).empresaId, alvo(req), String(req.body?.token ?? "")); res.json({ ok: true }); }));
 
