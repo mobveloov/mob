@@ -296,7 +296,7 @@ function EditarRota({ corrida: c, fechar, mudou }: { corrida: Corrida; fechar: (
     if (qual === "destino") setDestino({ texto }); else setParadas((l) => l.map((p, i) => (i === qual ? { texto } : p)));
     clearTimeout(tempo.current);
     if (texto.trim().length < 3) { setSugestoes([]); return; }
-    tempo.current = setTimeout(() => void api<{ enderecos: Endereco[] }>(`/enderecos?q=${encodeURIComponent(texto)}`).then((r) => setSugestoes(r.enderecos)).catch(() => setSugestoes([])), 350);
+    tempo.current = setTimeout(() => void api<{ enderecos: Endereco[] }>(`/enderecos?q=${encodeURIComponent(texto)}${c.embarque.lat != null ? `&lat=${c.embarque.lat}&lng=${c.embarque.lng}` : ""}`).then((r) => setSugestoes(r.enderecos)).catch(() => setSugestoes([])), 350);
   };
   const escolher = (s: Endereco) => {
     const p = { texto: s.texto, lat: s.lat, lng: s.lng };

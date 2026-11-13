@@ -41,17 +41,21 @@ export async function caminhoPelasRuas(pontos: Posicao[]): Promise<Caminho> {
   if (ja) return ja.v;
   const url = servidorOsrm();
   if (url) {
-    try {
-      const r = await fetch(`${url}/route/v1/driving/${p.map((x) => `${x.lng},${x.lat}`).join(";")}?overview=full&geometries=geojson`, { headers: { "user-agent": AGENTE }, signal: AbortSignal.timeout(6000) });
-      const j = (await r.json()) as { code?: string; routes?: Array<{ distance: number; duration: number; geometry?: { coordinates?: Array<[number, number]> } }> };
-      const rt = j.code === "Ok" ? j.routes?.[0] : undefined;
-      if (rt?.geometry?.coordinates?.length) {
-        return guardar(rotas, k, {
-          distanciaKm: Math.round(rt.distance / 10) / 100, minutos: Math.max(1, Math.round(rt.duration / 60)), pelasRuas: true,
-          caminho: rt.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
-        });
-      }
-    } catch { /* cai na linha reta */ }
+    // Duas tentativas: o servidor público às vezes demora na primeira.
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      try {
+        const r = await fetch(`${url}/route/v1/driving/${p.map((x) => `${x.lng},${x.lat}`).join(";")}?overview=full&geometries=geojson`, { headers: { "user-agent": AGENTE }, signal: AbortSignal.timeout(7000) });
+        const j = (await r.json()) as { code?: string; routes?: Array<{ distance: number; duration: number; geometry?: { coordinates?: Array<[number, number]> } }> };
+        const rt = j.code === "Ok" ? j.routes?.[0] : undefined;
+        if (rt?.geometry?.coordinates?.length) {
+          return guardar(rotas, k, {
+            distanciaKm: Math.round(rt.distance / 10) / 100, minutos: Math.max(1, Math.round(rt.duration / 60)), pelasRuas: true,
+            caminho: rt.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]),
+          });
+        }
+        if (j.code === "NoRoute") break; // sem caminho de carro entre os pontos: não adianta tentar de novo
+      } catch { /* tenta de novo, depois cai na linha reta */ }
+    }
   }
   return reta(p);
 }

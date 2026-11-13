@@ -53,7 +53,7 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
     clearTimeout(tempo.current);
     if (texto.trim().length < 3) { setSugestoes([]); setAviso(""); return; }
     tempo.current = setTimeout(async () => {
-      try { const r = await api<{ enderecos: Endereco[]; aviso: string | null }>(`/enderecos?q=${encodeURIComponent(texto)}`); setSugestoes(r.enderecos); setAviso(r.aviso ?? (r.enderecos.length ? "" : "Nenhum endereço encontrado. Tente “Escolher no mapa”.")); }
+      try { const r = await api<{ enderecos: Endereco[]; aviso: string | null }>(`/enderecos?q=${encodeURIComponent(texto)}${(partida.lat ?? aqui?.lat) != null ? `&lat=${partida.lat ?? aqui?.lat}&lng=${partida.lng ?? aqui?.lng}` : ""}`); setSugestoes(r.enderecos); setAviso(r.aviso ?? (r.enderecos.length ? "" : "Nenhum endereço encontrado. Tente “Escolher no mapa”.")); }
       catch { setSugestoes([]); }
     }, 350);
   };

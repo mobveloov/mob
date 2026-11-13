@@ -154,3 +154,8 @@
 .tela-carteira .secao-titulo { margin: .4rem 0 0; font-size: 1.1rem; }
 .cartao-saldo { border-radius: 24px; padding: 1.4rem; background: #111; color: #fff; display: flex; flex-direction: column; gap: .3rem; } .cartao-saldo small { color: #bbb; } .cartao-saldo strong { font-size: 2.2rem; } .cartao-saldo p { margin: .4rem 0 0; font-size: .8rem; color: #aaa; }
 .mapa-claro .leaflet-tile-pane { filter: grayscale(.85) brightness(1.06) contrast(.92); }
+.linha-endereco-campo { display: flex; flex-direction: column; } .linha-endereco-campo small { font-size: .68rem; font-weight: 700; letter-spacing: .08em; color: #667; } .linha-endereco-campo input { outline: 0 !important; box-shadow: none !important; font-weight: 800; } .linha-endereco-campo > span { font-weight: 800; }
+.linha-endereco-campo > span.suave { font-weight: 500; }
+.linha-endereco.ativa { outline: 0; background: transparent; } .linha-endereco.ativa small { color: var(--cor-forte, #b38600); }
+.marcador.bola { background: #1f2937; } .marcador.quadrado { background: var(--cor); color: var(--cor-texto); border-radius: 6px; }
+.cartao-enderecos { border: 0; border-radius: 22px; box-shadow: 0 6px 22px rgba(0,0,0,.12); }
