@@ -176,6 +176,7 @@ export function CarteiraTela() {
 function Carteira() {
   const [dados, setDados] = useState<{ saldo: number; extrato: Array<{ valor: number; descricao: string; em: string }>; recarga: string } | null>(null);
   const [erro, setErro] = useState("");
+  const [recarga, setRecarga] = useState(false);
   useEffect(() => { void api<NonNullable<typeof dados>>("/carteira").then(setDados).catch((e) => setErro(mensagemDeErro(e))); }, []);
   if (!dados) return erro ? <Aviso texto={erro} /> : <Carregando />;
   return (
@@ -183,9 +184,10 @@ function Carteira() {
       <section className="cartao-saldo">
         <small>Saldo Disponível</small>
         <strong>{reais(dados.saldo)}</strong>
+        <button className="botao-saldo" onClick={() => setRecarga(!recarga)}>+ Adicionar Saldo</button>
         <p>Na hora de pedir, escolha “Saldo da carteira” para pagar com ele.</p>
       </section>
-      {dados.recarga && <Aviso texto={dados.recarga} tipo="info" />}
+      {recarga && <Aviso texto={dados.recarga || "Para pôr saldo, fale com a central."} tipo="info" />}
       <h2 className="secao-titulo">Histórico de Movimentações</h2>
       <Cartao>
         {!dados.extrato.length && <div className="vazio"><strong>Sem movimentações</strong><p>Seu histórico de transações está limpo.</p></div>}
