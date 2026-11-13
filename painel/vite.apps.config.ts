@@ -11,7 +11,7 @@ import path from "node:path";
 const raiz = path.resolve(import.meta.dirname, "src/apps/web");
 const api = `http://localhost:${Number(process.env.PAINEL_API_PORTA) || 8787}`;
 const app = process.env.APP;
-const entradas = (app ? [app] : ["passageiro", "motorista"]).map((a) => [a, path.join(raiz, a, "index.html")]);
+const entradas = (app ? [app] : ["passageiro", "motorista", "baixar"]).map((a) => [a, path.join(raiz, a, "index.html")]);
 
 export default defineConfig({
   root: app ? path.join(raiz, app) : raiz,

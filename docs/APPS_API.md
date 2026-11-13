@@ -88,3 +88,19 @@ A corrida do passageiro agora traz também:
 - **Motoristas aguardando aprovação:** a tela mostra os dados, a foto, o endereço, o veículo e os documentos, com os botões Aprovar e Recusar (com motivo).
 - **Chat de suporte:** lista de conversas com motoristas e passageiros, para responder com texto.
 - **Configurações dos apps:** motivos de cancelamento, etiquetas de avaliação, opcionais e os contatos (WhatsApp, telefone, site, links de termos e privacidade).
+
+## Como ficou na implementação (servidor)
+
+O que difere do texto acima ou foi acrescentado. O código está em `painel/src/apps/` (`v2.ts`, `perfil.ts`, `suporte.ts`, `comissao.ts`, `ajustes.ts`, `despacho.ts`).
+
+- **`GET /ganhos?periodo=...`:** a chave `viagens` é o **número** de viagens, e a lista das viagens vem em `lista` (também em `realizadas`, com o mesmo conteúdo). Sem `periodo`, devolve o resumo simples de antes (`hoje`, `semana`, `mes`, `ultimas`).
+- **Chamada (`GET /ofertas`, evento `oferta` e `estado`):** os valores vêm planos na chamada **e** dentro de `corrida`: `valorBruto`, `taxaCentral`, `valorLiquido`, `ganhoPorKm`, `valorOferecido`, `opcionais` (nomes), `nota` e `viagens` do passageiro, `minutosAteEmbarque` e `distanciaViagemKm`. Vem também `regraComissao` (`{ tipo: "Percentual" | "Valor fixo" | "", valor }`), para o app mostrar o líquido de uma contra-oferta (o valor que o motorista digita é bruto). `valorBruto` já é o que o passageiro paga (valor oferecido menos o desconto do cupom).
+- **Comissão:** lida pelo adaptador `apps/comissao.ts`. Categoria: `comissaoTipo` (`Percentual` ou `Valor fixo`) e `comissaoValor`. Motorista: `cobranca` (`Padrão`, `Personalizado` ou `Isento`), `cobrancaTipo` e `cobrancaValor`. Quando o painel trouxer o cálculo dele, troca-se só o corpo de `calcularComissao`.
+- **Tempo real:** novos eventos `contraoferta` (para o passageiro), `contraoferta_encerrada` (para os outros motoristas) e `suporte` (resposta da central).
+- **Novas rotas:** `GET /mensagens-rapidas`, `POST /corridas/:id/chat/lida` (zera `mensagensNaoLidas`), `GET /suporte/nao-lidas`, `GET /suporte/audio/:id`.
+- **Login:** o motorista com cadastro "Aguardando aprovação" entra, mas `POST /online` recusa até a central aprovar. Quem cria conta já sai logado (`token`).
+- **Esqueci a senha:** quem não tem conta recebe a mesma resposta (`{ enviado: true }`). Conta criada pela central, sem senha, entra pelo código ou cria a senha por aqui.
+- **Limites por IP e por hora:** `APPS_CADASTROS_POR_IP` (cadastros, padrão 10) e `APPS_CODIGOS_POR_IP` (códigos, padrão 30). Senha: 8 erros em 10 minutos por login.
+- **Painel (central, em `/api/apps-central`):** `GET /aprovacoes`, `POST /aprovacoes/:id/aprovar` (recusa se faltar item, a menos que `forcar: true`) e `POST /aprovacoes/:id/recusar` (`motivo`). Chat de suporte: `GET /suporte`, `GET` e `POST /suporte/:papel/:chave`, `GET /suporte/:papel/:chave/audio/:audio`. Foto: `GET /foto/:papel/:chave`.
+- **Ajustes dos apps:** motivos de cancelamento, etiquetas, opcionais, formas de pagamento e mensagens rápidas têm padrão no código e podem ser trocados por empresa em `DADOS_DIR/empresas/<id>/apps/ajustes.json` (`apps/ajustes.ts`). Os contatos vêm da marca (`textos.suporteWhatsapp`, `suporteTelefone`, `suporteSite`, `termosUrl` e `privacidadeUrl`).
+- **Veículos:** ficam no perfil do motorista; o veículo ativo é copiado para o cadastro de Motoristas (modelo, placa, ano e CNH), que é o que a central vê.

@@ -211,3 +211,32 @@ import AppsCentral from "./apps/AppsCentral";
 ```
 
 Para o Docker servir os apps em `/apps/`, o `Dockerfile` pode rodar `npm run build:apps` junto do `npm run build`.
+
+## Página de download dos apps (`/apps/baixar/`)
+
+Página pública, com a marca da empresa, para baixar o app do passageiro e o do motorista (Android): `/apps/baixar/?empresa=<id>`.
+Os APKs **não vão para o Git**: ficam em `DADOS_DIR/empresas/<id>/apps/apks/<app>.apk` (com `<app>.json`: nome e versão).
+
+```bash
+node scripts/build-app-empresa.mjs up-corridas --app=passageiro --apk
+```
+
+```bash
+node scripts/build-app-empresa.mjs up-corridas --app=motorista --apk
+```
+
+```bash
+node scripts/publicar-apks.mjs up-corridas --docker mob-apps-teste
+```
+
+Sem `--docker`, o script copia para o `DADOS_DIR` deste computador. No ambiente de teste, gere os APKs com
+`APP_URL_API=<endereço do túnel>` e `APP_TESTE=1` (campo "Servidor de teste" na entrada, para trocar o endereço sem gerar de novo).
+
+Rotas: `GET /api/apps/<empresa>/apks` (o que está publicado) e `GET /api/apps/<empresa>/apks/<passageiro|motorista>` (entrega o APK).
+
+## O que os apps leem das configurações do painel
+
+Comissão: `config/comissao.ts` (percentual, valor fixo, faixas ou regra do motorista). A chamada leva a tabela de líquido de cada valor
+possível da contra-oferta. Opcionais, motivos de cancelamento e mensagens rápidas: Config › Gerais do App. Documentos do motorista: os
+exigidos no painel mais as duas fotos laterais do veículo. Contatos: Marca e aparência, e Gerais do App para o que faltar.
+**Ainda não aplicado:** a opção "Negociação" por categoria (hoje o valor oferecido e a contra-oferta valem para todas as categorias).
