@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Posicao } from "../comum/api";
+import { useCaminho } from "../comum/rota";
 
 export interface PontoMapa { lat: number; lng: number; tipo: "embarque" | "parada" | "destino"; rotulo: string; detalhe?: string }
 
@@ -81,6 +82,9 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     } else marcaEu.current.setLatLng([eu.lat, eu.lng]);
   }, [eu?.lat, eu?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Caminho pelas ruas (OSRM, pelo servidor). Sem ele a linha não é desenhada: nunca em linha reta.
+  const caminho = useCaminho(linha ? pontos : []);
+
   // Pontos e rota.
   const chave = pontos.map((p) => `${p.tipo}:${p.lat.toFixed(5)},${p.lng.toFixed(5)}:${p.detalhe ?? ""}`).join("|");
   useEffect(() => {
@@ -88,15 +92,14 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     if (!m || !g) return;
     g.clearLayers();
     let n = 0;
-    if (linha && pontos.length > 1) {
+    if (linha && caminho && caminho.length > 1) {
       const cor = getComputedStyle(document.documentElement).getPropertyValue("--cor").trim() || "#1a73e8";
-      const trajeto = pontos.map((p) => [p.lat, p.lng] as L.LatLngTuple);
-      L.polyline(trajeto, { color: "#ffffff", weight: 9, opacity: 0.9 }).addTo(g);
-      L.polyline(trajeto, { color: cor, weight: 5, opacity: 1 }).addTo(g);
+      L.polyline(caminho, { color: "#111111", weight: 9, opacity: 0.85, lineJoin: "round" }).addTo(g);
+      L.polyline(caminho, { color: cor, weight: 5, opacity: 1, lineJoin: "round" }).addTo(g);
     }
     for (const p of pontos) L.marker([p.lat, p.lng], { icon: icone(p, p.tipo === "parada" ? ++n : 0), title: p.rotulo, keyboard: false }).addTo(g);
     enquadrar();
-  }, [chave, linha]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chave, linha, caminho]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (centralizar) enquadrar(); }, [centralizar]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setTimeout(enquadrar, 50); return () => clearTimeout(t); }, [folga]); // eslint-disable-line react-hooks/exhaustive-deps

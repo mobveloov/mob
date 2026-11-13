@@ -20,10 +20,10 @@ Ordem combinada:
 
 1. [feito] Ver todos os prints e listar cada tela: `docs/APPS_PRINTS_REFERENCIA.md`.
 2. [falta] Refazer cada tela dos dois apps igual ao print, conferindo com captura nossa ao lado da referência.
-3. [falta] Motorista: botões e opções **por cima** do mapa. Causa achada: o CSS novo tirou o `isolation: isolate` do mapa, e as camadas do Leaflet (z-index 400+) cobrem tudo.
-4. [falta] Rota pelas ruas (OSRM; público só para teste, configurável), desenhada no pedido e no acompanhamento; distância e tempo do preço pela rota.
-5. [falta] Endereços: ligar o CNEFE da UP; sem resultado, buscar no Nominatim.
-6. [falta] Mapa claro com ruas e nomes nos dois apps (no motorista, mapa escuro só se ele escolher o tema escuro).
+3. [feito no código, falta ver no navegador] Motorista: botões e opções **por cima** do mapa. Causa achada: o CSS novo tirou o `isolation: isolate` do mapa, e as camadas do Leaflet (z-index 400+) cobrem tudo.
+4. [feito no código: `enderecos/externo.ts`, rota `/rota`, `comum/rota.ts`, mapas dos dois apps; falta ver no navegador] Rota pelas ruas (OSRM; público só para teste, configurável), desenhada no pedido e no acompanhamento; distância e tempo do preço pela rota.
+5. [Nominatim pronto em `/enderecos` e `/enderecos/ponto`; falta ligar o CNEFE no ambiente de teste da UP]
+6. [feito no CSS, falta ver] Mapa claro com ruas e nomes nos dois apps (no motorista, mapa escuro só se ele escolher o tema escuro).
 7. [falta] Testes, APKs novos da UP na página de download, PR.
 8. [falta] Tabela tela por tela (referência x nosso x situação) para a sessão principal.
 

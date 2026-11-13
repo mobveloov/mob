@@ -215,7 +215,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota(c)} carro={pos} escuro={escuro} centralizar={centralizar} folga={folga} linha={false} />
+      <Mapa pontos={pontosDaRota(c)} carro={pos} escuro={escuro} centralizar={centralizar} folga={folga} />
       <header className="topo-marca arredondado">
         <button className="icone-botao" aria-label={escuro ? "Mapa claro" : "Mapa escuro"} onClick={() => setEscuro(!escuro)}>{escuro ? <Sun size={24} /> : <Moon size={24} />}</button>
         <div className="topo-titulo"><strong>Acompanhar viagem</strong></div>
