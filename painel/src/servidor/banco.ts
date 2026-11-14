@@ -25,12 +25,37 @@ type Banco = InstanceType<typeof DatabaseSync>;
 
 let aberto: { arquivo: string; db: Banco } | null = null;
 
-export const arquivoDoBanco = () => path.resolve(process.env.BANCO_ARQUIVO?.trim() || path.join(raiz(), "painel.db"));
+// O caminho é calculado de novo só quando as variáveis de ambiente mudam (é chamado a cada consulta).
+let caminhoCache: { bruto: string; dados: string; caminho: string } | null = null;
+export function arquivoDoBanco() {
+  const bruto = process.env.BANCO_ARQUIVO?.trim() ?? "", dados = process.env.DADOS_DIR ?? "";
+  if (caminhoCache?.bruto === bruto && caminhoCache.dados === dados) return caminhoCache.caminho;
+  const caminho = path.resolve(bruto || path.join(raiz(), "painel.db"));
+  caminhoCache = { bruto, dados, caminho };
+  return caminho;
+}
+
+// Gravação em grupo: a primeira consulta de cada ciclo do servidor abre uma transação e ela é confirmada ao fim do ciclo
+// (setImmediate), então todas as gravações do ciclo dividem uma única confirmação (antes, cada gravação confirmava sozinha:
+// no teste de carga isso era o maior gasto de CPU). Quem lê na mesma conexão já vê o que foi gravado. Na saída do processo
+// e ao fechar o banco, o que está pendente é confirmado; antes de mexer em arquivo (migração), use confirmar().
+let emLote = false;
+/** Confirma agora o que está pendente (se houver). */
+export function confirmar() {
+  if (!emLote || !aberto) { emLote = false; return; }
+  emLote = false;
+  try { aberto.db.exec("COMMIT"); } catch (e) { console.error(`[banco] não confirmei: ${e instanceof Error ? e.message : e}`); try { aberto.db.exec("ROLLBACK"); } catch { /* sem transação */ } }
+}
+process.on("exit", confirmar);
 
 /** Banco aberto (abre e cria as tabelas na primeira vez). Troca sozinho se o caminho mudar (testes). */
 export function banco(): Banco {
   const arquivo = arquivoDoBanco();
-  if (aberto?.arquivo === arquivo) return aberto.db;
+  if (aberto?.arquivo === arquivo) {
+    if (!emLote) { aberto.db.exec("BEGIN"); emLote = true; setImmediate(confirmar); }
+    return aberto.db;
+  }
+  confirmar();
   aberto?.db.close();
   fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
@@ -100,29 +125,52 @@ export function banco(): Banco {
       municipio TEXT NOT NULL, numero INTEGER NOT NULL, rua TEXT NOT NULL, rua_norm TEXT NOT NULL, bairro TEXT NOT NULL, bairro_norm TEXT NOT NULL,
       tipo TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, PRIMARY KEY (municipio, rua_norm, bairro_norm, numero));
     CREATE INDEX IF NOT EXISTS enderecos_correcoes_rua ON enderecos_correcoes (municipio, rua_norm);
+    CREATE TABLE IF NOT EXISTS ondas (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, corrida_id TEXT NOT NULL, dados TEXT NOT NULL,
+      UNIQUE (empresa, id));
+    CREATE INDEX IF NOT EXISTS ondas_corrida ON ondas (empresa, corrida_id);
+    CREATE INDEX IF NOT EXISTS ondas_ordem ON ondas (empresa, seq);
+    CREATE TABLE IF NOT EXISTS chat_mensagens (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, id TEXT NOT NULL, de TEXT NOT NULL,
+      tem_audio INTEGER NOT NULL DEFAULT 0, audio_id TEXT, em TEXT NOT NULL, dados TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS chat_mensagens_corrida ON chat_mensagens (empresa, corrida_id, seq);
+    CREATE TABLE IF NOT EXISTS app_sessoes (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, hash TEXT NOT NULL, expira INTEGER NOT NULL, dados TEXT NOT NULL,
+      UNIQUE (empresa, hash));
+    CREATE INDEX IF NOT EXISTS app_sessoes_expira ON app_sessoes (empresa, expira);
+    CREATE TABLE IF NOT EXISTS cadastros_itens (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, cadastro TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL,
+      UNIQUE (empresa, cadastro, id));
   `);
   aberto = { arquivo, db };
+  db.exec("BEGIN");
+  emLote = true;
+  setImmediate(confirmar);
   return db;
 }
 
 /** Fecha o banco (testes e desligamento). */
 export function fecharBanco() {
+  confirmar();
   aberto?.db.close();
   aberto = null;
 }
 
-/** Roda tudo de uma vez: ou grava tudo, ou nada. */
+/** Roda tudo de uma vez: ou grava tudo, ou nada (um ponto de retorno dentro da transação do ciclo). */
+let nivel = 0;
 export function transacao<T>(fn: () => T): T {
   const db = banco();
-  db.exec("BEGIN IMMEDIATE");
+  const ponto = `t${nivel++}`;
+  db.exec(`SAVEPOINT ${ponto}`);
   try {
     const r = fn();
-    db.exec("COMMIT");
+    db.exec(`RELEASE ${ponto}`);
     return r;
   } catch (e) {
-    db.exec("ROLLBACK");
+    db.exec(`ROLLBACK TO ${ponto}`);
+    db.exec(`RELEASE ${ponto}`);
     throw e;
-  }
+  } finally { nivel--; }
 }
 
 /**
@@ -145,9 +193,47 @@ export function migrarUmaVez(empresa: string, nome: string, arquivoJson: string,
     db.prepare("INSERT INTO migracoes (empresa, nome, em, itens) VALUES (?, ?, ?, ?)").run(empresa, nome, new Date().toISOString(), n);
   });
   migradas.add(chave);
+  confirmar(); // os dados já estão no disco antes de o JSON antigo sair do lugar
   if (conteudo != null) {
     let destino = `${arquivoJson}.migrado`;
     for (let i = 2; fs.existsSync(destino); i++) destino = `${arquivoJson}.migrado-${i}`;
     fs.renameSync(arquivoJson, destino);
   }
 }
+
+/**
+ * Migra uma pasta de JSON antigos (um arquivo por item, ex.: o chat de cada corrida) uma única vez.
+ * `importar` recebe o nome do arquivo e o conteúdo e devolve quantos itens entraram (ou -1 para ignorar o arquivo).
+ * Cada arquivo importado vira "<nome>.migrado" (guardado, não apagado); arquivo estragado fica onde está.
+ */
+export function migrarPastaUmaVez(empresa: string, nome: string, pasta: string, importar: (arquivo: string, conteudo: unknown) => number) {
+  const db = banco();
+  const chave = `${arquivoDoBanco()}|${empresa}|${nome}`;
+  if (migradas.has(chave)) return;
+  if (db.prepare("SELECT 1 FROM migracoes WHERE empresa = ? AND nome = ?").get(empresa, nome)) { migradas.add(chave); return; }
+  const lidos: Array<{ arquivo: string; conteudo: unknown }> = [];
+  if (fs.existsSync(pasta)) {
+    for (const arq of fs.readdirSync(pasta)) {
+      if (!arq.endsWith(".json")) continue;
+      try { lidos.push({ arquivo: arq, conteudo: JSON.parse(fs.readFileSync(path.join(pasta, arq), "utf8")) }); }
+      catch (e) { console.error(`[banco] não li ${path.join(pasta, arq)}: ${e instanceof Error ? e.message : e}`); }
+    }
+  }
+  let total = 0;
+  const importados: string[] = [];
+  transacao(() => {
+    for (const l of lidos) { const n = importar(l.arquivo, l.conteudo); if (n >= 0) { total += n; importados.push(l.arquivo); } }
+    db.prepare("INSERT INTO migracoes (empresa, nome, em, itens) VALUES (?, ?, ?, ?)").run(empresa, nome, new Date().toISOString(), total);
+  });
+  migradas.add(chave);
+  confirmar(); // os dados já estão no disco antes de os JSON antigos saírem do lugar
+  for (const arq of importados) {
+    const origem = path.join(pasta, arq);
+    let destino = `${origem}.migrado`;
+    for (let i = 2; fs.existsSync(destino); i++) destino = `${origem}.migrado-${i}`;
+    fs.renameSync(origem, destino);
+  }
+}
+
+/** Só para os testes: esquece quais migrações já foram conferidas. */
+export const esquecerMigracoes = () => migradas.clear();

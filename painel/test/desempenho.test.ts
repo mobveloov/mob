@@ -94,16 +94,16 @@ test("login do painel: só tentativa errada conta (entrar certo várias vezes n�
   }
 });
 
-test("cadastro: importar o que já está igual não regrava o arquivo", async () => {
+test("cadastro: importar o que já está igual não grava nada no banco", async () => {
   const e = D.criarEmpresa("Sem Regravar").id;
   const cli = cadastroPorId("clientes")!;
   C.mesclar(e, cli, [{ nome: "Ana", telefone: "11955556666", status: "Ativo" }], "t");
-  const arq = path.join(DADOS, "empresas", e, "cadastros", "clientes.json");
-  const antes = fs.statSync(arq).mtimeMs;
-  await new Promise((r) => setTimeout(r, 30));
+  const { banco } = await import("../src/servidor/banco.ts");
+  const mudancas = () => (banco().prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const antes = mudancas();
   const r = C.mesclar(e, cli, [{ nome: "Ana", telefone: "11955556666", status: "Ativo" }], "t");
   assert.deepEqual(r, { criados: 0, atualizados: 0 });
-  assert.equal(fs.statSync(arq).mtimeMs, antes);
+  assert.equal(mudancas(), antes);
 });
 
 test("despacho: motorista que fechou o app (sem sinal há mais de 90 s) não recebe a oferta", async (t) => {

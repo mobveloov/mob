@@ -1,11 +1,14 @@
 // Chat da corrida entre passageiro e motorista: texto e áudio.
-// Mensagens em DADOS_DIR/empresas/<id>/apps/chat/<corrida>.json; áudios em .../chat/audio/<id>.<ext>.
+// Mensagens no banco (tabela chat_mensagens, uma linha por mensagem; os chat/<corrida>.json antigos entram na primeira vez e
+// viram .json.migrado); áudios em DADOS_DIR/empresas/<id>/apps/chat/audio/<id>.<ext>.
 // Áudio: só os tipos da lista (conferidos pelo cabeçalho do arquivo, não só pelo Content-Type) e até APPS_AUDIO_MAX_KB
 // (padrão 1024 KB, mais ou menos 1 minuto). No máximo 60 áudios e 500 mensagens por corrida.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { arquivo, gravar, idCorridaValido, ler } from "./armazem.ts";
+import type { StatementSync } from "node:sqlite";
+import { banco, migrarPastaUmaVez } from "../servidor/banco.ts";
+import { arquivo, idCorridaValido } from "./armazem.ts";
 import type { PapelApp } from "./sessoes.ts";
 
 export interface Mensagem {
@@ -41,19 +44,43 @@ function cabecalhoConfere(ext: string, b: Uint8Array): boolean {
   }
 }
 
-const arqChat = (empresaId: string, corridaId: string) => {
+function validar(corridaId: string) {
   if (!idCorridaValido(corridaId)) throw new Error("Corrida inválida.");
-  return arquivo(empresaId, "chat", `${corridaId}.json`);
-};
+}
 
-export const mensagens = (empresaId: string, corridaId: string) => ler<Mensagem[]>(arqChat(empresaId, corridaId), []);
+/** Traz para o banco os chat/<corrida>.json antigos da empresa (uma vez só; os arquivos ficam guardados como .migrado). */
+function preparar(empresaId: string) {
+  migrarPastaUmaVez(empresaId, "chat_mensagens", arquivo(empresaId, "chat"), (nome, conteudo) => {
+    const corridaId = nome.replace(/\.json$/, "");
+    if (!idCorridaValido(corridaId) || !Array.isArray(conteudo)) return -1;
+    const ins = banco().prepare("INSERT INTO chat_mensagens (empresa, corrida_id, id, de, tem_audio, audio_id, em, dados) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    let n = 0;
+    for (const m of conteudo as Mensagem[]) { if (m && typeof m.id === "string") { gravarLinha(ins, empresaId, corridaId, m); n++; } }
+    return n;
+  });
+}
+
+function gravarLinha(ins: StatementSync, empresaId: string, corridaId: string, m: Mensagem) {
+  ins.run(empresaId, corridaId, m.id, m.de, m.audio ? 1 : 0, m.audio?.id ?? null, m.em, JSON.stringify(m));
+}
+
+export const mensagens = (empresaId: string, corridaId: string): Mensagem[] => {
+  validar(corridaId);
+  preparar(empresaId);
+  return (banco().prepare("SELECT dados FROM chat_mensagens WHERE empresa = ? AND corrida_id = ? ORDER BY seq").all(empresaId, corridaId) as Array<{ dados: string }>)
+    .map((r) => JSON.parse(r.dados) as Mensagem);
+};
 
 const agora = () => new Date().toISOString();
 
+const contar = (empresaId: string, corridaId: string, soAudios: boolean) =>
+  (banco().prepare(`SELECT COUNT(*) AS n FROM chat_mensagens WHERE empresa = ? AND corrida_id = ?${soAudios ? " AND tem_audio = 1" : ""}`).get(empresaId, corridaId) as { n: number }).n;
+
 function acrescentar(empresaId: string, corridaId: string, m: Mensagem) {
-  const l = mensagens(empresaId, corridaId);
-  if (l.length >= MAX_MENSAGENS) throw new Error("O chat desta corrida chegou ao limite de mensagens.");
-  gravar(arqChat(empresaId, corridaId), [...l, m]);
+  validar(corridaId);
+  preparar(empresaId);
+  if (contar(empresaId, corridaId, false) >= MAX_MENSAGENS) throw new Error("O chat desta corrida chegou ao limite de mensagens.");
+  gravarLinha(banco().prepare("INSERT INTO chat_mensagens (empresa, corrida_id, id, de, tem_audio, audio_id, em, dados) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"), empresaId, corridaId, m);
   return m;
 }
 
@@ -88,8 +115,9 @@ export function caminhoDoAudio(empresaId: string, audioId: string, mime: string)
 }
 
 export function enviarAudio(empresaId: string, corridaId: string, de: PapelApp, nome: string, tipo: string, bytes: Uint8Array, segundos?: number): Mensagem {
-  const l = mensagens(empresaId, corridaId);
-  if (l.filter((m) => m.audio).length >= MAX_AUDIOS) throw new Error("Esta corrida já tem áudios demais.");
+  validar(corridaId);
+  preparar(empresaId);
+  if (contar(empresaId, corridaId, true) >= MAX_AUDIOS) throw new Error("Esta corrida já tem áudios demais.");
   const audio = salvarArquivoDeAudio(empresaId, tipo, bytes, segundos);
   return acrescentar(empresaId, corridaId, { id: crypto.randomUUID(), de, nome: nome.slice(0, 80), audio, em: agora() });
 }
@@ -102,13 +130,19 @@ export const marcarLida = (empresaId: string, corridaId: string, papel: PapelApp
 export function naoLidas(empresaId: string, corridaId: string, papel: PapelApp): number {
   if (!idCorridaValido(corridaId)) return 0;
   const desde = leituras.get(`${empresaId}|${corridaId}|${papel}`) ?? 0;
-  return mensagens(empresaId, corridaId).filter((m) => m.de !== papel && Date.parse(m.em) > desde).length;
+  preparar(empresaId);
+  // "em" é uma data ISO (UTC): comparar como texto é o mesmo que comparar as datas.
+  return (banco().prepare("SELECT COUNT(*) AS n FROM chat_mensagens WHERE empresa = ? AND corrida_id = ? AND de <> ? AND em > ?")
+    .get(empresaId, corridaId, papel, new Date(desde).toISOString()) as { n: number }).n;
 }
 
 /** Arquivo do áudio, só se ele for desta corrida. */
 export function arquivoDoAudio(empresaId: string, corridaId: string, audioId: string): { caminho: string; mime: string } | null {
   if (!idCorridaValido(audioId)) return null;
-  const m = mensagens(empresaId, corridaId).find((x) => x.audio?.id === audioId);
+  validar(corridaId);
+  preparar(empresaId);
+  const linha = banco().prepare("SELECT dados FROM chat_mensagens WHERE empresa = ? AND corrida_id = ? AND audio_id = ?").get(empresaId, corridaId, audioId) as { dados: string } | undefined;
+  const m = linha ? (JSON.parse(linha.dados) as Mensagem) : undefined;
   if (!m?.audio) return null;
   const ext = Object.entries(MIME_DA_EXT).find(([, v]) => v === m.audio!.mime)?.[0];
   const caminho = arquivo(empresaId, "chat", "audio", `${audioId}.${ext}`);

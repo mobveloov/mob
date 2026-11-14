@@ -161,7 +161,8 @@ function arquivo(empresaId: string) {
 // regravava o corridas.json inteiro da empresa: com centenas de corridas abertas, a fila travava (teste de carga).
 // O corridas.json antigo entra no banco na primeira vez e vira corridas.json.migrado (guardado).
 // Na memória fica uma lista só de leitura por empresa, atualizada a cada gravação (sem reler o banco).
-const memoria = new Map<string, { arquivoBanco: string; lista: readonly CorridaPropria[] }>();
+interface MemoriaCorridas { arquivoBanco: string; porId: Map<string, CorridaPropria>; lista?: readonly CorridaPropria[] }
+const memoria = new Map<string, MemoriaCorridas>();
 
 function congelar<T>(v: T): T {
   if (v && typeof v === "object" && !Object.isFrozen(v)) { Object.freeze(v); for (const x of Object.values(v as object)) congelar(x); }
@@ -178,15 +179,29 @@ export function prepararProprias(empresaId: string) {
   });
 }
 
-export function listarProprias(empresaId: string): CorridaPropria[] {
+/** Corridas da empresa na memória: um mapa por id (gravar é O(1)); a lista só é montada quando alguém pede e some a cada gravação. */
+function carregar(empresaId: string): MemoriaCorridas {
   const m = memoria.get(empresaId);
-  if (m && m.arquivoBanco === arquivoDoBanco()) { arquivo(empresaId); return m.lista as CorridaPropria[]; }
+  if (m && m.arquivoBanco === arquivoDoBanco()) { arquivo(empresaId); return m; }
   prepararProprias(empresaId);
-  const lista = banco().prepare("SELECT dados FROM corridas_proprias WHERE empresa = ? ORDER BY os_num, id").all(empresaId)
-    .map((r) => congelar(JSON.parse(String((r as { dados: string }).dados)) as CorridaPropria));
-  memoria.set(empresaId, { arquivoBanco: arquivoDoBanco(), lista: Object.freeze(lista) });
-  return lista;
+  const porId = new Map<string, CorridaPropria>();
+  for (const r of banco().prepare("SELECT dados FROM corridas_proprias WHERE empresa = ? ORDER BY os_num, id").all(empresaId)) {
+    const c = congelar(JSON.parse(String((r as { dados: string }).dados)) as CorridaPropria);
+    porId.set(c.id, c);
+  }
+  const novo: MemoriaCorridas = { arquivoBanco: arquivoDoBanco(), porId };
+  memoria.set(empresaId, novo);
+  return novo;
 }
+
+export function listarProprias(empresaId: string): CorridaPropria[] {
+  const m = carregar(empresaId);
+  m.lista ??= Object.freeze([...m.porId.values()]);
+  return m.lista as CorridaPropria[];
+}
+
+/** Uma corrida pelo id (busca direta no mapa, sem montar a lista). */
+export const corridaPorId = (empresaId: string, id: string): CorridaPropria | undefined => carregar(empresaId).porId.get(id);
 
 function gravarLinha(empresaId: string, c: CorridaPropria) {
   banco().prepare(`INSERT INTO corridas_proprias (empresa, id, os_num, status, telefone, motorista_id, solicitada_em, dados) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -195,15 +210,13 @@ function gravarLinha(empresaId: string, c: CorridaPropria) {
     .run(empresaId, c.id, Number(c.os) || 0, c.status, c.passageiro?.telefone ?? "", c.motoristaId ?? null, c.solicitadaEm ?? "", JSON.stringify(c));
 }
 
-/** Grava as corridas mudadas (tudo ou nada) e atualiza a lista da memória. */
+/** Grava as corridas mudadas (tudo ou nada) e atualiza a memória (por id, sem remontar a lista inteira). */
 function gravar(empresaId: string, mudadas: CorridaPropria[]) {
   if (!mudadas.length) return;
-  const atual = listarProprias(empresaId);
+  const m = carregar(empresaId);
   transacao(() => { for (const c of mudadas) gravarLinha(empresaId, c); });
-  const novas = new Map(mudadas.map((c) => [c.id, congelar(structuredClone(c))]));
-  const lista = atual.map((c) => novas.get(c.id) ?? c);
-  for (const [id, c] of novas) if (!atual.some((x) => x.id === id)) lista.push(c);
-  memoria.set(empresaId, { arquivoBanco: arquivoDoBanco(), lista: Object.freeze(lista) });
+  for (const c of mudadas) m.porId.set(c.id, congelar(structuredClone(c)));
+  m.lista = undefined;
 }
 
 /** Só para testes: esquece a lista da memória (força ler do banco). */

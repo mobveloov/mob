@@ -1,13 +1,13 @@
-// Guarda os cadastros de cada empresa: DADOS_DIR/empresas/<id>/cadastros/<cadastro>.json.
+// Guarda os cadastros de cada empresa no banco (tabela cadastros_itens, uma linha por registro). Os
+// DADOS_DIR/empresas/<id>/cadastros/<cadastro>.json antigos entram na primeira vez e viram .json.migrado (guardados).
 // Valida cada campo pela definição (comum/cadastros.ts). Uma empresa nunca lê a pasta de outra.
 
 import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import type { Cadastro, Campo } from "../comum/cadastros.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { normal } from "../servidor/util.ts";
-import { gravarJson, lerJson } from "../servidor/jsoncache.ts";
+import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
 
 export type Valor = string | number | boolean | null;
 export interface Registro { id: string; criadoEm: string; atualizadoEm: string; atualizadoPor: string; [campo: string]: Valor }
@@ -17,12 +17,55 @@ function arquivo(empresaId: string, cad: Cadastro) {
   return path.join(raiz(), "empresas", empresaId, "cadastros", `${cad.id}.json`);
 }
 
-export function listar(empresaId: string, cad: Cadastro): Registro[] {
-  return lerJson<Registro[]>(arquivo(empresaId, cad), []); // só leitura (cache): para mudar, copie e grave
+// Na memória: um mapa por id para cada cadastro da empresa (gravar um registro é O(1)); a lista só é montada quando alguém pede.
+interface Memoria { arquivoBanco: string; porId: Map<string, Registro>; lista?: readonly Registro[] }
+const memoria = new Map<string, Memoria>();
+
+function congelar<T>(v: T): T {
+  if (v && typeof v === "object" && !Object.isFrozen(v)) { Object.freeze(v); for (const x of Object.values(v as object)) congelar(x); }
+  return v;
 }
 
-function gravar(empresaId: string, cad: Cadastro, l: Registro[]) {
-  gravarJson(arquivo(empresaId, cad), l, { espacos: 1 });
+function carregar(empresaId: string, cad: Cadastro): Memoria {
+  const arq = arquivo(empresaId, cad); // valida a empresa e o cadastro
+  const chave = `${empresaId}|${cad.id}`;
+  const m = memoria.get(chave);
+  if (m && m.arquivoBanco === arquivoDoBanco()) return m;
+  migrarUmaVez(empresaId, `cadastro_${cad.id}`, arq, (conteudo) => {
+    const l = Array.isArray(conteudo) ? (conteudo as Registro[]).filter((r) => r && typeof r.id === "string") : [];
+    const ins = banco().prepare("INSERT OR IGNORE INTO cadastros_itens (empresa, cadastro, id, dados) VALUES (?, ?, ?, ?)");
+    for (const r of l) ins.run(empresaId, cad.id, r.id, JSON.stringify(r));
+    return l.length;
+  });
+  const porId = new Map<string, Registro>();
+  for (const r of banco().prepare("SELECT dados FROM cadastros_itens WHERE empresa = ? AND cadastro = ? ORDER BY seq").all(empresaId, cad.id) as Array<{ dados: string }>) {
+    const reg = congelar(JSON.parse(r.dados) as Registro);
+    porId.set(reg.id, reg);
+  }
+  const novo: Memoria = { arquivoBanco: arquivoDoBanco(), porId };
+  memoria.set(chave, novo);
+  return novo;
+}
+
+export function listar(empresaId: string, cad: Cadastro): Registro[] {
+  const m = carregar(empresaId, cad);
+  m.lista ??= Object.freeze([...m.porId.values()]);
+  return m.lista as Registro[]; // só leitura (memória): para mudar, copie e grave
+}
+
+/** Um registro pelo id (sem montar a lista). */
+export const registroPorId = (empresaId: string, cad: Cadastro, id: string): Registro | undefined => carregar(empresaId, cad).porId.get(id);
+
+/** Grava só os registros mudados (tudo ou nada) e atualiza a memória. */
+function gravar(empresaId: string, cad: Cadastro, mudados: Registro[]) {
+  const m = carregar(empresaId, cad);
+  transacao(() => {
+    const up = banco().prepare(`INSERT INTO cadastros_itens (empresa, cadastro, id, dados) VALUES (?, ?, ?, ?)
+      ON CONFLICT (empresa, cadastro, id) DO UPDATE SET dados = excluded.dados`);
+    for (const r of mudados) up.run(empresaId, cad.id, r.id, JSON.stringify(r));
+  });
+  for (const r of mudados) m.porId.set(r.id, congelar(structuredClone(r)));
+  m.lista = undefined;
 }
 
 const soDigitos = (v: string) => v.replace(/\D/g, "");
@@ -93,19 +136,18 @@ export function criar(empresaId: string, cad: Cadastro, entrada: Record<string, 
   conferirUnico(cad, lista, dados);
   const agora = new Date().toISOString();
   const r: Registro = { ...dados, id: crypto.randomUUID(), criadoEm: agora, atualizadoEm: agora, atualizadoPor: por };
-  gravar(empresaId, cad, [...lista, r]);
+  gravar(empresaId, cad, [r]);
   return r;
 }
 
 export function atualizar(empresaId: string, cad: Cadastro, id: string, entrada: Record<string, unknown>, por: string): Registro {
-  const lista = [...listar(empresaId, cad)]; // cópia: o cache é só leitura
-  const i = lista.findIndex((r) => r.id === id);
-  if (i < 0) throw new Error(`${cad.singular[0].toUpperCase()}${cad.singular.slice(1)} não encontrado.`);
-  const dados = limpar(cad, entrada, lista[i]);
-  conferirUnico(cad, lista, dados, id);
-  lista[i] = { ...lista[i], ...dados, atualizadoEm: new Date().toISOString(), atualizadoPor: por };
-  gravar(empresaId, cad, lista);
-  return lista[i];
+  const atual = registroPorId(empresaId, cad, id);
+  if (!atual) throw new Error(`${cad.singular[0].toUpperCase()}${cad.singular.slice(1)} não encontrado.`);
+  const dados = limpar(cad, entrada, atual);
+  conferirUnico(cad, listar(empresaId, cad), dados, id);
+  const novo: Registro = { ...atual, ...dados, atualizadoEm: new Date().toISOString(), atualizadoPor: por };
+  gravar(empresaId, cad, [novo]);
+  return novo;
 }
 
 /**
@@ -113,21 +155,22 @@ export function atualizar(empresaId: string, cad: Cadastro, id: string, entrada:
  * Cada campo passa pela mesma conferência do formulário; campo calculado ou desconhecido é ignorado.
  */
 export function alterarCampos(empresaId: string, cad: Cadastro, id: string, mudancas: Record<string, unknown>, por: string): Registro {
-  const lista = [...listar(empresaId, cad)]; // cópia: o cache é só leitura
-  const i = lista.findIndex((r) => r.id === id);
-  if (i < 0) throw new Error(`${cad.singular[0].toUpperCase()}${cad.singular.slice(1)} não encontrado.`);
+  const atual = registroPorId(empresaId, cad, id);
+  if (!atual) throw new Error(`${cad.singular[0].toUpperCase()}${cad.singular.slice(1)} não encontrado.`);
   const dados: Record<string, Valor> = {};
   for (const c of cad.campos) if (!c.calculado && c.chave in mudancas) dados[c.chave] = limparCampo(c, mudancas[c.chave]);
-  conferirUnico(cad, lista, { ...lista[i], ...dados }, id);
-  lista[i] = { ...lista[i], ...dados, atualizadoEm: new Date().toISOString(), atualizadoPor: por };
-  gravar(empresaId, cad, lista);
-  return lista[i];
+  conferirUnico(cad, listar(empresaId, cad), { ...atual, ...dados }, id);
+  const novo: Registro = { ...atual, ...dados, atualizadoEm: new Date().toISOString(), atualizadoPor: por };
+  gravar(empresaId, cad, [novo]);
+  return novo;
 }
 
 export function remover(empresaId: string, cad: Cadastro, id: string) {
-  const lista = listar(empresaId, cad);
-  if (!lista.some((r) => r.id === id)) throw new Error("Registro não encontrado.");
-  gravar(empresaId, cad, lista.filter((r) => r.id !== id));
+  const m = carregar(empresaId, cad);
+  if (!m.porId.has(id)) throw new Error("Registro não encontrado.");
+  banco().prepare("DELETE FROM cadastros_itens WHERE empresa = ? AND cadastro = ? AND id = ?").run(empresaId, cad.id, id);
+  m.porId.delete(id);
+  m.lista = undefined;
 }
 
 /**
@@ -135,31 +178,35 @@ export function remover(empresaId: string, cad: Cadastro, id: string) {
  * que a central já editou) e cria os novos. Devolve quantos criou e quantos atualizou.
  */
 export function mesclar(empresaId: string, cad: Cadastro, novos: Array<Record<string, Valor>>, por: string): { criados: number; atualizados: number } {
-  const lista = structuredClone(listar(empresaId, cad)); // cópia: o cache é só leitura
   const chave = cad.chaveUnica!;
-  const indice = new Map(lista.map((r, i) => [normal(String(r[chave] ?? "")), i]));
+  const porChave = new Map<string, Registro>(listar(empresaId, cad).map((r) => [normal(String(r[chave] ?? "")), r]));
   const calculados = new Set(cad.campos.filter((c) => c.calculado).map((c) => c.chave));
   const agora = new Date().toISOString();
+  const mudados = new Map<string, Registro>(); // só os registros novos ou mudados vão para o banco
   let criados = 0, atualizados = 0;
   for (const n of novos) {
     const k = normal(String(n[chave] ?? ""));
     if (!k) continue;
-    const i = indice.get(k);
-    if (i === undefined) {
+    const existente = porChave.get(k);
+    if (!existente) {
       const base: Record<string, Valor> = Object.fromEntries(cad.campos.map((c) => [c.chave, c.tipo === "booleano" ? false : null]));
-      lista.push({ ...base, ...n, id: crypto.randomUUID(), criadoEm: agora, atualizadoEm: agora, atualizadoPor: por });
-      indice.set(k, lista.length - 1);
+      const novo: Registro = { ...base, ...n, id: crypto.randomUUID(), criadoEm: agora, atualizadoEm: agora, atualizadoPor: por };
+      mudados.set(novo.id, novo);
+      porChave.set(k, novo);
       criados++;
     } else {
-      const r = lista[i];
+      const r: Registro = mudados.get(existente.id) ?? { ...existente }; // cópia: a memória é só leitura
       let mudou = false;
       for (const [c, v] of Object.entries(n)) {
         if (v == null || v === "") continue;
         if (calculados.has(c) || r[c] == null || r[c] === "") { if (r[c] !== v) { r[c] = v; mudou = true; } }
       }
-      if (mudou) { r.atualizadoEm = agora; atualizados++; }
+      if (mudou) { r.atualizadoEm = agora; atualizados++; mudados.set(r.id, r); porChave.set(k, r); }
     }
   }
-  if (criados || atualizados) gravar(empresaId, cad, lista); // nada mudou: não regrava (cada corrida chama isto)
+  if (mudados.size) gravar(empresaId, cad, [...mudados.values()]); // nada mudou: não grava (cada corrida chama isto)
   return { criados, atualizados };
 }
+
+/** Só para os testes: esquece os cadastros da memória (força ler do banco). */
+export const esquecerCadastrosDaMemoria = () => memoria.clear();

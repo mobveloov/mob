@@ -16,7 +16,7 @@ import { configDosApps, tiposDeDocumento } from "../config/apps.ts";
 import { mensagensDaPessoa, receberDaPessoa } from "../config/comunicacao.ts";
 import { criar, listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, avaliarPassageiro, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
-import { banco, transacao } from "../servidor/banco.ts";
+import { arquivoDoBanco, banco, transacao } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
@@ -64,9 +64,28 @@ const PESSOA_VAZIA: Pessoa = {
   senha: "", foto: "", cidadeId: "", exclusaoPedidaEm: "", lugares: { casa: null, trabalho: null, favoritos: [] }, pagamentos: [], filtros: [], veiculos: [],
 };
 
+// Perfis de cada empresa na memória (um mapa por papel), carregados do banco uma vez e atualizados a cada salvarPessoa.
+// Antes, cada oferta do despacho lia e interpretava o perfil de todos os motoristas e passageiros (teste de carga).
+interface PerfisMemoria { arquivoBanco: string; motoristas: Map<string, Pessoa>; passageiros: Map<string, Pessoa> }
+const perfis = new Map<string, PerfisMemoria>();
+
+function perfisDaEmpresa(empresaId: string): PerfisMemoria {
+  const m = perfis.get(empresaId);
+  if (m && m.arquivoBanco === arquivoDoBanco()) return m;
+  const novo: PerfisMemoria = { arquivoBanco: arquivoDoBanco(), motoristas: new Map(), passageiros: new Map() };
+  for (const r of banco().prepare("SELECT papel, chave, dados FROM app_pessoas WHERE empresa = ?").all(empresaId) as Array<{ papel: PapelApp; chave: string; dados: string }>) {
+    (r.papel === "motorista" ? novo.motoristas : novo.passageiros).set(r.chave, { ...PESSOA_VAZIA, ...JSON.parse(r.dados) });
+  }
+  perfis.set(empresaId, novo);
+  return novo;
+}
+
+/** Só para os testes: esquece os perfis da memória (força ler do banco). */
+export const esquecerPerfisDaMemoria = () => perfis.clear();
+
 function linhaPessoa(empresaId: string, papel: PapelApp, chave: string): Pessoa | null {
-  const r = banco().prepare("SELECT dados FROM app_pessoas WHERE empresa = ? AND papel = ? AND chave = ?").get(empresaId, papel, chave) as { dados: string } | undefined;
-  return r ? { ...PESSOA_VAZIA, ...JSON.parse(r.dados) } : null;
+  const p = (papel === "motorista" ? perfisDaEmpresa(empresaId).motoristas : perfisDaEmpresa(empresaId).passageiros).get(chave);
+  return p ? structuredClone(p) : null; // cópia: quem chama pode mexer nela sem mudar a memória
 }
 
 /** Perfil da pessoa no app (cria na primeira vez, com o código de indicação). */
@@ -82,6 +101,8 @@ export function salvarPessoa(empresaId: string, papel: PapelApp, chave: string, 
   banco().prepare(`INSERT INTO app_pessoas (empresa, papel, chave, codigo, indicado_por, dados) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT (empresa, papel, chave) DO UPDATE SET codigo = excluded.codigo, indicado_por = excluded.indicado_por, dados = excluded.dados`)
     .run(empresaId, papel, chave, p.codigo, p.indicadoPor, JSON.stringify(p));
+  const m = perfisDaEmpresa(empresaId);
+  (papel === "motorista" ? m.motoristas : m.passageiros).set(chave, { ...PESSOA_VAZIA, ...JSON.parse(JSON.stringify(p)) });
 }
 
 function novoCodigo(empresaId: string): string {
@@ -107,10 +128,7 @@ export function atendeAsExigencias(m: Pessoa | null | undefined, c: CorridaPropr
  * consultava o banco (a carga de 500 corridas ficou 4 vezes mais lenta).
  */
 export function filtrosDoDespacho(empresaId: string) {
-  const mot = new Map<string, Pessoa>(), pas = new Map<string, Pessoa>();
-  for (const r of banco().prepare("SELECT papel, chave, dados FROM app_pessoas WHERE empresa = ?").all(empresaId) as Array<{ papel: PapelApp; chave: string; dados: string }>) {
-    (r.papel === "motorista" ? mot : pas).set(r.chave, { ...PESSOA_VAZIA, ...JSON.parse(r.dados) });
-  }
+  const { motoristas: mot, passageiros: pas } = perfisDaEmpresa(empresaId); // visão da memória (sempre em dia)
   return {
     podeAtender(c: CorridaPropria, motoristaId: string) {
       const m = mot.get(motoristaId);

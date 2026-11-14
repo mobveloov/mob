@@ -81,20 +81,13 @@ test("comissão: motorista Isento vale 0 e Personalizado vale no lugar da catego
   const livre = criar(E, MOT, { nome: "Isento Silva", telefone: "11980000001", status: "Ativo" }, "t");
   const meu = criar(E, MOT, { nome: "Personal Souza", telefone: "11980000002", status: "Ativo" }, "t");
   // os campos de cobrança são da frente Cadastro: gravo direto no registro para simular
-  const arq = path.join(DADOS, "empresas", E);
-  assert.ok(fs.existsSync(arq));
+  const { banco } = await import("../src/servidor/banco.ts");
+  const { esquecerCadastrosDaMemoria } = await import("../src/cadastros/armazem.ts");
   for (const [id, campos] of [[livre.id, { cobranca: "Isento" }], [meu.id, { cobranca: "Personalizado", cobrancaTipo: "Valor fixo", cobrancaValor: 3.333 }]] as const) {
-    try { atualizar(E, MOT, id, campos, "t"); } catch { /* campo ainda não existe no cadastro: grava no arquivo */ }
+    const l = banco().prepare("SELECT dados FROM cadastros_itens WHERE empresa = ? AND cadastro = 'motoristas' AND id = ?").get(E, id) as { dados: string };
+    banco().prepare("UPDATE cadastros_itens SET dados = ? WHERE empresa = ? AND cadastro = 'motoristas' AND id = ?").run(JSON.stringify({ ...JSON.parse(l.dados), ...campos }), E, id);
   }
-  const caminho = fs.readdirSync(path.join(arq), { recursive: true }).map(String).find((f) => /motoristas.*\.json$/.test(f));
-  assert.ok(caminho, "arquivo do cadastro de motoristas");
-  const arquivo = path.join(arq, caminho!);
-  const lista = JSON.parse(fs.readFileSync(arquivo, "utf8")) as Array<Record<string, unknown>>;
-  for (const r of lista) {
-    if (r.id === livre.id) r.cobranca = "Isento";
-    if (r.id === meu.id) Object.assign(r, { cobranca: "Personalizado", cobrancaTipo: "Valor fixo", cobrancaValor: 3.333 });
-  }
-  (await import("../src/servidor/jsoncache.ts")).gravarJson(arquivo, lista);
+  esquecerCadastrosDaMemoria();
   assert.equal(calcularComissao(E, "Pop", 20, livre.id).taxaCentral, 0);
   assert.deepEqual(calcularComissao(E, "Pop", 20, meu.id), { valorBruto: 20, taxaCentral: 3.33, valorLiquido: 16.67 });
   assert.equal(calcularComissao(E, "Pop", 20).taxaCentral, 2.5, "sem motorista vale a categoria");
