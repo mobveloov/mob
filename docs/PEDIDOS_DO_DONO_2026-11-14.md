@@ -21,7 +21,7 @@ Escrito em português do Brasil. Cada sessão pega a sua parte, faz commits pequ
 - [ ] **CRM, Bot e Totem**: copiar EXATAMENTE como está no mobveloov (repo `D:\mobveloov-git`, é o que funciona),
       tirando só a integração com a Machine, que no `mob` já é nativa.
 - [x] **Barra de cima em qualquer zoom** (100%, 90%, 80%; 1920 a 1024) e título "Corridas" legível; remover o "NOVO".
-- [ ] **Segurança do painel** (ver bloco abaixo, tarefas 2 e 3).
+- [x] **Segurança do painel** (ver bloco abaixo, tarefas 2 e 3). Feito no branch `seguranca-painel`; resumo e pendências em docs/SEGURANCA.md.
 
 ## Sessão dos APPS (painel/src/apps, painel/src/apps/web)
 

@@ -17,7 +17,7 @@ rotasOutros(rotasGestao);
 
 // Equipe: os usuários do painel (cargos Administrador e Operador).
 const publico = ({ hash: _h, ...u }: ReturnType<typeof listarUsuarios>[number]) => u;
-rotasGestao.get("/equipe", ok((req, res) => {
+rotasGestao.get("/equipe", soAdmin, ok((req, res) => {
   res.json({ equipe: listarUsuarios().filter((u) => u.empresaId === emp(req)).map(publico).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) });
 }));
 rotasGestao.post("/equipe", soAdmin, ok((req, res) => {

@@ -36,6 +36,7 @@ import { rotasConfig } from "../config/rotas.ts";
 import { rotasRelatorios } from "../relatorios/rotas.ts";
 import { rotasAreas } from "../areas/rotas.ts";
 import { rotasCentrais } from "../centrais/rotas.ts";
+import { cabecalhosDaApi, servirPainel } from "./protecao.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -48,6 +49,10 @@ const app = express();
 }
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
+app.use("/api", cabecalhosDaApi);
+
+/** Verificação de saúde (Docker, túnel, monitoramento): pública, sem dado nenhum e sem filtro de User-Agent. */
+app.get("/api/saude", (_req, res) => res.json({ ok: true }));
 
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
   try { await fn(req, res); } catch (e) {
@@ -56,6 +61,7 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
   }
 };
 const ctx = (req: Request) => req.ctx!;
+const HASH_FALSO = D.hashSenha("sem-conta-" + Math.random());
 
 // ------------------------------------------------------------------ filtro
 
@@ -130,10 +136,12 @@ app.post("/api/configurar", ok((req, res) => {
 }));
 
 app.post("/api/entrar", ok((req, res) => {
-  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const email = String(req.body?.email ?? "").trim().toLowerCase().slice(0, 200);
   if (!podeTentar(req.ip ?? "", email)) return res.status(429).json({ erro: "Muitas tentativas. Espere alguns minutos." });
   const u = D.listarUsuarios().find((x) => x.email === email);
-  if (!u || !D.senhaConfere(String(req.body?.senha ?? ""), u.hash)) { errouLogin(req.ip ?? "", email); return res.status(401).json({ erro: "E-mail ou senha errados." }); }
+  // E-mail que não existe gasta o mesmo tempo de uma senha errada (não deixa descobrir quais e-mails têm conta).
+  const confere = D.senhaConfere(String(req.body?.senha ?? ""), u?.hash ?? HASH_FALSO);
+  if (!u || !confere) { errouLogin(req.ip ?? "", email); return res.status(401).json({ erro: "E-mail ou senha errados." }); }
   criarCookie(res, req, u.id);
   res.json({ ok: true });
 }));
@@ -149,6 +157,8 @@ app.use("/api/totem", rotasTotem);
 app.use("/api/apps", rotasApps);
 
 app.use("/api", exigirLogin);
+// Resposta com dado da empresa nunca fica guardada em cache de navegador ou proxy.
+app.use("/api", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
 const admin = exigirPapel("admin");
 
 app.get("/api/sessao", ok((req, res) => {
@@ -486,11 +496,8 @@ const distApps = path.resolve("dist-apps");
 if (fs.existsSync(distApps)) app.use("/apps", express.static(distApps));
 
 // Produção: serve o painel compilado (npm run build).
-const dist = path.resolve("dist");
-if (fs.existsSync(dist)) {
-  app.use(express.static(dist));
-  app.get(/^\/(?!api).*/, (_req, res) => res.sendFile(path.join(dist, "index.html")));
-}
+// Só as páginas ganham o filtro de User-Agent e os cabeçalhos anti-iframe/cache (ver protecao.ts); a API fica de fora.
+servirPainel(app, path.resolve("dist"));
 
 if (process.env.NODE_ENV !== "test") {
   // Promessa sem tratamento em algum módulo (bot, CRM, totem): registra e segue, em vez de derrubar o painel.
