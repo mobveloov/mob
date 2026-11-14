@@ -222,9 +222,9 @@ tbody tr { cursor: pointer; transition: background .15s; } tbody tr:hover { back
 
 .ind-linha3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-bottom: 32px; position: relative; z-index: 20; }
 .ind-linha4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-bottom: 32px; position: relative; z-index: 10; }
-.ind-caixa { position: relative; width: 100%; height: 340px; }
-.ind-caixa.baixa { height: 160px; }
-.ind-cartao { position: absolute; inset: 0 0 auto 0; min-height: 100%; z-index: 10; display: flex; flex-direction: column; padding: 24px; background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; box-shadow: var(--sombra); transition: transform .2s, box-shadow .2s, background-color .2s; }
+.ind-caixa { position: relative; width: 100%; }
+.ind-caixa.baixa { }
+.ind-cartao { position: relative; height: 100%; z-index: 10; display: flex; flex-direction: column; padding: 24px; background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; box-shadow: var(--sombra); transition: transform .2s, box-shadow .2s, background-color .2s; }
 .ind-cartao:hover { z-index: 50; transform: translateY(-2px); box-shadow: var(--sombra-alta); }
 :root[data-theme="dark"] .ind-cartao:hover { background: #26334d; border-color: #475569; }
 .ind-cab { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
@@ -257,8 +257,8 @@ tbody tr { cursor: pointer; transition: background .15s; } tbody tr:hover { back
 .ind-leg.linha p { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ind-leg.linha strong { font-size: 12px; font-weight: 800; }
 .pizza { width: 160px; height: 160px; border-radius: 50%; flex-shrink: 0; margin-left: auto; }
-.ind-extra { display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--borda); font-size: 12px; color: var(--suave); animation: surgir .3s ease; }
-.ind-cartao:hover .ind-extra { display: block; }
+.ind-extra { display: block; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--borda); font-size: 12px; color: var(--suave); animation: surgir .3s ease; }
+
 .ind-extra div { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .ind-extra b { color: var(--texto); }
 .ind-extra .dica { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--borda); }
@@ -395,3 +395,21 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 
 /* Atalho do Painel para o Mapa de engajamento */
 .atalho-engajamento { text-decoration: none; width: auto; white-space: nowrap; }
+
+/* Página inicial no formato da Machine: títulos de bloco com período, aviso de ocorrências, medidor do NPS, rodapé. */
+.ind-linha3, .ind-linha4 { align-items: stretch; }
+.ind-secao-linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 8px 0 16px; position: relative; z-index: 25; }
+.ind-secao-linha .ind-secao { margin: 0; font-size: 16px; text-transform: none; letter-spacing: 0; color: var(--texto); }
+.ind-secao-linha .seletor.periodo-sel { width: 210px; }
+.aviso-ocorrencia { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 12px 16px; border-radius: 12px; background: var(--alerta-bg); color: var(--alerta); font-size: 13px; font-weight: 600; }
+.aviso-ocorrencia a { color: inherit; text-decoration: underline; }
+.ind-caixa.nps .ind-cartao { height: auto; }
+.nps-escala { position: relative; margin: 18px 0 6px; }
+.nps-faixas { display: flex; height: 12px; border-radius: 999px; overflow: hidden; gap: 2px; }
+.nps-faixas i { display: block; }
+.nps-marca { position: absolute; top: -5px; width: 4px; height: 22px; margin-left: -2px; border-radius: 2px; background: var(--texto); }
+.nps-numeros { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; font-weight: 700; color: var(--suave); }
+.nps-legenda { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; font-weight: 700; }
+.nps-legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.grafico-rodape { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 12px; color: var(--suave); }
+.rodape-versao { margin: 32px 0 0; text-align: center; font-size: 12px; color: var(--suave); }
