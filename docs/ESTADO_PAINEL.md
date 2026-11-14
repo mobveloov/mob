@@ -39,6 +39,13 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Central de notificações** (sino): avisos montados do que está pendente, leitura por pessoa, "Somente não lidas" (`config/central-notificacoes.ts`).
 - Exportar CSV com proteção de fórmula em Pix, pendências e taxas. Só admin muda situação. Teste: `painel/test/pix-pendencias.test.ts`.
 
+## Centrais (branch machine-centr)
+- **Modelo:** uma empresa pode ser central principal e ter centrais associadas (só um nível). Vínculos, códigos, controle financeiro, plano e serviços ficam em `dados/centrais.json` (`painel/src/centrais/rede.ts`). Cada central continua sendo uma empresa isolada.
+- **Isolamento:** a central consultada vem de `?central=ID` e só vale se for a própria empresa ou uma associada dela; senão 404 igual ao de central inexistente. A principal NÃO entra no painel da associada: vê só controle, plano, demonstrativo (quando o débito é da principal) e o extrato se a associada permitir, sem nomes de pessoas. Só o papel plataforma troca de empresa (X-Empresa), como antes. Operador não acessa nada de cobrança; tudo é admin.
+- **Telas** (menu novo "Cobrança", `painel/src/web/telas/centrais/`): Controle financeiro de centrais (exibir extrato = consentimento da associada; débito automático e conta online = decisão da principal), Meus planos (Essencial, Plus, Ultra, serviços adicionais, categoria de bonificação da rede só para a principal), Demonstrativo Mensal (por central e competência, Exportar CSV com apóstrofo contra fórmula) e o seletor "Central principal e centrais associadas" no topo (só quando há rede; muda só o que as telas de Cobrança mostram).
+- **Abrir uma central associada:** admin da principal cria a empresa nova (e o primeiro admin, opcional). Ligar uma empresa existente e desfazer vínculo: só a plataforma.
+- **Sem gateway:** nada é cobrado; valores dos planos são exemplos nossos. API em `/api/centrais` (`painel/src/centrais/rotas.ts`). Teste: `painel/test/centrais.test.ts`.
+
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
 - **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
 - **Saldo mínimo** existe em duas configurações (Regras de Crédito e gestão do motorista); só a da gestão vale no despacho.
