@@ -11,6 +11,7 @@ import { gravarG, lerG } from "./armazem.ts";
 import { cad, contem, digitos, emp, hojeBr, ok, paginar, perfisApp, periodo, quem, registros, soAdmin, texto } from "./comum.ts";
 import { contaParaDesafio, corridaFicouPendente, TIPOS_DESAFIO_CORRIDA } from "./desafio-regra.ts";
 import { areas, FUSOS, removerArea, salvarArea } from "./regras.ts";
+import { rotasEmpresas } from "./empresas.ts";
 
 const diaBr = (iso: unknown) => (typeof iso === "string" && iso ? new Date(Date.parse(iso) - 3 * 3_600_000).toISOString().slice(0, 10) : "");
 
@@ -130,36 +131,6 @@ function rotasCupons(r: Router) {
       .sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)));
     const pg = paginar(f, q.pagina);
     res.json({ cupons: pg.itens, paginacao: pg.paginacao, kpis: { total: todos.length, usos: todos.reduce((a, c) => a + c.usos, 0), economia: arred(todos.reduce((a, c) => a + c.descontoTotal, 0)) } });
-  }));
-}
-
-// ====================================================================== empresas
-
-function rotasEmpresas(r: Router) {
-  r.get("/empresas", ok((req, res) => {
-    const e = emp(req), q = req.query as Record<string, unknown>;
-    const clientes = registros(e, "clientes");
-    const mes = hojeBr().slice(0, 7);
-    const gastoPorTel = new Map<string, number>();
-    for (const c of listarProprias(e)) if (c.status === "finalizada" && (c.finalizadaEm ?? "").slice(0, 7) === mes) gastoPorTel.set(c.passageiro.telefone, (gastoPorTel.get(c.passageiro.telefone) ?? 0) + (c.valor ?? 0));
-    const todas = registros(e, "conveniadas").map((x): Registro & { funcionarios: number; faturaMes: number; ativa: boolean } => {
-      const func = clientes.filter((c) => c.conveniada && normal(c.conveniada) === normal(x.nome));
-      return { ...x, funcionarios: func.length, faturaMes: arred(func.reduce((a, c) => a + (gastoPorTel.get(String(c.telefone)) ?? 0), 0)), ativa: x.status === "Ativa" };
-    });
-    const f = todas.filter((x) => contem(x.nome, texto(q.busca)) || (digitos(q.busca) && String(x.cnpj ?? "").replace(/\D/g, "").includes(digitos(q.busca))))
-      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), "pt-BR"));
-    const pg = paginar(f, q.pagina);
-    res.json({ empresas: pg.itens, paginacao: pg.paginacao, kpis: { ativas: todas.filter((x) => x.ativa).length, faturaMes: arred(todas.reduce((a, x) => a + x.faturaMes, 0)) } });
-  }));
-
-  r.post("/empresas/:id/funcionarios", soAdmin, ok((req, res) => {
-    const e = emp(req);
-    const x = registros(e, "conveniadas").find((c) => c.id === req.params.id);
-    if (!x) throw new Error("Empresa não encontrada.");
-    const tel = digitos(req.body?.telefone);
-    const c = registros(e, "clientes").find((p) => String(p.telefone) === tel);
-    if (!c) throw new Error("Passageiro não encontrado com este telefone.");
-    res.json({ passageiro: atualizar(e, cad("clientes"), c.id, { ...c, conveniada: x.nome }, quem(req)) });
   }));
 }
 

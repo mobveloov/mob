@@ -34,6 +34,7 @@ import * as S from "./servico.ts";
 import { periodo } from "../config/financeiro.ts";
 import { ABAS_TAXAS, csvPendencias, csvTaxas, listarPendencias, listarTaxas, mudarPendencia, registrarPendencia, type AcaoPendencia, type FiltroPendencias, type FiltroTaxas } from "./pendencias.ts";
 import { csvPix, listarPix, marcarPix, type FiltroPix } from "./pix.ts";
+import { categoriasDaEmpresa, pagamentosDaEmpresa } from "../gestao/empresas.ts";
 
 export const rotasOperacao = Router();
 const hojeBr = () => agoraBr().toISOString().slice(0, 10);
@@ -245,6 +246,10 @@ rotasOperacao.post("/recuperacao/contato", central, ok((req, res) => res.json({ 
 rotasOperacao.get("/passageiro", ok((req, res) => res.json(S.buscarPassageiro(emp(req), { telefone: q(req, "telefone", 20), cpf: q(req, "cpf", 20) }))));
 rotasOperacao.get("/motoristas", ok((req, res) => res.json({ motoristas: S.opcoesMotoristas(emp(req)) })));
 
+const PAGAMENTO_MACHINE_PARA_CORRIDA: Record<string, string[]> = {
+  Dinheiro: ["Dinheiro"], "Maquininha de Débito": ["Cartão na Maquininha", "Débito (máquina)"], "Maquininha de Crédito": ["Cartão na Maquininha", "Crédito (máquina)"], "Cartão no app": ["Cartão no App"], Pix: ["Pix", "Pix no app"],
+};
+
 /** Empresa conveniada, centro de custo e voucher da solicitação. Voucher exige empresa e um número dentro de uma faixa dela, ainda não usado. */
 function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
   const nomes = nomesConveniadas(empresaId);
@@ -256,6 +261,16 @@ function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
     const cad = listar(empresaId, cadastroPorId("conveniadas")!).find((r) => normal(r.nome) === normal(conveniada));
     const centros = String(cad?.centrosCusto ?? "").split(",").map((x) => x.trim()).filter(Boolean);
     if (centros.length && !centros.some((x) => normal(x) === normal(centro))) throw new Error("Centro de custo não cadastrado nesta empresa.");
+  }
+  if (conveniada) {
+    const reg = listar(empresaId, cadastroPorId("conveniadas")!).find((r) => normal(r.nome) === normal(conveniada));
+    if (reg?.status === "Suspensa" || reg?.status === "Encerrada" || reg?.status === "Aguardando ativação") throw new Error(`A empresa "${conveniada}" está com a situação "${reg.status}" e não pode solicitar corridas.`);
+    const permitidas = categoriasDaEmpresa(reg);
+    if (permitidas.length && b.categoria && !permitidas.some((x) => normal(x) === normal(String(b.categoria)))) throw new Error("Esta categoria não é permitida para a empresa.");
+    const pagamentos = pagamentosDaEmpresa(reg);
+    const pedido = String(b.pagamento ?? "");
+    if (pagamentos.length && pedido && !ehVoucher(pedido) && !pagamentos.some((p) => (PAGAMENTO_MACHINE_PARA_CORRIDA[p.tipo] ?? [p.tipo]).some((n) => normal(n) === normal(pedido)))) throw new Error("Este tipo de pagamento não é permitido para a empresa.");
+    if (reg?.permiteEspecificarMotorista === "Não" && b.motoristaId) throw new Error("Esta empresa não pode escolher o motorista da corrida.");
   }
   let numero: string | undefined;
   if (ehVoucher(String(b.pagamento ?? ""))) {
