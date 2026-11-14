@@ -71,13 +71,13 @@ export default function Passageiros() {
 
 function Formulario({ id, cidades, onFechar, onSalvo }: { id: string | "novo"; cidades: string[]; onFechar: () => void; onSalvo: () => void }) {
   const novo = id === "novo";
-  const [f, setF] = useState<Record<string, string>>({ nome: "", genero: "", telefone: "", email: "", cidade: "", avaliouApp: "Pendente", notaApp: "0", senha: "" });
+  const [f, setF] = useState<Record<string, string>>({ nome: "", genero: "", telefone: "", email: "", cidade: "", cpf: "", status: "Ativo", observacao: "", avaliouApp: "Pendente", notaApp: "0", senha: "" });
   const [nota, setNota] = useState<number | null>(null);
   const { aviso, tentar } = useAviso();
   useCarregar(async () => {
     if (novo) return null;
     const r = await chamar<{ passageiro: Record<string, unknown>; nota: number | null }>("GET", `/passageiros/${id}`);
-    setF((a) => ({ ...a, ...Object.fromEntries(["nome", "genero", "telefone", "email", "cidade", "avaliouApp"].map((k) => [k, String(r.passageiro[k] ?? a[k])])), notaApp: String(r.passageiro.notaApp ?? 0) }));
+    setF((a) => ({ ...a, ...Object.fromEntries(["nome", "genero", "telefone", "email", "cidade", "cpf", "status", "observacao", "avaliouApp"].map((k) => [k, String(r.passageiro[k] ?? a[k])])), notaApp: String(r.passageiro.notaApp ?? 0) }));
     setNota(r.nota);
     return r;
   }, [id]);
@@ -95,8 +95,12 @@ function Formulario({ id, cidades, onFechar, onSalvo }: { id: string | "novo"; c
         <Campo rotulo="Telefone"><input value={f.telefone} onChange={(e) => set("telefone", e.target.value)} /></Campo>
         <Campo rotulo="E-mail"><input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Campo>
         <Campo rotulo="Cidade"><select value={f.cidade} onChange={(e) => set("cidade", e.target.value)}><option value="">Selecione</option>{cidades.map((c) => <option key={c}>{c}</option>)}</select></Campo>
+        <Campo rotulo="CPF"><input value={f.cpf} inputMode="numeric" placeholder="000.000.000-00" onChange={(e) => set("cpf", e.target.value)} /></Campo>
+        <Campo rotulo="Situação"><select value={f.status} onChange={(e) => set("status", e.target.value)}><option>Ativo</option><option>Inativo</option><option>Suspenso</option><option>Bloqueado</option></select></Campo>
         <Campo rotulo="Senha do app" dica={novo ? "Opcional (mínimo 6)." : "Deixe vazio para manter."}><input type="text" autoComplete="off" value={f.senha} onChange={(e) => set("senha", e.target.value)} /></Campo>
       </div>
+      <h4 className="cg-secao">Dados internos</h4>
+      <Campo rotulo="Observação" dica={`${f.observacao.length}/5000. Só a central vê.`}><textarea value={f.observacao} maxLength={5000} rows={3} onChange={(e) => set("observacao", e.target.value)} /></Campo>
       <h4 className="cg-secao">Avaliações</h4>
       <div className="cg-grade">
         <Campo rotulo="Nota Passageiro (Média)"><input readOnly value={nota == null ? "-" : nota.toFixed(1)} /></Campo>

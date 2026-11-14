@@ -12,12 +12,13 @@ const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").r
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
 
 const VAZIA = {
-  id: "", nome: "", descricao: "", taxaBase: 0, precoKm: 0, precoMin: 0, tarifaMinima: 0, taxaCancelamento: null as number | null, comissaoTipo: "Percentual", comissaoValor: 0,
+  id: "", nome: "", descricao: "", vinculo: { modo: "nenhum", deCategoriaId: "" }, taxaBase: 0, precoKm: 0, precoMin: 0, tarifaMinima: 0, taxaCancelamento: null as number | null, comissaoTipo: "Percentual", comissaoValor: 0,
   extra: {
     cidade: "", visivel: true, tipoFisico: "carro", grupo: "Carro", ordem: 1, capacidade: 4, raio: 5000, icone: { modo: "biblioteca", biblioteca: "carro-popular", imagem: "" },
     negociacao: { ativo: false, descontoMaxPax: 20, acrescimoMaxMot: 50 }, modoPrecoKm: "padrao", faixasKm: [] as any[], kmIncluso: 0, tempoToque: 30, paradas: { tipo: "fixo", valor: 0 },
     deslocamento: { ativo: false, minKm: 0, tipo: "fixo", valor: 0, teto: 0, junto: true }, compensacao: { ativo: false, faixas: [] as any[] },
-    mostrarGanhoKm: false, permiteAgendamento: true, dinamicas: [] as string[], comissao: { usaFaixas: false, regras: [] as string[] },
+    mostrarGanhoKm: false, permiteAgendamento: true, dinamicas: [] as string[],
+    detalhes: "", ocultarCapacidade: false, macaneta: true, dinamicaAtiva: true, impulsionamentoAuto: false, valorExtraPassageiro: false, segurancaMulheres: false, solicitacoes: "ambas", comissao: { usaFaixas: false, regras: [] as string[] },
   },
 };
 
@@ -81,12 +82,12 @@ export function Categorias() {
         </div>
       )}
       {tarifa && <JanelaTarifa cat={tarifa.cat} extra={tarifa.extra} onFechar={() => setTarifa(null)} onSalvo={() => { setTarifa(null); d.recarregar(); }} />}
-      {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
+      {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} outras={todas} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
     </>
   );
 }
 
-function JanelaCategoria({ inicial, automacoes, dinamicas, regras, icones, onFechar, onSalvo }: { inicial: any; automacoes: any[]; dinamicas: any[]; regras: any[]; icones: string[]; onFechar: () => void; onSalvo: () => void }) {
+function JanelaCategoria({ inicial, outras, automacoes, dinamicas, regras, icones, onFechar, onSalvo }: { inicial: any; outras: any[]; automacoes: any[]; dinamicas: any[]; regras: any[]; icones: string[]; onFechar: () => void; onSalvo: () => void }) {
   const [c, setC] = useState<any>(inicial);
   const [passo, setPasso] = useState<Passo>("basico");
   const { msg, salvando, salvar } = useSalvar();
@@ -97,6 +98,8 @@ function JanelaCategoria({ inicial, automacoes, dinamicas, regras, icones, onFec
   const idx = passos.findIndex(([p]) => p === passo);
   const alternar = (campo: "dinamicas", id: string) => setEx(campo, ex[campo].includes(id) ? ex[campo].filter((x: string) => x !== id) : [...ex[campo], id]);
   const enviar = async () => {
+    if (!c.nome.trim() || c.nome.trim().length < 2) { setPasso("basico"); alert("Informe o nome da categoria."); return; }
+    if (!c.id && c.vinculo?.modo === "copiar" && !c.vinculo.deCategoriaId) { setPasso("basico"); alert("Escolha a categoria de onde copiar os motoristas."); return; }
     const r = await salvar(() => pedirConfig(c.id ? `/categorias/${c.id}` : "/categorias", c.id ? "PUT" : "POST", c));
     if (r) onSalvo();
   };
@@ -129,6 +132,27 @@ function JanelaCategoria({ inicial, automacoes, dinamicas, regras, icones, onFec
               <Campo rotulo="Capacidade" dica="Máximo de passageiros."><input type="number" min={1} value={ex.capacidade} onChange={(e) => setEx("capacidade", Number(e.target.value))} /></Campo>
               <Campo rotulo="Raio Busca (m)" dica="Distância para encontrar motoristas."><input type="number" min={100} value={ex.raio} onChange={(e) => setEx("raio", Number(e.target.value))} /></Campo>
             </div>
+            <h3>Outras configurações</h3>
+            <Campo rotulo="Detalhes adicionais" dica={`${ex.detalhes.length}/140. Mostrado no app (Android 16.0+, iOS 14.0+).`}><textarea value={ex.detalhes} maxLength={140} rows={2} onChange={(e) => setEx("detalhes", e.target.value)} /></Campo>
+            <Interruptor valor={ex.ocultarCapacidade} onChange={(v) => setEx("ocultarCapacidade", v)} rotulo="Não exibir capacidade de pessoas" descricao="Esconde a quantidade de pessoas no app do passageiro." />
+            <Interruptor valor={ex.macaneta} onChange={(v) => setEx("macaneta", v)} rotulo="Maçaneta" descricao="Permitir que o motorista abra corridas maçaneta nessa categoria." />
+            <Interruptor valor={ex.dinamicaAtiva} onChange={(v) => setEx("dinamicaAtiva", v)} rotulo="Tarifas dinâmicas" descricao="Utilizar tarifas dinâmicas nessa categoria (escolha as regras no passo Dinâmica)." />
+            <Interruptor valor={ex.impulsionamentoAuto} onChange={(v) => setEx("impulsionamentoAuto", v)} rotulo="Impulsionamento automático do valor" descricao="Quando a chance de aceite for baixa (motoristas longe), o valor da corrida sobe sozinho." />
+            <Interruptor valor={ex.valorExtraPassageiro} onChange={(v) => setEx("valorExtraPassageiro", v)} rotulo="Valor extra adicionado pelo passageiro" descricao="O passageiro pode somar um valor extra para ser atendido. Só vale para solicitações imediatas (app 23.13+)." />
+            <Interruptor valor={ex.segurancaMulheres} onChange={(v) => setEx("segurancaMulheres", v)} rotulo="Segurança para mulheres" descricao="Exibir apenas para passageiras. Só vale se o gênero estiver no cadastro (Android 16.7+, iOS 14.6+)." />
+            <Interruptor valor={ex.negociacao.ativo} onChange={(v) => sub("negociacao", "ativo", v)} rotulo="Negocia" descricao="Permitir que o passageiro negocie o preço da corrida (só imediatas). Os limites ficam no passo Tarifas." />
+            <fieldset><legend>Preferências de solicitação da categoria</legend>
+              <div className="dm-radios">
+                {([["ambas", "Permitir solicitações imediatas e agendamentos"], ["imediatas", "Permitir apenas solicitações imediatas"], ["agendadas", "Permitir apenas agendamentos"]] as const).map(([v, t]) => <label key={v}><input type="radio" name="solicitacoes" checked={ex.solicitacoes === v} onChange={() => setEx("solicitacoes", v)} /> {t}</label>)}
+              </div></fieldset>
+            {!c.id && (
+              <fieldset><legend>Vinculação de motoristas</legend>
+                <div className="dm-radios">
+                  {([["nenhum", "Não vincular agora"], ["todos", "Vincular todos os motoristas (inclusive inativos e bloqueados)"], ["copiar", "Copiar motoristas de outra categoria"]] as const).map(([v, t]) => <label key={v}><input type="radio" name="vinculo" checked={c.vinculo?.modo === v} onChange={() => set("vinculo", { ...c.vinculo, modo: v })} /> {t}</label>)}
+                </div>
+                {c.vinculo?.modo === "copiar" && <select aria-label="Categoria de origem" value={c.vinculo.deCategoriaId} onChange={(e) => set("vinculo", { ...c.vinculo, deCategoriaId: e.target.value })}><option value="">Escolha a categoria</option>{outras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}</select>}
+              </fieldset>
+            )}
             <h3>Ícone da Categoria</h3><p className="sub">Defina a imagem que representará esta categoria na tela do passageiro.</p>
             <Campo rotulo="Origem da Imagem"><select value={ex.icone.modo} onChange={(e) => sub("icone", "modo", e.target.value)}><option value="biblioteca">Selecionar da Biblioteca</option><option value="personalizado">Fazer Upload Novo</option></select></Campo>
             {ex.icone.modo === "biblioteca" ? <div className="dm-radios">{icones.map((i) => <label key={i} className="dm-check"><input type="radio" name="icone" checked={ex.icone.biblioteca === i} onChange={() => sub("icone", "biblioteca", i)} /> {i}</label>)}</div> : (
@@ -179,7 +203,7 @@ function JanelaCategoria({ inicial, automacoes, dinamicas, regras, icones, onFec
               </div>
             )}
             <Interruptor valor={ex.mostrarGanhoKm} onChange={(v) => setEx("mostrarGanhoKm", v)} rotulo="Transparência: Ganho por KM" descricao="Mostrar na tela de chamada o valor exato que o motorista ganha por KM?" />
-            <fieldset><legend>Permitir Agendamento?</legend><p className="sub">Habilita a função de agendar corridas para o futuro nesta categoria.</p><div className="dm-radios"><label><input type="radio" name="agenda" checked={ex.permiteAgendamento} onChange={() => setEx("permiteAgendamento", true)} /> Sim</label><label><input type="radio" name="agenda" checked={!ex.permiteAgendamento} onChange={() => setEx("permiteAgendamento", false)} /> Não</label></div></fieldset>
+            
           </>
         )}
         {passo === "dinamica" && (
