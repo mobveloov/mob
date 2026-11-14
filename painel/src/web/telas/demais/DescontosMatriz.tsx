@@ -2,7 +2,7 @@
 // e a tela "Alterando Desconto" (site e aplicativo #1 a #4 de cada forma). O máximo da empresa fica no fim de cada bloco.
 
 import { useState } from "react";
-import { Aviso, Cab, Carregando, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Aviso, Cab, Carregando, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 const APPS = ["app1", "app2", "app3", "app4"] as const;
 // Nomes que a Machine usa na tela de alteração.
@@ -12,7 +12,7 @@ const txt = (n: number) => (n ? String(n).replace(".", ",") : "");
 const rotulo = (n: number, motoristas: number) => `${n > 0 ? `${String(n).replace(".", ",")}%` : "Nenhum"} (${motoristas} Motoristas)`;
 
 export function DescontosMatriz() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/descontos-matriz"), []);
   const [m, setM] = useState<any>(null), [lido, setLido] = useState<unknown>(null), [editando, setEditando] = useState(false);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setM(structuredClone(d.dados.matriz)); }

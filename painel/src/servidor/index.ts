@@ -14,7 +14,8 @@ import { opcoesDoFiltro } from "./filtro.ts";
 import { corridasDoCsv } from "./fontes/arquivo.ts";
 import { buscarCorridas, limparCachePlanilhas } from "./fontes/index.ts";
 import { CAMPOS, pendenciasDoMotor, type TipoMotor } from "./fontes/motor.ts";
-import { apagarCookie, criarCookie, errouLogin, exigirLogin, exigirPapel, podeTentar } from "./sessao.ts";
+import { apagarCookie, criarCookie, errouLogin, exigirCargoDaRota, exigirLogin, exigirPapel, podeTentar } from "./sessao.ts";
+import { NOME_CARGO } from "../comum/cargos.ts";
 import { rotasCadastros } from "../cadastros/rotas.ts";
 import { rotasCorridasProprias } from "../corridas/rotas.ts";
 import { encerrarSemMotorista, listarProprias } from "../corridas/index.ts";
@@ -37,8 +38,13 @@ import { rotasRelatorios } from "../relatorios/rotas.ts";
 import { rotasAreas } from "../areas/rotas.ts";
 import { rotasCentrais } from "../centrais/rotas.ts";
 import { cabecalhosDaApi, servirPainel } from "./protecao.ts";
+import { rotasFiliais } from "../filiais/rotas.ts";
+import { rotasSuperadmin } from "../superadmin/rotas.ts";
+import { recursosDesligados } from "../superadmin/recursos.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
+// Cargos: garante um cargo válido para todo usuário (ninguém perde o acesso). Veja docs/CARGOS.md.
+try { D.migrarCargos(); } catch (e) { console.error("[painel] migração de cargos:", e instanceof Error ? e.message : e); }
 
 const app = express();
 // Atrás de proxy (nginx, túnel, balanceador): CONFIAR_PROXY=1 (número de proxies) faz o painel ver o IP real de quem
@@ -142,6 +148,8 @@ app.post("/api/entrar", ok((req, res) => {
   // E-mail que não existe gasta o mesmo tempo de uma senha errada (não deixa descobrir quais e-mails têm conta).
   const confere = D.senhaConfere(String(req.body?.senha ?? ""), u?.hash ?? HASH_FALSO);
   if (!u || !confere) { errouLogin(req.ip ?? "", email); return res.status(401).json({ erro: "E-mail ou senha errados." }); }
+  const e = D.empresa(u.empresaId);
+  if (u.papel !== "plataforma" && (!e || !e.ativa)) return res.status(403).json({ erro: "Esta empresa está suspensa. Fale com o suporte da plataforma." });
   criarCookie(res, req, u.id);
   res.json({ ok: true });
 }));
@@ -156,17 +164,19 @@ app.use("/api/totem", rotasTotem);
 // Apps do passageiro e do motorista: login próprio pelo telefone (token).
 app.use("/api/apps", rotasApps);
 
-app.use("/api", exigirLogin);
+app.use("/api", exigirLogin, exigirCargoDaRota);
 // Resposta com dado da empresa nunca fica guardada em cache de navegador ou proxy.
 app.use("/api", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
 const admin = exigirPapel("admin");
+const gestor = exigirPapel("gestor");
 
 app.get("/api/sessao", ok((req, res) => {
   const { usuario, empresaId } = ctx(req);
   res.json({
-    usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, telefone: usuario.telefone ?? "", papel: usuario.papel },
+    usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, telefone: usuario.telefone ?? "", papel: usuario.papel, cargo: NOME_CARGO[usuario.papel] },
     empresa: D.empresa(empresaId), marca: D.marca(empresaId),
     empresas: usuario.papel === "plataforma" ? D.listarEmpresas() : undefined,
+    recursosDesligados: recursosDesligados(empresaId),
   });
 }));
 
@@ -285,7 +295,7 @@ app.post("/api/perguntar", ok(async (req, res) => {
 
 app.get("/api/marca", ok((req, res) => res.json({ marca: D.marca(ctx(req).empresaId), empresaId: ctx(req).empresaId })));
 
-app.put("/api/marca", admin, ok((req, res) => {
+app.put("/api/marca", gestor, ok((req, res) => {
   const id = ctx(req).empresaId;
   const atual = D.marca(id);
   const nova = sanearMarca({ ...req.body, arquivos: atual.arquivos }, atual); // arquivos só mudam pelo envio
@@ -293,7 +303,7 @@ app.put("/api/marca", admin, ok((req, res) => {
   res.json({ marca: nova });
 }));
 
-app.post("/api/marca/arquivo", admin, express.raw({ type: "image/*", limit: D.MAX_IMAGEM }), ok((req, res) => {
+app.post("/api/marca/arquivo", gestor, express.raw({ type: "image/*", limit: D.MAX_IMAGEM }), ok((req, res) => {
   const id = ctx(req).empresaId;
   const tipo = String(req.query.tipo ?? "") as TipoArquivo;
   if (!TIPOS_ARQUIVO.includes(tipo)) return res.status(400).json({ erro: "Tipo de imagem inválido." });
@@ -306,7 +316,7 @@ app.post("/api/marca/arquivo", admin, express.raw({ type: "image/*", limit: D.MA
   res.json({ marca: m });
 }));
 
-app.delete("/api/marca/arquivo", admin, ok((req, res) => {
+app.delete("/api/marca/arquivo", gestor, ok((req, res) => {
   const id = ctx(req).empresaId;
   const tipo = String(req.query.tipo ?? "") as TipoArquivo;
   if (!TIPOS_ARQUIVO.includes(tipo)) return res.status(400).json({ erro: "Tipo inválido." });
@@ -317,7 +327,7 @@ app.delete("/api/marca/arquivo", admin, ok((req, res) => {
 }));
 
 /** brand.json para gerar o app (scripts/build-app-empresa). */
-app.get("/api/marca/brand.json", admin, ok((req, res) => {
+app.get("/api/marca/brand.json", gestor, ok((req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="brand-${ctx(req).empresaId}.json"`);
   res.json(D.marca(ctx(req).empresaId));
 }));
@@ -447,7 +457,7 @@ app.get("/api/usuarios", admin, ok((req, res) => {
   res.json({ usuarios: D.listarUsuarios().filter((u) => u.empresaId === ctx(req).empresaId).map(({ hash: _h, ...u }) => u) });
 }));
 app.post("/api/usuarios", admin, ok((req, res) => {
-  const papel = req.body?.papel === "admin" ? "admin" : "operador";
+  const papel = (["admin", "gestor", "operador"] as const).find((x) => x === req.body?.papel) ?? "operador";
   const u = D.criarUsuario({ email: String(req.body?.email ?? ""), nome: String(req.body?.nome ?? ""), senha: String(req.body?.senha ?? ""), empresaId: ctx(req).empresaId, papel });
   res.json({ ok: true, id: u.id });
 }));
@@ -478,6 +488,8 @@ app.use("/api/config", rotasConfig);
 app.use("/api/relatorios", rotasRelatorios);
 app.use("/api/areas", rotasAreas);
 app.use("/api/centrais", rotasCentrais);
+app.use("/api/filiais", rotasFiliais);
+app.use("/api/superadmin", rotasSuperadmin);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 

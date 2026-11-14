@@ -120,3 +120,20 @@ Prints do teste: motorista "a caminho" (1,5 km, "Siga até local de embarque") e
       para recolher. Tem que arrastar/tocar para recolher (mostra só o essencial: status e botão principal) e expandir
       de novo, com 2 ou 3 alturas (recolhida, meio, aberta), liberando o mapa. O botão de localização não pode ficar
       em cima da hora/barra de status.
+
+## Opções da corrida no app do motorista (pedido do dono)
+- [ ] O app do motorista NÃO tem o botão de cancelar a corrida. Tem que ter TODAS as opções disponíveis durante a
+      corrida (como o app da Machine/88): cancelar (com lista de motivos, configurável no painel, e aviso das
+      regras/taxas), ligar, chat, ver rota completa, editar rota, avisar problema, compartilhar/segurança (SOS),
+      "cheguei ao local", iniciar, finalizar, adicionar parada se a empresa permitir. Ao cancelar, a corrida volta
+      para "procurando" e é oferecida a outros motoristas dentro das regras do despacho; quem cancelou não recebe a
+      mesma de novo. Aparece no painel (motivo e quem cancelou). Conferir nas capturas de `apk machine motorista`
+      quais opções existem e copiar todas.
+
+## Tela do celular desliga com o app aberto (bug relatado no teste)
+- [ ] Nos apps (principalmente o do motorista, e o do passageiro durante a corrida) a tela do celular apaga sozinha
+      mesmo com o app aberto. Manter a tela acesa: motorista online ou em corrida, e passageiro acompanhando a
+      viagem (Wake Lock: no Capacitor, plugin de keep-awake / `android:keepScreenOn`; na web, `navigator.wakeLock`
+      com pedido de novo ao voltar para o app). Opção em Ajustes "Manter a tela ligada" (padrão ligado durante a
+      corrida). Também garantir que o GPS e o tempo real continuem com a tela apagada ou o app em segundo plano
+      (serviço em primeiro plano com notificação). Testar no aparelho.

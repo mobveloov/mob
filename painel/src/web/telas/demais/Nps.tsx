@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Download } from "lucide-react";
 import { baixar } from "../../api";
-import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, dataBr, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, dataBr, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 type Papel = "motorista" | "passageiro";
 const PapelAbas = ({ valor, onChange }: { valor: Papel; onChange: (p: Papel) => void }) => <Abas abas={[["passageiro", "Passageiros"], ["motorista", "Motoristas"]]} valor={valor} onChange={onChange} />;
@@ -13,7 +13,7 @@ const PapelAbas = ({ valor, onChange }: { valor: Papel; onChange: (p: Papel) => 
 
 /** "Configurações NPS" como na Machine: ativar ou desativar a pesquisa para passageiros e para motoristas. */
 export function ConfigNps() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const voltar = useNavigate();
   const pas = useCarregar(() => pedirConfig("/nps/passageiro"), []);
   const mot = useCarregar(() => pedirConfig("/nps/motorista"), []);
@@ -51,7 +51,7 @@ export function ConfigNps() {
 
 /** Opções a mais do nosso painel (pergunta, link da loja, etiquetas). A Machine não tem; ficam abaixo. */
 function OpcoesNps() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [papel, setPapel] = useState<Papel>("passageiro");
   const d = useCarregar(() => pedirConfig(`/nps/${papel}`), [papel]);
   const [c, setC] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
@@ -192,7 +192,7 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
 }
 
 export function Avaliacoes() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [papel, setPapel] = useState<Papel>("passageiro");
   const [aba, setAba] = useState<"avaliacoes" | "contestacoes" | "reclamacoes">("avaliacoes");
   const d = useCarregar(() => pedirConfig(`/nps/${papel}`), [papel]);

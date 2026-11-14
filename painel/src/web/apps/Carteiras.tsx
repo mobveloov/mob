@@ -2,6 +2,7 @@
 // (ex.: recarga recebida por Pix) e saques pedidos pelos motoristas (a central paga o Pix e marca como pago, ou recusa).
 // Servidor: /api/apps-central/carteiras e /saques (src/apps/extras.ts).
 
+import { podeCargo } from "../../comum/cargos.ts";
 import { useState } from "react";
 import { useSessao } from "../App";
 import { dataHora, dinheiro } from "../api";
@@ -21,7 +22,7 @@ const SELO: Record<string, string> = { Pendente: "alerta", Pago: "ok", Recusado:
 
 export default function Carteiras() {
   const { sessao } = useSessao();
-  const admin = sessao.usuario.papel !== "operador";
+  const admin = podeCargo(sessao.usuario.papel, "admin");
   const d = useCarregar(() => pedir<{ saldos: SaldoLinha[]; saques: Saque[] }>("/api/apps-central/carteiras"), [], 20_000);
   const [msg, setMsg] = useState<{ texto: string; erro?: boolean } | null>(null);
   const [busca, setBusca] = useState("");

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Pencil, Plus, Trash2, Zap } from "lucide-react";
-import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
@@ -25,7 +25,7 @@ export function valorDinamica(r: { cobranca: string; valor: number }) {
 }
 
 export function TarifasDinamicas() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [aba, setAba] = useState<Aba>("manuais");
   const [legenda, setLegenda] = useState(true);
   const [guia, setGuia] = useState(true);

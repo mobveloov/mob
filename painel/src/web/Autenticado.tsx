@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ChevronDown, KeyRound, LogOut, Menu, Moon, Sun, X } from "lucide-react";
-import { FUNCOES, GRUPOS, type Funcao, type Grupo } from "../comum/funcoes.ts";
+import { NOME_CARGO, podeCargo } from "../comum/cargos.ts";
+import { moduloDaFuncao } from "../comum/modulos.ts";
+import { funcoesDoCargo, GRUPOS, type Funcao, type Grupo } from "../comum/funcoes.ts";
 import { urlImagem } from "./api";
 import { useSessao } from "./App";
 import Painel from "./paginas/Painel";
@@ -53,7 +55,7 @@ const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <EmCon
 
 const rotuloFuncao = (f: Funcao, assistente: string) => (f.id === "analise" ? `Análise com ${assistente}` : f.nome);
 const iniciais = (nome: string) => (nome.trim().charAt(0) || "?").toUpperCase();
-const CARGO: Record<string, string> = { plataforma: "Plataforma", admin: "Gestor", operador: "Operador" };
+const CARGO: Record<string, string> = NOME_CARGO;
 
 /** Itens de um grupo, separados por seção (títulos pequenos no menu suspenso), na ordem do menu. */
 function porSecao(itens: Funcao[]) {
@@ -71,10 +73,11 @@ export default function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { es
   const [aberto, setAberto] = useState(false);
   const [grupoMobile, setGrupoMobile] = useState<Grupo | null>(null);
   const [fechado, setFechado] = useState<string | null>(null);
-  const admin = sessao.usuario.papel !== "operador";
+  const admin = podeCargo(sessao.usuario.papel, "gestor"); // seletor de centrais (cobrança)
   const logoArq = escuro ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro || marca.arquivos.logoEscuro;
   const logo = logoArq ? <img src={urlImagem(sessao.empresa.id, logoArq)} alt={marca.produto} /> : <span className="logo-texto">{marca.produto}</span>;
-  const funcoes = FUNCOES.filter((f) => admin || !f.soAdmin);
+  const desligados = new Set(sessao.recursosDesligados ?? []);
+  const funcoes = funcoesDoCargo(sessao.usuario.papel).filter((f) => { const m = moduloDaFuncao(f.id); return !m || !desligados.has(m); });
   const grupos = GRUPOS.map((g) => ({ g, itens: funcoes.filter((f) => f.grupo === g) })).filter((x) => x.itens.length);
   const nomeUsuario = sessao.usuario.nome || sessao.usuario.email;
   const ativoGrupo = (itens: Funcao[]) => itens.some((f) => (f.rota === "/" ? local.pathname === "/" : local.pathname === f.rota || local.pathname.startsWith(`${f.rota}/`)));

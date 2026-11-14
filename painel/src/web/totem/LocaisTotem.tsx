@@ -1,6 +1,7 @@
 // Totem (painel): cadastro dos locais da empresa. Cada local tem endereço fixo de embarque, categorias e formas de
 // pagamento que o totem mostra, e senha. Daqui sai o link do totem e o botão de recarregar remoto.
 
+import { podeCargo } from "../../comum/cargos.ts";
 import { useState } from "react";
 import { Copy, ExternalLink, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useSessao } from "../App";
@@ -17,7 +18,7 @@ const doLocal = (l: LocalTotem): Form => ({
 
 export default function LocaisTotem() {
   const { sessao } = useSessao();
-  const admin = sessao.usuario.papel !== "operador";
+  const admin = podeCargo(sessao.usuario.papel, "admin");
   const { dados, erro, recarregar } = useCarregar(() => apiCentral.locais(), []);
   const corridas = useCarregar(() => apiCentral.corridas("totem"), [], 20_000);
   const op = useCarregar(() => apiCentral.opcoes(), []);

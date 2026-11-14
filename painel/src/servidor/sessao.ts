@@ -6,6 +6,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { NextFunction, Request, Response } from "express";
+import { cargoMinimoDaRota, NIVEL, podeCargo } from "../comum/cargos.ts";
+import { moduloDaRota, type Modulo } from "../comum/modulos.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { empresa, listarUsuarios, raiz, type Papel, type Usuario } from "./dados.ts";
 
 const DURACAO_MS = 12 * 3600_000;
@@ -67,11 +70,29 @@ export function exigirLogin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-/** Exige um dos papéis. "plataforma" sempre passa. */
-export const exigirPapel = (...papeis: Papel[]) => (req: Request, res: Response, next: NextFunction) => {
-  const p = req.ctx?.usuario.papel;
-  if (p === "plataforma" || (p && papeis.includes(p))) return next();
-  res.status(403).json({ erro: "Seu usuário não tem acesso a esta parte." });
+/** Exige o cargo mais baixo da lista, ou um acima dele (operador < gestor < admin < plataforma).
+ *  Sem argumentos, só o ADMIN Mestre (plataforma) passa. */
+export const exigirPapel = (...papeis: Papel[]) => {
+  const minimo = papeis.length ? papeis.reduce((a, b) => (NIVEL[b] < NIVEL[a] ? b : a)) : "plataforma";
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (podeCargo(req.ctx?.usuario.papel, minimo)) return next();
+    res.status(403).json({ erro: "Seu usuário não tem acesso a esta parte." });
+  };
+};
+
+/** Porteiro geral: cada caminho da API tem um cargo mínimo (REGRAS_API em src/comum/cargos.ts). Roda depois do login. */
+export function exigirCargoDaRota(req: Request, res: Response, next: NextFunction) {
+  const minimo = cargoMinimoDaRota(req.method, req.path);
+  if (minimo && !podeCargo(req.ctx?.usuario.papel, minimo)) return res.status(403).json({ erro: "Seu cargo não tem acesso a esta parte." });
+  const modulo = moduloDaRota(req.path);
+  if (modulo && req.ctx && !moduloLigado(req.ctx.empresaId, modulo)) return res.status(403).json({ erro: "Este recurso está desligado para a sua empresa." });
+  next();
+}
+
+/** Para rotas que têm o próprio login (bot e totem): recusa se o módulo estiver desligado para a empresa do usuário. */
+export const exigirModulo = (id: Modulo["id"]) => (req: Request, res: Response, next: NextFunction) => {
+  if (req.ctx && !moduloLigado(req.ctx.empresaId, id)) return res.status(403).json({ erro: "Este recurso está desligado para a sua empresa." });
+  next();
 };
 
 // Tentativas de login ERRADAS (força bruta), todas numa janela de 10 minutos:

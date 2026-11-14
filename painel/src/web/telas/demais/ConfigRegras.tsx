@@ -5,7 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { DescontosMatriz } from "./DescontosMatriz";
-import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
@@ -15,7 +15,7 @@ const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sáb
 // ------------------------------------------------------------------ Regras de Crédito
 
 export function RegrasCredito() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/credito"), []);
   const [g, setG] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setG(structuredClone(d.dados)); }
@@ -71,7 +71,7 @@ export function Descontos() {
 }
 
 function DescontosCampanhas() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/descontos"), []);
   const [filtro, setFiltro] = useState("Todos"), [busca, setBusca] = useState("");
   const [edit, setEdit] = useState<any>(null);
@@ -139,7 +139,7 @@ const METODOS: Array<[string, string, string, string]> = [
 ];
 
 export function RegrasDespacho() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/despacho"), []);
   const [r, setR] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setR(structuredClone(d.dados)); }

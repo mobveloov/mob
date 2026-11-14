@@ -17,6 +17,7 @@ import path from "node:path";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { corridaVazia, type CorridaPainel, type GrupoStatus } from "../comum/corrida.ts";
 import { listar, mesclar, type Registro } from "../cadastros/armazem.ts";
+import { filial as acharFilial, filialDe } from "../filiais/filiais.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
 import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
@@ -61,6 +62,8 @@ export interface NovaCorridaPropria {
   semCadastro?: boolean;
   /** Número da OS no sistema de origem (quando a corrida veio de outro sistema ou central parceira). */
   osExterna?: string;
+  /** Filial de quem pediu na central (Cadastro › Filiais). Se não vier, vale a filial do motorista que atender. */
+  filialId?: string;
   /** Central que recebeu a chamada e central que atendeu a corrida (transbordo). Vazio: a própria central. */
   centralChamada?: string;
   centralCorrida?: string;
@@ -127,6 +130,8 @@ export interface CorridaPropria {
   /** Maçaneta (corrida de rua): "taximetro" cobra pela distância e pelo tempo reais; "destino" pela rota. */
   macaneta?: { modo: "taximetro" | "destino"; km: number; ultimaLat?: number; ultimaLng?: number; ultimaEm?: number };
   osExterna?: string;
+  /** Filial da corrida: a de quem pediu na central ou, depois, a do motorista (Cadastro › Filiais). */
+  filialId?: string;
   centralChamada?: string;
   centralCorrida?: string;
   empresaConveniada?: string;
@@ -436,6 +441,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(valorOferecido != null ? { valorOferecido } : {}),
       ...(n.opcionais?.length ? { opcionais: n.opcionais.slice(0, 8) } : {}),
       compartilhamento: crypto.randomBytes(12).toString("base64url"),
+      ...(n.filialId && acharFilial(empresaId, n.filialId) ? { filialId: n.filialId } : {}),
       ...(n.osExterna ? { osExterna: String(n.osExterna).replace(/[<>]/g, "").trim().slice(0, 40) } : {}),
       ...(n.centralChamada ? { centralChamada: String(n.centralChamada).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
       ...(n.centralCorrida ? { centralCorrida: String(n.centralCorrida).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
@@ -477,6 +483,7 @@ export function atribuirMotorista(empresaId: string, id: string, motoristaId: st
     if (!m) throw new Error("Motorista não encontrado.");
     if (m.status !== "Ativo") throw new Error("Este motorista não está ativo.");
     c.motoristaId = m.id; c.motorista = String(m.nome ?? ""); c.telefoneMotorista = String(m.telefone ?? "");
+    if (!c.filialId) { const fm = filialDe(empresaId, "motorista", m.id); if (fm) c.filialId = fm; }
     const agora = agoraBr().toISOString();
     c.atribuidaEm = agora;
     if (c.status === "procurando") c.status = "a_caminho";

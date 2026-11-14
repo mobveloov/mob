@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { ArrowUpDown, GripVertical, MoreVertical, Pencil, Plus, Smartphone, Trash2 } from "lucide-react";
 import { valorDinamica } from "./Dinamica";
 import { DetalhesTarifas, JanelaTarifa } from "./EditarTarifa";
-import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 const passos = [["basico", "Categoria"], ["avancado", "Mais opções"], ["tarifas", "Tarifas & Negociação"], ["dinamica", "Dinâmica"], ["comissao", "Comissão"]] as const;
 const ICONES: Array<[string, string]> = [["moto", "Moto"], ["taxi", "Táxi"], ["mulher", "Mulher"], ["carro-premium", "Premium"], ["carro-popular", "Comum"], ["entregas", "Entregas"], ["pcd", "PcD"], ["diversos", "Diversos"]];
@@ -29,7 +29,7 @@ const VAZIA = {
 };
 
 export function Categorias() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/categorias"), []);
   const [cidade, setCidade] = useState("");
   const [edit, setEdit] = useState<any>(null);

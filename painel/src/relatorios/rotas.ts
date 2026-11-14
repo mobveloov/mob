@@ -10,6 +10,7 @@
 //   GET    /vouchers/entrega                 OS de voucher pendentes de entrega (?motorista&osCompradas)
 //   POST   /vouchers/entrega                 Registrar Entrega ({ ids })
 
+import { filialForcada } from "../filiais/filiais.ts";
 import express, { type Request, type Response } from "express";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr } from "../servidor/util.ts";
@@ -28,6 +29,8 @@ const quem = (req: Request) => req.ctx!.usuario.email;
 const admin = exigirPapel("admin");
 const central = exigirPapel("admin", "operador");
 const q = (req: Request, k: string) => String(req.query[k] ?? "").slice(0, 400);
+/** Filtros da URL; Operador e Gestor ligados a uma filial só enxergam as corridas dela. */
+const filtrosDe = (req: Request) => ({ ...lerFiltros(req.query), ...(filialForcada(emp(req), req.ctx!.usuario) ? { filial: filialForcada(emp(req), req.ctx!.usuario)! } : {}) });
 const inteiroOuNulo = (v: string) => (/^\d{1,12}$/.test(v) ? Number(v) : null);
 
 // Relatórios que têm item no menu (os demais só existem como base de modelo).
@@ -46,9 +49,9 @@ rotasRelatorios.get("/indice", ok((req, res) => res.json({
 rotasRelatorios.post("/modelos", admin, ok((req, res) => res.status(201).json({ modelo: criarModelo(emp(req), req.body ?? {}, quem(req)) })));
 rotasRelatorios.delete("/modelos/:id", admin, ok((req, res) => { removerModelo(emp(req), req.params.id); res.json({ ok: true }); }));
 
-rotasRelatorios.get("/relatorio/:id", ok((req, res) => res.json(gerarRelatorio(emp(req), req.params.id, lerFiltros(req.query), Number(q(req, "pagina")) || 1, q(req, "ordem"), q(req, "dir")))));
+rotasRelatorios.get("/relatorio/:id", ok((req, res) => res.json(gerarRelatorio(emp(req), req.params.id, filtrosDe(req), Number(q(req, "pagina")) || 1, q(req, "ordem"), q(req, "dir")))));
 rotasRelatorios.get("/relatorio/:id/csv", ok((req, res) => {
-  const csv = csvDoRelatorio(emp(req), req.params.id, lerFiltros(req.query));
+  const csv = csvDoRelatorio(emp(req), req.params.id, filtrosDe(req));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${req.params.id.replace(/[^a-z0-9-]/g, "")}-${agoraBr().toISOString().slice(0, 10)}.csv"`);
   res.send(csv);

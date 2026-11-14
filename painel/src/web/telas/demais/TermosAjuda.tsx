@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Play, Plus, Printer, Search, Trash2 } from "lucide-react";
-import { Abas, Aviso, Cab, Campo, Carregando, Modal, dataHoraBr, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Abas, Aviso, Cab, Campo, Carregando, Modal, dataHoraBr, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 // ------------------------------------------------------------------ Termos de Uso (edição, no formato da Machine)
 
@@ -14,7 +14,7 @@ const TERMOS: Record<"passageiro" | "motorista" | "empresa", { aba: string; modo
 };
 
 export function TermosApp() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [aba, setAba] = useState<AbaTermo>("passageiro");
   const d = useCarregar(() => pedirConfig("/termos"), []);
   const [t, setT] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
@@ -90,7 +90,7 @@ type Aba = "videos" | "faq" | "contato";
 const urlVideo = (t: any) => (t.origem === "youtube" ? `https://www.youtube-nocookie.com/embed/${t.codigo}` : t.origem === "loom" ? `https://www.loom.com/embed/${t.codigo}` : t.codigo);
 
 export function CentralAjuda() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [aba, setAba] = useState<Aba>("videos");
   const [busca, setBusca] = useState("");
   const d = useCarregar(() => pedirConfig("/ajuda"), []);

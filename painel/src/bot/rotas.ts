@@ -2,10 +2,11 @@
 //   POST /webhook/:empresa/:segredo   entrada do provedor de WhatsApp (pública, protegida pelo segredo da empresa)
 //   o resto exige login; mudar conexão e configuração exige admin.
 
+import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request, type Response } from "express";
 import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
-import { exigirLogin, exigirPapel } from "../servidor/sessao.ts";
+import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
 import { encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
 import { caixaSimulada, soDigitos } from "./provedores.ts";
@@ -39,6 +40,7 @@ rotasBot.post("/webhook/:empresa/:segredo", express.json({ limit: "2mb" }), (req
 // ------------------------------------------------------------------ com login
 
 rotasBot.use(exigirLogin);
+rotasBot.use((req, res, next) => (req.path.startsWith("/webhook/") ? next() : exigirModulo("bot")(req, res, next)));
 const admin = exigirPapel("admin");
 const ctx = (req: Request) => req.ctx!;
 
@@ -50,7 +52,7 @@ function urlWebhook(req: Request, empresaId: string) {
 rotasBot.get("/config", ok((req, res) => {
   const id = ctx(req).empresaId;
   const s = A.segredosBot(id);
-  const ehAdmin = ["admin", "plataforma"].includes(ctx(req).usuario.papel);
+  const ehAdmin = podeCargo(ctx(req).usuario.papel, "admin");
   const srv = servidorWhatsApp(id);
   res.json({
     config: { ...A.config(id), instancia: srv.instancia },

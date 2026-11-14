@@ -9,7 +9,7 @@ import { banco } from "../servidor/banco.ts";
 import { hashSenha } from "../servidor/dados.ts";
 import { arred, celulaCsv, normal } from "../servidor/util.ts";
 import { gravarG, lerG } from "./armazem.ts";
-import { cad, contem, digitos, emp, hojeBr, ok, paginar, perfisApp, periodo, quem, registros, soAdmin, texto } from "./comum.ts";
+import { cad, contem, digitos, emp, hojeBr, ok, paginar, perfisApp, periodo, quem, registros, soAdmin, soGestor, texto } from "./comum.ts";
 import { contaParaDesafio, corridaFicouPendente, TIPOS_DESAFIO_CORRIDA } from "./desafio-regra.ts";
 import { areas, FUSOS, removerArea, salvarArea } from "./regras.ts";
 import { rotasEmpresas } from "./empresas.ts";
@@ -205,9 +205,9 @@ function rotasCupons(r: Router) {
 
 function rotasAreas(r: Router) {
   r.get("/areas", ok((req, res) => res.json({ areas: areas(emp(req)), fusos: FUSOS })));
-  r.post("/areas", soAdmin, ok((req, res) => res.json({ area: salvarArea(emp(req), { ...req.body, id: undefined }) })));
-  r.put("/areas/:id", soAdmin, ok((req, res) => res.json({ area: salvarArea(emp(req), { ...req.body, id: req.params.id }) })));
-  r.delete("/areas/:id", soAdmin, ok((req, res) => { removerArea(emp(req), req.params.id); res.json({ ok: true }); }));
+  r.post("/areas", soGestor, ok((req, res) => res.json({ area: salvarArea(emp(req), { ...req.body, id: undefined }) })));
+  r.put("/areas/:id", soGestor, ok((req, res) => res.json({ area: salvarArea(emp(req), { ...req.body, id: req.params.id }) })));
+  r.delete("/areas/:id", soGestor, ok((req, res) => { removerArea(emp(req), req.params.id); res.json({ ok: true }); }));
 }
 
 // ====================================================================== desafios
@@ -294,7 +294,7 @@ function rotasDesafios(r: Router) {
     });
   }));
 
-  r.post("/desafios", soAdmin, ok((req, res) => {
+  r.post("/desafios", soGestor, ok((req, res) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const nome = texto(b.nome, 30);
     if (!nome) throw new Error("Informe o nome do desafio.");
@@ -314,11 +314,11 @@ function rotasDesafios(r: Router) {
     if (!d) throw new Error("Desafio não encontrado.");
     return atualizar(emp(req), cad("desafios"), d.id, { ...d, ...f(d) }, quem(req));
   };
-  r.post("/desafios/:id/ativar", soAdmin, ok((req, res) => res.json({ desafio: mudar(req, (d) => { if (d.cancelado === true) throw new Error("Desafio cancelado não volta."); return { ativo: d.ativo !== true }; }) })));
-  r.post("/desafios/:id/cancelar", soAdmin, ok((req, res) => res.json({ desafio: mudar(req, () => ({ cancelado: true, ativo: false })) })));
+  r.post("/desafios/:id/ativar", soGestor, ok((req, res) => res.json({ desafio: mudar(req, (d) => { if (d.cancelado === true) throw new Error("Desafio cancelado não volta."); return { ativo: d.ativo !== true }; }) })));
+  r.post("/desafios/:id/cancelar", soGestor, ok((req, res) => res.json({ desafio: mudar(req, () => ({ cancelado: true, ativo: false })) })));
 
   /** Aprovação manual: paga o prêmio na carteira do motorista (uma vez). */
-  r.post("/desafios/:id/aprovar/:motoristaId", soAdmin, ok((req, res) => {
+  r.post("/desafios/:id/aprovar/:motoristaId", soGestor, ok((req, res) => {
     const e = emp(req);
     const d = registros(e, "desafios").find((x) => x.id === req.params.id);
     if (!d) throw new Error("Desafio não encontrado.");

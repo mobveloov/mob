@@ -29,7 +29,7 @@ const emp = (req: Request) => {
   if (!id || !D.idValido(id)) throw new Error("Entre de novo.");
   return id;
 };
-const admin = exigirPapel("admin");
+const admin = exigirPapel("gestor"); // marketing: Gestor e acima
 const texto = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 const agoraIso = () => new Date().toISOString();
 

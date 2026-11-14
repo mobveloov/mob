@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { BandeiraDespacho } from "../grupoc/BandeiraDespacho";
-import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 type Aba = "geral" | "despacho" | "motorista" | "preferencias" | "passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
 const ABAS: Array<[Aba, string]> = [["geral", "Geral"], ["motorista", "Motorista"], ["preferencias", "Preferências"], ["passageiro", "Passageiro"], ["despacho", "Despacho"], ["indicacoes", "Indicações"], ["cancelamento", "Cancelamentos"], ["macaneta", "Maçaneta"], ["banners", "Banners"], ["juridico", "Jurídico"]];
@@ -12,7 +12,7 @@ const dinheiroNum = (v: string) => Number(String(v).replace(/\./g, "").replace("
 const Num = ({ v, on, ...r }: { v: number; on: (n: number) => void } & Record<string, unknown>) => <input inputMode="decimal" value={String(v).replace(".", ",")} onChange={(e) => on(dinheiroNum(e.target.value))} {...r} />;
 
 export function ConfigGerais() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [aba, setAba] = useState<Aba>(() => { const a = new URLSearchParams(window.location.search).get("aba"); return ABAS.some(([k]) => k === a) ? (a as Aba) : "geral"; });
   const d = useCarregar(() => pedirConfig("/gerais"), []);
   const [c, setC] = useState<any>(null);

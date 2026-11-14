@@ -21,7 +21,7 @@ test("menu: grupos na ordem da Machine, 'Mais' no fim, ids e rotas fixos", () =>
   assert.equal(new Set(FUNCOES.map((f) => f.rota)).size, FUNCOES.length, "rotas repetidas");
   // submenus e nomes da Machine (menu do topo)
   const nomes = (g: string, secao?: string) => FUNCOES.filter((f) => f.grupo === g && (secao === undefined || f.secao === secao) && f.secao !== "Outras telas").map((f) => f.nome);
-  assert.deepEqual(nomes("Cadastro").slice(0, 9), ["Cupons", "Empresas", "Faixa de Vouchers", "Áreas", "Plantão", "Motoristas", "Punições", "Clientes", "Ruas"]);
+  assert.deepEqual(nomes("Cadastro").slice(0, 10), ["Cupons", "Empresas", "Faixa de Vouchers", "Áreas", "Plantão", "Filiais", "Motoristas", "Punições", "Clientes", "Ruas"]);
   assert.deepEqual(nomes("Financeiro", "Estatísticas"), ["OS por motorista", "OS por empresa", "OS por bairro", "OS por forma de pagamento", "OS por operador", "% de OS por motorista"]);
   assert.deepEqual(nomes("Configurações"), ["Gerais", "Taxas da central", "Personalização app passageiro", "Despacho", "Transbordos", "Tarifas e categorias", "Tarifas dinâmicas", "Descontos", "Integrações", "NPS", "Termos de uso"]);
   assert.equal(FUNCOES.find((f) => f.id === "alterar-senha")!.nome, "Trocar senha");
