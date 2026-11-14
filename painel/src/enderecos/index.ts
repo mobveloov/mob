@@ -14,6 +14,7 @@ import path from "node:path";
 import readline from "node:readline";
 import zlib from "node:zlib";
 import { idValido, raiz } from "../servidor/dados.ts";
+import { aplicarRegrasDeVia } from "../areas/ruas.ts";
 import { buscarNasCorrecoes, correcaoDoPonto, formatarTitulo, totalCorrecoes } from "./correcoes.ts";
 
 export interface Municipio { codigo: string; nome: string; uf: string }
@@ -231,7 +232,7 @@ function pontoNaRua(ix: Indice, r: Rua, numero: string): { i: number; exato: boo
 }
 
 /** Busca o endereço nos municípios da empresa. Devolve até `limite` opções, a melhor primeiro. */
-export function buscarEndereco(empresaId: string, texto: string, limite = 8): { enderecos: Endereco[]; aviso: string | null } {
+function buscarEnderecoBruto(empresaId: string, texto: string, limite = 8): { enderecos: Endereco[]; aviso: string | null } {
   const cods = lerConfig(empresaId).municipios;
   const { palavras, numero, bairro } = separar(texto);
   // Correções (casas que o CNEFE não tem) vêm primeiro e funcionam mesmo sem o CNEFE.
@@ -269,7 +270,7 @@ export function buscarEndereco(empresaId: string, texto: string, limite = 8): { 
 }
 
 /** Endereço mais perto de um ponto (localização enviada pelo WhatsApp, por exemplo). */
-export function enderecoDoPonto(empresaId: string, lat: number, lng: number): Endereco | null {
+function enderecoDoPontoBruto(empresaId: string, lat: number, lng: number): Endereco | null {
   const cc = correcaoDoPonto(lerConfig(empresaId).municipios, lat, lng);
   if (cc) {
     const m = nomeMunicipio(cc.municipio), rua = formatarTitulo(`${cc.tipo} ${cc.rua}`.trim()), nr = cc.numero ? String(cc.numero) : "";
@@ -325,4 +326,19 @@ export function completarPonto<T extends { texto: string; lat?: number; lng?: nu
   if (!p || !p.texto?.trim()) return p;
   const e = buscarEndereco(empresaId, p.texto, 1).enderecos[0];
   return e ? { ...p, lat: e.lat, lng: e.lng } : p;
+}
+
+// ------------------------------------------------------------------ regras de via (Cadastro › Ruas)
+// O nome da rua mostrado à central pode ser corrigido por regra dentro de um traçado no mapa.
+
+/** Endereço mais perto de um ponto, com as regras de via da empresa aplicadas. */
+export function enderecoDoPonto(empresaId: string, lat: number, lng: number): Endereco | null {
+  const e = enderecoDoPontoBruto(empresaId, lat, lng);
+  return e ? aplicarRegrasDeVia(empresaId, e) : e;
+}
+
+/** Busca de endereços, com as regras de via da empresa aplicadas aos resultados. */
+export function buscarEndereco(empresaId: string, texto: string, limite = 8): { enderecos: Endereco[]; aviso: string | null } {
+  const r = buscarEnderecoBruto(empresaId, texto, limite);
+  return { ...r, enderecos: r.enderecos.map((e) => aplicarRegrasDeVia(empresaId, e)) };
 }

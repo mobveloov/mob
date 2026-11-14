@@ -19,6 +19,8 @@ import { pessoa } from "./extras.ts";
 import { naoLidas } from "./chat.ts";
 import { filtrosDoDespacho } from "./extras.ts";
 import { fantasmas, regrasDoDespacho } from "../gestao/regras.ts";
+import { fotoDeAreas } from "../areas/areas.ts";
+import { motoristasEmPlantao } from "../areas/plantao.ts";
 import { regrasDespacho, transbordoPermitido } from "../config/despacho.ts";
 import { enderecoDoPonto, linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
@@ -298,10 +300,25 @@ export function despachar(empresaId: string) {
     return v;
   };
   const gestao = regrasDoDespacho(empresaId, cadastro); // punição, cerca eletrônica, saldo mínimo e nível
+  const areasEmpresa = fotoDeAreas(empresaId); // Cadastro › Áreas: bloqueio e prioridade
+  const emPlantao = motoristasEmPlantao(empresaId); // Cadastro › Plantão: escalados têm prioridade nas filas
   let n = 0;
   for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
+    if (areasEmpresa.bloqueando(c.embarque.lat, c.embarque.lng)) continue; // embarque em área de risco/bloqueio: ninguém é chamado
+    const areaDaCorrida = areasEmpresa.principal(c.embarque.lat, c.embarque.lng);
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
-    let melhor: { id: string; km: number | null } | null = null;
+    type Candidato = { id: string; km: number | null; fav: boolean; plantao: boolean; nivel: number; naArea: boolean; desde: number };
+    let melhor: Candidato | null = null;
+    // Ordem: favorito do passageiro, plantão, nível (prioritário, secundário, reserva), mesma área do embarque; depois, com a fila
+    // virtual ligada (Config › Regras de Despacho), quem está online há mais tempo; senão, o mais perto.
+    const vence = (a: Candidato, b: Candidato) => {
+      if (a.fav !== b.fav) return a.fav;
+      if (a.plantao !== b.plantao) return a.plantao;
+      if (a.nivel !== b.nivel) return a.nivel < b.nivel;
+      if (a.naArea !== b.naArea) return a.naArea;
+      if (regras.metodo === "fila_virtual") return a.desde < b.desde;
+      return (a.km ?? Infinity) < (b.km ?? Infinity) || (a.km == null && b.km == null && a.desde < b.desde);
+    };
     for (const [id, p] of e.online) {
       if (busy.has(id) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
@@ -313,15 +330,11 @@ export function despachar(empresaId: string) {
       const km = c.embarque.lat != null && c.embarque.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) : null;
       if (km != null && km > (process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000)) continue;
       if (!transbordoOk(cad.cidade, c.categoria)) continue; // Config › Transbordos
-      // Sem coordenada no embarque: vai para quem está online há mais tempo.
-      const pior = (a: { id: string; km: number | null }) => (a.km ?? Infinity);
-      // Motorista favorito do passageiro (dentro do raio) passa na frente; depois, o mais perto.
-      const fav = filtros.ehFavorito(c.passageiro.telefone, id), favMelhor = !!melhor && filtros.ehFavorito(c.passageiro.telefone, melhor.id);
-      // Depois do favorito, o nível (prioritário, secundário, reserva). Com a fila virtual ligada (Config › Regras de
-      // Despacho), entre iguais vence quem está online há mais tempo; senão, o mais perto.
-      const nv = gestao.nivel(id), nvMelhor = melhor ? gestao.nivel(melhor.id) : 0;
-      if (regras.metodo === "fila_virtual" && melhor && fav === favMelhor && nv === nvMelhor) { if (p.desde < e.online.get(melhor.id)!.desde) melhor = { id, km }; continue; }
-      if (!melhor || (fav && !favMelhor) || (fav === favMelhor && (nv < nvMelhor || (nv === nvMelhor && ((km ?? Infinity) < pior(melhor) || (km == null && melhor.km == null && p.desde < e.online.get(melhor.id)!.desde)))))) melhor = { id, km };
+      const cand: Candidato = {
+        id, km, fav: filtros.ehFavorito(c.passageiro.telefone, id), plantao: emPlantao.has(id), nivel: gestao.nivel(id),
+        naArea: !!areaDaCorrida && areasEmpresa.principal(p.lat, p.lng)?.id === areaDaCorrida.id, desde: p.desde,
+      };
+      if (!melhor || vence(cand, melhor)) melhor = cand;
     }
     if (!melhor) continue;
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };

@@ -9,6 +9,7 @@ import { percentualDaMatriz, type CanalDesconto, type FormaDesconto } from "../c
 import { extraDaCategoria, tarifaVigente } from "../config/categorias.ts";
 import { calcularTarifa } from "../config/tarifa-calculo.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
+import { motivoDeBloqueio } from "../areas/areas.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -347,6 +348,8 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     if (n.valorFinal?.modo === "prefixado" && !(Number(n.valorFinal.valor) > 0)) throw new Error("Informe o valor prefixado da corrida.");
     const cliente = listar(empresaId, cadastroPorId("clientes")!).find((c) => c.telefone === telefone);
     if (cliente && (cliente.status === "Bloqueado" || cliente.status === "Suspenso")) throw new Error("Este passageiro está bloqueado.");
+    const bloqueio = motivoDeBloqueio(empresaId, n.embarque, agendadaPara ? new Date(agendadaPara) : undefined); // Cadastro › Áreas: área de risco/bloqueio
+    if (bloqueio) throw new Error(bloqueio);
 
     const lista = listarProprias(empresaId);
     // Mesmo passageiro com corrida em aberto: não cria outra (proteção contra toque duplo).
