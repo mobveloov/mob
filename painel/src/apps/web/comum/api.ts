@@ -240,13 +240,26 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
     const p = await Push.requestPermissions();
     if (p.receive !== "granted") return;
     for (const [id, nome] of [["corridas", "Corridas"], ["chat", "Mensagens"], ["geral", "Avisos"]]) {
-      await Push.createChannel({ id, name: nome, importance: id === "corridas" ? 5 : 4, visibility: 1, vibration: true }).catch(() => undefined);
+      await Push.createChannel({ id, name: nome, importance: id === "corridas" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: "chamada" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
     }
     await Push.addListener("registration", (t: { value: string }) => { void api("/push", { corpo: { token: t.value } }).catch(() => undefined); });
     await Push.addListener("pushNotificationActionPerformed", (a: { notification?: { data?: Record<string, string> } }) => aoTocar(a.notification?.data ?? {}));
     await Push.register();
   } catch { /* sem push: segue pelo tempo real */ }
 }
+
+// ------------------------------------------------------------------ ícone flutuante (só no APK do motorista)
+
+interface PluginFlutuante { permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
+const FlutuanteNativo = registerPlugin<PluginFlutuante>("Flutuante");
+/** Bolinha por cima de outros apps quando o app é minimizado. Fora do APK do motorista, tudo isto não faz nada. */
+export const flutuante = {
+  disponivel: () => nativo() && Capacitor.isPluginAvailable("Flutuante"),
+  permitido: async () => { try { return flutuante.disponivel() ? (await FlutuanteNativo.permitido()).valor : false; } catch { return false; } },
+  pedir: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.pedir(); } catch { /* sem plugin */ } },
+  mostrar: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.mostrar(); } catch { /* sem plugin */ } },
+  esconder: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.esconder(); } catch { /* sem plugin */ } },
+};
 
 // ------------------------------------------------------------------ utilidades
 
@@ -256,16 +269,35 @@ export const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleString(
 export const vibrar = (ms: number | number[]) => { try { navigator.vibrate?.(ms); } catch { /* sem vibração */ } };
 
 /** Toque curto (chamada de corrida), sem arquivo de som. */
-export function tocarAlerta(vezes = 3) {
+export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado";
+const ARQUIVOS: Record<Som, string> = {
+  chamada: new URL("./sons/chamada.wav", import.meta.url).href,
+  mensagem: new URL("./sons/mensagem.wav", import.meta.url).href,
+  aceite: new URL("./sons/aceite.wav", import.meta.url).href,
+  alerta: new URL("./sons/alerta.wav", import.meta.url).href,
+  cancelado: new URL("./sons/cancelado.wav", import.meta.url).href,
+};
+/** Toca um dos sons do app (arquivos em comum/sons, gerados por scripts/gerar-sons.mjs). `vezes` repete o som; sem `som`, escolhe pelo número de repetições. */
+export function tocarAlerta(vezes = 3, som?: Som) {
+  const qual: Som = som ?? (vezes <= 1 ? "mensagem" : vezes === 2 ? "cancelado" : "chamada");
+  let n = 0;
+  const uma = () => {
+    try {
+      const a = new Audio(ARQUIVOS[qual]);
+      a.onended = () => { if (++n < Math.min(vezes, 3)) setTimeout(uma, 250); };
+      void a.play().catch(() => bipe());
+    } catch { bipe(); }
+  };
+  uma();
+}
+/** Reserva, se o navegador não deixar tocar o arquivo: um bipe simples. */
+function bipe() {
   try {
     const ctx = new AudioContext();
-    for (let i = 0; i < vezes; i++) {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.frequency.value = i % 2 ? 660 : 880; o.connect(g); g.connect(ctx.destination);
-      const t = ctx.currentTime + i * 0.35;
-      g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      o.start(t); o.stop(t + 0.3);
-    }
-    setTimeout(() => void ctx.close(), vezes * 400 + 200);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.25, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    o.start(); o.stop(ctx.currentTime + 0.3);
+    setTimeout(() => void ctx.close(), 500);
   } catch { /* sem som */ }
 }

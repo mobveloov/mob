@@ -121,16 +121,16 @@ export function FormFoto({ fotoAtual, aoSalvar, botao }: { fotoAtual?: string | 
   };
   const mostrar = previa || atual;
   return (
-    <div className="formulario centro">
+    <div className="passo-foto">
       <p className="dica grande">Escolha uma foto clara e de frente.</p>
       <div className="foto-rosto">
         {mostrar ? <img src={mostrar} alt="Sua foto" /> : <UserRound size={90} />}
-        <button type="button" className="foto-camera" aria-label="Tirar foto" onClick={() => entrada.current?.click()}><Camera size={20} /></button>
+        <button type="button" className="foto-camera" aria-label="Tirar foto" onClick={() => entrada.current?.click()}><Camera size={22} /></button>
       </div>
       <input ref={entrada} type="file" accept="image/*" capture="user" hidden onChange={(e) => { escolher(e.target.files?.[0]); e.target.value = ""; }} />
       <Erro texto={erro} />
       {enviada || (mostrar && !previa)
-        ? <><button type="button" className="botao-m" onClick={aoSalvar}>{botao}</button><button type="button" className="link-m" onClick={() => entrada.current?.click()}>Trocar foto</button></>
+        ? <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: ".4rem" }}><button type="button" className="botao-m" onClick={aoSalvar}>{botao}</button><button type="button" className="link-m" onClick={() => entrada.current?.click()}>Trocar foto</button></div>
         : <button type="button" className="botao-m" disabled={ocupado} onClick={() => entrada.current?.click()}><Camera size={18} /> {ocupado ? "ENVIANDO…" : "ESCOLHER FOTO"}</button>}
     </div>
   );
@@ -245,7 +245,7 @@ export function FormDocumentos({ aoTerminar, botao }: { aoTerminar?: () => void;
             <FileText size={22} className="doc-icone" />
             <span className="item-textos">
               <strong>{rotulo}</strong>
-              <small className={`situacao ${classe}`}>{enviando === tipo ? "Enviando…" : texto}{doc?.em && doc.situacao !== "Aprovado" ? ` · ${diaHora(doc.em)}` : ""}</small>
+              <small className={`situacao ${classe}`}>{doc?.situacao === "Aprovado" && <BadgeCheck size={13} />}{enviando === tipo ? "Enviando…" : texto}{doc?.em && doc.situacao !== "Aprovado" ? ` · ${diaHora(doc.em)}` : ""}</small>
               {doc?.situacao === "Recusado" && doc.motivo && <small className="situacao ruim">Motivo: {doc.motivo}</small>}
             </span>
             {doc?.situacao === "Aprovado" ? <BadgeCheck size={24} className="cor-ok" /> : doc?.situacao === "Recusado" ? <CircleAlert size={24} className="cor-perigo" /> : doc ? <Clock3 size={22} className="cor-aviso" /> : <Camera size={22} className="cor-marca" />}
@@ -267,7 +267,7 @@ export function Cadastro({ voltarAoLogin, concluir }: { voltarAoLogin: () => voi
   const [passo, setPasso] = useState(1);
   const proximo = () => setPasso((p) => p + 1);
   if (passo > 5) return (
-    <Pagina>
+    <Pagina className="clara">
       <div className="conteudo centro analise">
         <Vazio icone={Hourglass} titulo="Cadastro em análise" texto="Recebemos seus dados. A central vai conferir e avisar você. Até lá, você pode entrar no app, mas ainda não fica online." />
         <button type="button" className="botao-m" onClick={concluir}>IR PARA O INÍCIO</button>
@@ -275,7 +275,7 @@ export function Cadastro({ voltarAoLogin, concluir }: { voltarAoLogin: () => voi
     </Pagina>
   );
   return (
-    <Pagina>
+    <Pagina className="clara">
       <Topo titulo={PASSOS[passo - 1]} contador={`${passo}/5`} voltar={passo === 1 ? voltarAoLogin : () => setPasso(passo - 1)} />
       <div className="conteudo">
         {passo === 1 && <FormDados criar aoSalvar={proximo} botao="CONTINUAR" />}

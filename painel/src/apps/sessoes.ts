@@ -10,7 +10,7 @@
 // Passageiro: qualquer telefone; bloqueado ou suspenso no cadastro Passageiros não entra.
 
 import crypto from "node:crypto";
-import { cadastroPorId } from "../comum/cadastros.ts";
+import { cadastroPorId, GENEROS } from "../comum/cadastros.ts";
 import { listar, mesclar } from "../cadastros/armazem.ts";
 import { provedorDaEmpresa } from "../crm/whatsapp.ts";
 import { arquivo, gravar, ler, limitador, soDigitos } from "./armazem.ts";
@@ -143,6 +143,13 @@ export function eu(empresaId: string, s: SessaoApp) {
   }
   const c = clienteDoTelefone(empresaId, s.telefone);
   return { papel: s.papel, telefone: s.telefone, nome: String(c?.nome ?? "") };
+}
+
+/** Gênero do passageiro (tela Editar Perfil). */
+export function salvarGeneroPassageiro(empresaId: string, s: SessaoApp, genero: string) {
+  if (!GENEROS.includes(genero)) throw new Error("Escolha o gênero.");
+  mesclar(empresaId, cadastroPorId("clientes")!, [{ telefone: s.telefone, genero }], "app");
+  return eu(empresaId, s);
 }
 
 export function salvarNomePassageiro(empresaId: string, s: SessaoApp, nome: string) {

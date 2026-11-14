@@ -5,9 +5,11 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
-import { Abas, Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Clock, House, User, Wallet } from "lucide-react";
+import { Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 import { esperandoHorario, lerLugares, quandoAgendada, type Corrida, type Endereco, type Eu, type Lugares, type Ponto, type Rota } from "./apoio";
-import { Agendadas, Conta } from "./Conta";
+import { Agendadas, CarteiraTela, Conta } from "./Conta";
+import { Avatar, MenuBaixo } from "./pecas";
 import { Acompanhar, Procurando } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Inicio } from "./Inicio";
@@ -17,7 +19,7 @@ import { Avaliar, OpcoesDaCorrida } from "./PosCorrida";
 import "./passageiro.css";
 import "./passageiro-m.css";
 
-type Aba = "inicio" | "agendadas" | "historico" | "conta";
+type Aba = "inicio" | "agendadas" | "historico" | "carteira" | "conta";
 type Fluxo = { tela: "" } | { tela: "paraonde"; modo: ModoParaOnde } | { tela: "opcoes"; rota: Rota };
 
 export default function App() {
@@ -96,7 +98,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, (ligado) => { setConectado(ligado); if (ligado) void carregar().catch(() => undefined); }), [carregar]);
 
   if (!eu) return <Carregando />;
-  if (chat && corrida) return <Chat corridaId={corrida.id} papel="passageiro" mensagens={mensagens} aberto={!!corrida.motorista && corrida.aberta} fechar={() => { setChat(false); void api(`/corridas/${corrida.id}/chat/lida`, { corpo: {} }).catch(() => undefined); }} />;
+  if (chat && corrida) return <Chat corridaId={corrida.id} papel="passageiro" mensagens={mensagens} titulo={corrida.motorista?.nome} avatar={corrida.motorista ? <Avatar foto={corrida.motorista.foto} nome={corrida.motorista.nome} tamanho={40} /> : undefined} telefone={corrida.motorista?.telefone} aberto={!!corrida.motorista && corrida.aberta} fechar={() => { setChat(false); void api(`/corridas/${corrida.id}/chat/lida`, { corpo: {} }).catch(() => undefined); }} />;
   if (avaliar) return <Avaliar corrida={avaliar} fechar={() => setAvaliar(null)} />;
 
   // Corrida em andamento: procurando motorista ou acompanhando a viagem (tela cheia, sem abas).
@@ -123,24 +125,27 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   return (
     <div className="app">
-      {aba !== "inicio" && <header className="topo"><strong>{marca.nome}</strong><span className="situacao">{conectado ? `Olá, ${eu.nome.split(" ")[0]}` : "Reconectando…"}</span></header>}
+      
       {aviso && <div style={{ padding: "1rem 1rem 0", position: aba === "inicio" ? "fixed" : "static", zIndex: 40, top: aba === "inicio" ? "9rem" : undefined, left: 0, right: 0 }}><Aviso texto={aviso} tipo="info" /></div>}
       {aba === "inicio" ? <Inicio eu={eu} aqui={aqui} lugares={lugares} irPara={() => setFluxo({ tela: "paraonde", modo: "destino" })} atalho={(a) => void atalho(a)} indique={() => { setAba("conta"); }} />
         : aba === "agendadas" ? <Agendadas pedir={() => mudarAba("inicio")} />
-          : aba === "historico" ? <Historico />
-            : <Conta eu={eu} marca={marca} sair={async () => { await api("/sair", { corpo: {} }).catch(() => undefined); window.dispatchEvent(new Event("app-sair")); sair(); }} />}
-      <Abas abas={[["inicio", "Início"], ["agendadas", "Agendadas"], ["historico", "Histórico"], ["conta", "Conta"]]} atual={aba} mudar={mudarAba} />
+          : aba === "historico" ? <Historico irAgendadas={() => mudarAba("agendadas")} />
+            : aba === "carteira" ? <CarteiraTela />
+              : <Conta eu={eu} marca={marca} irPara={mudarAba} mudouEu={() => void carregar()} sair={async () => { await api("/sair", { corpo: {} }).catch(() => undefined); window.dispatchEvent(new Event("app-sair")); sair(); }} />}
+      <MenuBaixo atual={aba === "agendadas" ? "historico" : aba} mudar={mudarAba}
+        itens={[["inicio", "Início", <House size={26} />], ["historico", "Histórico", <Clock size={26} />], ["carteira", "Carteira", <Wallet size={26} />], ["conta", "Conta", <User size={26} />]]} />
     </div>
   );
 }
 
 // ------------------------------------------------------------------ histórico
 
-function Historico() {
+function Historico({ irAgendadas }: { irAgendadas: () => void }) {
   const [lista, setLista] = useState<Corrida[] | null>(null);
   const [aberta, setAberta] = useState<Corrida | null>(null);
   const [darNota, setDarNota] = useState(false);
   const [filtro, setFiltro] = useState<"todas" | "finalizadas" | "canceladas" | "andamento">("todas");
+  const [dataFiltro, setDataFiltro] = useState("");
   const carregar = useCallback(() => api<{ corridas: Corrida[] }>(`/corridas?filtro=${filtro}`).then((r) => setLista(r.corridas)).catch(() => setLista([])), [filtro]);
   useEffect(() => { void carregar(); }, [carregar]);
   if (!lista) return <Carregando />;
@@ -176,10 +181,10 @@ function Historico() {
   const filtros: Array<[typeof filtro, string]> = [["todas", "Todas"], ["finalizadas", "Finalizadas"], ["canceladas", "Canceladas"], ["andamento", "Em andamento"]];
   return (
     <div className="tela">
-      <h1>Suas viagens</h1>
-      <div className="pilulas">{filtros.map(([id, nome]) => <button key={id} className={filtro === id ? "ativa" : ""} onClick={() => { setLista(null); setFiltro(id); }}>{nome}</button>)}</div>
-      {!lista.length && <p className="dica centro">Nenhuma viagem por aqui.</p>}
-      <ul className="lista">{lista.map((c) => (
+      <h1 className="titulo-tela">Suas Viagens</h1>
+      <div className="pilulas">{filtros.map(([id, nome]) => <button key={id} className={filtro === id ? "ativa" : ""} onClick={() => { setLista(null); setFiltro(id); }}>{nome}</button>)}<button onClick={irAgendadas}>Agendadas</button><label className={`pilula-data ${dataFiltro ? "ativa" : ""}`}>Filtrar Data<input type="date" value={dataFiltro} onChange={(e) => setDataFiltro(e.target.value)} /></label>{dataFiltro && <button onClick={() => setDataFiltro("")}>Limpar data</button>}</div>
+      {!lista.length && <div className="vazio"><span className="vazio-icone"><Clock size={34} /></span><strong>Nenhuma viagem por aqui</strong><p>Quando você realizar corridas, elas aparecerão organizadas aqui.</p></div>}
+      <ul className="lista">{lista.filter((c) => !dataFiltro || (c.agendadaPara ?? c.solicitadaEm).slice(0, 10) === dataFiltro).map((c) => (
         <li key={c.id} className="clicavel" role="button" tabIndex={0} onClick={() => setAberta(c)} onKeyDown={(e) => { if (e.key === "Enter") setAberta(c); }}>
           <span><strong>{c.agendadaPara ? quandoAgendada(c.agendadaPara) : hora(c.solicitadaEm)}</strong><br /><small className="dica">OS {c.os} · {c.destino?.texto ?? c.embarque.texto}</small></span>
           <span className="direita">{esperandoHorario(c) ? "Agendada" : c.statusTexto}<br /><strong>{c.valor != null ? reais(c.valor) : c.taxaCancelamento ? `taxa ${reais(c.taxaCancelamento)}` : ""}</strong>{c.avaliacao ? ` · ${c.avaliacao}★` : ""}</span>

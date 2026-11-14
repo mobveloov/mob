@@ -186,3 +186,16 @@ export function PrecoAjustavel({ valor, mudar, min, max, passo, grande = false }
 export function Pilulas<T extends string>({ itens, atual, mudar }: { itens: Array<[T, ReactNode]>; atual: T | null; mudar: (v: T) => void }) {
   return <div className="pilulas">{itens.map(([id, nome]) => <button key={id} className={atual === id ? "ativa" : ""} onClick={() => mudar(id)}>{nome}</button>)}</div>;
 }
+
+/** Menu de baixo flutuante: Início, Histórico, Carteira e Conta (como na referência). */
+export function MenuBaixo<T extends string>({ itens, atual, mudar }: { itens: Array<[T, string, ReactNode]>; atual: T; mudar: (a: T) => void }) {
+  return (
+    <nav className="menu-baixo" aria-label="Menu">
+      {itens.map(([id, nome, icone]) => (
+        <button key={id} className={atual === id ? "ativa" : ""} onClick={() => mudar(id)} aria-current={atual === id ? "page" : undefined}>
+          <span className="mb-icone">{icone}</span>{nome}
+        </button>
+      ))}
+    </nav>
+  );
+}

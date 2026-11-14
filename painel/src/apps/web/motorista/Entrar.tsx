@@ -94,7 +94,7 @@ export function Entrar({ marca, aoEntrar, cadastrar }: { marca: MarcaApp; aoEntr
             <h2>Acesse sua conta</h2>
             <p className="dica">Digite seu e-mail ou celular</p>
             <span className="campo-caixa"><Mail size={18} className="campo-icone" />
-              <input autoComplete="username" inputMode="email" placeholder="Digite seu e-mail" value={login} onChange={(e) => setLogin(e.target.value)} />
+              <input autoComplete="username" inputMode="email" placeholder="Digite seu E-MAIL" value={login} onChange={(e) => setLogin(e.target.value)} />
             </span>
             <Erro texto={erro} />
             <button className="botao-m" disabled={ocupado || login.trim().length < 5}>CONTINUAR <ArrowRight size={18} /></button>
@@ -105,7 +105,7 @@ export function Entrar({ marca, aoEntrar, cadastrar }: { marca: MarcaApp; aoEntr
             <Info texto={info} />
             {fase === "senha" && (
               <>
-                <Campo rotulo="Sua senha" icone={KeyRound}>
+                <Campo rotulo="Sua Senha" icone={KeyRound}>
                   <input type={ver ? "text" : "password"} autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} autoFocus />{olho}
                 </Campo>
                 <button type="button" className="link-m direita" onClick={() => void fazer(() => pedirNovaSenha(false))}>Esqueceu a senha?</button>

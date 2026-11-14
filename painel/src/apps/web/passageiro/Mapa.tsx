@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Posicao } from "../comum/api";
+import { useRota } from "../comum/rota";
 
 export interface PontoMapa { lat: number; lng: number; tipo: "embarque" | "parada" | "destino"; rotulo: string; detalhe?: string }
 
@@ -16,10 +17,11 @@ const SVG_PESSOA = `<svg viewBox="0 0 24 24" width="14" height="14" fill="curren
 const SVG_BANDEIRA = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M5 22V3h2v1h12l-2.5 4.5L19 13H7v9z"/></svg>`;
 const SVG_CARRO = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M5 11l1.6-4.4A2 2 0 0 1 8.5 5h7a2 2 0 0 1 1.9 1.6L19 11a2 2 0 0 1 2 2v4a1 1 0 0 1-1 1h-1a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H4a1 1 0 0 1-1-1v-4a2 2 0 0 1 2-2zm2.2 0h9.6l-1.2-3.4a.8.8 0 0 0-.8-.6H9.2a.8.8 0 0 0-.8.6zM7 15.5A1.5 1.5 0 1 0 7 12.5a1.5 1.5 0 0 0 0 3zm10 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>`;
 
-function icone(p: PontoMapa, n: number) {
+function icone(p: PontoMapa, n: number, resumo?: { km: number; minutos: number } | null) {
   const simbolo = p.tipo === "embarque" ? SVG_PESSOA : p.tipo === "destino" ? SVG_BANDEIRA : String(n);
   const etiqueta = `<div class="pino-etiqueta"><small>${esc(p.rotulo)}</small>${p.detalhe ? `<b>${esc(p.detalhe)}</b>` : ""}</div>`;
-  return L.divIcon({ className: "", html: `<div class="pino pino-${p.tipo}"><span>${simbolo}</span>${etiqueta}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+  const selo = p.tipo === "destino" && resumo ? `<div class="pino-selo"><b>${Math.max(1, Math.round(resumo.minutos))}</b><small>min</small><b>${resumo.km.toFixed(1).replace(".", ",")}</b><small>km</small></div>` : "";
+  return L.divIcon({ className: "", html: `<div class="pino pino-${p.tipo}"><span>${simbolo}</span>${selo}${etiqueta}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
 }
 const iconeCarro = L.divIcon({ className: "", html: `<div class="pino-carro" aria-label="Motorista">${SVG_CARRO}</div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
 const iconeEu = L.divIcon({ className: "", html: `<div class="pino-eu">${SVG_PESSOA}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
@@ -81,6 +83,9 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     } else marcaEu.current.setLatLng([eu.lat, eu.lng]);
   }, [eu?.lat, eu?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Caminho pelas ruas (OSRM, pelo servidor). Sem ele a linha não é desenhada: nunca em linha reta.
+  const { linha: caminho, km: kmRota, minutos: minRota } = useRota(linha ? pontos : []);
+
   // Pontos e rota.
   const chave = pontos.map((p) => `${p.tipo}:${p.lat.toFixed(5)},${p.lng.toFixed(5)}:${p.detalhe ?? ""}`).join("|");
   useEffect(() => {
@@ -88,15 +93,14 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     if (!m || !g) return;
     g.clearLayers();
     let n = 0;
-    if (linha && pontos.length > 1) {
+    if (linha && caminho && caminho.length > 1) {
       const cor = getComputedStyle(document.documentElement).getPropertyValue("--cor").trim() || "#1a73e8";
-      const trajeto = pontos.map((p) => [p.lat, p.lng] as L.LatLngTuple);
-      L.polyline(trajeto, { color: "#ffffff", weight: 9, opacity: 0.9 }).addTo(g);
-      L.polyline(trajeto, { color: cor, weight: 5, opacity: 1 }).addTo(g);
+      L.polyline(caminho, { color: "#111111", weight: 9, opacity: 0.85, lineJoin: "round" }).addTo(g);
+      L.polyline(caminho, { color: cor, weight: 5, opacity: 1, lineJoin: "round" }).addTo(g);
     }
-    for (const p of pontos) L.marker([p.lat, p.lng], { icon: icone(p, p.tipo === "parada" ? ++n : 0), title: p.rotulo, keyboard: false }).addTo(g);
+    for (const p of pontos) L.marker([p.lat, p.lng], { icon: icone(p, p.tipo === "parada" ? ++n : 0, kmRota != null && minRota != null ? { km: kmRota, minutos: minRota } : null), title: p.rotulo, keyboard: false }).addTo(g);
     enquadrar();
-  }, [chave, linha]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chave, linha, caminho, kmRota, minRota]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (centralizar) enquadrar(); }, [centralizar]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setTimeout(enquadrar, 50); return () => clearTimeout(t); }, [folga]); // eslint-disable-line react-hooks/exhaustive-deps

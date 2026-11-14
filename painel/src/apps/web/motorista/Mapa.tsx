@@ -1,10 +1,11 @@
 // Mapa do app do motorista: Leaflet com o mapa base do OpenStreetMap (sem chave), em estilo escuro (filtro nos
 // blocos do mapa). Mostra você (seta), embarque, paradas e destino, o caminho da viagem e a linha até o próximo ponto.
-// A linha é reta, só para orientar: o caminho pelas ruas fica com o navegador (Google Maps ou Waze).
+// Os caminhos são pelas ruas (OSRM, consultado pelo servidor).
 
 import { useEffect, useRef } from "react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useCaminho } from "../comum/rota";
 
 export type TipoPonto = "eu" | "embarque" | "parada" | "destino";
 export interface PontoMapa { lat: number; lng: number; rotulo: string; tipo: TipoPonto }
@@ -59,15 +60,20 @@ export function Mapa({ pontos, caminho = [], ate, centralizar = 0, className = "
 
   useEffect(() => { seguir.current = true; ultimaChave.current = null; }, [centralizar]);
 
+  // Caminhos pelas ruas: a viagem inteira e o trecho de você até o próximo ponto (este se atualiza, no máximo a cada 12 s).
+  const ruaViagem = useCaminho(caminho);
+  const ruaAte = useCaminho(ate ?? [], 12000, 4);
+
   useEffect(() => {
     const m = mapa.current, g = camada.current;
     if (!m || !g) return;
     g.clearLayers();
     const validos = pontos.filter(valido);
-    const trajeto = caminho.filter(valido).map((p) => L.latLng(p.lat, p.lng));
-    if (trajeto.length > 1) L.polyline(trajeto, { color: "#94a3b8", weight: 4, opacity: 0.6 }).addTo(g);
-    const [de, para] = ate ?? [null, null];
-    if (valido(de) && valido(para)) L.polyline([[de.lat, de.lng], [para.lat, para.lng]], { color: corMarca(), weight: 5, dashArray: "8 8" }).addTo(g);
+    if (ruaViagem && ruaViagem.length > 1) L.polyline(ruaViagem, { color: "#64748b", weight: 6, opacity: 0.7, lineJoin: "round" }).addTo(g);
+    if (ruaAte && ruaAte.length > 1) {
+      L.polyline(ruaAte, { color: "#111111", weight: 10, opacity: 0.85, lineJoin: "round" }).addTo(g);
+      L.polyline(ruaAte, { color: corMarca(), weight: 6, lineJoin: "round" }).addTo(g);
+    }
     for (const p of validos) L.marker([p.lat, p.lng], { icon: icone(p), keyboard: false, interactive: false, zIndexOffset: p.tipo === "eu" ? 1000 : 0 }).addTo(g);
     if (!validos.length || !seguir.current) return;
     // Enquadra de novo quando muda o conjunto de pontos fixos; se só você andou, acompanha sem mudar o zoom.
