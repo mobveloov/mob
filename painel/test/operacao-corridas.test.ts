@@ -219,17 +219,19 @@ test("programadas: agenda, edita e filtra", async () => {
   const dia = new Date(Date.now() - 3 * 3600_000 + 2 * 86_400_000).toISOString().slice(0, 10);
   const r = await pedir("/solicitar", { cookie: co, corpo: { ...PEDIDO("Sara Agenda", "11944443333"), agendadaPara: `${dia}T10:30` } });
   assert.equal(r.status, 200, r.texto);
-  const p = await pedir("/programadas?filtro=futuras", { cookie: co });
+  const p = await pedir("/programadas", { cookie: co });
   assert.equal(p.corpo.total, 1);
-  assert.equal((await pedir("/programadas?filtro=hoje", { cookie: co })).corpo.total, 0);
-  assert.equal((await pedir("/programadas?filtro=todas&busca=sara", { cookie: co })).corpo.total, 1);
+  assert.equal((await pedir(`/programadas?dataIni=${dia.slice(0, 8)}01&dataFim=${new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10)}`, { cookie: co })).corpo.total, 0);
+  assert.equal((await pedir("/programadas?situacao=aguardando", { cookie: co })).corpo.total, 1);
+  assert.equal((await pedir("/programadas?situacao=cancelada", { cookie: co })).corpo.total, 0);
+  assert.equal((await pedir("/programadas?passageiro=sara", { cookie: co })).corpo.total, 1);
   const e = await pedir(`/programadas/${r.corpo.corrida.id}`, { metodo: "PUT", corpo: { dataHora: `${dia}T11:45`, valor: "40,00", observacao: "Bagagem" }, cookie: co });
   assert.equal(e.status, 200, e.texto);
-  const q = (await pedir("/programadas?filtro=futuras", { cookie: co })).corpo.itens[0];
+  const q = (await pedir("/programadas", { cookie: co })).corpo.itens[0];
   assert.match(q.agendadaPara, /T11:45/);
   assert.equal(q.valor, 40);
   assert.equal(q.observacao, "Bagagem");
-  assert.equal((await pedir("/programadas?filtro=todas", { cookie: cb })).corpo.total, 0);
+  assert.equal((await pedir("/programadas", { cookie: cb })).corpo.total, 0);
 });
 
 test("pagamentos pendentes: taxa de cancelamento, baixar uma vez e abonar", async () => {
