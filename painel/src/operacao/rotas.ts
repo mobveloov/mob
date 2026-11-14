@@ -199,7 +199,7 @@ const faixa = (req: Request): { inicio?: string; fim?: string } => {
   const r = periodo(p, q(req, "inicio"), q(req, "fim"));
   return { inicio: r.inicio, fim: r.fim };
 };
-const filtroPendencias = (req: Request): FiltroPendencias => ({ ...faixa(req), tipo: q(req, "tipo"), situacao: q(req, "status") || q(req, "situacao"), busca: q(req, "busca", 80), motorista: q(req, "motorista", 80) });
+const filtroPendencias = (req: Request): FiltroPendencias => ({ ...faixa(req), tipo: q(req, "tipo"), situacao: q(req, "status") || q(req, "situacao") || "pendente", busca: q(req, "busca", 80), motorista: q(req, "motorista", 80) });
 const baixarCsv = (res: Response, nome: string, csv: string) => {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${nome}-${hojeBr()}.csv"`);
