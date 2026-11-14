@@ -10,5 +10,6 @@ import { Recompensas } from "./Recompensas";
 export const TELAS_GRUPOC: Record<string, JSX.Element> = {
   "alterar-os": <AlterarOS />,
   "personalizacao-app": <Personalizacao />,
+  "indicacoes": <Recompensas />,
   "recompensas-indicacao": <Recompensas />,
 };
