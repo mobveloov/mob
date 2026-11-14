@@ -93,7 +93,7 @@ export function detalheCarteira(empresaId: string, papel: PapelCarteira, chave: 
 
 function comissoesDoPeriodo(empresaId: string, de: string, ate: string) {
   return listarProprias(empresaId).filter((c) => c.status === "finalizada" && c.valor && c.motoristaId && (c.finalizadaEm ?? c.solicitadaEm).slice(0, 10) >= de && (c.finalizadaEm ?? c.solicitadaEm).slice(0, 10) <= ate)
-    .map((c) => ({ c, r: calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!) })).filter((x) => x.r.taxaCentral > 0);
+    .map((c) => ({ c, r: calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!, c.pagamento) })).filter((x) => x.r.taxaCentral > 0);
 }
 
 // ------------------------------------------------------------------ extrato geral
@@ -160,7 +160,7 @@ export function producaoMotoristas(empresaId: string, f: FiltroProducao) {
     if (q && !normal(`${c.motorista} ${m?.placa ?? ""} ${c.telefoneMotorista}`).includes(q)) continue;
     const k = `${c.motoristaId}|${c.categoria}`;
     const g = grupos.get(k) ?? { motoristaId: c.motoristaId!, motorista: c.motorista, placa: String(m?.placa ?? ""), veiculo: String(m?.veiculo ?? ""), categoria: c.categoria, qtd: 0, faturamento: 0, comissao: 0 };
-    g.qtd++; g.faturamento += c.valor!; g.comissao += calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!).taxaCentral;
+    g.qtd++; g.faturamento += c.valor!; g.comissao += calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!, c.pagamento).taxaCentral;
     grupos.set(k, g);
   }
   const campo = ({ nome: "motorista", qtd_corridas: "qtd", faturamento_total: "faturamento", ticket_medio: "ticket", comissao_total: "comissao" } as Record<string, string>)[f.ordem ?? ""] ?? "faturamento";

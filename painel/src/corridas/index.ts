@@ -4,6 +4,7 @@
 //
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
+import { cobrancas, formaDaTaxa, somaCobrancas } from "../config/taxas.ts";
 import { aplicarDinamica, type PedidoRecente } from "../config/dinamica.ts";
 import { percentualDaMatriz, type CanalDesconto, type FormaDesconto } from "../config/descontos-matriz.ts";
 import { extraDaCategoria, tarifaVigente } from "../config/categorias.ts";
@@ -293,7 +294,9 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
   const forma = formaDaMatriz(p.pagamento);
   const descontoPct = forma ? percentualDaMatriz(empresaId, forma, canalDaMatriz(p.canal, p.app)) : 0;
   const final = descontoPct > 0 ? arred(valor * (1 - descontoPct / 100)) : arred(valor);
-  return { valor: final, valorCheio: arred(valor), descontoPct, distanciaKm: km, minutos, categoria: nome, erro: null as string | null, tarifaExtra: extra };
+  // Taxa de serviço do passageiro (Config › Taxas da central): acrescida ao valor; o app mostra à parte.
+  const taxaServico = somaCobrancas(cobrancas(empresaId, "passageiro", { categoria: nome, valor: final, forma: formaDaTaxa(p.pagamento) }));
+  return { valor: final, valorCheio: arred(valor), descontoPct, taxaServico, distanciaKm: km, minutos, categoria: nome, erro: null as string | null, tarifaExtra: extra };
 }
 
 /** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). */

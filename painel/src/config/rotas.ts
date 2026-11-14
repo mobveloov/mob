@@ -3,7 +3,7 @@
 import express, { type Request, type Response } from "express";
 import fs from "node:fs";
 import { resolverSaque } from "../apps/extras.ts";
-import { lancar, saldo } from "../apps/extras.ts";
+import { ajustarCarteira } from "../apps/extras.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
@@ -16,6 +16,8 @@ import { categoriasCompletas, ICONES, removerCategoria, removerTarifaExtra, salv
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
 import { pedidosRecentes } from "../corridas/index.ts";
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { removerTaxa, salvarTaxa, taxas } from "./taxas.ts";
+import { FORMAS_TAXA } from "../comum/taxas.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
@@ -47,13 +49,11 @@ const papelCart = (v: string) => (v === "motorista" ? "motorista" : "passageiro"
 rotasConfig.get("/carteiras", ok((req, res) => res.json(listaCarteiras(emp(req), papelCart(q(req, "papel")), q(req, "busca"), q(req, "situacao") || "todos"))));
 rotasConfig.get("/carteiras/:papel/:chave", ok((req, res) => res.json({ ...detalheCarteira(emp(req), papelCart(req.params.papel), req.params.chave, per(req)), periodo: per(req) })));
 rotasConfig.post("/carteiras/:papel/:chave/ajuste", admin, ok((req, res) => {
-  const papel = papelCart(req.params.papel);
+  // Crédito ou débito manual: motivo obrigatório e chave única por clique (clique duplo não lança duas vezes).
   const valor = Number(req.body?.valor);
-  if (!Number.isFinite(valor) || valor <= 0 || valor > 10_000) throw new Error("Valor inválido.");
-  const retirar = req.body?.acao === "remover";
-  if (retirar && saldo(emp(req), papel, req.params.chave) < valor) throw new Error("O saldo não cobre esta retirada.");
-  const l = lancar(emp(req), papel, req.params.chave, retirar ? -valor : valor, texto(req.body?.descricao, 120) || (retirar ? "Débito da central" : "Crédito da central"), quem(req));
-  res.json({ lancamento: l, saldo: saldo(emp(req), papel, req.params.chave) });
+  if (!Number.isFinite(valor) || valor <= 0) throw new Error("Valor inválido.");
+  const r = ajustarCarteira(emp(req), { papel: papelCart(req.params.papel), chave: req.params.chave, valor: req.body?.acao === "remover" ? -valor : valor, motivo: texto(req.body?.motivo ?? req.body?.descricao, 120), chaveUnica: String(req.body?.chaveUnica ?? ""), por: quem(req) });
+  res.status(r.repetido ? 200 : 201).json(r);
 }));
 rotasConfig.get("/extrato", ok((req, res) => res.json({ periodo: per(req), ...extratoGeral(emp(req), (["motorista", "passageiro"].includes(q(req, "aba")) ? q(req, "aba") : "geral") as "geral", per(req)) })));
 rotasConfig.get("/saques", ok((req, res) => res.json({ periodo: per(req), ...listaSaques(emp(req), per(req)) })));
@@ -135,6 +135,10 @@ rotasConfig.get("/apps", ok((req, res) => res.json(configDosApps(emp(req)))));
 
 // ------------------------------------------------------------------ config: crédito, categorias, dinâmicas, descontos
 
+// Taxas da central (Taxa por corrida): leitura para quem está logado, gravação só do admin.
+rotasConfig.get("/taxas", ok((req, res) => res.json({ taxas: taxas(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome), pagamentos: FORMAS_TAXA })));
+rotasConfig.post("/taxas", admin, ok((req, res) => res.json({ taxas: salvarTaxa(emp(req), req.body, quem(req)) })));
+rotasConfig.delete("/taxas/:id", admin, ok((req, res) => res.json({ taxas: removerTaxa(emp(req), req.params.id) })));
 rotasConfig.get("/credito", ok((req, res) => res.json({ ...credito(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
 rotasConfig.put("/credito", admin, ok((req, res) => res.json(salvarCredito(emp(req), req.body))));
 rotasConfig.post("/credito/regras", admin, ok((req, res) => res.json(salvarRegraComissao(emp(req), req.body))));

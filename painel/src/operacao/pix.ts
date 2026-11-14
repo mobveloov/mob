@@ -32,7 +32,7 @@ export function pixDasCorridas(empresaId: string): LinhaPix[] {
     const m = mk[c.id];
     if (!m && (c.status === "cancelada" || c.status === "nao_atendida")) continue;
     const valor = arred(c.valor ?? c.estimativa.valor ?? 0);
-    const taxa = c.motoristaId && valor > 0 ? calcularComissao(empresaId, c.categoria, valor, c.motoristaId).taxaCentral : 0;
+    const taxa = c.motoristaId && valor > 0 ? calcularComissao(empresaId, c.categoria, valor, c.motoristaId, c.pagamento).taxaCentral : 0;
     l.push({
       id: c.id, os: c.os, data: c.finalizadaEm ?? c.solicitadaEm, passageiro: c.passageiro.nome, telefone: c.passageiro.telefone, motorista: c.motorista, motoristaId: c.motoristaId,
       valor, liquidoBandeira: arred(taxa), liquidoMotorista: arred(valor - taxa),

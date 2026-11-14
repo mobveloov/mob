@@ -24,6 +24,8 @@ import { ajustes } from "./ajustes.ts";
 import { arquivo, num, txt } from "./armazem.ts";
 import type { Lugares, Veiculo } from "./perfil.ts";
 import type { PapelApp, SessaoApp } from "./sessoes.ts";
+import { regraDoMotorista } from "../config/comissao.ts";
+import { cobrancas, formaDaTaxa } from "../config/taxas.ts";
 import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
 
 const arred = (n: number) => Math.round(n * 100) / 100;
@@ -178,6 +180,44 @@ export function extrato(empresaId: string, papel: PapelApp, chave: string, limit
     .all(empresaId, papel, chave, limite) as unknown as Lancamento[]);
 }
 
+/** Tamanho mínimo do motivo de um ajuste manual (a central responde por ele no extrato). */
+export const MOTIVO_MINIMO = 5;
+export const LIMITE_AJUSTE = 10_000;
+
+export interface AjusteManual { papel: PapelApp; chave: string; valor: number; motivo: string; chaveUnica: string; por: string }
+
+/**
+ * Ajuste manual da central na carteira (crédito se positivo, débito se negativo). Exige motivo e uma chave única por clique de "Confirmar":
+ * se a mesma chave chegar de novo (clique duplo, nova tentativa), devolve o lançamento que já existe e não lança outra vez.
+ * Débito nunca deixa o saldo negativo. Quem fez e quando ficam no lançamento (por, em).
+ */
+export function ajustarCarteira(empresaId: string, a: AjusteManual): { lancamento: Lancamento; saldo: number; repetido: boolean } {
+  const chave = a.papel === "passageiro" ? a.chave.replace(/\D/g, "") : a.chave.trim();
+  if (!chave) throw new Error(a.papel === "passageiro" ? "Informe o telefone do passageiro." : "Escolha o motorista.");
+  if (!Number.isFinite(a.valor) || a.valor === 0 || Math.abs(a.valor) > LIMITE_AJUSTE) throw new Error(`Valor inválido (até R$ ${LIMITE_AJUSTE.toLocaleString("pt-BR")} por lançamento).`);
+  const motivo = a.motivo.replace(/[<>]/g, "").trim().slice(0, 120);
+  if (motivo.length < MOTIVO_MINIMO) throw new Error(`Informe o motivo (pelo menos ${MOTIVO_MINIMO} letras). Ele aparece no extrato.`);
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(a.chaveUnica)) throw new Error("Pedido sem identificador. Recarregue a tela e tente de novo.");
+  const id = `aj-${a.chaveUnica}`;
+  {
+    // Tudo síncrono: nenhum outro pedido entra entre a conferência da chave e o lançamento (e a chave é única no banco).
+    const ja = banco().prepare("SELECT id, papel, chave, valor, descricao, corrida_id AS corridaId, em, por FROM carteira WHERE empresa = ? AND id = ?").get(empresaId, id) as unknown as (Lancamento & { papel: string; chave: string }) | undefined;
+    if (ja) {
+      if (ja.papel !== a.papel || ja.chave !== chave || ja.valor !== arred(a.valor)) throw new Error("Este pedido já foi usado em outro lançamento. Recarregue a tela.");
+      return { lancamento: { id: ja.id, valor: ja.valor, descricao: ja.descricao, corridaId: ja.corridaId, em: ja.em, por: ja.por }, saldo: saldo(empresaId, a.papel, chave), repetido: true };
+    }
+    const existe = a.papel === "motorista"
+      ? listar(empresaId, cadastroPorId("motoristas")!).some((m) => m.id === chave)
+      : listar(empresaId, cadastroPorId("clientes")!).some((c) => String(c.telefone ?? "").replace(/\D/g, "") === chave) || extrato(empresaId, "passageiro", chave, 1).length > 0;
+    if (!existe) throw new Error(a.papel === "motorista" ? "Motorista não encontrado." : "Passageiro não encontrado.");
+    if (a.valor < 0 && saldo(empresaId, a.papel, chave) < -a.valor) throw new Error("O saldo não cobre este débito.");
+    const l: Lancamento = { id, valor: arred(a.valor), descricao: motivo, corridaId: null, em: agoraBr().toISOString(), por: a.por.slice(0, 80) };
+    banco().prepare("INSERT INTO carteira (empresa, id, papel, chave, valor, descricao, corrida_id, em, por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(empresaId, l.id, a.papel, chave, l.valor, l.descricao, null, l.em, l.por);
+    return { lancamento: l, saldo: saldo(empresaId, a.papel, chave), repetido: false };
+  }
+}
+
 /** Lançamento ligado a uma corrida, uma vez só (pagamento com saldo, taxa). */
 function lancarUmaVez(empresaId: string, papel: PapelApp, chave: string, valor: number, descricao: string, corridaId: string, por: string) {
   const ja = banco().prepare("SELECT 1 FROM carteira WHERE empresa = ? AND papel = ? AND chave = ? AND corrida_id = ? AND descricao = ?").get(empresaId, papel, chave, corridaId, descricao.slice(0, 120));
@@ -186,13 +226,34 @@ function lancarUmaVez(empresaId: string, papel: PapelApp, chave: string, valor: 
 
 export const PAGAMENTO_SALDO = "Saldo da carteira";
 
-/** Depois que a corrida finaliza: pago com saldo -> sai do passageiro e entra para o motorista. */
+/**
+ * Depois que a corrida finaliza:
+ * - pago com saldo: sai do passageiro e entra para o motorista;
+ * - taxas da central (Config › Taxas da central): as do motorista saem da carteira dele; as do passageiro saem da carteira dele
+ *   (pago com saldo), do motorista (ele recebeu o valor com a taxa em mãos: dinheiro, máquina ou Pix) ou de ninguém (cartão no app, já cobrado).
+ * Cada lançamento entra uma vez só por corrida e nome de taxa.
+ */
 export function aposFinalizar(empresaId: string, c: CorridaPropria) {
-  if (c.status !== "finalizada" || c.pagamento !== PAGAMENTO_SALDO || !c.valor || !c.motoristaId) return;
-  transacao(() => {
-    lancarUmaVez(empresaId, "passageiro", c.passageiro.telefone, -c.valor!, `Corrida OS ${c.os}`, c.id, "sistema");
-    lancarUmaVez(empresaId, "motorista", c.motoristaId!, c.valor!, `Corrida OS ${c.os} (paga com saldo)`, c.id, "sistema");
-  });
+  if (c.status !== "finalizada" || !c.valor || !c.motoristaId) return;
+  const motoristaId = c.motoristaId, valor = c.valor;
+  // Primeiro as contas (leem cadastros e configuração); depois os lançamentos juntos, de uma vez só.
+  const linhas: Array<[PapelApp, string, number, string]> = [];
+  if (c.pagamento === PAGAMENTO_SALDO) {
+    linhas.push(["passageiro", c.passageiro.telefone, -valor, `Corrida OS ${c.os}`]);
+    linhas.push(["motorista", motoristaId, valor, `Corrida OS ${c.os} (paga com saldo)`]);
+  }
+  const forma = formaDaTaxa(c.pagamento);
+  const base = Math.max(0, arred(valor - (c.desconto ?? 0)));
+  // Motorista com regra própria (Personalizado ou Isento) não paga as taxas da central.
+  if (!regraDoMotorista(empresaId, motoristaId)) {
+    for (const t of cobrancas(empresaId, "motorista", { categoria: c.categoria, valor: base, forma })) linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} · OS ${c.os}`]);
+  }
+  for (const t of cobrancas(empresaId, "passageiro", { categoria: c.categoria, valor: base, forma })) {
+    if (c.pagamento === PAGAMENTO_SALDO) linhas.push(["passageiro", c.passageiro.telefone, -t.valor, `${t.nome} · OS ${c.os}`]);
+    else if (forma !== "cartao_app") linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} (do passageiro) · OS ${c.os}`]);
+  }
+  if (!linhas.length) return;
+  transacao(() => { for (const [papel, chave, v, desc] of linhas) lancarUmaVez(empresaId, papel, chave, v, desc, c.id, "sistema"); });
 }
 
 /** Depois que o passageiro cancela com taxa: a taxa sai da carteira dele e vai para o motorista. */
@@ -649,13 +710,9 @@ rotasExtrasCentral.get("/carteiras/:papel/:chave", ok((req, res) => {
 }));
 rotasExtrasCentral.post("/carteiras/lancar", exigirPapel("admin"), ok((req, res) => {
   const papel: PapelApp = req.body?.papel === "motorista" ? "motorista" : "passageiro";
-  let chave = String(req.body?.chave ?? "").trim();
-  if (papel === "passageiro") chave = chave.replace(/\D/g, "");
-  if (!chave) throw new Error(papel === "passageiro" ? "Informe o telefone do passageiro." : "Escolha o motorista.");
   const valor = num(req.body?.valor);
-  if (valor == null || valor === 0 || Math.abs(valor) > 10_000) throw new Error("Valor inválido.");
-  const descricao = txt(req.body?.descricao, 120) || (valor > 0 ? "Crédito da central" : "Débito da central");
-  res.json({ lancamento: lancar(emp(req), papel, chave, valor, descricao, quem(req)), saldo: saldo(emp(req), papel, chave) });
+  const r = ajustarCarteira(emp(req), { papel, chave: String(req.body?.chave ?? ""), valor: valor ?? 0, motivo: txt(req.body?.motivo ?? req.body?.descricao, 120), chaveUnica: String(req.body?.chaveUnica ?? ""), por: quem(req) });
+  res.status(r.repetido ? 200 : 201).json(r);
 }));
 rotasExtrasCentral.post("/saques/:id/:acao", exigirPapel("admin"), ok((req, res) => {
   const acao = req.params.acao;
