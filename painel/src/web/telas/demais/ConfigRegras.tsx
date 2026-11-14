@@ -10,6 +10,8 @@ import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedi
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
 
+const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
 // ------------------------------------------------------------------ Regras de Crédito
 
 export function RegrasCredito() {
@@ -58,117 +60,6 @@ export function RegrasCredito() {
         )}
       </Modal>
     </>
-  );
-}
-
-// ------------------------------------------------------------------ Tarifas Dinâmicas
-
-const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-type TipoDin = "mapa" | "horario" | "demanda";
-const ROTULO_ABA: Record<TipoDin, string> = { mapa: "Área", horario: "Horário", demanda: "Demanda" };
-
-export function TarifasDinamicas() {
-  const admin = useAdmin();
-  const [aba, setAba] = useState<TipoDin>("mapa");
-  const d = useCarregar(() => pedirConfig("/dinamicas"), []);
-  const [edit, setEdit] = useState<any>(null);
-  const { msg, salvar } = useSalvar();
-  const regras: any[] = (d.dados?.regras ?? []).filter((r: any) => r.tipo === aba);
-  const nova = () => setEdit({ tipo: aba, nome: "", cidade: "", cobranca: "percentual", valor: 0, minimo: 0, poligono: [], janelas: [], gatilho: 10, ativa: true });
-  return (
-    <>
-      <Cab titulo="Tarifas Dinâmicas" sub="Multiplicadores de Preço" />
-      <div className="dm-dinamicas">
-        <div className="dm-cartao dm-mapa-principal"><MapaRegras regras={d.dados?.regras ?? []} /></div>
-        <section className="dm-cartao">
-          <div className="dm-linha dm-entre"><div><h2>Regras Ativas</h2><small>Gerencie suas dinâmicas</small></div>{admin && <button className="botao primario" aria-label="Nova Regra" onClick={nova}><Plus size={14} /> Nova Regra</button>}</div>
-          <div className="dm-abas" role="tablist">{(Object.keys(ROTULO_ABA) as TipoDin[]).map((t) => <button key={t} role="tab" aria-selected={aba === t} className={aba === t ? "ativo" : ""} onClick={() => setAba(t)}>{ROTULO_ABA[t]}</button>)}</div>
-          <Aviso erro={d.erro ?? msg?.erro} />
-          {!d.dados ? <Carregando /> : !regras.length ? <p className="vazio">Nenhuma regra de {ROTULO_ABA[aba].toLowerCase()}.</p> : (
-            <ul className="dm-transacoes">{regras.map((r) => (
-              <li key={r.id}><span><strong>{r.nome}</strong><small>{r.cobranca === "percentual" ? `+${String(r.valor).replace(".", ",")}%` : `+${dinheiro(r.valor)}`}{r.tipo === "demanda" ? ` · acima de ${r.gatilho} corridas ativas` : ""}{r.tipo === "horario" ? ` · ${r.janelas.length} janela(s)` : ""}{r.cidade ? ` · ${r.cidade}` : ""}</small></span>
-                <span className="dm-linha"><Interruptor valor={r.ativa} desabilitado={!admin} rotulo={`${r.nome} ativa`} onChange={(v) => salvar(async () => { await pedirConfig(`/dinamicas/${r.id}/ativa`, "POST", { ativa: v }); d.recarregar(); }, v ? "Regra ligada." : "Regra desligada.")} />
-                  {admin && <><button className="icone" aria-label={`Editar ${r.nome}`} onClick={() => setEdit(structuredClone(r))}><Pencil size={14} /></button><button className="icone" aria-label={`Remover ${r.nome}`} onClick={async () => { if (confirm(`Remover a regra "${r.nome}"?`)) { await salvar(async () => { await pedirConfig(`/dinamicas/${r.id}`, "DELETE"); d.recarregar(); }, "Regra removida."); } }}><Trash2 size={14} /></button></>}</span></li>
-            ))}</ul>
-          )}
-        </section>
-      </div>
-      {edit && <JanelaDinamica inicial={edit} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
-    </>
-  );
-}
-
-function MapaRegras({ regras }: { regras: any[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    const mapa = L.map(ref.current, { zoomControl: true }).setView([-15.8, -47.9], 4);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapa);
-    const poligonos = regras.filter((r) => r.tipo === "mapa" && r.poligono.length >= 3).map((r) => L.polygon(r.poligono, { color: r.ativa ? "#ef4444" : "#94a3b8" }).bindTooltip(r.nome).addTo(mapa));
-    if (poligonos.length) mapa.fitBounds(L.featureGroup(poligonos).getBounds().pad(0.3));
-    return () => { mapa.remove(); };
-  }, [regras]);
-  return <div ref={ref} className="dm-mapa" role="img" aria-label="Mapa das áreas com tarifa dinâmica" />;
-}
-
-function DesenhoArea({ pontos, onChange }: { pontos: Array<[number, number]>; onChange: (p: Array<[number, number]>) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const atual = useRef(pontos);
-  atual.current = pontos;
-  useEffect(() => {
-    if (!ref.current) return;
-    const mapa = L.map(ref.current).setView(pontos[0] ?? [-15.8, -47.9], pontos.length ? 13 : 4);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapa);
-    const grupo = L.layerGroup().addTo(mapa);
-    const desenhar = () => { grupo.clearLayers(); const p = atual.current; if (p.length) { L.polygon(p, { color: "#ef4444" }).addTo(grupo); p.forEach((x) => L.circleMarker(x, { radius: 4, color: "#ef4444" }).addTo(grupo)); } };
-    desenhar();
-    mapa.on("click", (e: L.LeafletMouseEvent) => { atual.current = [...atual.current, [Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6))]]; onChange(atual.current); desenhar(); });
-    const ajusta = () => mapa.invalidateSize();
-    setTimeout(ajusta, 200);
-    return () => { mapa.remove(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => { /* o desenho segue o estado pelo clique; limpar recria o mapa pela chave */ }, [pontos]);
-  return <div ref={ref} className="dm-mapa modal" role="img" aria-label="Mapa para desenhar a área" />;
-}
-
-function JanelaDinamica({ inicial, onFechar, onSalvo }: { inicial: any; onFechar: () => void; onSalvo: () => void }) {
-  const [r, setR] = useState<any>(inicial);
-  const [chaveMapa, setChaveMapa] = useState(0);
-  const { msg, salvando, salvar } = useSalvar();
-  const set = (k: string, v: unknown) => setR({ ...r, [k]: v });
-  const T = r.tipo as TipoDin;
-  const janela = (dia: number) => r.janelas.filter((j: any) => j.dia === dia);
-  const setJanelas = (l: any[]) => set("janelas", l);
-  return (
-    <Modal aberto onFechar={onFechar} titulo={r.id ? "Editar Regra" : "Nova Regra"} sub="Configure os parâmetros" larga={T !== "demanda"}>
-      <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); const x = await salvar(() => pedirConfig("/dinamicas", "POST", r)); if (x) onSalvo(); }}>
-        <Campo rotulo={T === "demanda" ? "Nome" : "Nome da Regra"}><input value={r.nome} onChange={(e) => set("nome", e.target.value)} placeholder={T === "mapa" ? "Ex: Zona Show" : T === "horario" ? "Ex: Rush Manhã" : ""} required maxLength={60} /></Campo>
-        <Campo rotulo="Cidade"><input value={r.cidade} onChange={(e) => set("cidade", e.target.value)} maxLength={80} /></Campo>
-        {T === "mapa" && (
-          <div><div className="dm-linha dm-entre"><small>{r.poligono.length >= 3 ? `Área com ${r.poligono.length} pontos` : "Clique no mapa para desenhar"}</small><button type="button" className="botao" onClick={() => { set("poligono", []); setChaveMapa(chaveMapa + 1); }}>Limpar desenho</button></div>
-            <DesenhoArea key={chaveMapa} pontos={r.poligono} onChange={(p) => setR((x: any) => ({ ...x, poligono: p }))} /></div>
-        )}
-        {T === "demanda" && <fieldset><legend>Gatilho de Alta Demanda</legend><div className="dm-linha">Acima de <input type="number" min={1} value={r.gatilho} onChange={(e) => set("gatilho", Number(e.target.value))} aria-label="Corridas ativas" /> Corridas Ativas</div></fieldset>}
-        <div className="dm-duplo">
-          <Campo rotulo="Tipo Cobrança"><select value={r.cobranca} onChange={(e) => set("cobranca", e.target.value)}><option value="percentual">{T === "demanda" ? "%" : "% Multiplicador"}</option><option value="fixo">{T === "mapa" ? "R$ Adicional" : T === "horario" ? "R$ Valor Fixo" : "R$"}</option></select></Campo>
-          <Campo rotulo={T === "mapa" ? "Valor Extra" : T === "horario" ? "Valor" : "Valor Adicional"} dica={r.cobranca === "percentual" ? "Percentual de acréscimo: 20 = +20% no preço." : "Reais somados ao preço."}><input inputMode="decimal" value={txt(r.valor)} onChange={(e) => set("valor", num(e.target.value))} placeholder="Ex: 1.50" required /></Campo>
-        </div>
-        {T === "horario" && (
-          <>
-            <Campo rotulo="Mínimo (R$)"><input inputMode="decimal" value={txt(r.minimo)} onChange={(e) => set("minimo", num(e.target.value))} placeholder="0.00" /></Campo>
-            <h4>Configurar Dias e Horários</h4>
-            {DIAS.map((nome, dia) => (
-              <div key={nome} className="dm-dia"><strong>{nome}</strong>
-                {janela(dia).map((j: any, k: number) => { const idx = r.janelas.indexOf(j); return <span key={k} className="dm-linha"><input type="time" aria-label={`${nome} início`} value={j.inicio} onChange={(e) => setJanelas(r.janelas.map((x: any, i: number) => (i === idx ? { ...x, inicio: e.target.value } : x)))} /> até <input type="time" aria-label={`${nome} fim`} value={j.fim} onChange={(e) => setJanelas(r.janelas.map((x: any, i: number) => (i === idx ? { ...x, fim: e.target.value } : x)))} /><button type="button" className="icone" aria-label="Remover horário" onClick={() => setJanelas(r.janelas.filter((_: unknown, i: number) => i !== idx))}><Trash2 size={14} /></button></span>; })}
-                <button type="button" className="botao" onClick={() => setJanelas([...r.janelas, { dia, inicio: "07:00", fim: "09:00" }])}>+ horário</button></div>
-            ))}
-          </>
-        )}
-        <Aviso erro={msg?.erro} />
-        <div className="dm-rodape-modal"><button type="button" className="botao" onClick={onFechar}>Cancelar</button><button className="botao primario" disabled={salvando}>{T === "mapa" ? "Salvar Regra de Mapa" : T === "horario" ? "Salvar Regra de Horário" : "Salvar Regra de Demanda"}</button></div>
-      </form>
-    </Modal>
   );
 }
 

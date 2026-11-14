@@ -22,7 +22,7 @@ rotasCorridasProprias.get("/estimativa", ok(async (req, res) => {
     km = r.distanciaKm; minutos = r.minutos;
   }
   km ??= distanciaEstimada({ texto: "", lat: lat1, lng: lng1 }, { texto: "", lat: lat2, lng: lng2 });
-  res.json(estimarPreco(emp(req), { categoria: String(req.query.categoria ?? ""), distanciaKm: km ?? null, minutos }));
+  res.json(estimarPreco(emp(req), { categoria: String(req.query.categoria ?? ""), distanciaKm: km ?? null, minutos, pagamento: String(req.query.pagamento ?? ""), canal: "painel" }));
 }));
 
 rotasCorridasProprias.get("/:id", ok((req, res) => {

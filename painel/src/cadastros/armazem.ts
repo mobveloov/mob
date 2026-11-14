@@ -60,7 +60,7 @@ function limparCampo(c: Campo, bruto: unknown): Valor {
     case "selecao":
       if (c.opcoes && !c.opcoes.includes(s)) throw new Error(`"${c.rotulo}": escolha uma das opções.`);
       return s;
-    case "textoLongo": return s.replace(/[<>]/g, "").slice(0, 3000);
+    case "textoLongo": return s.replace(/[<>]/g, "").slice(0, 5000);
     default: return s.replace(/[<>]/g, "").slice(0, 200);
   }
 }

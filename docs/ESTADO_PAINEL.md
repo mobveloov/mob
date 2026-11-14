@@ -76,3 +76,8 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Em andamento (ramos machine-*):** Tarifa + Dinâmica (inclui ligar a matriz de descontos ao preço); Relatórios + Vouchers; Pix, pendências, taxas de cancelamento, alertas e central de notificações.
 - **Falta:** cadastros completos (motorista, empresa, categoria, nova solicitação), Plantão e Ruas, telas de centrais (Controle financeiro, Meus planos, Demonstrativo, seletor), Funil de Clientes e Mapa de Bairros e Demanda (do 88), comparação tela a tela no navegador, carga de 500 corridas, Docker.
 - **Pendente de arquivo:** o arquivo completo das casas (só há 400 linhas de exemplo); o usuário precisa exportar do servidor.
+
+### Atualização (13/11/2026, noite)
+- **Também no main:** Pix, pendências, taxas de cancelamento, alertas e central de notificações; Relatórios e Vouchers; Tarifa (Editar tarifa) e Dinâmica; matriz de descontos já entra no preço da corrida. 203 testes passando.
+- **Em andamento (ramos machine-*):** cadmot (motorista e empresa), cadcat (categoria e nova solicitação), plarua (Plantão, Ruas, Áreas, Funil de Clientes, Mapa de Bairros), centr (telas de centrais).
+- **Depois:** comparar tela a tela com a Machine no navegador, carga de 500 corridas, Docker, up.veloov.com.
