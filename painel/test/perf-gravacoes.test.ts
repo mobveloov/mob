@@ -68,3 +68,46 @@ test("ondas: guarda só as últimas 5000 por empresa", () => {
   assert.equal(l[0].id, "x3");
   assert.equal(l[4999].id, "x5002");
 });
+
+test("chat: o JSON antigo da corrida entra no banco, mensagens novas só acrescentam e os limites valem", async () => {
+  const C = await import("../src/apps/chat.ts");
+  const id = "11111111-1111-4111-8111-111111111111", outra = "22222222-2222-4222-8222-222222222222";
+  const velhas = [
+    { id: "m1", de: "passageiro", nome: "Ana", texto: "Oi", em: "2026-11-01T10:00:00.000Z" },
+    { id: "m2", de: "motorista", nome: "Dora", audio: { id: "a1", mime: "audio/ogg", bytes: 10, segundos: 2 }, em: "2026-11-01T10:01:00.000Z" },
+  ];
+  fs.mkdirSync(pasta(um, "apps", "chat"), { recursive: true });
+  fs.writeFileSync(pasta(um, "apps", "chat", `${id}.json`), JSON.stringify(velhas));
+  assert.deepEqual(C.mensagens(um, id), velhas);
+  assert.ok(!fs.existsSync(pasta(um, "apps", "chat", `${id}.json`)));
+  assert.ok(fs.existsSync(pasta(um, "apps", "chat", `${id}.json.migrado`)), "o JSON antigo fica guardado");
+  assert.deepEqual(C.mensagens(dois, id), [], "outra empresa não vê");
+
+  C.enviarTexto(um, id, "passageiro", "Ana", "Já cheguei");
+  const l = C.mensagens(um, id);
+  assert.equal(l.length, 3);
+  assert.equal(l[2].texto, "Já cheguei");
+  assert.deepEqual(C.mensagens(um, outra), [], "outra corrida não mistura");
+  assert.throws(() => C.enviarTexto(um, "../x", "passageiro", "A", "oi"), /Corrida inválida/);
+
+  // Não lidas: só as do outro lado depois da última leitura.
+  assert.equal(C.naoLidas(um, id, "motorista"), 2, "do passageiro, ainda não lidas pelo motorista");
+  C.marcarLida(um, id, "motorista");
+  assert.equal(C.naoLidas(um, id, "motorista"), 0);
+  await new Promise((r) => setTimeout(r, 5));
+  C.enviarTexto(um, id, "passageiro", "Ana", "Estou aqui");
+  assert.equal(C.naoLidas(um, id, "motorista"), 1);
+  assert.equal(C.naoLidas(um, id, "passageiro"), 0);
+
+  // Áudio guardado e achado pelo id, só na corrida certa.
+  const ogg = Buffer.concat([Buffer.from("OggS"), Buffer.alloc(40)]);
+  const m = C.enviarAudio(um, outra, "motorista", "Dora", "audio/ogg", ogg, 3);
+  assert.ok(C.arquivoDoAudio(um, outra, m.audio!.id));
+  assert.equal(C.arquivoDoAudio(um, id, m.audio!.id), null);
+
+  // Limite de mensagens por corrida.
+  const cheia = "33333333-3333-4333-8333-333333333333";
+  for (let i = 0; i < 500; i++) C.enviarTexto(um, cheia, "passageiro", "Ana", `msg ${i}`);
+  assert.throws(() => C.enviarTexto(um, cheia, "passageiro", "Ana", "mais uma"), /limite de mensagens/);
+  assert.equal(C.mensagens(um, cheia).length, 500);
+});
