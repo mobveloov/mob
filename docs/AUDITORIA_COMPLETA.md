@@ -140,3 +140,20 @@ O painel roda num só processo do Node, então a CPU chega perto de 100% de um n
 - **Carga atrás do proxy de produção:** nginx ou túnel, com `CONFIAR_PROXY` ligado.
 
 A lista do que depende de você para ligar cada parte real está no `README.md`, na seção "O que depende de você".
+
+## Carga de 14/11/2026: piora achada e corrigida
+Depois das telas novas da Machine, o teste de 500 corridas ficou lento e as ofertas começaram a expirar. Medimos de novo, no mesmo teste (`carga.mjs ... 500 --extras`, Docker, 2 empresas, com bot, totem e CRM). A máquina estava mais lenta que em 08/11 (outros 19 contêineres rodando, pouca memória livre), por isso a comparação válida é entre versões medidas no mesmo dia.
+
+| Versão (medida em 14/11) | Tempo total | Erros "Esta chamada já passou" | Login de 1000 pessoas |
+|---|---|---|---|
+| Commit da auditoria (807e7a8) | 53 s | 0 | 22 s |
+| Código de antes das telas novas (3b626ef) | 97 s | 55 | 29 s |
+| Main com as telas novas, antes da correção | 85 a 122 s | 110 a 288 | 19 a 34 s |
+| **Main depois da correção** | **31 s (agente) e 43 s (nossa conferência)** | **0** | **11 a 12 s** |
+| Referência de 08/11 (máquina mais livre) | 26 s | 0 | — |
+
+**Causa:** o painel reescrevia arquivos JSON inteiros a cada oferta, mensagem de chat, login e cadastro (o perfil de CPU mostrou o tempo em abrir, renomear e gravar arquivos), e relia listas inteiras por oferta. Com 500 corridas e 500 motoristas, a fila de gravações passava de 20 segundos e as ofertas expiravam.
+
+**Correção:** ondas, chat dos apps, sessões e cadastros passaram para tabelas do SQLite (uma linha por registro, JSON antigo guardado como `.migrado`); a corrida é buscada por id; os perfis dos apps ficam em memória; as gravações do mesmo ciclo do servidor dividem uma só confirmação no banco.
+**Atenção:** como as confirmações são agrupadas, um travamento do processo pode perder as gravações do ciclo em andamento (milissegundos). Ao desligar normalmente, tudo é gravado.
+Testes depois da correção: 253 passando (8 novos em `perf-gravacoes.test.ts`).
