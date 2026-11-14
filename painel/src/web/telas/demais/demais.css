@@ -204,3 +204,21 @@
 .dm-guia { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; } .dm-guia p { flex: 1; margin: 0; }
 .dm-etiqueta { font-weight: 700; background: #fff; border: 1px solid #cbd5e1; }
 .dm-tarifas { margin-top: 10px; border-top: 1px solid var(--borda, #e2e8f0); padding-top: 10px; } .dm-cat:has(.dm-tarifas) { grid-column: 1 / -1; }
+
+/* Taxas da central */
+.dm-info { display: flex; gap: 8px; align-items: center; padding: 10px 14px; margin-bottom: 14px; border-radius: 12px; background: var(--cartao); border: 1px solid var(--borda); color: var(--suave); }
+.dm-taxas { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.dm-taxa { width: 100%; display: grid; grid-template-columns: minmax(120px, 1.2fr) repeat(4, minmax(90px, 1fr)) 24px; gap: 12px; align-items: center; text-align: left; padding: 12px 14px; border: 1px solid var(--borda); border-radius: 12px; background: var(--cartao); color: inherit; cursor: pointer; }
+.dm-taxa:hover { border-color: var(--primaria, currentColor); }
+.dm-taxa small { display: block; color: var(--suave); font-size: 11px; }
+.dm-taxa span { overflow-wrap: anywhere; }
+.dm-faixas input, .dm-faixas select { min-width: 90px; }
+.dm-prefixo { margin-right: 6px; color: var(--suave); }
+.dm-opcoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.dm-opcoes label { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--borda); border-radius: 12px; cursor: pointer; }
+.dm-opcoes label.ativo { border-color: var(--primaria, currentColor); }
+.dm-opcoes input { width: auto; min-height: 0; margin-top: 3px; }
+.dm-opcoes small { display: block; color: var(--suave); }
+.dm-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 12px; }
+.dm-check { display: flex; gap: 8px; align-items: center; }
+@media (max-width: 760px) { .dm-taxa { grid-template-columns: 1fr; } }

@@ -10,6 +10,7 @@ import { Conversas, Notificacoes } from "./Comunicacao";
 import { ConfigGerais } from "./ConfigGerais";
 import { Categorias } from "./Categorias";
 import { Descontos, RegrasCredito, RegrasDespacho, Transbordos } from "./ConfigRegras";
+import { TaxasCentral } from "./TaxasCentral";
 import { TarifasDinamicas } from "./Dinamica";
 import { Integracoes } from "./Integracoes";
 import { Avaliacoes, ConfigNps } from "./Nps";
@@ -30,6 +31,7 @@ export const TELAS_DEMAIS: Record<string, JSX.Element> = {
   notificacoes: <Notificacoes />,
   "config-gerais": <ConfigGerais />,
   "regras-credito": <RegrasCredito />,
+  "taxas-central": <TaxasCentral />,
   categorias: <Categorias />,
   "tarifas-dinamicas": <TarifasDinamicas />,
   descontos: <Descontos />,

@@ -80,6 +80,7 @@ export const FUNCOES: Funcao[] = [
 
   { id: "config-gerais", grupo: "Config", nome: "Gerais do App", rota: "/config-gerais", soAdmin: true },
   { id: "regras-credito", grupo: "Config", nome: "Regras de Crédito", rota: "/regras-credito", soAdmin: true },
+  { id: "taxas-central", grupo: "Config", nome: "Taxas da central", rota: "/taxas-central", soAdmin: true, novo: true },
   { id: "categorias", grupo: "Config", nome: "Categorias", rota: "/categorias", soAdmin: true, antigas: ["/tarifas"] },
   { id: "tarifas-dinamicas", grupo: "Config", nome: "Tarifas Dinâmicas", rota: "/tarifas-dinamicas", soAdmin: true },
   { id: "descontos", grupo: "Config", nome: "Descontos", rota: "/descontos", soAdmin: true },
