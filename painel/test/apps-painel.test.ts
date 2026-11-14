@@ -25,6 +25,7 @@ const { criar } = await import("../src/cadastros/armazem.ts");
 const { rotasApps } = await import("../src/apps/rotas.ts");
 const { rotasOperacao } = await import("../src/operacao/rotas.ts");
 const { rotasCorridasProprias } = await import("../src/corridas/rotas.ts");
+const { rotasCadastros } = await import("../src/cadastros/rotas.ts");
 
 const app = express();
 app.use(express.json());
@@ -33,6 +34,7 @@ app.use("/api/apps", rotasApps);
 app.use("/api", exigirLogin);
 app.use("/api/operacao", rotasOperacao);
 app.use("/api/corridas-proprias", rotasCorridasProprias);
+app.use("/api/cadastros", rotasCadastros);
 const servidor = app.listen(0);
 const base = `http://127.0.0.1:${(servidor.address() as AddressInfo).port}`;
 test.after(() => servidor.close());
@@ -173,4 +175,20 @@ test("motorista: cada corrida do histórico traz valor, comissão da central, l�
   assert.equal(resumo.hoje.liquido >= c.valorLiquido, true);
   const acc = (await chamar("GET", `${API}/aceitacao`, undefined, tokM)).corpo;
   assert.ok(acc.aceitas >= 1 && acc.porcentagem > 0);
+});
+
+test("cadastro feito no app aparece nos cadastros do painel; o mesmo telefone, e-mail e CPF vale como passageiro e como motorista", async () => {
+  const cookie = await cookieDoPainel();
+  const dados = { nome: "Pessoa Dupla", telefone: "11955554444", email: "dupla@teste.com", senha: "segredo1", genero: "Feminino" };
+  const p = await chamar("POST", `${API}/conta/criar`, { papel: "passageiro", ...dados });
+  assert.equal(p.status, 200, JSON.stringify(p.corpo));
+  const m = await chamar("POST", `${API}/conta/criar`, { papel: "motorista", ...dados, cpf: "52998224725", nascimento: "1990-05-10", chavePix: "11955554444" });
+  assert.equal(m.status, 200, "o mesmo telefone e e-mail também pode ser motorista: " + JSON.stringify(m.corpo));
+  const clientes = (await chamar("GET", "/api/cadastros/clientes", undefined, undefined, cookie)).corpo;
+  const motoristas = (await chamar("GET", "/api/cadastros/motoristas", undefined, undefined, cookie)).corpo;
+  const lista = (x: any) => (x.registros ?? x.lista ?? x) as any[];
+  assert.ok(lista(clientes).some((c) => c.telefone === "11955554444"), "o passageiro criado no app está em Clientes do painel");
+  const reg = lista(motoristas).find((c) => c.telefone === "11955554444");
+  assert.ok(reg, "o motorista criado no app está em Motoristas do painel");
+  assert.notEqual(reg.status, "Ativo", "motorista novo fica aguardando aprovação da central");
 });
