@@ -17,6 +17,7 @@ import { listar } from "../cadastros/armazem.ts";
 import { cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
+import * as A from "./apk.ts";
 import * as T from "./dados.ts";
 import { esquecerWhatsapp, instanciaDoTotem, provedorDoTotem, whatsappPronto } from "./whatsapp.ts";
 
@@ -298,6 +299,13 @@ interno.post("/locais/:id/whatsapp/desconectar", admin, ok(async (req, res) => {
   await provedorDoTotem(emp(req), l).desconectar();
   res.json({ ok: true });
 }));
+
+/** App Android do totem: a versão ativa mais nova (todas as empresas) e, para o dono da plataforma, publicar e ligar/desligar versões. */
+interno.get("/apk", ok((_req, res) => { res.json({ versao: A.versaoAtiva() }); }));
+const dono = exigirPapel();
+interno.get("/apk/versoes", dono, ok((_req, res) => { res.json({ versoes: A.listarVersoes() }); }));
+interno.post("/apk/versoes", dono, ok((req, res) => { res.json({ versao: A.publicarVersao(req.body ?? {}) }); }));
+interno.put("/apk/versoes/:id", dono, ok((req, res) => { res.json({ versao: A.ativarVersao(req.params.id, req.body?.ativa !== false) }); }));
 
 interno.post("/locais/:id/recarregar", admin, ok((req, res) => { res.json({ local: T.localPublico(T.recarregarLocal(emp(req), req.params.id)) }); }));
 

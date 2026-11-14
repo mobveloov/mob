@@ -15,7 +15,7 @@ export interface Modulo {
 export const MODULOS: Modulo[] = [
   { id: "crm", nome: "CRM e campanhas", descricao: "Campanhas, jornadas e público.", funcoes: ["crm"], api: [/^\/crm(\/|$)/] },
   { id: "bot", nome: "Bot de WhatsApp", descricao: "Atendimento e pedidos de corrida pelo WhatsApp.", funcoes: ["bot"], api: [] },
-  { id: "totem", nome: "Totem", descricao: "Pedido de corrida por totem em locais parceiros.", funcoes: ["totem"], api: [] },
+  { id: "totem", nome: "Totem", descricao: "Pedido de corrida por totem em locais parceiros.", funcoes: ["totem", "app-totem"], api: [] },
   { id: "analise", nome: "Análise com IA", descricao: "Relatórios e perguntas com o assistente de IA.", funcoes: ["analise"], api: [/^\/(relatorio|perguntar)$/] },
   { id: "engajamento", nome: "Engajamento", descricao: "Mapa de engajamento e ações para motoristas e passageiros.", funcoes: ["engajamento"], api: [/^\/engajamento(\/|$)/] },
   { id: "apps", nome: "Apps e carteiras", descricao: "Apps do passageiro e do motorista, SOS, carteiras e documentos.", funcoes: ["apps", "documentos", "carteiras"], api: [/^\/apps-central(\/|$)/] },

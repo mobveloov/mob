@@ -4,3 +4,4 @@
 export { default as Totem } from "./Totem";
 export { default as SolicitarCorrida } from "./SolicitarCorrida";
 export { default as LocaisTotem } from "./LocaisTotem";
+export { default as AppTotem } from "./AppTotem";

@@ -22,7 +22,7 @@ const ICONES: Record<string, LucideIcon> = {
   solicitar: Car, monitoramento: Radio, mapa: MapaIcone, historico: ScrollText, programadas: CalendarClock, ocorrencias: Siren, recuperacao: RotateCcw,
   "pagamentos-pendentes": Clock, "taxas-cancelamento": Ban, objetos: Package, "entrega-voucher": Ticket,
   motoristas: Users, destravar: Lock, veiculos: Truck, plantao: Clock, areas: MapPin, ruas: Route, punicoes: Scale, desafios: Trophy, documentos: FileText,
-  bot: Bot, totem: Smartphone, notificacoes: Bell, "alertas-empresas": Megaphone, apps: Smartphone, enderecos: Navigation,
+  bot: Bot, totem: Smartphone, "app-totem": ArrowDownToLine, notificacoes: Bell, "alertas-empresas": Megaphone, apps: Smartphone, enderecos: Navigation,
   passageiros: UserCheck, empresas: Building2, cupons: Tag, indicacoes: UserPlus, "faixas-vouchers": Ticket, crm: Sparkles,
   engajamento: Heart, "funil-clientes": Filter, "mapa-bairros": MapaIcone, avaliacoes: Star,
   analise: FileSearch,

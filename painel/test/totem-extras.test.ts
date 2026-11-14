@@ -211,3 +211,21 @@ test("cálculo do preço do local: base + km + minutos, nunca abaixo da mínima,
   assert.equal(T.precoDoLocal({ surge: 1.5 }, c, 10, 20), 52.5);
   assert.equal(T.precoDoLocal({ surge: 1 }, c, 1, 2), 12); // 5 + 2 + 1 = 8, sobe para a mínima
 });
+
+test("app do totem (APK): só o dono publica; empresa só vê a versão ativa mais nova; endereço precisa ser https", async () => {
+  const dono = D.criarUsuario({ email: "dono@x.test", nome: "Dono", senha: "senha-forte-9", empresaId: A.id, papel: "plataforma" });
+  const cd = await cookieDe(dono.id);
+  assert.equal((await pedir("/totem/apk", { cookie: co })).corpo.versao, null);
+  const v1 = { nome: "1.0.0", codigo: 10, url: "https://exemplo.test/totem-1.0.0.apk", tamanho: 12_582_912, notas: "Primeira versão" };
+  assert.equal((await pedir("/totem/apk/versoes", { corpo: v1, cookie: ca })).status, 403); // admin da empresa não publica
+  assert.equal((await pedir("/totem/apk/versoes", { corpo: { ...v1, url: "http://exemplo.test/a.apk" }, cookie: cd })).status, 400);
+  assert.equal((await pedir("/totem/apk/versoes", { corpo: { ...v1, codigo: 0 }, cookie: cd })).status, 400);
+  assert.equal((await pedir("/totem/apk/versoes", { corpo: v1, cookie: cd })).status, 200);
+  assert.equal((await pedir("/totem/apk/versoes", { corpo: v1, cookie: cd })).status, 400); // código repetido
+  const v2 = await pedir("/totem/apk/versoes", { corpo: { ...v1, nome: "1.1.0", codigo: 11, url: "https://exemplo.test/totem-1.1.0.apk" }, cookie: cd });
+  assert.equal((await pedir("/totem/apk", { cookie: co })).corpo.versao.nome, "1.1.0");
+  assert.equal((await pedir(`/totem/apk/versoes/${v2.corpo.versao.id}`, { metodo: "PUT", corpo: { ativa: false }, cookie: cd })).status, 200);
+  assert.equal((await pedir("/totem/apk", { cookie: co })).corpo.versao.nome, "1.0.0"); // desligou a nova: volta a anterior
+  assert.equal((await pedir("/totem/apk/versoes", { cookie: ca })).status, 403);
+  assert.equal((await pedir("/totem/apk/versoes", { cookie: cd })).corpo.versoes.length, 2);
+});

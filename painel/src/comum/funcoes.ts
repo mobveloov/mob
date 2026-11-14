@@ -112,7 +112,8 @@ export const FUNCOES: Funcao[] = [
   // Telas próprias (não existem na Machine).
   { id: "crm", grupo: "Mais", secao: "CRM", nome: "CRM & Engajamento", rota: "/crm", minimo: "gestor", antigas: ["/crm/campanhas", "/crm/jornadas", "/crm/publico"] },
   { id: "bot", grupo: "Mais", secao: "Atendimento", nome: "Bot de WhatsApp", rota: "/bot" },
-  { id: "totem", grupo: "Mais", secao: "Atendimento", nome: "Totem", rota: "/totem" },
+  { id: "totem", grupo: "Mais", secao: "Atendimento", nome: "Totens & Preços", rota: "/totem" },
+  { id: "app-totem", grupo: "Mais", secao: "Atendimento", nome: "App do Totem", rota: "/app-totem" },
   { id: "analise", grupo: "Mais", secao: "Operação", nome: "Análise com IA", rota: "/analise", minimo: "admin" },
   { id: "apps", grupo: "Mais", secao: "Operação", nome: "Apps e SOS", rota: "/apps" },
   { id: "documentos", grupo: "Mais", secao: "Operação", nome: "Documentos dos motoristas", rota: "/documentos" },

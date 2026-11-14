@@ -78,6 +78,7 @@ const PUBLICAS: Array<[string, string, string]> = [
   ["POST", "/api/bot/webhook/:empresa/:segredo", "webhook da Evolution (segredo na URL)"],
   ["GET", "/api/totem/publico/:empresa/:local", "tela do totem (só nome do local e marca)"],
   ["POST", "/api/totem/publico/:empresa/:local/entrar", "senha do totem (com limite de tentativas)"],
+  ["POST", "/api/totem/webhook/:empresa/:local", "webhook do WhatsApp do totem (aceita e ignora: o bot não responde pelo número do totem)"],
   ["POST", "/api/apps/:empresa/entrar/codigo", "app: pede o código"],
   ["POST", "/api/apps/:empresa/entrar", "app: entra com o código"],
   ["GET", "/api/apps/:empresa/marca", "app: marca"],
