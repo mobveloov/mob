@@ -105,3 +105,87 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Carga corrigida:** 500 corridas em 31 a 43 s, 0 erros (antes 85 a 122 s e até 288 erros). Números em `docs/AUDITORIA_COMPLETA.md`. 253 testes passando.
 - **Docker refeito** com o main; `up.veloov.com` responde.
 - **Falta:** comparar mais telas lado a lado com a Machine (imagem), "Enviar mais de um carro" no despacho, desconto da empresa por forma de pagamento no preço, observação da empresa para o motorista no app, passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
+
+## Comparação tela a tela com a Machine (14/11/2026)
+
+Cada tela da Machine foi lida e comparada com a nossa, com banco de teste próprio. Detalhe completo (inclusive "o que ainda difere") em `docs/comparacao/GRUPO_A.md` a `GRUPO_E.md`. "quase" = igual com diferença pequena listada. Também: barra do topo igual nos temas claro e escuro (gaveta do celular segue o tema, cor de destaque legível no claro, troca sem piscar) e a etiqueta NOVO foi removida de todo lugar.
+
+| Grupo | Tela | Igual? | O que corrigi (resumo) |
+|---|---|---|---|
+| A | Consultar corridas | quase | Título "Consultar corridas"; botão "Filtro"; "Exportar relatório" (planilha); texto "Atualizando automaticamente" / "Atualização automática… |
+| A | Corrida por motorista | sim | Nada a mudar: filtros (data inicial, data final, nome do motorista, Filtrar, Limpar filtros), Imprimir e colunas OS, Voucher, Data, Viatura,… |
+| A | Corridas programadas | quase | Tela refeita: filtros Central chamada, Empresa, Nº OS, Categoria, nome do passageiro, Nome/VTR do motorista, data inicial e final, forma de… |
+| A | Solicitar corrida | quase | Título "Solicitar nova corrida"; formulário numa coluna na ordem da Machine: buscar cliente via Telefone/CPF, telefone de cadastro, telefone para… |
+| A | Operação (Acompanhamento) | quase | Título "Acompanhamento" e subtítulo "Corridas Pendentes de Atendimento"; filtros Nome do passageiro, Telefone, Nome/VTR do motorista, Endereço de… |
+| A | Chat | quase | Abas Motoristas e Empresas; "Criar conversa" (escolhe a pessoa e abre a conversa); item "Mensagem Geral" no topo da lista (envia aviso a todos);… |
+| A | Objetos perdidos | quase | Abas Abertos e Finalizados; período (Hoje, Ontem, Últimos 7 e 30 dias, todos, personalizado); "Mais filtros" (motorista, OS, passageiro); colunas… |
+| A | Mapa de motoristas | quase | Título "Mapa de motoristas" com "Atualizando automaticamente"; Cadastros ativos, Conectados agora e Desconectados com %; Livres, A caminho,… |
+| A | Cliente | quase | Título "Clientes"; botões Criar Estabelecimento, Criar Cliente e Exportar (CSV seguro); filtros Nome, Telefone, CPF, E-mail, período de… |
+| A | CadastroPassageiro Cliente | quase | Janela "Cadastro de passageiro": Informações gerais (Bandeira, Tipo, Status), Dados pessoais (Nome, Telefone, CPF), "Campos com * são… |
+| A | Notificações | quase | Tela "Notificações app" com o texto da Machine, botão "Nova notificação", filtros Destinatário (Todos, Clientes App, Motoristas), datas, Título,… |
+| A | Leme (Painel inicial) | sim | Conferido no navegador: Indicadores, Estatísticas da operação, Corridas solicitadas, origem das finalizadas, Ganhos gerais, Ticket médio,… |
+| A | Motorista (lista) | quase | Título "Motoristas"; botões Criar e Exportar; abas Todos, Ativos, Suspensos, Em análise, Fila de espera, Rejeitados, Inativos, Deletados (com… |
+| A | Alterando Motorista | quase | Conferido item a item (feito antes pelo ramo machine-cadmot): versão do app, taxa de aceitação, total de corridas, Geral e Cerca eletrônica,… |
+| A | Empresa (lista) | quase | Botões Criar Empresa e Exportar relatório na ordem da Machine; sem subtítulo extra; colunas Nome fantasia, CPF/CNPJ, Status da empresa primeiro;… |
+| A | Create Empresa | quase | Conferido: Bandeira, CPF/CNPJ com troca, Número do contrato, Razão social, Nome fantasia, endereço, UF, Cidade, Bairro, CEP, Status e última… |
+| B | tela | igual? | o que corrigi |
+| B | Visão geral do financeiro | quase | Textos das dicas dos cartões iguais aos da Machine; dicas também nos títulos dos gráficos; "Total do próximo repasse" foi para o fim (depois da… |
+| B | Extrato da central | quase | Nome da central logo abaixo do título; botão "Mais ações" com Exportar CSV (rota nova `/extrato-central/csv`); título "Movimentações" com o dia ou… |
+| B | Extrato de transações online | quase | Período padrão Hoje; botão "Mais filtros" abre tipo, status e data de repasse; busca por ID da transação acima da tabela; "Ver detalhes" em… |
+| B | Demonstrativo Mensal | sim | Nada a mudar: Bandeira, Competência, Dias ativos, Exportar, tabela Descrição/Quantidade/Valor unitário/Débitos/Créditos, Total a pagar,… |
+| B | Faturamento de centro de custo | sim | Só o botão Imprimir no topo (sem Exportar), datas sem asterisco, rótulo "Filtros", texto "Nenhum resultado encontrado." |
+| B | Faturamento por empresa | quase | Botões Exportar e Imprimir, asteriscos em Data inicial, Data final e Empresa, rótulo "Filtros", vazio como na Machine |
+| B | Faturamento por período | sim | Só o botão Exportar no topo, datas sem asterisco, "Gerar", rótulo "Filtros" |
+| B | Relatório de faturamento | sim (tela nova) | Não existia. Criada: 5 indicadores (bruto, taxa da central, ticket médio, não atendidas, canceladas), período, Mais filtros (status e forma de… |
+| B | Relatório de Km rodados | sim | Só o botão Exportar, datas sem asterisco, rótulo "Filtros" |
+| B | Gestão de pendências de pagamentos | quase | Período padrão Hoje (como a Machine); lista de períodos da Machine; linha "Filtrando por" sempre visível (Todos e o período) |
+| B | Gestão de taxas de cancelamento | quase | Data no formato "dd/mm/aaaa - hh:mm"; "Passageiro" acima do nome; linha "Filtrando por: Período: ... até ..."; lista de períodos da Machine |
+| B | Transação com Pix | quase | Período padrão Hoje com a lista da Machine (inclui Últimos 14 dias, novo no servidor); "Nome/VTR do motorista" busca também pela viatura; rótulo… |
+| B | Controle financeiro de centrais | quase | Nada: colunas, dicas e opções já batiam |
+| B | Meus planos | quase | Nada: Plano, categoria de bonificação, tarifa, cobrança fixa, taxas, incluso, serviços adicionais já batiam |
+| B | Vouchers e tickets por motoristas | sim | Exportar e Imprimir, datas sem asterisco, rótulo "Filtros" |
+| B | Entrega de voucher | sim | Nada: VTR/Nome, OS Compradas, Obter OS Pendentes, Limpar filtros, tabela e Registrar Entrega já batiam |
+| B | FaixaVoucherEmpresa (Faixas de Vouchers) | sim | Filtro "Empresa *" com asterisco |
+| B | Create FaixaVoucherEmpresa (Criando Faixa de Vouchers) | sim | Campo "Bandeira *" antes de Empresa (lista com o nome da central) |
+| B | Cupons | quase | Tela refeita no formato da Machine: botão "Criar cupom", filtro de tipo (Resgatável, Automático, Todos), Exportar (Impressão e Planilha CSV, rota… |
+| C | Tarifa Categoria | Config › Tarifas e categorias | quase |
+| C | Dinamica TarifaCategoria | Config › Tarifas dinâmicas | quase |
+| C | EditarTarifaExtra TarifaCategoria | Tarifas e categorias › Tarifa › Editar tarifa | sim |
+| C | Create Categoria | Tarifas e categorias › Criar categoria | quase |
+| C | Descontos | Config › Descontos | quase |
+| C | Alterando Desconto | Descontos › Alterar | sim |
+| C | AlteraValor (Alteração de dados da OS) | Corridas › Alteração de dados da OS (nova) | quase |
+| C | Alterando Bandeira (Gerais) | Config › Gerais do App › aba Despacho (nova) | parcial |
+| C | Integracoes Bandeira | Config › Integrações › Transações Financeiras | quase |
+| C | DespachoBandeira Bandeira | Config › Despacho | sim |
+| C | DespachoBandeirasParceiras Bandeira (Transbordo) | Config › Transbordos | quase |
+| C | TermosUso Bandeira | Config › Termos de uso | quase |
+| C | Personalização | Config › Personalização app passageiro (nova) | parcial |
+| C | Up Corridas | Painel (Indicadores) | quase |
+| C | Punicao Qrt | Cadastro › Punições › Gerenciar Punição | sim |
+| C | Recompensas Indicacao | Financeiro › Estatísticas › Recompensas por indicação (nova) | quase |
+| D | Area (lista de Áreas) | quase | Título "Áreas" e o texto da Machine; botões "Criar Área" e "Visão Geral" (antes eram abas); filtro na lateral ("Filtros", Nome, Filtrar, Limpar… |
+| D | Create Area (Criando Área) | quase | Título "Criando Área" (na edição, "Alterando Área"); "Campos com * são obrigatórios."; faixa "Clique na área para entrar ou sair do modo de… |
+| D | VisaoGeral Area | quase | Virou uma tela própria ("Visão Geral") aberta pelo botão; Mapa/Satélite; botões Voltar e Gravar no rodapé, como na Machine. |
+| D | Plantao (lista) | sim | Título e texto da Machine (inclusive "tem prioridade nas filas"); botão "Criar Plantão"; filtros Data Inicial, Hora Inicial, Data Final, Hora… |
+| D | Create Plantao | sim | "Criando Plantão" com Data Inicial *, Hora Inicial, Data Final *, Hora Final, Voltar e Criar; a ação Editar abre a mesma tela como "Alterando… |
+| D | GerenciaPlantao Plantao | sim | Datas e horas só para ler (como na Machine; para mudar usa-se Editar); "Vtr / Motorista" (busca com 2+ letras), "Adicionar Motorista", Voltar;… |
+| D | Ruas | quase | Sem regras: tela com "O que são regras de via?", o texto da Machine (tirei a frase a mais) e o botão "Criar nova regra". Com regras: lista e botão… |
+| D | Mapa de engajamento | sim (já estava) | Nada: já foi comparado e igualado antes (ver docs/COMPARACAO_PAINEL_INICIAL.md, parte B). |
+| D | Alerta (lista) | sim | Filtros na lateral: Empresa, Conteúdo do alerta, Tipo de alerta (Urgente, Atenção, Aviso em caixas de marcar), Status (Ativo marcado de início,… |
+| D | Create Alerta | sim | Já era igual; só ajustei o limite de "Exibir alerta por" a 750 e tirei o rótulo "Unidade" (a Machine só tem o número e Horas/Dias/Semanas). |
+| D | CentralNotificacoes Alerta | sim (já estava) | Nada novo: sino com "Central de notificações", Todos, "Somente não lidas", seleção e "Tudo em dia!" já existiam. |
+| D | Create Notificacao | quase | Nova tela "Criando Notificação" (botão "Nova notificação" em Comunicação › Notificações Push): "Para agora" / "Agendar" (data e hora de envio e o… |
+| D | ConfiguracaoNPS Avaliacao | quase | Título "Configurações NPS" com dois blocos, "NPS para passageiros" e "NPS para motoristas": "Ativar pesquisa de NPS ...", o texto da Machine,… |
+| D | NPS Avaliacao | quase | Título "Net Promoter Score"; abas Passageiros e Motoristas (nessa ordem, no alto); período e tipo na barra; "Mais filtros" abre "Filtro de… |
+| D | Desafios | sim | Tela vazia com "Comece a criar desafios agora mesmo" e "Clique em "Novo desafio" abaixo para começar." com o botão verde. |
+| D | Desafios dos motoristas | quase | Título "Desafios"; botão verde "Novo desafio"; abas Motoristas e Clientes; barra com Período, Status (Todos, Ativos, Aguardando, Cancelados,… |
+| E | Estatística por bairro | igual, com adaptação | Filtros numa coluna à esquerda (Data inicial, Data final, Filtrar, Limpar filtros) e tabela à direita. Título sem texto de apoio. "Exibindo 1-10… |
+| E | Estatística por empresa | igual, com adaptação | Mesmo formato da tela acima. Colunas Empresa, Corridas, Valor, Porcentagem. Valor em reais |
+| E | Estatística por forma de pagamento | igual, com adaptação | Mesmo formato. Colunas Forma de pagamento, Corridas, Porcentagem. Asterisco (*) nas datas só nesta tela, como na Machine |
+| E | Estatísticas por motorista | igual, com adaptação | Mesmo formato. Colunas ID ("viatura - nome"), Corridas, Porcentagem, ordenadas do maior para o menor |
+| E | Estatísticas por operador | igual, com adaptação | Mesmo formato. Botões Exportar (CSV) e Imprimir. Colunas Operador, FINALIZADAS, CANC PASS, CANC MOTORISTA, CANC OPE, N/ATEND, TOTAIS. Tirei a… |
+| E | Relatorio (índice de Relatórios) | igual, com adaptação | "Relatórios padrão" em cartões numerados de 1 a 9, na ordem e com os nomes da Machine (o 1 abre Motoristas; os outros abrem em outra aba, como… |
+| E | Página inicial (Painel) | igual, com adaptação | Nada novo: já estava igual (ver `docs/COMPARACAO_PAINEL_INICIAL.md`). Conferi de novo no navegador: aviso de atenção, períodos, corridas… |
+| E | Menu do topo | igual, com adaptação | Grupos na ordem: Painel, Cadastro, Corridas, Financeiro, Comunicação, Configurações (era "Config"), Avaliações, Ajuda. Submenus como na Machine:… |
+| E | Menu do usuário | igual, com adaptação | "Alterar Senha" virou "Trocar senha" e "Sair do Sistema" virou "Sair" (menu do topo e menu do celular). Sino de notificações antes do nome, como… |
