@@ -15,6 +15,8 @@ export interface ProvedorWhatsApp {
   conectar(webhookUrl: string): Promise<Conexao>;
   situacao(): Promise<Conexao>;
   desconectar(): Promise<void>;
+  /** O número tem WhatsApp? null = não deu para conferir (sem rede, WhatsApp fora): quem chama segue normal. */
+  existeNoWhatsApp(telefone: string): Promise<boolean | null>;
   /** Traduz o corpo do webhook do provedor em mensagens recebidas (ignora as enviadas pelo próprio número). */
   lerWebhook(corpo: unknown): Recebida[];
 }
@@ -52,6 +54,8 @@ ${legenda}` : ""}`, em: new Date().toISOString() });
     async conectar() { return { situacao: "conectado", qr: QR_SIMULADO, detalhe: "Modo simulado: nenhuma mensagem sai de verdade." }; },
     async situacao() { return { situacao: "conectado", detalhe: "Modo simulado." }; },
     async desconectar() { /* nada */ },
+    /** Simulado: telefone terminado em 0000 não tem WhatsApp (mesma regra do envio do CRM). */
+    async existeNoWhatsApp(telefone) { return !soDigitos(telefone).endsWith("0000"); },
     lerWebhook(corpo) {
       const c = (corpo ?? {}) as Record<string, unknown>;
       const telefone = soDigitos(c.telefone);
@@ -146,6 +150,13 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
     },
     situacao,
     async desconectar() { await chamar("DELETE", `/instance/logout/${inst}`); },
+    async existeNoWhatsApp(telefone) {
+      try {
+        const n = soDigitos(telefone);
+        const r = await chamar<Array<{ exists?: boolean }>>("POST", `/chat/whatsappNumbers/${inst}`, { numbers: [n.length <= 11 ? `55${n}` : n] });
+        return Array.isArray(r) && typeof r[0]?.exists === "boolean" ? r[0].exists : null;
+      } catch { return null; }
+    },
     lerWebhook(corpo) {
       const c = (corpo ?? {}) as { event?: string; data?: unknown };
       const evento = String(c.event ?? "").toLowerCase().replace(/_/g, ".");
