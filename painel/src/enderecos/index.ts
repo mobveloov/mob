@@ -14,6 +14,7 @@ import path from "node:path";
 import readline from "node:readline";
 import zlib from "node:zlib";
 import { idValido, raiz } from "../servidor/dados.ts";
+import { buscarNasCorrecoes, correcaoDoPonto, formatarTitulo, totalCorrecoes } from "./correcoes.ts";
 
 export interface Municipio { codigo: string; nome: string; uf: string }
 export interface Endereco { texto: string; rua: string; numero: string; bairro: string; cidade: string; uf: string; cep: string; lat: number; lng: number; exato: boolean }
@@ -178,7 +179,7 @@ export function buscarCep(empresaId: string, cepBruto: string): { rua: string; b
 
 export function situacao(empresaId: string) {
   return {
-    cnefe: temCnefe(), osrm: !!process.env.OSRM_URL?.trim(),
+    cnefe: temCnefe(), correcoes: totalCorrecoes(lerConfig(empresaId).municipios), osrm: !!process.env.OSRM_URL?.trim(),
     municipios: lerConfig(empresaId).municipios.map((cod) => ({ ...nomeMunicipio(cod), pronto: indices.has(cod) || fs.existsSync(arquivoCache(cod)), preparo: situacaoPreparo.get(cod) ?? null, enderecos: indices.get(cod)?.num.length ?? null })),
   };
 }
@@ -232,9 +233,19 @@ function pontoNaRua(ix: Indice, r: Rua, numero: string): { i: number; exato: boo
 /** Busca o endereço nos municípios da empresa. Devolve até `limite` opções, a melhor primeiro. */
 export function buscarEndereco(empresaId: string, texto: string, limite = 8): { enderecos: Endereco[]; aviso: string | null } {
   const cods = lerConfig(empresaId).municipios;
-  if (!temCnefe()) return { enderecos: [], aviso: "Base de endereços (CNEFE) não configurada." };
-  if (!cods.length) return { enderecos: [], aviso: "Escolha as cidades atendidas em Endereços." };
   const { palavras, numero, bairro } = separar(texto);
+  // Correções (casas que o CNEFE não tem) vêm primeiro e funcionam mesmo sem o CNEFE.
+  const corrigidos: Endereco[] = [];
+  if (cods.length && palavras.length && palavras.join("").length >= 3) {
+    for (const c of buscarNasCorrecoes(cods, palavras, numero, bairro, limite)) {
+      const m = nomeMunicipio(c.municipio);
+      const rua = formatarTitulo(`${c.tipo} ${c.rua}`.trim());
+      const nr = numero || (c.numero ? String(c.numero) : "");
+      corrigidos.push({ texto: `${rua}${nr ? `, ${nr}` : ""}${c.bairro ? ` - ${formatarTitulo(c.bairro)}` : ""}, ${m.nome}/${m.uf}`, rua, numero: nr, bairro: formatarTitulo(c.bairro), cidade: m.nome, uf: m.uf, cep: "", lat: c.lat, lng: c.lng, exato: c.exato });
+    }
+  }
+  if (!temCnefe()) return corrigidos.length ? { enderecos: corrigidos, aviso: null } : { enderecos: [], aviso: "Base de endereços (CNEFE) não configurada." };
+  if (!cods.length) return { enderecos: [], aviso: "Escolha as cidades atendidas em Endereços." };
   if (!palavras.length || palavras.join("").length < 3) return { enderecos: [], aviso: null };
   const achados: Array<{ s: number; ix: Indice; r: Rua }> = [];
   let preparandoAlgum = false;
@@ -244,7 +255,8 @@ export function buscarEndereco(empresaId: string, texto: string, limite = 8): { 
     for (const r of ix.ruas) { const s = pontuar(r, palavras, bairro); if (s > 0.3) achados.push({ s, ix, r }); }
   }
   achados.sort((a, b) => b.s - a.s);
-  const vistos = new Set<string>(), enderecos: Endereco[] = [];
+  const vistos = new Set<string>(), enderecos: Endereco[] = [...corrigidos];
+  for (const c of corrigidos) vistos.add(`${normal(c.cidade)}|${normal(c.rua.replace(/^\S+\s/, ""))}|${normal(c.bairro)}`);
   for (const a of achados) {
     const k = `${a.ix.cod}|${a.r.nome}|${a.r.bairro}`;
     if (vistos.has(k)) continue;
@@ -258,6 +270,11 @@ export function buscarEndereco(empresaId: string, texto: string, limite = 8): { 
 
 /** Endereço mais perto de um ponto (localização enviada pelo WhatsApp, por exemplo). */
 export function enderecoDoPonto(empresaId: string, lat: number, lng: number): Endereco | null {
+  const cc = correcaoDoPonto(lerConfig(empresaId).municipios, lat, lng);
+  if (cc) {
+    const m = nomeMunicipio(cc.municipio), rua = formatarTitulo(`${cc.tipo} ${cc.rua}`.trim()), nr = cc.numero ? String(cc.numero) : "";
+    return { texto: `${rua}${nr ? `, ${nr}` : ""}${cc.bairro ? ` - ${formatarTitulo(cc.bairro)}` : ""}, ${m.nome}/${m.uf}`, rua, numero: nr, bairro: formatarTitulo(cc.bairro), cidade: m.nome, uf: m.uf, cep: "", lat, lng, exato: true };
+  }
   let melhor: { d: number; ix: Indice; i: number } | null = null;
   for (const cod of lerConfig(empresaId).municipios) {
     const ix = indice(cod);
