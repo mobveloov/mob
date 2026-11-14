@@ -514,3 +514,10 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 .nav-dropdown .grupo-titulo { color: var(--primaria-viva); opacity: 1; }
 .nav-dropdown .dropdown-header.sub { padding-left: 16px; text-transform: none; letter-spacing: 0; font-weight: 600; }
 @media (max-width: 1180px) { .usuario-nome { display: none; } }
+
+/* com o menu lateral aberto o conteúdo fica mais estreito: as grades do painel reduzem colunas mais cedo */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .app:not(.menu-recolhido) .ind-linha3 { grid-template-columns: 1fr; }
+  .app:not(.menu-recolhido) .ind-linha4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app:not(.menu-recolhido) .ind-graficos { grid-template-columns: 1fr; }
+}
