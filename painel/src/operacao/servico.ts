@@ -40,7 +40,7 @@ export function acharPropria(empresaId: string, id: string): CorridaPropria {
 // ====================================================================== histórico (consultar corridas)
 
 export { RAPIDOS, STATUS_FILTRO, type StatusFiltro } from "./consulta.ts";
-import { RAPIDOS, STATUS_FILTRO, type FiltroConsulta, type StatusFiltro } from "./consulta.ts";
+import { RAPIDOS, STATUS_FILTRO, empresasPorTelefone, type FiltroConsulta, type StatusFiltro } from "./consulta.ts";
 
 export interface FiltroHistorico extends FiltroConsulta { cidade?: string; fonte?: string }
 
@@ -257,13 +257,18 @@ export function chat(empresaId: string, id: string) {
 
 // ====================================================================== monitoramento (acompanhamento)
 
-export function monitoramento(empresaId: string, f: { passageiro?: string; telefone?: string }) {
+export function monitoramento(empresaId: string, f: { passageiro?: string; telefone?: string; motorista?: string; endereco?: string; empresa?: string }) {
+  const empresas = empresasPorTelefone(empresaId);
+  const empDe = (c: CorridaPropria) => c.empresaConveniada || empresas.get(soDigitos(c.passageiro.telefone)) || "";
   const agora = agoraBr().getTime();
   const lista = listarProprias(empresaId);
   const cid = (c: CorridaPropria) => c.motoristaId ? String(motoristasCad(empresaId).find((m) => m.id === c.motoristaId)?.cidade ?? "") : "";
   let corridas = lista.filter((c) => ABERTA.has(c.status) || agora - Date.parse(c.solicitadaEm) <= 10 * 60_000);
   if (f.passageiro) corridas = corridas.filter((c) => normal(c.passageiro.nome).includes(normal(f.passageiro)));
   if (f.telefone) { const t = soDigitos(f.telefone); corridas = corridas.filter((c) => c.passageiro.telefone.includes(t)); }
+  if (f.motorista) corridas = corridas.filter((c) => normal(c.motorista).includes(normal(f.motorista)));
+  if (f.endereco) corridas = corridas.filter((c) => normal(c.embarque.texto).includes(normal(f.endereco)));
+  if (f.empresa) corridas = corridas.filter((c) => normal(empDe(c)) === normal(f.empresa));
   const chats = lista.filter((c) => ABERTA.has(c.status) || agora - Date.parse(c.solicitadaEm) <= 6 * 3600_000).flatMap((c) => {
     const n = naoLidas(empresaId, c.id);
     if (!n.length) return [];
@@ -273,8 +278,9 @@ export function monitoramento(empresaId: string, f: { passageiro?: string; telef
   return {
     corridas: corridas.sort((a, b) => b.solicitadaEm.localeCompare(a.solicitadaEm)).slice(0, 200).map((c) => ({
       id: c.id, os: c.os, solicitadaEm: c.solicitadaEm, passageiro: c.passageiro.nome, telefone: c.passageiro.telefone, embarque: c.embarque.texto,
-      motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, status: c.status, statusTexto: STATUS_TEXTO[c.status], cidade: cid(c), categoria: c.categoria,
+      motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, status: c.status, statusTexto: STATUS_TEXTO[c.status], cidade: cid(c), categoria: c.categoria, empresa: empDe(c),
     })),
+    empresas: [...new Set([...empresas.values()])].sort(),
     chats,
   };
 }

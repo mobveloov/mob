@@ -1,29 +1,32 @@
 // Monitoramento (Acompanhamento): corridas dos últimos 10 min e abertas, mensagens não lidas, atualização automática a cada 5 s.
 import { useState } from "react";
-import { Eye, Loader2, MessageCircle, RefreshCw } from "lucide-react";
-import { Aviso, GRUPO_CLASSE, Selo, Vazio, dh, fone, hora, op, qs, useDados } from "./comum";
+import { Loader2, MessageCircle, RefreshCw } from "lucide-react";
+import { Aviso, GRUPO_CLASSE, Selo, Vazio, hora, op, qs, useDados } from "./comum";
 import { JanelaCorrida } from "./JanelaCorrida";
 import "./corridas.css";
 
 const GRUPO: Record<string, string> = { procurando: "alerta", a_caminho: "info", no_local: "info", em_andamento: "info", finalizada: "ok", cancelada: "ruim", nao_atendida: "alerta" };
 
+const VAZIO = { passageiro: "", telefone: "", motorista: "", endereco: "", empresa: "" };
+
 export default function Monitoramento() {
-  const [passageiro, setPassageiro] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [f, setF] = useState({ passageiro: "", telefone: "" });
+  const [rasc, setRasc] = useState(VAZIO);
+  const [f, setF] = useState(VAZIO);
   const [aberta, setAberta] = useState<string | null>(null);
   const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/monitoramento${qs(f)}`), [JSON.stringify(f)], 5000);
+  const campo = (k: keyof typeof VAZIO, r: string, ph = "") => <label className="oc-l" style={{ flex: 1, minWidth: 180 }}>{r}<input value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })} placeholder={ph} /></label>;
+  const total = dados?.corridas.length ?? 0;
   return (
     <div className="oc">
-      <div className="oc-topo"><h1>Monitoramento <small>Monitoramento em Tempo Real · <span style={{ color: "var(--oc-ok)" }}>Sistema Online</span></small></h1></div>
+      <div className="oc-topo"><h1>Acompanhamento <small>Corridas Pendentes de Atendimento</small></h1></div>
       <div className="oc-card">
-        <h3>Filtros</h3>
-        <form className="oc-fila" style={{ alignItems: "flex-end" }} onSubmit={(e) => { e.preventDefault(); setF({ passageiro, telefone }); }}>
-          <label className="oc-l" style={{ flex: 1, minWidth: 180 }}>Passageiro<input value={passageiro} onChange={(e) => setPassageiro(e.target.value)} placeholder="Nome..." /></label>
-          <label className="oc-l" style={{ flex: 1, minWidth: 180 }}>Telefone<input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" /></label>
-          <button className="oc-btn pri" type="submit"><RefreshCw size={16} className={carregando ? "gira" : ""} /> Atualizar</button>
+        <h3>Filtrar</h3>
+        <form className="oc-fila" style={{ alignItems: "flex-end" }} onSubmit={(e) => { e.preventDefault(); setF(rasc); }}>
+          {campo("passageiro", "Nome do passageiro")}{campo("telefone", "Telefone do passageiro", "+55")}{campo("motorista", "Nome/VTR do motorista")}{campo("endereco", "Endereço de partida")}
+          <label className="oc-l" style={{ flex: 1, minWidth: 180 }}>Empresa<select value={rasc.empresa} onChange={(e) => setRasc({ ...rasc, empresa: e.target.value })}><option value="">Selecione</option>{(dados?.empresas ?? []).map((n: string) => <option key={n}>{n}</option>)}</select></label>
+          <button className="oc-btn pri" type="submit"><RefreshCw size={16} className={carregando ? "gira" : ""} /> Filtrar</button>
+          <button className="oc-btn" type="button" onClick={() => { setRasc(VAZIO); setF(VAZIO); }}>Limpar filtros</button>
         </form>
-        <p className="suave" style={{ marginBottom: 0 }}>Atualização auto a cada 5s</p>
       </div>
       <Aviso texto={erro} erro />
       <div className="oc-card">
@@ -38,20 +41,18 @@ export default function Monitoramento() {
         </div>
       </div>
       <div className="oc-card">
-        <h3>Corridas Recentes (10 min)</h3>
-        {carregando && !dados && <Vazio><Loader2 size={16} className="gira" /> Carregando solicitações...</Vazio>}
-        {dados && !dados.corridas.length && <Vazio>Nenhuma corrida recente.</Vazio>}
-        {!!dados?.corridas.length && <div className="oc-rola"><table>
-          <thead><tr><th>Nº OS / Hora</th><th>Passageiro / Origem</th><th>Motorista</th><th>Status</th><th>Ação</th></tr></thead>
+        {carregando && !dados && <Vazio><Loader2 size={16} className="gira" /> Carregando...</Vazio>}
+        {dados && !dados.corridas.length && <Vazio>Nenhum resultado encontrado.</Vazio>}
+        {!!total && <><p className="suave" style={{ marginTop: 0 }}>Exibindo 1-{total} de {total} {total === 1 ? "resultado" : "resultados"}.</p><div className="oc-rola"><table>
+          <thead><tr><th>Nº OS</th><th>Nome do passageiro</th><th>Motorista</th><th>Empresa</th><th>Status</th></tr></thead>
           <tbody>{dados.corridas.map((c: any) => (
             <tr key={c.id} className="clic" onClick={() => setAberta(c.id)}>
-              <td><b>{c.os}</b><br /><small>{dh(c.solicitadaEm)}</small></td>
-              <td>{c.passageiro}<br /><small className="corta">{c.embarque}</small></td>
-              <td>{c.motorista || "—"}{c.telefoneMotorista && <><br /><small>{fone(c.telefoneMotorista)}</small></>}</td>
+              <td className="forte">{c.os}</td>
+              <td>{c.passageiro}<br /><small className="corta suave">{c.embarque}</small></td>
+              <td>{c.motorista || "---"}</td>
+              <td>{c.empresa || "---"}</td>
               <td><Selo tom={GRUPO[c.status] ?? GRUPO_CLASSE.aberta}>{c.statusTexto}</Selo></td>
-              <td><button className="oc-btn peq" onClick={(e) => { e.stopPropagation(); setAberta(c.id); }}><Eye size={14} /> Ver</button></td>
-            </tr>))}</tbody></table></div>}
-        <p className="suave" style={{ marginBottom: 0 }}>Exibindo {dados?.corridas.length ?? 0} registros</p>
+            </tr>))}</tbody></table></div></>}
       </div>
       {aberta && <JanelaCorrida id={aberta} onFechar={() => setAberta(null)} onMudou={recarregar} />}
     </div>

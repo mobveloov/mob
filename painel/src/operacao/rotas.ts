@@ -170,7 +170,7 @@ rotasOperacao.put("/corridas/:id", central, ok(async (req, res) => {
 
 // ------------------------------------------------------------------ telas
 
-rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20) }))));
+rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20), motorista: q(req, "motorista", 80), endereco: q(req, "endereco", 120), empresa: q(req, "empresa", 80) }))));
 rotasOperacao.get("/mapa", ok((req, res) => res.json(S.mapa(emp(req)))));
 rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   const h = Number(req.query.horas);
