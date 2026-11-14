@@ -26,19 +26,22 @@ Referências: `docs/APPS_PRINTS_REFERENCIA.md` (P## = passageiro, M## = motorist
 
 ## Motorista
 
-Refeito por outra sessão (commit `6377ee0` e seguintes): início, menu, histórico, veículos, cadastro, preferências, configurações, diagnóstico e chats. **Nenhuma destas telas foi conferida por mim lado a lado**; a sessão que as refez atingiu o limite de uso antes de escrever a tabela dela.
+Refeito por outra sessão (commit `6377ee0` e seguintes). Conferi lado a lado, no navegador com posição simulada em Pitangueiras, as telas marcadas "Conferido"; as demais foram refeitas mas eu não as vi (a sessão que as refez atingiu o limite de uso antes de escrever a tabela dela).
 
 | Tela (referência) | Situação |
 |---|---|
+| Início offline (M29) | Conferido. Botões e pílula R$ sobre o mapa, botão INICIAR amarelo, barra preta "Mapa / Você está offline / Corridas" |
+| Ficar Online (M01, mesmo padrão) | Conferido. Diálogo escuro com ícone redondo, Cancelar e Iniciar |
+| Início online (M04) | Conferido. Mapa escuro com nomes de ruas, "Você está online", "Procurando…", botão vermelho PARAR, Maçaneta; as opções ficam acima do mapa |
+| Menu lateral (M30) | Conferido. Cartão do motorista, Operação, Conta e veículo, Suporte e sistema, Sair com versão |
+| Corridas Disp./Pend./Prog. (M14) | Conferido. Três abas e "Nenhuma corrida no momento…" |
+| Histórico de Viagens (M11) | Conferido. Mês, Ganhos do Mês, Viagens/Online/Em trânsito, Formas de Pagamento & Bônus |
 | Login/Senha (M02/M03) | Refeito, não conferido |
 | Cadastro em 5 passos (M24/M28/M22/M21/M20) | Refeito, não conferido |
-| Início offline/online, barra preta e botão INICIAR/PARAR (M29/M17/M07/M04) | Refeito, não conferido. O mapa foi posto em camada própria para as opções ficarem acima dele |
-| Ficar Online/Offline (M08/M01) | Não conferido |
-| Corridas Disponíveis/Pendentes/Programadas (M14) | Não conferido |
-| Chamada com valor líquido grande, bruto e taxa menores (cartaz) | Já existia e foi mantida |
+| Chamada com valor líquido grande, bruto e taxa menores (cartaz) | Já existia e foi mantida; não reconferida |
 | Em corrida (P09/P04/P01) | Rota pelas ruas no mapa; layout não conferido |
-| Chat (P06), Maçaneta (M12) | Não conferido |
-| Menu lateral (M30/M27), Histórico de Viagens (M11/M10), Meus veículos (M26), Meu Cadastro (M25), Preferências (M05/M06), Notificações (M09), Fale Conosco (M13), Configurações (M16/M15), Diagnóstico (M23/M18), Chat de suporte (M19) | Refeitos, não conferidos |
+| Chat (P06), Maçaneta (M12) | Refeitos, não conferidos |
+| Meus veículos (M26), Meu Cadastro (M25), Preferências (M05/M06), Notificações (M09), Fale Conosco (M13), Configurações (M16/M15), Diagnóstico (M23/M18), Chat de suporte (M19) | Refeitos, não conferidos |
 
 ## Rota, mapa e endereços (pedidos do usuário)
 
@@ -47,5 +50,5 @@ Refeito por outra sessão (commit `6377ee0` e seguintes): início, menu, histór
 | Trajeto pelas ruas, não em linha reta | Feito e conferido no navegador (Pitangueiras): a linha segue as ruas; o app não desenha reta |
 | Preço pela distância e tempo por rua | Feito (o servidor usa o OSRM); OSRM público só para teste, próprio em produção |
 | Mapa claro com ruas e nomes | Feito nos dois apps |
-| Mapa não fica por cima das opções (motorista) | Corrigido no código (camada própria); falta conferir no aparelho |
+| Mapa não fica por cima das opções (motorista) | Corrigido e conferido no navegador (início offline e online); falta ver no aparelho |
 | Endereços no destino | Feito: CNEFE primeiro, OpenStreetMap quando não acha |
