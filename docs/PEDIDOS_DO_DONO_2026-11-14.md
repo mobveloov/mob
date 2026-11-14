@@ -88,3 +88,17 @@ Atue como engenheiro sênior e especialista em AppSec nos apps e no painel. Vali
    permissão; isolamento entre empresas (token de uma empresa não lê a outra). Teste com requisição forjada.
 3. Limite de tentativas (força bruta) no login, sanitização contra XSS e injeção nas buscas e listagens.
 4. Entregar resumo técnico com os arquivos criados e alterados, e o build sem erros.
+
+## Quem faz o quê (sessão do painel, 14/11)
+
+Todos são agentes Sonnet 5.5, cada um no próprio worktree e ramo, sem mexer nos mesmos arquivos. Quem mescla é a sessão do painel.
+
+| Tarefa | Agente | Ramo | Situação |
+|---|---|---|---|
+| Taxas da central + carteira de crédito | taxas-carteira | worktree-agent-a538efdd5eef532ee | em andamento |
+| Cargos, filiais e superadmin | cargos-filiais-superadmin | worktree-agent-a1a2562b7d9420c54 | em andamento |
+| Menu lateral (igual ao MobVeloov) + foto da empresa | menu-lateral | worktree-agent-a4657717dc85a0595 | em andamento |
+| Segurança do painel e da API | seguranca | worktree-agent-a7161959705b31c5f | em andamento |
+| CRM, Bot e Totem (cópia exata do mobveloov) | crm-bot-totem | worktree-agent-a5eb39a3ed6da876e | em andamento |
+
+Revisão final e bug difícil: só com Fable 5.2, no fim, depois da mesclagem.
