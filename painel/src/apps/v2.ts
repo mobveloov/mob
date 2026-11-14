@@ -281,7 +281,7 @@ rotasV2.post("/corridas/:id/rota", so("passageiro"), ok(async (req, res) => {
     for (let i = 1; i < pontos.length; i++) { const r = await rota({ lat: pontos[i - 1].lat!, lng: pontos[i - 1].lng! }, { lat: pontos[i].lat!, lng: pontos[i].lng! }); km += r.distanciaKm; minutos += r.minutos; }
     km = arred(km);
   }
-  const est = estimarPreco(empresaId, { categoria: c.categoria, distanciaKm: km, minutos });
+  const est = estimarPreco(empresaId, { categoria: c.categoria, distanciaKm: km, minutos, embarque: c.embarque, destino, paradas: paradas.length });
   const feita = await alterarCorrida(empresaId, c.id, (x) => {
     const seguia = x.valorOferecido == null || x.valorOferecido === x.estimativa.valor;
     x.paradas = paradas.length ? paradas : undefined;

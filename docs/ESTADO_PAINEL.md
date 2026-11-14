@@ -45,6 +45,12 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Ruas** (Cadastro › Gestão): regras de via (nome de exibição, nome no mapa opcional, traçado desenhado no mapa). Trocam o nome da rua nos endereços achados pelo ponto e pela busca (`enderecos/index.ts`). Só o admin grava.
 - **Funil de Clientes** e **Mapa de Bairros e Demanda** (Corridas, do painel 88): usam corridas e passageiros reais. Sem registro de "visitou o app", o funil começa nos cadastros e nas solicitações (Solicitadas, Tiveram motorista, Embarcaram, Concluíram), com abandono por etapa, corridas e leads incompletos (cadastrados que nunca pediram). O mapa agrupa por bairro do endereço de embarque, com filtros por situação, desertos, lista de passageiros, CSV, XML e copiar telefones.
 - Código: servidor em `painel/src/areas/` (API em `/api/areas`), telas em `painel/src/web/telas/areas/` e `cadastro/Areas.tsx`. Teste: `painel/test/plantao-ruas-areas.test.ts`.
+## Centrais (branch machine-centr)
+- **Modelo:** uma empresa pode ser central principal e ter centrais associadas (só um nível). Vínculos, códigos, controle financeiro, plano e serviços ficam em `dados/centrais.json` (`painel/src/centrais/rede.ts`). Cada central continua sendo uma empresa isolada.
+- **Isolamento:** a central consultada vem de `?central=ID` e só vale se for a própria empresa ou uma associada dela; senão 404 igual ao de central inexistente. A principal NÃO entra no painel da associada: vê só controle, plano, demonstrativo (quando o débito é da principal) e o extrato se a associada permitir, sem nomes de pessoas. Só o papel plataforma troca de empresa (X-Empresa), como antes. Operador não acessa nada de cobrança; tudo é admin.
+- **Telas** (menu novo "Cobrança", `painel/src/web/telas/centrais/`): Controle financeiro de centrais (exibir extrato = consentimento da associada; débito automático e conta online = decisão da principal), Meus planos (Essencial, Plus, Ultra, serviços adicionais, categoria de bonificação da rede só para a principal), Demonstrativo Mensal (por central e competência, Exportar CSV com apóstrofo contra fórmula) e o seletor "Central principal e centrais associadas" no topo (só quando há rede; muda só o que as telas de Cobrança mostram).
+- **Abrir uma central associada:** admin da principal cria a empresa nova (e o primeiro admin, opcional). Ligar uma empresa existente e desfazer vínculo: só a plataforma.
+- **Sem gateway:** nada é cobrado; valores dos planos são exemplos nossos. API em `/api/centrais` (`painel/src/centrais/rotas.ts`). Teste: `painel/test/centrais.test.ts`.
 
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
 - **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
@@ -76,3 +82,8 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Em andamento (ramos machine-*):** Tarifa + Dinâmica (inclui ligar a matriz de descontos ao preço); Relatórios + Vouchers; Pix, pendências, taxas de cancelamento, alertas e central de notificações.
 - **Falta:** cadastros completos (motorista, empresa, categoria, nova solicitação), Plantão e Ruas, telas de centrais (Controle financeiro, Meus planos, Demonstrativo, seletor), Funil de Clientes e Mapa de Bairros e Demanda (do 88), comparação tela a tela no navegador, carga de 500 corridas, Docker.
 - **Pendente de arquivo:** o arquivo completo das casas (só há 400 linhas de exemplo); o usuário precisa exportar do servidor.
+
+### Atualização (13/11/2026, noite)
+- **Também no main:** Pix, pendências, taxas de cancelamento, alertas e central de notificações; Relatórios e Vouchers; Tarifa (Editar tarifa) e Dinâmica; matriz de descontos já entra no preço da corrida. 203 testes passando.
+- **Em andamento (ramos machine-*):** cadmot (motorista e empresa), cadcat (categoria e nova solicitação), plarua (Plantão, Ruas, Áreas, Funil de Clientes, Mapa de Bairros), centr (telas de centrais).
+- **Depois:** comparar tela a tela com a Machine no navegador, carga de 500 corridas, Docker, up.veloov.com.

@@ -200,3 +200,7 @@
 .dm-faixa { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
 .dm-faixa .botao-tema { margin: 0; flex-shrink: 0; }
 @media (max-width: 760px) { .barra-celular .dm-sino-painel { position: fixed; top: 56px; right: 4%; } }
+.dm-legenda { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 4px 0; font-size: 13px; } .dm-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; } .dm-legenda small { opacity: .7; }
+.dm-guia { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; } .dm-guia p { flex: 1; margin: 0; }
+.dm-etiqueta { font-weight: 700; background: #fff; border: 1px solid #cbd5e1; }
+.dm-tarifas { margin-top: 10px; border-top: 1px solid var(--borda, #e2e8f0); padding-top: 10px; } .dm-cat:has(.dm-tarifas) { grid-column: 1 / -1; }

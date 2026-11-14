@@ -11,7 +11,7 @@ const { datasDoPeriodo, variacao, nps } = await import("../src/servidor/indicado
 const D = await import("../src/servidor/dados.ts");
 
 test("menu: grupos na ordem da referência, 'Mais' no fim, ids e rotas fixos", () => {
-  assert.deepEqual(GRUPOS, ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Config", "Avaliações", "Ajuda", "Mais"]);
+  assert.deepEqual(GRUPOS, ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Config", "Cobrança", "Avaliações", "Ajuda", "Mais"]);
   const ids = ["painel", "motoristas", "destravar", "passageiros", "veiculos", "equipe", "cupons", "empresas", "areas", "punicoes", "desafios", "indicacoes", "solicitar", "recuperacao", "monitoramento", "mapa", "historico", "ocorrencias", "programadas", "pagamentos-pendentes", "objetos", "carteiras", "extrato", "saques", "recargas", "relatorios", "conversas", "notificacoes", "config-gerais", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app", "avaliacoes", "juridico", "central-ajuda", "alterar-senha"];
   for (const id of ids) {
     const f = FUNCOES.find((x) => x.id === id);

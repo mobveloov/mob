@@ -2,7 +2,7 @@
 // mais o grupo "Mais" no fim com as telas próprias (CRM, bot, totem, IA, apps, marca...).
 // Os ids e as rotas são fixos: cada tela é ligada ao menu pelo id (src/web/App.tsx).
 
-export type Grupo = "Painel" | "Cadastro" | "Corridas" | "Financeiro" | "Comunicação" | "Config" | "Avaliações" | "Ajuda" | "Mais" | "Usuário";
+export type Grupo = "Painel" | "Cadastro" | "Corridas" | "Financeiro" | "Comunicação" | "Config" | "Cobrança" | "Avaliações" | "Ajuda" | "Mais" | "Usuário";
 
 export interface Funcao {
   id: string;
@@ -89,6 +89,10 @@ export const FUNCOES: Funcao[] = [
   { id: "config-nps", grupo: "Config", nome: "Configuração NPS", rota: "/config-nps", soAdmin: true },
   { id: "termos-app", grupo: "Config", nome: "Termos de Uso App", rota: "/termos-app", soAdmin: true },
 
+  { id: "demonstrativo-mensal", grupo: "Cobrança", nome: "Demonstrativo Mensal", rota: "/demonstrativo-mensal", soAdmin: true },
+  { id: "meus-planos", grupo: "Cobrança", nome: "Meus planos", rota: "/meus-planos", soAdmin: true },
+  { id: "controle-centrais", grupo: "Cobrança", nome: "Controle financeiro de centrais", rota: "/controle-centrais", soAdmin: true, novo: true },
+
   { id: "avaliacoes", grupo: "Avaliações", nome: "Avaliações", rota: "/avaliacoes", antigas: ["/nps"] },
 
   { id: "juridico", grupo: "Ajuda", nome: "Jurídico & Leis", rota: "/juridico" },
@@ -111,6 +115,6 @@ export const FUNCOES: Funcao[] = [
 ];
 
 /** Grupos do menu do topo, na ordem da referência ("Mais" no fim). "Usuário" fica no menu à direita. */
-export const GRUPOS: Grupo[] = ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Config", "Avaliações", "Ajuda", "Mais"];
+export const GRUPOS: Grupo[] = ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Config", "Cobrança", "Avaliações", "Ajuda", "Mais"];
 
 export const funcaoPorId = (id: string) => FUNCOES.find((f) => f.id === id) ?? null;

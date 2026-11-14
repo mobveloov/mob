@@ -114,6 +114,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
       nome: c.passageiro.nome, telefone: aberta && papel === "motorista" ? c.passageiro.telefone : "",
       ...(papel === "motorista" ? { foto: urlDaFoto(empresaId, "passageiro", c.passageiro.telefone), nota: estatisticas(empresaId, "passageiro", c.passageiro.telefone).nota, corridas: estatisticas(empresaId, "passageiro", c.passageiro.telefone).viagens } : {}),
     },
+    ...(papel === "motorista" ? { infoAntes: c.infoAntes ?? "", infoDepois: c.motoristaId ? c.infoDepois ?? "" : "" } : {}),
     canal: c.canal, valorOferecido: c.valorOferecido ?? null, opcionais: c.opcionais ?? [], etiquetas: c.etiquetas ?? [],
     modo: c.macaneta?.modo, distanciaPercorridaKm: c.macaneta ? c.macaneta.km : undefined,
     ...(papel === "passageiro" ? { ...aproximacao(empresaId, c), mensagensNaoLidas: aberta ? naoLidas(empresaId, c.id, "passageiro") : 0 } : {}),
@@ -274,7 +275,7 @@ export function ofertaParaApp(empresaId: string, o: Oferta) {
   const extras = extrasDaChamada(empresaId, c, o.motoristaId, o.distanciaKm);
   return {
     id: o.id, expira: o.expira, segundos: Math.max(0, Math.round((o.expira - Date.now()) / 1000)), distanciaKm: o.distanciaKm, ...extras,
-    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, ...extras },
+    corrida: { id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao, infoAntes: c.infoAntes ?? "", estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, ...extras },
   };
 }
 
@@ -501,7 +502,7 @@ const kmAteEmbarque = (e: Estado, motoristaId: string, c: CorridaPropria): numbe
 function dadosDaLista(empresaId: string, c: CorridaPropria, motoristaId: string, km: number | null) {
   return {
     id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
-    estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null,
+    infoAntes: c.infoAntes ?? "", estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null,
     status: c.status, statusTexto: STATUS_TEXTO[c.status], solicitadaEm: c.solicitadaEm, distanciaKm: km, ...extrasDaChamada(empresaId, c, motoristaId, km),
   };
 }
