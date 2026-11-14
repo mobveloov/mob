@@ -9,7 +9,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { banco, migrarUmaVez } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
-import type { ConfigBot, Conversa } from "./tipos.ts";
+import { normalizeBotControl } from "./controle.ts";
+import { normalizeBotTexts, normalizeFaq, normalizeGreeting } from "./textos-editaveis.ts";
+import { normalizeStatusMessages } from "./mensagens-status.ts";
+import { FLUXO_PADRAO, type ConfigBot, type Conversa, type FluxoBot } from "./tipos.ts";
 
 export const CHAVE_SEGREDOS = "bot-whatsapp";
 const MAX_MENSAGENS = 300;
@@ -34,7 +37,19 @@ function gravar(arq: string, valor: unknown) {
 export const instanciaPadrao = (empresaId: string) => `bot-${empresaId}`;
 
 export function configPadrao(empresaId: string): ConfigBot {
-  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId) };
+  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId), ...avancadaPadrao() };
+}
+
+const avancadaPadrao = () => ({
+  fluxo: { ...FLUXO_PADRAO }, textos: {}, saudacao: normalizeGreeting(null), faq: [], controle: normalizeBotControl(null), textosStatus: {},
+});
+
+/** Confere as configurações avançadas (fluxo, textos, saudação, respostas prontas, comandos, status). */
+export function sanearAvancada(c: Partial<ConfigBot>): Pick<ConfigBot, "fluxo" | "textos" | "saudacao" | "faq" | "controle" | "textosStatus"> {
+  const f = (c.fluxo ?? {}) as Partial<FluxoBot>;
+  const fluxo = { ...FLUXO_PADRAO };
+  for (const k of Object.keys(FLUXO_PADRAO) as Array<keyof FluxoBot>) if (typeof f[k] === "boolean") fluxo[k] = f[k]!;
+  return { fluxo, textos: normalizeBotTexts(c.textos), saudacao: normalizeGreeting(c.saudacao), faq: normalizeFaq(c.faq), controle: normalizeBotControl(c.controle), textosStatus: normalizeStatusMessages(c.textosStatus) };
 }
 
 export function config(empresaId: string): ConfigBot {
@@ -44,10 +59,15 @@ export function config(empresaId: string): ConfigBot {
     ativo: c.ativo ?? p.ativo,
     provedor: c.provedor === "evolution" ? "evolution" : "simulado",
     instancia: typeof c.instancia === "string" && c.instancia ? c.instancia : p.instancia,
+    ...sanearAvancada(c),
   };
 }
 
-export const salvarConfig = (empresaId: string, c: ConfigBot) => gravar(path.join(pasta(empresaId), "config.json"), c);
+/** Grava a config. Campos que não vierem ficam como estão (as configurações avançadas não somem ao mudar só a conexão). */
+export function salvarConfig(empresaId: string, c: Pick<ConfigBot, "ativo" | "provedor" | "instancia"> & Partial<ConfigBot>) {
+  const arq = path.join(pasta(empresaId), "config.json");
+  gravar(arq, { ...ler<Record<string, unknown>>(arq, {}), ...c });
+}
 
 /** Segredos do bot da empresa: urlApi e token (só se a empresa usa servidor próprio) e segredoWebhook. */
 export function segredosBot(empresaId: string): Record<string, string> {

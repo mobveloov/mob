@@ -98,13 +98,13 @@ test("conversa completa: menu, embarque, destino, confirmação, categoria, paga
   // Status mudado no painel -> mensagem ao passageiro.
   assert.equal(await atualizarStatus(empresa.id, tel), null); // ainda procurando
   await R.atribuirMotorista(empresa.id, corrida.id, motorista.id);
-  assert.match((await atualizarStatus(empresa.id, tel))!, /Ana Souza aceitou.*Carro prata, placa ABC1D23/s);
+  assert.match((await atualizarStatus(empresa.id, tel))!, /Corrida confirmada.*Ana Souza.*Carro prata, placa ABC1D23/s);
   await R.mudarStatus(empresa.id, corrida.id, "no_local");
   assert.match((await atualizarStatus(empresa.id, tel))!, /chegou/);
   await R.mudarStatus(empresa.id, corrida.id, "em_andamento");
-  assert.match((await atualizarStatus(empresa.id, tel))!, /iniciada/);
+  assert.match((await atualizarStatus(empresa.id, tel))!, /em andamento/);
   await R.mudarStatus(empresa.id, corrida.id, "finalizada");
-  assert.match((await atualizarStatus(empresa.id, tel))!, /finalizada.*R\$ 9,00/s);
+  assert.match((await atualizarStatus(empresa.id, tel))!, /viagem foi concluida.*R\$ 9,00/s);
   assert.equal(await atualizarStatus(empresa.id, tel), null); // nada mais a olhar
   c = A.conversa(empresa.id, tel)!;
   assert.equal(c.etapa, "avaliacao");
@@ -203,7 +203,7 @@ test("cancelar pelo WhatsApp cancela a corrida própria; cancelamento da central
   const nova = propria(tel).find((x) => x.status === "procurando")!;
   assert.equal(nova.pagamento, "Cartão na maquininha");
   await R.cancelarCorrida(empresa.id, nova.id, "Central", "Sem carro");
-  assert.match((await atualizarStatus(empresa.id, tel))!, /cancelada \(central\)/);
+  assert.match((await atualizarStatus(empresa.id, tel))!, /cancelada pela central/);
   assert.equal(A.conversa(empresa.id, tel)!.etapa, "inicio");
 });
 

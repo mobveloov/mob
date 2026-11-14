@@ -6,8 +6,11 @@ import { validarUrlExterna } from "../servidor/url.ts";
 import { CANCELAR, classificarComIa, ehCumprimento, limparEndereco, MENU, NAO, normalizar, opcao, pareceEndereco, pareceRua, SEM_DESTINO, SIM, type Classificador } from "./entender.ts";
 import { clienteDoTelefone, corridasDoBot } from "./corridas.ts";
 import { provedorEvolution, provedorSimulado, type ProvedorWhatsApp } from "./provedores.ts";
+import { botSilencedFor, brPhoneVariants, parseBotCommand, parseBotCommandWithPhone, type BotCommand } from "./controle.ts";
+import { decideSkip } from "./destino.ts";
+import { customText, matchFaq, shouldSendGreetingImage } from "./textos-editaveis.ts";
 import { marcador, NOME_STATUS, PAGAMENTOS, T, type Marcador } from "./textos.ts";
-import type { CategoriaBot, Conversa, CorridaBot, Local, Recebida } from "./tipos.ts";
+import type { CategoriaBot, ConfigBot, Conversa, CorridaBot, Local, Recebida } from "./tipos.ts";
 
 export interface Dependencias {
   provedor?: ProvedorWhatsApp;
@@ -62,7 +65,27 @@ export function receber(empresaId: string, r: Recebida, deps: Dependencias = {})
   return A.naFila(empresaId, r.telefone, () => tratar(empresaId, r, deps));
 }
 
+/** Comando digitado pela central no WhatsApp do bot (#bloquear, #desbloquear, #pausar, #voltar). Vale para o contato da conversa. */
+function comandoDaCentral(empresaId: string, r: Recebida, cfg: ConfigBot): string[] {
+  const texto = (r.texto ?? "").trim();
+  const comNumero = parseBotCommandWithPhone(texto, cfg.controle);
+  const cmd: BotCommand | null = comNumero?.cmd ?? parseBotCommand(texto, cfg.controle);
+  if (!cmd) return [];
+  // Com número ("#bloquear 16 99293-0774") vale para aquele contato; sem número, para quem está na conversa.
+  const alvo = comNumero ? comNumero.phone : r.telefone;
+  const existente = brPhoneVariants(alvo).map((t) => A.conversa(empresaId, t)).find(Boolean);
+  const c = existente ?? A.novaConversa(alvo, clienteDoTelefone(empresaId, alvo)?.nome || "");
+  if (cmd === "block") c.bloqueado = true;
+  if (cmd === "unblock") c.bloqueado = false;
+  if (cmd === "pause") c.pausadoAte = new Date(Date.now() + cfg.controle.pauseMinutes * 60_000).toISOString();
+  if (cmd === "resume") c.pausadoAte = undefined;
+  A.salvarConversa(empresaId, c);
+  return [];
+}
+
 async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promise<string[]> {
+  const cfg = A.config(empresaId);
+  if (r.daCentral) return comandoDaCentral(empresaId, r, cfg);
   const c = A.conversa(empresaId, r.telefone) ?? A.novaConversa(r.telefone, clienteDoTelefone(empresaId, r.telefone)?.nome || r.nome || "");
   if (c.vistas.includes(r.id)) return []; // o provedor mandou de novo a mesma mensagem
   c.vistas.push(r.id);
@@ -71,35 +94,79 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   c.mensagens.push({ de: "passageiro", texto: texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
   c.naoLidas++;
 
+  // Bloqueado pela central ou com o bot pausado: o bot fica quieto (a conversa continua no painel para a equipe).
+  if (botSilencedFor({ blocked: c.bloqueado, paused_until: c.pausadoAte ?? null })) {
+    A.salvarConversa(empresaId, c);
+    return [];
+  }
+
   const respostas: string[] = [];
-  const ctx: Passo = { empresaId, c, r, texto, n: normalizar(texto), m: marcador(empresaId), dizer: (t) => respostas.push(t), deps };
+  const ctx: Passo = {
+    empresaId, c, r, texto, n: normalizar(texto), m: marcador(empresaId), dizer: (t) => respostas.push(t), deps, cfg,
+    txt: (chave, padrao) => customText(cfg.textos, chave, padrao),
+  };
   try {
     await passo(ctx);
   } catch (e) {
     console.error("[bot] fluxo", empresaId, e instanceof Error ? e.message : e);
-    respostas.push(T.erroCriar());
+    respostas.push(ctx.txt("ride_error", T.erroCriar()));
   }
   for (const t of respostas) c.mensagens.push({ de: "bot", texto: t, em: agora() });
+  const provedor = deps.provedor ?? provedorDe(empresaId);
+  if (ctx.imagem) {
+    c.mensagens.splice(c.mensagens.length - respostas.length, 0, { de: "bot", texto: `🖼️ ${ctx.imagem.url}${ctx.imagem.caption ? `\n${ctx.imagem.caption}` : ""}`, em: agora() });
+  }
   A.salvarConversa(empresaId, c);
-  await enviar(empresaId, deps.provedor ?? provedorDe(empresaId), c.id, respostas);
+  if (ctx.imagem) {
+    try { await provedor.enviarImagem(c.id, ctx.imagem.url, ctx.imagem.caption); } catch (e) { console.error("[bot] imagem", empresaId, e instanceof Error ? e.message : e); }
+  }
+  await enviar(empresaId, provedor, c.id, respostas);
   return respostas;
 }
 
 interface Passo {
   empresaId: string; c: Conversa; r: Recebida; texto: string; n: string; m: Marcador;
-  dizer: (t: string) => void; deps: Dependencias;
+  dizer: (t: string) => void; deps: Dependencias; cfg: ConfigBot;
+  /** Texto da empresa para a chave (Bot de WhatsApp › Mensagens), ou o padrão. */
+  txt: (chave: string, padrao: string) => string;
+  /** Imagem de saudação a mandar antes das respostas. */
+  imagem?: { url: string; caption: string };
 }
 
 const localDe = (r: Recebida): Local | null => (r.local ? { texto: r.local.texto || "Localização enviada", lat: r.local.lat, lng: r.local.lng } : null);
 
-function irPara(p: Passo, etapa: Conversa["etapa"]) {
-  p.c.etapa = etapa;
-  if (etapa === "menu") p.dizer(T.menu(p.m, p.c.nome));
-  if (etapa === "embarque") p.dizer(T.embarque());
-  if (etapa === "destino") p.dizer(T.destino());
-  if (etapa === "confirmar") p.dizer(T.confirmar(p.c.rascunho));
-  if (etapa === "pagamento") p.dizer(T.pagamento());
-  if (etapa === "suporte") p.dizer(T.suporte(p.m));
+const OPCOES_MENU = "\n*1* - Pedir uma corrida\n*2* - Falar com o suporte";
+
+function textoMenu(p: Passo): string {
+  const custom = customText(p.cfg.textos, p.c.historico.length ? "welcome_back" : "welcome_menu", "");
+  return custom ? `${custom}${OPCOES_MENU}` : T.menu(p.m, p.c.nome);
+}
+
+function irPara(p: Passo, etapa: Conversa["etapa"], corrigindo = false): void | Promise<void> {
+  const { cfg, c } = p;
+  // Menu de boas-vindas desligado: vai direto para o endereço de embarque.
+  if (etapa === "menu" && !cfg.fluxo.show_welcome_menu && !corrigindo && !bloqueado(p)) return irPara(p, "embarque");
+  // Pedir destino desligado: segue sem destino.
+  if (etapa === "destino" && !cfg.fluxo.ask_destination) { c.rascunho.semDestino = true; c.rascunho.destino = undefined; return irPara(p, "confirmar"); }
+  // Confirmar endereços desligado: avança direto para as categorias.
+  if (etapa === "confirmar" && !cfg.fluxo.confirm_address) { c.etapa = "confirmar"; return mostrarCategorias(p); }
+  c.etapa = etapa;
+  if (etapa === "menu") {
+    if (shouldSendGreetingImage(cfg.saudacao, c.imagemEm, Date.now())) { p.imagem = { url: cfg.saudacao.imageUrl, caption: cfg.saudacao.caption }; c.imagemEm = agora(); }
+    p.dizer(textoMenu(p));
+  }
+  if (etapa === "embarque") p.dizer(corrigindo ? p.txt("address_correction", T.embarqueCorrecao()) : p.txt("ask_address", T.embarque()));
+  if (etapa === "destino") {
+    const base = p.txt("ask_destination", "");
+    p.dizer(base ? `${base}${cfg.fluxo.allow_skip_destination ? "\nSe preferir não informar, responda *2*." : ""}` : T.destino(cfg.fluxo.allow_skip_destination));
+  }
+  if (etapa === "confirmar") p.dizer(T.confirmar(c.rascunho));
+  if (etapa === "pagamento") {
+    if (!cfg.fluxo.ask_payment) { c.rascunho.pagamento = PAGAMENTOS[0]; return criar(p); } // a corrida própria exige uma forma: sem perguntar, vai Dinheiro
+    const base = p.txt("ask_payment", "");
+    p.dizer(base ? `${base}\n${PAGAMENTOS.map((x, i) => `*${i + 1}* - ${x}`).join("\n")}` : T.pagamento());
+  }
+  if (etapa === "suporte") p.dizer(p.txt("support_forward", T.suporte(p.m)));
 }
 
 async function passo(p: Passo) {
@@ -119,10 +186,20 @@ async function passo(p: Passo) {
   }
 
   if (c.etapa === "suporte") {
-    if (MENU.test(n)) return irPara(p, "menu");
+    if (MENU.test(n)) { const saiu = p.txt("support_exit", ""); if (saiu) p.dizer(saiu); return irPara(p, "menu"); }
     return; // o operador responde pelo painel
   }
   if (MENU.test(n) && c.etapa !== "inicio") { c.rascunho = {}; return irPara(p, "menu"); }
+
+  // Respostas prontas ("aceita pet?"): no começo vale qualquer pergunta; no meio do pedido só com "?" (não confunde com endereço).
+  if (texto && !localDe(r) && ["inicio", "menu", "embarque", "destino", "confirmar"].includes(c.etapa)) {
+    const resposta = matchFaq(texto, p.cfg.faq, c.etapa !== "inicio" && c.etapa !== "menu");
+    if (resposta) {
+      p.dizer(resposta.answer);
+      if (c.etapa === "embarque" || c.etapa === "destino" || c.etapa === "confirmar") irPara(p, c.etapa); // volta à pergunta do pedido
+      return;
+    }
+  }
 
   switch (c.etapa) {
     case "inicio":
@@ -140,39 +217,45 @@ async function passo(p: Passo) {
       if (o === 1) return irPara(p, "embarque");
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; return irPara(p, "destino"); }
       if (!ehCumprimento(texto) && (await fraseLivre(p))) return;
-      return p.dizer(T.menuDeNovo());
+      return p.dizer(p.txt("welcome_repeat", "") ? `${p.txt("welcome_repeat", "")}${OPCOES_MENU}` : T.menuDeNovo());
     }
 
     case "embarque":
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; return irPara(p, "destino"); }
       if (pareceEndereco(texto)) { c.rascunho.embarque = { texto: limparEndereco(texto) }; return irPara(p, "destino"); }
-      return p.dizer(T.embarqueDeNovo());
+      return p.dizer(p.txt("address_retry", T.embarqueDeNovo()));
 
     case "destino":
-      if (n === "2" || SEM_DESTINO.test(n)) { c.rascunho.semDestino = true; c.rascunho.destino = undefined; return irPara(p, "confirmar"); }
+      {
+        // "Não informar destino": segue sem destino ou, se a empresa tornou o destino obrigatório, explica e pergunta de novo.
+        const quer = n === "2" || SEM_DESTINO.test(n) || decideSkip(true, texto) === "skip";
+        const pular = quer ? (p.cfg.fluxo.allow_skip_destination ? "skip" : "required") : "none";
+        if (pular === "skip") { c.rascunho.semDestino = true; c.rascunho.destino = undefined; return irPara(p, "confirmar"); }
+        if (pular === "required") return p.dizer(T.destinoObrigatorio());
+      }
       if (localDe(r)) { c.rascunho.destino = localDe(r)!; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
       if (pareceEndereco(texto)) { c.rascunho.destino = { texto: limparEndereco(texto) }; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
-      return p.dizer(T.destinoDeNovo());
+      return p.dizer(p.txt("destination_retry", T.destinoDeNovo(p.cfg.fluxo.allow_skip_destination)));
 
     case "confirmar": {
       const o = opcao(texto, 2, { 1: SIM, 2: NAO });
       if (o === 1) return mostrarCategorias(p);
-      if (o === 2) { c.rascunho = {}; return irPara(p, "embarque"); }
-      return p.dizer(T.confirmarDeNovo());
+      if (o === 2) { c.rascunho = {}; return irPara(p, "embarque", true); }
+      return p.dizer(p.txt("confirm_retry", T.confirmarDeNovo()));
     }
 
     case "categoria": {
       const lista = c.rascunho.categorias ?? [];
       let o = opcao(texto, lista.length);
       if (!o) { const i = lista.findIndex((x) => normalizar(x.nome) === n); o = i >= 0 ? i + 1 : null; }
-      if (!o) return p.dizer(T.categoriaDeNovo(lista.length));
+      if (!o) return p.dizer(`${p.txt("category_retry", "")}${p.txt("category_retry", "") ? "\n" : ""}${p.txt("category_retry", "") ? T.categorias(lista) : T.categoriaDeNovo(lista.length)}`);
       c.rascunho.categoria = lista[o - 1];
       return irPara(p, "pagamento");
     }
 
     case "pagamento": {
       const o = opcao(texto, PAGAMENTOS.length, { 1: /\bdinheiro\b/, 2: /\bpix\b/, 3: /\b(cartao|credito|debito|maquininha)\b/ });
-      if (!o) return p.dizer(T.pagamentoDeNovo());
+      if (!o) return p.dizer(p.txt("payment_retry", "") ? `${p.txt("payment_retry", "")}\n${PAGAMENTOS.map((x, i) => `*${i + 1}* - ${x}`).join("\n")}` : T.pagamentoDeNovo());
       c.rascunho.pagamento = PAGAMENTOS[o - 1];
       return criar(p);
     }
@@ -221,7 +304,7 @@ async function fraseLivre(p: Passo): Promise<boolean> {
   return false;
 }
 
-async function mostrarCategorias(p: Passo) {
+async function mostrarCategorias(p: Passo): Promise<void> {
   const { c } = p;
   let lista: CategoriaBot[] = [];
   try {
@@ -229,16 +312,18 @@ async function mostrarCategorias(p: Passo) {
   } catch (e) {
     console.error("[bot] categorias", p.empresaId, e instanceof Error ? e.message : e);
   }
-  if (!lista.length) { p.dizer(T.semCategorias()); c.rascunho.categoria = undefined; return irPara(p, "pagamento"); }
+  if (!lista.length) { if (p.cfg.fluxo.ask_category) p.dizer(T.semCategorias()); c.rascunho.categoria = undefined; return irPara(p, "pagamento"); }
+  if (!p.cfg.fluxo.ask_category) { c.rascunho.categoria = lista[0]; return irPara(p, "pagamento"); }
   c.rascunho.categorias = lista;
   c.etapa = "categoria";
-  p.dizer(T.categorias(lista));
+  const titulo = p.txt("ask_category", "");
+  p.dizer(titulo ? T.categorias(lista).replace(/^[^\n]*/, titulo) : T.categorias(lista));
 }
 
-async function criar(p: Passo) {
+async function criar(p: Passo): Promise<void> {
   const { c, empresaId } = p;
   const rasc = c.rascunho;
-  if (!rasc.embarque || !rasc.pagamento) { c.rascunho = {}; return irPara(p, "embarque"); }
+  if (!rasc.embarque || rasc.pagamento === undefined) { c.rascunho = {}; return irPara(p, "embarque"); }
   // Trava: a etapa "criando" fica gravada antes de chamar o sistema de origem.
   c.etapa = "criando";
   A.salvarConversa(empresaId, c);
@@ -251,14 +336,15 @@ async function criar(p: Passo) {
     c.corrida = { id: nova.id, os: nova.os, status: "procurando", grupo: "aberta", criadaEm: agora(), valor: nova.valor };
     c.etapa = "em_corrida";
     c.rascunho = {};
-    p.dizer(T.criada(nova.os, nova.valor));
+    const ok = p.txt("ride_success", "");
+    p.dizer(ok ? `${ok}\nNúmero *${nova.os}*.${nova.valor ? ` Valor estimado: *R$ ${nova.valor.toFixed(2).replace(".", ",")}*.` : ""}\nPara cancelar, envie *cancelar*.` : T.criada(nova.os, nova.valor));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[bot] criar corrida", empresaId, msg);
     if (/em aberto/i.test(msg)) { c.etapa = "inicio"; c.rascunho = {}; return p.dizer(T.jaTemAberta(msg.replace(/^Este passageiro já tem/, "Você já tem"))); }
     if (/bloqueado/i.test(msg)) { c.etapa = "menu"; c.rascunho = {}; return p.dizer(T.bloqueado(p.m)); }
-    c.etapa = "pagamento";
-    p.dizer(T.erroCriar());
+    c.etapa = p.cfg.fluxo.ask_payment ? "pagamento" : "menu";
+    p.dizer(p.txt("ride_error", T.erroCriar()));
   }
 }
 
@@ -302,10 +388,24 @@ export function encerrarAtendimento(empresaId: string, conversaId: string, deps:
     if (c.etapa !== "suporte") return c;
     c.etapa = "inicio";
     c.rascunho = {};
-    const t = T.fimAtendimento();
+    const t = customText(A.config(empresaId).textos, "support_thanks", T.fimAtendimento());
     c.mensagens.push({ de: "bot", texto: t, em: agora() });
     A.salvarConversa(empresaId, c);
     await enviar(empresaId, deps.provedor ?? provedorDe(empresaId), c.id, [t]);
+    return c;
+  });
+}
+
+/** Bloquear, desbloquear, pausar ou voltar o bot com um contato (mesmos comandos da central, pela tela Conversas). */
+export function controlarConversa(empresaId: string, conversaId: string, cmd: BotCommand) {
+  return A.naFila(empresaId, conversaId, async () => {
+    const c = A.conversa(empresaId, conversaId);
+    if (!c) throw new Error("Conversa não encontrada.");
+    if (cmd === "block") c.bloqueado = true;
+    if (cmd === "unblock") c.bloqueado = false;
+    if (cmd === "pause") c.pausadoAte = new Date(Date.now() + A.config(empresaId).controle.pauseMinutes * 60_000).toISOString();
+    if (cmd === "resume") c.pausadoAte = undefined;
+    A.salvarConversa(empresaId, c);
     return c;
   });
 }

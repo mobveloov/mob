@@ -1,4 +1,4 @@
-// Catálogo do CRM (portado do mobveloov): variáveis, modelos prontos de template e tipos de gatilho.
+// Catálogo do CRM (portado do sistema de referência): variáveis, modelos prontos de template e tipos de gatilho.
 // Sem a Machine: a corrida é nativa, então os eventos vêm das corridas do próprio painel.
 
 export type CategoriaTemplate = "coupon" | "expiration_warning" | "referral" | "reactivation" | "birthday" | "loyalty" | "sweepstake" | "nps" | "welcome" | "abandoned" | "post_ride" | "operational" | "strategic" | "custom";

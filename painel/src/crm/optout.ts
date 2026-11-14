@@ -1,4 +1,4 @@
-// Descadastro do WhatsApp do CRM (portado do mobveloov, v16.122). Regras de texto, sem banco.
+// Descadastro do WhatsApp do CRM (portado do sistema de referência, v16.122). Regras de texto, sem banco.
 // A parte que grava e consulta fica em optout-banco.ts (SQLite).
 export const WA_OPTOUT_FOOTER =
   "Não deseja mais receber nossas mensagens? Responda *NÃO QUERO MAIS* que removeremos seu número da nossa lista de comunicação pelo WhatsApp.";

@@ -18,7 +18,7 @@ type Aba = "dashboard" | "triggers" | "queue" | "journeys" | "regua" | "behavior
   | "passengers" | "drivers" | "behavior" | "contacts" | "segments" | "rfm" | "conversion" | "heatmap" | "rewards" | "cities" | "governance" | "audit";
 interface Item { key: Aba; label: string; icon: LucideIcon }
 
-// Mesmos grupos e abas, na mesma ordem, do CRM do mobveloov. A aba "Machine" não existe aqui: a corrida é nativa.
+// Mesmos grupos e abas, na mesma ordem, do CRM do sistema de referência. A aba "Machine" não existe aqui: a corrida é nativa.
 const GRUPOS: Array<{ key: string; label: string; icon: LucideIcon; abas: Item[] }> = [
   { key: "overview", label: "Visão Geral", icon: LayoutDashboard, abas: [{ key: "dashboard", label: "Visão Geral", icon: LayoutDashboard }] },
   { key: "automation", label: "Automação", icon: Zap, abas: [
@@ -42,7 +42,7 @@ const GRUPOS: Array<{ key: string; label: string; icon: LucideIcon; abas: Item[]
   ] },
 ];
 
-/** Abas do mobveloov que ainda não foram portadas: a tela diz isso claramente (nada de dado inventado). */
+/** Abas do sistema de referência que ainda não foram portadas: a tela diz isso claramente (nada de dado inventado). */
 const AINDA_NAO: Partial<Record<Aba, string>> = {
   triggers: "Gatilhos por evento (cadastro, simulação, status da corrida, aniversário)", queue: "Fila de dispatches", regua: "Régua de reativação",
   behavior_templates: "Templates comportamentais", logs: "Notificações enviadas", behavior_history: "Histórico de disparos", behavior: "Comportamentos",
@@ -50,7 +50,7 @@ const AINDA_NAO: Partial<Record<Aba, string>> = {
   cities: "Cidades", governance: "Governança", audit: "Auditoria",
 };
 
-/** CRM & Engajamento: menu em grupos (o grupo escolhe as abas da segunda linha), igual ao do mobveloov. */
+/** CRM & Engajamento: menu em grupos (o grupo escolhe as abas da segunda linha), igual ao do sistema de referência. */
 export default function CrmPainel() {
   const [aba, setAba] = useState<Aba>("dashboard");
   const grupo = GRUPOS.find((g) => g.abas.some((a) => a.key === aba)) ?? GRUPOS[0];

@@ -1,4 +1,4 @@
-// Telas do CRM. "CRM & Engajamento" (Painel) reúne todas em grupos e abas, como no mobveloov.
+// Telas do CRM. "CRM & Engajamento" (Painel) reúne todas em grupos e abas, como no sistema de referência.
 // Registrar em App.tsx, no mapa PAGINAS:  crm: <CrmPainel />
 export { default as CrmPainel } from "./Painel";
 export { default as CrmPublico } from "./Publico";

@@ -7,7 +7,7 @@ import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
 import { exigirLogin, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
-import { encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
+import { controlarConversa, encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
 import { caixaSimulada, soDigitos } from "./provedores.ts";
 import { atualizarStatus, iniciarStatus } from "./status.ts";
 import type { ConfigBot, Conversa, Recebida } from "./tipos.ts";
@@ -71,7 +71,7 @@ rotasBot.put("/config", admin, ok((req, res) => {
   const atual = A.config(id);
   const instancia = typeof b.instancia === "string" && b.instancia.trim() ? b.instancia.trim() : atual.instancia;
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,40}$/.test(instancia)) throw new Error("Nome da instância: 3 a 40 letras, números, - ou _.");
-  const nova: ConfigBot = {
+  const nova: Pick<ConfigBot, "ativo" | "provedor" | "instancia"> = {
     ativo: typeof b.ativo === "boolean" ? b.ativo : atual.ativo,
     provedor: b.provedor === "evolution" ? "evolution" : b.provedor === "simulado" ? "simulado" : atual.provedor,
     instancia,
@@ -86,6 +86,16 @@ rotasBot.put("/config", admin, ok((req, res) => {
   A.salvarConfig(id, nova);
   A.segredoWebhook(id);
   res.json({ ok: true, config: nova });
+}));
+
+/** Mensagens, etapas do fluxo, saudação, respostas prontas, comandos da central e textos de status. Só admin. */
+rotasBot.put("/config/avancada", admin, ok((req, res) => {
+  const id = ctx(req).empresaId;
+  const b = (req.body ?? {}) as Partial<ConfigBot>;
+  const atual = A.config(id);
+  const nova = A.sanearAvancada({ ...atual, ...Object.fromEntries(Object.entries(b).filter(([k]) => ["fluxo", "textos", "saudacao", "faq", "controle", "textosStatus"].includes(k))) });
+  A.salvarConfig(id, { ativo: atual.ativo, provedor: atual.provedor, instancia: atual.instancia, ...nova });
+  res.json({ ok: true, config: { ...A.config(id) } });
 }));
 
 rotasBot.get("/situacao", ok(async (req, res) => {
@@ -110,6 +120,7 @@ const resumo = (c: Conversa) => {
     id: c.id, nome: c.nome, etapa: c.etapa, naoLidas: c.naoLidas, atualizadaEm: c.atualizadaEm,
     ultima: ultima ? { de: ultima.de, texto: ultima.texto.slice(0, 120), em: ultima.em } : null,
     corrida: c.corrida ? { os: c.corrida.os, status: c.corrida.status } : null,
+    bloqueado: c.bloqueado === true, pausadoAte: c.pausadoAte && Date.parse(c.pausadoAte) > Date.now() ? c.pausadoAte : null,
   };
 };
 
@@ -134,6 +145,13 @@ rotasBot.get("/conversas/:id", ok(async (req, res) => {
 rotasBot.post("/conversas/:id/responder", ok(async (req, res) => {
   const c = await responderOperador(ctx(req).empresaId, soDigitos(req.params.id), String(req.body?.texto ?? ""), ctx(req).usuario.nome);
   res.json({ ok: true, etapa: c.etapa });
+}));
+
+rotasBot.post("/conversas/:id/controle", ok(async (req, res) => {
+  const cmd = String(req.body?.comando ?? "");
+  if (!["block", "unblock", "pause", "resume"].includes(cmd)) return res.status(400).json({ erro: "Comando inválido." });
+  const c = await controlarConversa(ctx(req).empresaId, soDigitos(req.params.id), cmd as "block" | "unblock" | "pause" | "resume");
+  res.json({ ok: true, bloqueado: c.bloqueado === true, pausadoAte: c.pausadoAte ?? null });
 }));
 
 rotasBot.post("/conversas/:id/encerrar", ok(async (req, res) => {

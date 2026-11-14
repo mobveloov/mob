@@ -9,6 +9,8 @@ export interface Conexao { situacao: SituacaoConexao; qr?: string; codigo?: stri
 export interface ProvedorWhatsApp {
   readonly tipo: "evolution" | "simulado";
   enviarTexto(telefone: string, texto: string): Promise<void>;
+  /** Imagem de saudação (endereço https público) com legenda opcional. */
+  enviarImagem(telefone: string, url: string, legenda: string): Promise<void>;
   /** Cria/liga a instância e aponta o webhook para o painel. Devolve o QR quando falta ler. */
   conectar(webhookUrl: string): Promise<Conexao>;
   situacao(): Promise<Conexao>;
@@ -41,6 +43,12 @@ export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
       l.push({ telefone: soDigitos(telefone), texto, em: new Date().toISOString() });
       caixas.set(empresaId, l.slice(-500));
     },
+    async enviarImagem(telefone, url, legenda) {
+      const l = caixas.get(empresaId) ?? [];
+      l.push({ telefone: soDigitos(telefone), texto: `🖼️ ${url}${legenda ? `
+${legenda}` : ""}`, em: new Date().toISOString() });
+      caixas.set(empresaId, l.slice(-500));
+    },
     async conectar() { return { situacao: "conectado", qr: QR_SIMULADO, detalhe: "Modo simulado: nenhuma mensagem sai de verdade." }; },
     async situacao() { return { situacao: "conectado", detalhe: "Modo simulado." }; },
     async desconectar() { /* nada */ },
@@ -53,6 +61,7 @@ export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
         id: String(c.id ?? `sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
         telefone, nome: c.nome ? String(c.nome).slice(0, 60) : undefined,
         texto: c.texto != null ? String(c.texto).slice(0, 1000) : undefined,
+        daCentral: c.daCentral === true,
         local: local && Number.isFinite(Number(local.lat)) && Number.isFinite(Number(local.lng))
           ? { lat: Number(local.lat), lng: Number(local.lng), texto: String(local.texto ?? "") } : undefined,
       }];
@@ -117,6 +126,9 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
     async enviarTexto(telefone, texto) {
       await chamar("POST", `/message/sendText/${inst}`, { number: soDigitos(telefone), text: texto });
     },
+    async enviarImagem(telefone, url, legenda) {
+      await chamar("POST", `/message/sendMedia/${inst}`, { number: soDigitos(telefone), mediatype: "image", media: url, caption: legenda });
+    },
     async conectar(webhookUrl) {
       const webhook = { enabled: true, url: webhookUrl, byEvents: false, base64: false, events: EVENTOS };
       const s = await situacao();
@@ -147,12 +159,15 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
             locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string; address?: string } };
         };
         const jid = m.key?.remoteJid ?? "";
-        if (!jid || m.key?.fromMe || !jid.endsWith("@s.whatsapp.net")) continue; // ignora grupos, status e as próprias
+        if (!jid || !jid.endsWith("@s.whatsapp.net")) continue; // ignora grupos (@g.us), status e transmissões
+        const daCentral = m.key?.fromMe === true;
         const loc = m.message?.locationMessage;
         const texto = m.message?.conversation ?? m.message?.extendedTextMessage?.text;
+        // As próprias mensagens do número só interessam se forem comandos da central (#bloquear, #pausar...).
+        if (daCentral && !String(texto ?? "").trim().startsWith("#")) continue;
         out.push({
-          id: String(m.key?.id ?? `${jid}-${Date.now()}`), telefone: soDigitos(jid.split("@")[0]), nome: m.pushName?.slice(0, 60),
-          texto: texto ? texto.slice(0, 1000) : undefined,
+          id: String(m.key?.id ?? `${jid}-${Date.now()}`), telefone: soDigitos(jid.split("@")[0]), nome: daCentral ? undefined : m.pushName?.slice(0, 60),
+          texto: texto ? texto.slice(0, 1000) : undefined, daCentral: daCentral || undefined,
           local: loc && Number.isFinite(loc.degreesLatitude) && Number.isFinite(loc.degreesLongitude)
             ? { lat: loc.degreesLatitude!, lng: loc.degreesLongitude!, texto: [loc.name, loc.address].filter(Boolean).join(" - ") } : undefined,
         });

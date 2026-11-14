@@ -1,6 +1,14 @@
 // Conversa das telas do bot com o servidor (/api/bot). Mesmo jeito do api.ts do painel.
 
-export interface ConfigBot { ativo: boolean; provedor: "evolution" | "simulado"; instancia: string }
+export interface ConfigAvancada {
+  fluxo: { show_welcome_menu: boolean; ask_destination: boolean; allow_skip_destination: boolean; confirm_address: boolean; ask_category: boolean; ask_payment: boolean };
+  textos: Record<string, string>;
+  saudacao: { imageUrl: string; caption: string };
+  faq: Array<{ question: string; keywords: string[]; answer: string }>;
+  controle: { blockWord: string; unblockWord: string; pauseWord: string; resumeWord: string; pauseMinutes: number };
+  textosStatus: Record<string, string>;
+}
+export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: "evolution" | "simulado"; instancia: string }
 export interface RespostaConfig {
   config: ConfigBot; webhook: string | null;
   servidor: { daPlataforma: boolean; plataformaPronta: boolean; urlApi: string; tokenSalvo: boolean };
@@ -14,7 +22,7 @@ export interface ResumoConversa {
 export interface CorridaBot { id: string; os: string; status: string; grupo: string; criadaEm: string; valor?: number; motorista?: string; nota?: number }
 export interface Conversa {
   id: string; nome: string; etapa: string; naoLidas: number; criadaEm: string; atualizadaEm: string;
-  mensagens: Mensagem[]; corrida?: CorridaBot; historico: CorridaBot[];
+  mensagens: Mensagem[]; corrida?: CorridaBot; historico: CorridaBot[]; bloqueado?: boolean; pausadoAte?: string;
 }
 
 const empresaEscolhida = () => { try { return localStorage.getItem("empresa") ?? ""; } catch { return ""; } };
@@ -32,13 +40,15 @@ const json = (method: string, body: unknown): RequestInit => ({ method, headers:
 
 export const apiBot = {
   config: () => pedir<RespostaConfig>("/api/bot/config"),
-  salvar: (d: Partial<ConfigBot> & { urlApi?: string; token?: string }) => pedir<{ ok: true }>("/api/bot/config", json("PUT", d)),
+  salvarAvancada: (d: Partial<ConfigAvancada>) => pedir<{ ok: true }>("/api/bot/config/avancada", json("PUT", d)),
+  salvar: (d: Partial<Pick<ConfigBot, "ativo" | "provedor" | "instancia">> & { urlApi?: string; token?: string }) => pedir<{ ok: true }>("/api/bot/config", json("PUT", d)),
   situacao: () => pedir<Conexao>("/api/bot/situacao"),
   conectar: () => pedir<Conexao>("/api/bot/conectar", { method: "POST" }),
   desconectar: () => pedir<{ ok: true }>("/api/bot/desconectar", { method: "POST" }),
   conversas: (busca = "") => pedir<{ conversas: ResumoConversa[] }>(`/api/bot/conversas?busca=${encodeURIComponent(busca)}`),
   conversa: (id: string) => pedir<{ conversa: Conversa }>(`/api/bot/conversas/${encodeURIComponent(id)}?lida=1`),
   responder: (id: string, texto: string) => pedir<{ ok: true }>(`/api/bot/conversas/${encodeURIComponent(id)}/responder`, json("POST", { texto })),
+  controle: (id: string, comando: "block" | "unblock" | "pause" | "resume") => pedir<{ ok: true; bloqueado: boolean; pausadoAte: string | null }>(`/api/bot/conversas/${encodeURIComponent(id)}/controle`, json("POST", { comando })),
   encerrar: (id: string) => pedir<{ ok: true }>(`/api/bot/conversas/${encodeURIComponent(id)}/encerrar`, { method: "POST" }),
   simular: (d: { telefone: string; nome: string; texto?: string; local?: { lat: number; lng: number; texto: string } }) =>
     pedir<{ respostas: string[] }>("/api/bot/simular", json("POST", d)),

@@ -1,4 +1,4 @@
-// Testes dos templates e dos descadastros do CRM (portados do mobveloov). Nada sai para a internet.
+// Testes dos templates e dos descadastros do CRM (portados do sistema de referência). Nada sai para a internet.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";

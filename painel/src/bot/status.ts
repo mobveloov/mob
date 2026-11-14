@@ -17,7 +17,7 @@ export function atualizarStatus(empresaId: string, conversaId: string, deps: Dep
     const anterior = corrida.status;
     const mudouMotorista = Boolean(d.motorista && d.motorista !== corrida.motorista && d.status === "a_caminho");
     if (d.status === anterior && !mudouMotorista) return null;
-    const texto = textoStatus(marcador(empresaId), d.status, { ...d, anterior });
+    const texto = textoStatus(marcador(empresaId), d.status, { ...d, anterior, passageiro: c.nome, motoristaTrocado: mudouMotorista && anterior === "a_caminho" }, A.config(empresaId).textosStatus);
     corrida.status = d.status;
     corrida.grupo = d.grupo;
     if (d.motorista) corrida.motorista = d.motorista;

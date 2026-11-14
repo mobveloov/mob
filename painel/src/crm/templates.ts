@@ -1,4 +1,4 @@
-// Templates de mensagem do CRM (portado do mobveloov: tabela crm_templates) e descadastros do WhatsApp
+// Templates de mensagem do CRM (portado do sistema de referência: tabela crm_templates) e descadastros do WhatsApp
 // (tabela crm_descadastros). Tudo no banco do painel, por empresa.
 
 import crypto from "node:crypto";
@@ -37,7 +37,7 @@ export function template(e: string, id: string): Template | null {
 const txt = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 const ou = (v: unknown, max: number) => txt(v, max) || null;
 
-/** Confere e normaliza o que veio da tela. Mensagens de erro iguais às do mobveloov. */
+/** Confere e normaliza o que veio da tela. Mensagens de erro iguais às do sistema de referência. */
 export function sanearTemplate(corpo: Record<string, unknown>): Omit<Template, "id" | "created_at"> {
   const name = txt(corpo.name, 120);
   const content = txt(corpo.content, 4000);

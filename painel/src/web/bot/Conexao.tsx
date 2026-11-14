@@ -14,7 +14,7 @@ export function BotConexao() {
   const { sessao } = useSessao();
   const admin = sessao.usuario.papel !== "operador";
   const cfg = useCarregar(() => apiBot.config(), []);
-  const [form, setForm] = useState<ConfigBot & { urlApi: string; token: string }>({ ativo: false, provedor: "simulado", instancia: "", urlApi: "", token: "" });
+  const [form, setForm] = useState<Pick<ConfigBot, "ativo" | "provedor" | "instancia"> & { urlApi: string; token: string }>({ ativo: false, provedor: "simulado", instancia: "", urlApi: "", token: "" });
   const [proprio, setProprio] = useState(false);
   const [conexao, setConexao] = useState<Conexao | null>(null);
   const [msg, setMsg] = useState<{ texto: string; erro?: boolean } | null>(null);
@@ -22,7 +22,7 @@ export function BotConexao() {
 
   useEffect(() => {
     if (!cfg.dados) return;
-    setForm({ ...cfg.dados.config, urlApi: cfg.dados.servidor.urlApi, token: "" });
+    setForm({ ativo: cfg.dados.config.ativo, provedor: cfg.dados.config.provedor, instancia: cfg.dados.config.instancia, urlApi: cfg.dados.servidor.urlApi, token: "" });
     setProprio(!cfg.dados.servidor.daPlataforma);
   }, [cfg.dados]);
   const situacao = useCarregar(() => apiBot.situacao(), [cfg.dados], conexao?.situacao === "aguardando_qr" ? 4000 : 30000);

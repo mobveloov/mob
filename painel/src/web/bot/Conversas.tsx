@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, RefreshCw, Send, Undo2 } from "lucide-react";
+import { Ban, MessageCircle, Pause, Play, RefreshCw, Send, Undo2 } from "lucide-react";
 import { Cartao, useCarregar } from "../componentes/ui";
 import { apiBot, ETAPA, hora, partesWhatsApp, type Mensagem } from "./api";
 
@@ -32,6 +32,11 @@ export function BotConversas() {
     try { await apiBot.responder(aberta, texto); setTexto(""); setErro(null); conv.recarregar(); lista.recarregar(); }
     catch (e) { setErro(e instanceof Error ? e.message : String(e)); }
   };
+  const controlar = async (cmd: "block" | "unblock" | "pause" | "resume") => {
+    if (!aberta) return;
+    try { await apiBot.controle(aberta, cmd); conv.recarregar(); lista.recarregar(); } catch (e) { setErro(e instanceof Error ? e.message : String(e)); }
+  };
+  const pausado = !!c?.pausadoAte && Date.parse(c.pausadoAte) > Date.now();
   const encerrar = async () => {
     if (!aberta) return;
     try { await apiBot.encerrar(aberta); conv.recarregar(); lista.recarregar(); } catch (e) { setErro(e instanceof Error ? e.message : String(e)); }
@@ -70,6 +75,10 @@ export function BotConversas() {
               <span className={`selo ${c.etapa === "suporte" ? "alerta" : c.corrida ? "info" : ""}`}>{ETAPA[c.etapa] ?? c.etapa}</span>
               {c.corrida && <span className="selo info">OS {c.corrida.os}: {c.corrida.status}</span>}
               {c.historico.length > 0 && <span className="selo">{c.historico.length} corrida(s) antes</span>}
+              {c.bloqueado && <span className="selo ruim">Bloqueado</span>}
+              {pausado && <span className="selo alerta">Bot pausado</span>}
+              <button className="botao" onClick={() => controlar(c.bloqueado ? "unblock" : "block")} title="A pessoa não consegue pedir corrida pelo bot"><Ban size={14} /> {c.bloqueado ? "Desbloquear" : "Bloquear"}</button>
+              <button className="botao" onClick={() => controlar(pausado ? "resume" : "pause")} title="O bot fica quieto com essa pessoa para você atender">{pausado ? <Play size={14} /> : <Pause size={14} />} {pausado ? "Voltar o bot" : "Pausar o bot"}</button>
               {c.etapa === "suporte" && <button className="botao direita" onClick={encerrar}><Undo2 size={14} /> Devolver ao bot</button>}
             </div>
             <div className="bot-chat">

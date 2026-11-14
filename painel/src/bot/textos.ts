@@ -1,6 +1,8 @@
 // Textos do bot. Sempre com o nome da empresa e do assistente da marca (white-label).
 
 import * as D from "../servidor/dados.ts";
+import { DEST_REQUIRED_TEXT, DEST_RETRY_REQUIRED_TEXT } from "./destino.ts";
+import { renderStatusMessage, statusKeyFor, type StatusMessages } from "./mensagens-status.ts";
 import type { CategoriaBot, Rascunho } from "./tipos.ts";
 
 export interface Marcador { empresa: string; assistente: string }
@@ -23,9 +25,11 @@ export const T = {
   },
   menuDeNovo: () => "Não entendi. Responda *1* para pedir uma corrida ou *2* para falar com o suporte.",
   embarque: () => "Onde você está? Envie o *endereço de embarque* (rua e número) ou a sua *localização* pelo clipe 📎.",
+  embarqueCorrecao: () => "🔄 Sem problema! Qual é o *endereço* correto de embarque? Envie o endereço ou a localização 📎.",
   embarqueDeNovo: () => "Preciso do endereço de embarque. Exemplo: *Rua das Flores, 120*. Ou envie a localização 📎.",
-  destino: () => "Para onde você vai? Envie o *endereço de destino*.\nSe preferir não informar, responda *2*.",
-  destinoDeNovo: () => "Não entendi o destino. Envie o endereço (exemplo: *Av. Brasil, 500*) ou *2* para seguir sem destino.",
+  destino: (podePular = true) => `Para onde você vai? Envie o *endereço de destino*.${podePular ? "\nSe preferir não informar, responda *2*." : ""}`,
+  destinoDeNovo: (podePular = true) => (podePular ? "Não entendi o destino. Envie o endereço (exemplo: *Av. Brasil, 500*) ou *2* para seguir sem destino." : DEST_RETRY_REQUIRED_TEXT),
+  destinoObrigatorio: () => DEST_REQUIRED_TEXT,
   confirmar: (r: Rascunho) =>
     `Confira o pedido:\n📍 *Embarque:* ${r.embarque?.texto || "localização enviada"}\n🏁 *Destino:* ${r.semDestino ? "não informado (combine com o motorista)" : r.destino?.texto}\n\nEstá certo?\n*1* - Sim\n*2* - Não, quero corrigir`,
   confirmarDeNovo: () => "Responda *1* para confirmar ou *2* para corrigir.",
@@ -50,26 +54,25 @@ export const T = {
   fimAtendimento: () => "Atendimento encerrado. Se precisar, é só mandar uma mensagem.",
 };
 
-/** Mensagem de cada mudança de status da corrida própria. `null` = não avisa. */
-export function textoStatus(m: Marcador, status: string, d: { motorista?: string; veiculo?: string; valor?: number; anterior?: string; canceladaPor?: string }): string | null {
-  switch (status) {
-    case "a_caminho":
-      return `✅ ${d.motorista ?? "Um motorista"} aceitou sua corrida${d.veiculo ? `.
-🚘 ${d.veiculo}` : ""}.
-Já está a caminho.`;
-    case "procurando":
-      return d.anterior === "a_caminho" || d.anterior === "no_local" ? "O motorista desistiu. Já estou procurando outro. 🔎" : null;
-    case "no_local": return "📍 O motorista chegou no local de embarque.";
-    case "em_andamento": return "🚗 Corrida iniciada. Boa viagem!";
-    case "finalizada":
-      return `🏁 Corrida finalizada${d.valor ? `. Valor: *${reais(d.valor)}*` : ""}. Obrigado por viajar com a ${m.empresa}!
-
-Como foi a corrida? Responda de *1* a *5* ⭐`;
-    case "cancelada":
-      return `Sua corrida foi cancelada${d.canceladaPor && d.canceladaPor !== "Passageiro" ? ` (${d.canceladaPor.toLowerCase()})` : ""}. Se ainda precisar, mande uma mensagem para pedir outra.`;
-    case "nao_atendida": return "Não encontrei motorista disponível agora. 😕 Mande uma mensagem para tentar de novo.";
-    default: return null;
+/**
+ * Mensagem de cada mudança de status da corrida própria (texto padrão do sistema de referência, ou o da empresa).
+ * Aceite e troca levam os dados do motorista; finalizada leva o valor e o pedido de nota. `null` = não avisa.
+ */
+export function textoStatus(
+  m: Marcador, status: string,
+  d: { passageiro?: string; motorista?: string; veiculo?: string; valor?: number; anterior?: string; canceladaPor?: string; motoristaTrocado?: boolean },
+  custom?: StatusMessages | null,
+): string | null {
+  const chave = statusKeyFor(status, { driverChanged: d.motoristaTrocado, anterior: d.anterior, canceladaPor: d.canceladaPor });
+  if (!chave) return null;
+  const base = renderStatusMessage(chave, custom, { passageiro: d.passageiro ? primeiroNome(d.passageiro) : "", motorista: d.motorista, empresa: m.empresa });
+  if (!base) return null;
+  if (chave === "accepted" || chave === "driver_changed") {
+    const dados = [d.motorista ? `👤 ${d.motorista}` : "", d.veiculo ? `🚘 ${d.veiculo}` : ""].filter(Boolean).join("\n");
+    return dados ? `${base}\n\n${dados}` : base;
   }
+  if (chave === "completed") return `${base}${d.valor ? `\nValor: *${reais(d.valor)}*.` : ""}\n\nComo foi a corrida? Responda de *1* a *5* ⭐`;
+  return base;
 }
 
 export const NOME_STATUS: Record<string, string> = {

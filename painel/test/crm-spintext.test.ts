@@ -1,4 +1,4 @@
-// Testes do SpinText (portados do mobveloov).
+// Testes do SpinText (portados do sistema de referência).
 import assert from "node:assert/strict";
 import { parseSpinText, processTemplate, validateSpinText } from "../src/crm/spintext.ts";
 

@@ -15,7 +15,7 @@ export function montarTexto(modelo: string, d: DadosTexto): string {
     cupom: d.cupom, empresa: d.empresa, dias_sem_corrida: d.contato.diasSemCorrida == null ? "" : String(d.contato.diasSemCorrida),
     corridas: String(d.contato.corridas),
   };
-  // Estilo do mobveloov: {{variavel}} e SpinText {a|b}. Primeiro nome em {{nome}}; {{nome_completo}} traz o nome todo.
+  // Estilo do sistema de referência: {{variavel}} e SpinText {a|b}. Primeiro nome em {{nome}}; {{nome_completo}} traz o nome todo.
   const duplas: Record<string, string> = { ...valores, nome: valores.primeiro_nome, nome_completo: nome || "tudo bem", os: d.os ?? "", valor: d.valor ?? "", motorista: d.motorista ?? "" };
   let t = modelo.replace(/\{\{(\w+)\}\}/g, (inteiro, k: string) => (k in duplas ? duplas[k] : inteiro));
   t = t.replace(/\{(\w+)\}/g, (inteiro, k: string) => (k in valores ? valores[k] : inteiro));
@@ -66,7 +66,7 @@ export async function variacoesComIa(texto: string, quantidade: number, empresa:
 }
 
 /**
- * "Corrigir com IA + SpinText" (portado do mobveloov): corrige a ortografia e põe {opcao1|opcao2} nas saudações e verbos.
+ * "Corrigir com IA + SpinText" (portado do sistema de referência): corrige a ortografia e põe {opcao1|opcao2} nas saudações e verbos.
  * Só aceita a resposta se as {{variáveis}} ficaram iguais e o SpinText é válido.
  */
 export async function spintextComIa(texto: string, chavesEmpresa: Record<string, string>, extra: Pick<PedidoIa, "fetch" | "env"> = {}) {

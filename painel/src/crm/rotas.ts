@@ -330,7 +330,7 @@ router.put("/config", admin, ok((req, res) => {
   res.json({ config: c });
 }));
 
-// ------------------------------------------------------------------ templates (portado do mobveloov)
+// ------------------------------------------------------------------ templates (portado do sistema de referência)
 
 router.get("/templates", ok((req, res) => res.json({ templates: T.templates(emp(req)) })));
 
