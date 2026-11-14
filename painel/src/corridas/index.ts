@@ -5,6 +5,7 @@
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
 import { aplicarDinamica } from "../config/dinamica.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -63,6 +64,16 @@ export interface NovaCorridaPropria {
   empresaConveniada?: string;
   centroCusto?: string;
   voucher?: string;
+  /** Nova Solicitação (Machine): informação que o motorista vê antes de aceitar, a que vê depois, e a interna (só a central). */
+  infoAntes?: string;
+  infoDepois?: string;
+  infoInterna?: string;
+  /** Telefone de contato informado na solicitação (quando diferente do cadastro). */
+  telefoneContato?: string;
+  /** Oferta enviada a vários carros ao mesmo tempo. */
+  enviarVariosCarros?: boolean;
+  /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
+  valorFinal?: { modo: "livre" | "prefixado"; valor?: number };
 }
 
 export interface CorridaPropria {
@@ -117,6 +128,16 @@ export interface CorridaPropria {
   empresaConveniada?: string;
   centroCusto?: string;
   voucher?: string;
+  /** Nova Solicitação (Machine): informação que o motorista vê antes de aceitar, a que vê depois, e a interna (só a central). */
+  infoAntes?: string;
+  infoDepois?: string;
+  infoInterna?: string;
+  /** Telefone de contato informado na solicitação (quando diferente do cadastro). */
+  telefoneContato?: string;
+  /** Oferta enviada a vários carros ao mesmo tempo. */
+  enviarVariosCarros?: boolean;
+  /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
+  valorFinal?: { modo: "livre" | "prefixado"; valor?: number };
 }
 
 /** Hora de referência da corrida: a agendada (se houver) ou a do pedido. */
@@ -284,6 +305,12 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     const cats = categorias(empresaId);
     const cat = achar(cats, "nome", n.categoria ?? "");
     if (cats.length && (!cat || cat.ativa === false)) throw new Error("Categoria inválida ou desligada.");
+    if (cat) {
+      const modo = extraDaCategoria(empresaId, String(cat.nome ?? "")).solicitacoes;
+      if (modo === "imediatas" && agendadaPara) throw new Error("Esta categoria aceita apenas solicitações imediatas.");
+      if (modo === "agendadas" && !agendadaPara) throw new Error("Esta categoria aceita apenas corridas agendadas.");
+    }
+    if (n.valorFinal?.modo === "prefixado" && !(Number(n.valorFinal.valor) > 0)) throw new Error("Informe o valor prefixado da corrida.");
     const cliente = listar(empresaId, cadastroPorId("clientes")!).find((c) => c.telefone === telefone);
     if (cliente && (cliente.status === "Bloqueado" || cliente.status === "Suspenso")) throw new Error("Este passageiro está bloqueado.");
 
@@ -332,6 +359,12 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(limpo(n.empresaConveniada || cliente?.conveniada, 80) ? { empresaConveniada: limpo(n.empresaConveniada || cliente?.conveniada, 80) } : {}),
       ...(limpo(n.centroCusto, 80) ? { centroCusto: limpo(n.centroCusto, 80) } : {}),
       ...(limpo(n.voucher, 30) ? { voucher: limpo(n.voucher, 30) } : {}),
+      ...(limpo(n.infoAntes, 300) ? { infoAntes: limpo(n.infoAntes, 300) } : {}),
+      ...(limpo(n.infoDepois, 300) ? { infoDepois: limpo(n.infoDepois, 300) } : {}),
+      ...(limpo(n.infoInterna, 500) ? { infoInterna: limpo(n.infoInterna, 500) } : {}),
+      ...(soDigitos(n.telefoneContato ?? "").length >= 10 ? { telefoneContato: soDigitos(n.telefoneContato ?? "").slice(0, 13) } : {}),
+      ...(n.enviarVariosCarros ? { enviarVariosCarros: true } : {}),
+      ...(n.valorFinal ? { valorFinal: n.valorFinal.modo === "prefixado" ? { modo: "prefixado" as const, valor: arred(Number(n.valorFinal.valor)) } : { modo: "livre" as const } } : {}),
     };
     gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
