@@ -8,6 +8,7 @@ import { buscarCorridas } from "../servidor/fontes/index.ts";
 import { categoriasDoMotor, motoristasDoMotor, type TipoMotor } from "../servidor/fontes/motor.ts";
 import { normal } from "../servidor/util.ts";
 import { atualizar, criar, listar, mesclar, remover, type Valor } from "./armazem.ts";
+import { prepararEmpresa } from "../gestao/empresas.ts";
 
 export const rotasCadastros = Router();
 
@@ -39,12 +40,15 @@ rotasCadastros.get("/:cadastro", ok((req, res) => {
 
 rotasCadastros.post("/:cadastro", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
-  res.json({ registro: criar(ctx(req).empresaId, c, req.body ?? {}, quem(req)) });
+  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, null, false) : (req.body ?? {});
+  res.json({ registro: criar(ctx(req).empresaId, c, dados, quem(req)) });
 }));
 
 rotasCadastros.put("/:cadastro/:id", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
-  res.json({ registro: atualizar(ctx(req).empresaId, c, String(req.params.id), req.body ?? {}, quem(req)) });
+  const antes = c.id === "conveniadas" ? listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null : null;
+  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, antes, false) : (req.body ?? {});
+  res.json({ registro: atualizar(ctx(req).empresaId, c, String(req.params.id), dados, quem(req)) });
 }));
 
 rotasCadastros.delete("/:cadastro/:id", ok((req, res) => {

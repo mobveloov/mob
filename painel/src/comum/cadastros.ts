@@ -2,7 +2,7 @@
 // O mesmo motor de cadastro (servidor) e a mesma tela (navegador) servem para todos.
 // Os dados ficam no painel, por empresa. "importa" diz de onde o botão "Importar" puxa os registros.
 
-export type TipoCampo = "texto" | "textoLongo" | "numero" | "dinheiro" | "telefone" | "email" | "cpf" | "data" | "selecao" | "booleano";
+export type TipoCampo = "texto" | "textoLongo" | "numero" | "dinheiro" | "telefone" | "email" | "cpf" | "data" | "selecao" | "booleano" | "json";
 
 export interface Campo {
   chave: string;
@@ -38,6 +38,12 @@ export const SITUACOES_MOTORISTA = ["Ativo", "Em análise", "Fila de espera", "B
 export const NIVEIS_MOTORISTA = ["Prioritário", "Secundário", "Reserva"];
 /** Gêneros que os apps oferecem (iguais nos dois apps). */
 export const GENEROS = ["Masculino", "Feminino", "Outro", "Prefiro não dizer"];
+/** Sexo do motorista: os da Machine mais os que os apps já gravam. */
+export const GENEROS_MOTORISTA = ["Feminino", "Masculino", "Outros", "Prefiro não responder", "Outro", "Prefiro não dizer"];
+export const VINCULOS_MOTORISTA = ["Titular", "Auxiliar"];
+export const TIPOS_CHAVE_PIX = ["CPF", "CNPJ", "E-mail", "Telefone", "Chave aleatória"];
+/** Formas de pagamento que o motorista pode aceitar e que as empresas podem liberar (como na Machine). */
+export const PAGAMENTOS_MACHINE = ["Dinheiro", "Maquininha de Débito", "Maquininha de Crédito", "Cartão no app", "Pix"];
 
 export const CADASTROS: Cadastro[] = [
   {
@@ -50,14 +56,7 @@ export const CADASTROS: Cadastro[] = [
       { chave: "cpf", rotulo: "CPF", tipo: "cpf" },
       { chave: "email", rotulo: "E-mail", tipo: "email" },
       { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: SITUACOES_MOTORISTA, obrigatorio: true },
-      { chave: "nascimento", rotulo: "Nascimento", tipo: "data" },
-      { chave: "genero", rotulo: "Sexo", tipo: "selecao", opcoes: ["Masculino", "Feminino"] },
       { chave: "nivel", rotulo: "Prioridade de toque", tipo: "selecao", opcoes: NIVEIS_MOTORISTA },
-      { chave: "endereco", rotulo: "Endereço", tipo: "texto" },
-      { chave: "numero", rotulo: "Nº", tipo: "texto" },
-      { chave: "cep", rotulo: "CEP", tipo: "texto" },
-      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
-      { chave: "chavePix", rotulo: "Chave PIX", tipo: "texto" },
       { chave: "cnhNumero", rotulo: "CNH Nº", tipo: "texto" },
       { chave: "fantasma", rotulo: "Modo fantasma (oculto no mapa)", tipo: "booleano" },
       { chave: "cobranca", rotulo: "Cobrança da central", tipo: "selecao", opcoes: ["Padrão", "Personalizado", "Isento"], dica: "Padrão = comissão da categoria; Isento = não paga; Personalizado = vale no lugar da comissão da categoria." },
@@ -72,15 +71,34 @@ export const CADASTROS: Cadastro[] = [
       { chave: "validadeCnh", rotulo: "Validade da CNH", tipo: "data" },
       { chave: "validadeLicenciamento", rotulo: "Validade do licenciamento", tipo: "data" },
       { chave: "nascimento", rotulo: "Nascimento", tipo: "data" },
-      { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: GENEROS },
-      { chave: "chavePix", rotulo: "Chave Pix", tipo: "texto" },
-      { chave: "cep", rotulo: "CEP", tipo: "texto" },
+      { chave: "genero", rotulo: "Sexo", tipo: "selecao", opcoes: GENEROS_MOTORISTA },
+      { chave: "tipoVinculo", rotulo: "Tipo de vínculo", tipo: "selecao", opcoes: VINCULOS_MOTORISTA },
+      { chave: "endereco", rotulo: "Endereço", tipo: "texto" },
       { chave: "rua", rotulo: "Rua", tipo: "texto" },
       { chave: "numero", rotulo: "Número", tipo: "texto", dica: "S/N quando não tem número." },
+      { chave: "semNumero", rotulo: "Endereço sem número", tipo: "booleano" },
       { chave: "complemento", rotulo: "Complemento", tipo: "texto" },
-      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
-      { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
+      { chave: "cep", rotulo: "CEP", tipo: "texto" },
       { chave: "uf", rotulo: "UF", tipo: "texto" },
+      { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
+      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
+      { chave: "referencia", rotulo: "Referência do endereço", tipo: "texto" },
+      { chave: "informacoesAdicionais", rotulo: "Informações adicionais", tipo: "textoLongo" },
+      { chave: "tipoChavePix", rotulo: "Tipo de chave PIX", tipo: "selecao", opcoes: TIPOS_CHAVE_PIX },
+      { chave: "chavePix", rotulo: "Chave PIX", tipo: "texto" },
+      { chave: "obsInterna1", rotulo: "Observação interna 1", tipo: "textoLongo" },
+      { chave: "obsInterna2", rotulo: "Observação interna 2", tipo: "textoLongo" },
+      { chave: "obsInterna3", rotulo: "Observação interna 3", tipo: "textoLongo" },
+      { chave: "bancoCpfTitular", rotulo: "CPF do titular da conta", tipo: "texto" },
+      { chave: "bancoNomeTitular", rotulo: "Nome do titular da conta", tipo: "texto" },
+      { chave: "ocupacao", rotulo: "Ocupação profissional", tipo: "texto" },
+      { chave: "renda", rotulo: "Renda mensal", tipo: "dinheiro" },
+      { chave: "bancoNumero", rotulo: "Número do banco", tipo: "texto" },
+      { chave: "bancoAgencia", rotulo: "Número da agência", tipo: "texto" },
+      { chave: "bancoConta", rotulo: "Número da conta", tipo: "texto" },
+      { chave: "bancoContaDv", rotulo: "Dígito da conta", tipo: "texto" },
+      { chave: "aceitaPagamentos", rotulo: "Aceita pagamento para", tipo: "texto", dica: "Separe por vírgula. Vazio = aceita todos." },
+      { chave: "statusMudouEm", rotulo: "Última mudança de status", tipo: "texto" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
       { chave: "origem", rotulo: "Origem", tipo: "texto", calculado: true },
       { chave: "corridas", rotulo: "Corridas (30 dias)", tipo: "numero", calculado: true },
@@ -129,6 +147,12 @@ export const CADASTROS: Cadastro[] = [
       { chave: "motoristaId", rotulo: "Motorista proprietário (id)", tipo: "texto" },
       { chave: "emUso", rotulo: "Em uso", tipo: "booleano", dica: "Cada motorista tem um veículo em uso; os outros ficam guardados." },
       { chave: "validadeLicenciamento", rotulo: "Validade do licenciamento", tipo: "data" },
+      { chave: "anoExercicio", rotulo: "Ano de exercício", tipo: "numero" },
+      { chave: "ufEmplacamento", rotulo: "UF de emplacamento", tipo: "texto" },
+      { chave: "cidadeEmplacamento", rotulo: "Cidade de emplacamento", tipo: "texto" },
+      { chave: "renavam", rotulo: "Código RENAVAM", tipo: "texto" },
+      { chave: "corHex", rotulo: "Cor (código)", tipo: "texto" },
+      { chave: "veiculoProprio", rotulo: "Veículo próprio", tipo: "selecao", opcoes: ["Sim", "Não"] },
       { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Em manutenção", "Inativo"], obrigatorio: true },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
     ],
@@ -140,8 +164,17 @@ export const CADASTROS: Cadastro[] = [
     chaveUnica: "cnpj",
     campos: [
       { chave: "nome", rotulo: "Nome Fantasia", tipo: "texto", obrigatorio: true },
+      { chave: "bandeira", rotulo: "Bandeira", tipo: "texto" },
       { chave: "razaoSocial", rotulo: "Razão Social", tipo: "texto" },
-      { chave: "cnpj", rotulo: "CNPJ", tipo: "texto" },
+      { chave: "tipoDocumento", rotulo: "Tipo de documento", tipo: "selecao", opcoes: ["CNPJ", "CPF"] },
+      { chave: "cnpj", rotulo: "CPF/CNPJ", tipo: "texto" },
+      { chave: "numeroContrato", rotulo: "Número do contrato", tipo: "texto" },
+      { chave: "endereco", rotulo: "Endereço", tipo: "texto" },
+      { chave: "enderecoNumero", rotulo: "Número", tipo: "texto" },
+      { chave: "complemento", rotulo: "Complemento", tipo: "texto" },
+      { chave: "uf", rotulo: "UF", tipo: "texto" },
+      { chave: "bairro", rotulo: "Bairro", tipo: "texto" },
+      { chave: "cep", rotulo: "CEP", tipo: "texto" },
       { chave: "contato", rotulo: "Responsável", tipo: "texto" },
       { chave: "telefone", rotulo: "Telefone", tipo: "telefone" },
       { chave: "email", rotulo: "E-mail Responsável", tipo: "email" },
@@ -150,7 +183,12 @@ export const CADASTROS: Cadastro[] = [
       { chave: "limiteMensal", rotulo: "Limite mensal", tipo: "dinheiro" },
       { chave: "desconto", rotulo: "Desconto (%)", tipo: "numero" },
       { chave: "diaFechamento", rotulo: "Dia de fechamento", tipo: "numero" },
-      { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativa", "Suspensa", "Encerrada"], obrigatorio: true },
+      { chave: "status", rotulo: "Situação cadastral", tipo: "selecao", opcoes: ["Ativa", "Suspensa", "Aguardando ativação", "Encerrada"], obrigatorio: true },
+      { chave: "permiteEspecificarMotorista", rotulo: "Permitir especificar motorista ao criar uma nova corrida", tipo: "selecao", opcoes: ["Sim", "Não"] },
+      { chave: "categoriasPermitidas", rotulo: "Categorias permitidas", tipo: "texto", dica: "Separe por vírgula. Vazio = todas." },
+      { chave: "pagamentosPermitidos", rotulo: "Tipos de pagamento permitidos (e desconto de cada um)", tipo: "json" },
+      { chave: "obsMotorista", rotulo: "Observação para o motorista", tipo: "textoLongo" },
+      { chave: "dadosExtras", rotulo: "Dados extras", tipo: "json" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
     ],
     colunas: ["nome", "cnpj", "contato", "telefone", "limiteMensal", "desconto", "status"],

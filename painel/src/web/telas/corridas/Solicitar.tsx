@@ -45,7 +45,7 @@ export default function Solicitar() {
   const cats = useDados(() => api.registros("categorias"), []);
   const cfg = useDados<{ categorias: Array<{ nome: string; extra: { solicitacoes: string } }> }>(() => pedirConfig("/categorias"), []);
   const conv = useDados(() => api.registros("conveniadas"), []);
-  const conveniadas = (conv.dados?.registros ?? []).filter((c) => c.status !== "Encerrada");
+  const conveniadas = (conv.dados?.registros ?? []).filter((c) => !c.status || c.status === "Ativa");
   const centros = String(conveniadas.find((c) => String(c.nome) === empresaConv)?.centrosCusto ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const mots = useDados<{ motoristas: any[] }>(() => op("/motoristas"), []);
   const mapa = useDados<any>(() => op("/mapa"), [], 15_000);

@@ -33,7 +33,7 @@ function limparCampo(c: Campo, bruto: unknown): Valor {
     if (c.obrigatorio && c.tipo !== "booleano") throw new Error(`Preencha "${c.rotulo}".`);
     return c.tipo === "booleano" ? false : null;
   }
-  const s = String(bruto).trim();
+  const s = typeof bruto === "object" ? JSON.stringify(bruto) : String(bruto).trim();
   switch (c.tipo) {
     case "numero": case "dinheiro": {
       const n = Number(s.replace(/\s|R\$/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."));
@@ -60,6 +60,11 @@ function limparCampo(c: Campo, bruto: unknown): Valor {
     case "selecao":
       if (c.opcoes && !c.opcoes.includes(s)) throw new Error(`"${c.rotulo}": escolha uma das opções.`);
       return s;
+    case "json": {
+      try { JSON.parse(s); } catch { throw new Error(`"${c.rotulo}" está num formato inválido.`); }
+      if (s.length > 4000) throw new Error(`"${c.rotulo}" ficou grande demais.`);
+      return s.replace(/[<>]/g, "");
+    }
     case "textoLongo": return s.replace(/[<>]/g, "").slice(0, 5000);
     default: return s.replace(/[<>]/g, "").slice(0, 200);
   }
