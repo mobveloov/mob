@@ -167,3 +167,21 @@ test("cadastros: o JSON antigo entra no banco; criar, editar, mesclar e remover 
   fecharBanco();
   assert.deepEqual(Cad.listar(dois, cli).map((r) => r.nome), ["Velho Editado", "Merge"]);
 });
+
+test("perfis dos apps: filtros do despacho e consulta acompanham o que foi salvo, sem reler o banco todo", async () => {
+  const X = await import("../src/apps/extras.ts");
+  const p = X.pessoa(um, "passageiro", "11933330001");
+  assert.ok(p.codigo, "perfil novo ganha código");
+  const f1 = X.filtrosDoDespacho(um);
+  assert.equal(f1.ehFavorito("11933330001", "mot-1"), false);
+  const mexida = X.pessoa(um, "passageiro", "11933330001");
+  mexida.favoritos.push("mot-1");
+  assert.equal(X.ehFavorito(um, "11933330001", "mot-1"), false, "mexer na cópia não muda nada sem salvar");
+  X.salvarPessoa(um, "passageiro", "11933330001", mexida);
+  assert.equal(X.ehFavorito(um, "11933330001", "mot-1"), true);
+  assert.equal(X.filtrosDoDespacho(um).ehFavorito("11933330001", "mot-1"), true);
+  assert.equal(X.ehFavorito(dois, "11933330001", "mot-1"), false, "outra empresa não vê");
+  X.esquecerPerfisDaMemoria();
+  assert.equal(X.ehFavorito(um, "11933330001", "mot-1"), true, "ficou no banco");
+  assert.equal(X.pessoa(um, "passageiro", "11933330001").codigo, p.codigo);
+});
