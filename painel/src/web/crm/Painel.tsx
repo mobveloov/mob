@@ -39,8 +39,7 @@ const GRUPOS: Array<{ key: string; label: string; icon: LucideIcon; abas: Item[]
 
 /** Abas do sistema de referência que ainda não foram portadas: a tela diz isso claramente (nada de dado inventado). */
 const AINDA_NAO: Partial<Record<Aba, string>> = {
-  triggers: "Gatilhos por evento (cadastro, simulação, status da corrida, aniversário)", queue: "Fila de dispatches", regua: "Régua de reativação",
-  behavior_templates: "Templates comportamentais", logs: "Notificações enviadas", behavior_history: "Histórico de disparos", behavior: "Comportamentos",
+  behavior_templates: "Templates comportamentais", behavior_history: "Histórico de disparos", behavior: "Comportamentos",
   contacts: "Contatos", segments: "Segmentos", rfm: "Análise RFM", conversion: "Conversão", heatmap: "Mapa de calor", rewards: "Recompensas",
   cities: "Cidades", governance: "Governança", audit: "Auditoria",
 };

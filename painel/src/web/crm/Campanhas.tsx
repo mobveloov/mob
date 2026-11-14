@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { BarChart3, CalendarClock, Copy, Eye, Pause, Play, Plus, Save, Send, Sparkles, Trash2, X } from "lucide-react";
+import { BarraPausa } from "./automacao-comum";
 import { Cartao, Gaveta, Kpi, Titulo, useCarregar } from "../componentes/ui";
 import { crm, quando, quandoReal, type Campanha, type CampanhaLinha } from "./api";
 import { EditorRegras, Selo, useGestor, useRetorno, Variaveis } from "./comum";
@@ -33,6 +34,7 @@ export default function CrmCampanhas() {
         </div>
         {aba === "campanhas" && <button className="botao primario" onClick={() => setEditando({ ...NOVA })}><Plus size={14} /> Nova campanha</button>}
       </Titulo>
+      {aba === "campanhas" && <BarraPausa />}
       {caixa}
       {erro && <div className="aviso erro">{erro}</div>}
       {aba === "envio" ? <Envio /> : (
