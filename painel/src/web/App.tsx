@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ChevronDown, KeyRound, LogOut, Menu, Moon, Sun, X } from "lucide-react";
-import { FUNCOES, GRUPOS, type Funcao, type Grupo } from "../comum/funcoes.ts";
+import { FUNCOES, type Funcao } from "../comum/funcoes.ts";
+import { BotaoRecolher, MenuItens } from "./menu/MenuLateral";
 import { MARCA_PADRAO, variaveisTema, type Marca } from "../comum/marca.ts";
 import { api, ErroApi, escolherEmpresa, urlImagem, type Sessao } from "./api";
 import Entrar from "./paginas/Entrar";
@@ -127,37 +128,30 @@ const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <EmCon
 
 // ------------------------------------------------------------------ menu
 
-const rotuloFuncao = (f: Funcao, assistente: string) => (f.id === "analise" ? `Análise com ${assistente}` : f.nome);
 const iniciais = (nome: string) => (nome.trim().charAt(0) || "?").toUpperCase();
 const CARGO: Record<string, string> = { plataforma: "Plataforma", admin: "Gestor", operador: "Operador" };
 
-/** Itens de um grupo, separados por seção (títulos pequenos no menu suspenso). */
-function porSecao(itens: Funcao[]) {
-  const m = new Map<string, Funcao[]>();
-  for (const f of itens) { const k = f.secao ?? ""; m.set(k, [...(m.get(k) ?? []), f]); }
-  return [...m.entries()];
+/** Foto da empresa (quadrado arredondado com anel dourado); sem foto, a inicial do nome. */
+function FotoEmpresa({ classe = "" }: { classe?: string }) {
+  const { sessao, marca } = useSessao();
+  const arq = marca.arquivos.fotoEmpresa;
+  return (
+    <span className={`foto-empresa-mini ${classe}`}>
+      {arq ? <img src={urlImagem(sessao.empresa.id, arq)} alt="" /> : <b>{iniciais(sessao.empresa.nome)}</b>}
+    </span>
+  );
 }
 
 function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; trocarTema: () => void; trocarEmpresa: (id: string) => void; sair: () => void }) {
   const { sessao, marca } = useSessao();
   const local = useLocation();
   const [aberto, setAberto] = useState(false);
-  const [grupoMobile, setGrupoMobile] = useState<Grupo | null>(null);
-  const [fechado, setFechado] = useState<string | null>(null);
+  const [recolhido, setRecolhido] = useState(() => ler("menuLateral") === "recolhido");
   const admin = sessao.usuario.papel !== "operador";
-  const logoArq = escuro ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro || marca.arquivos.logoEscuro;
-  const logo = logoArq ? <img src={urlImagem(sessao.empresa.id, logoArq)} alt={marca.produto} /> : <span className="logo-texto">{marca.produto}</span>;
   const funcoes = FUNCOES.filter((f) => admin || !f.soAdmin);
-  const grupos = GRUPOS.map((g) => ({ g, itens: funcoes.filter((f) => f.grupo === g) })).filter((x) => x.itens.length);
   const nomeUsuario = sessao.usuario.nome || sessao.usuario.email;
-  const ativoGrupo = (itens: Funcao[]) => itens.some((f) => (f.rota === "/" ? local.pathname === "/" : local.pathname === f.rota || local.pathname.startsWith(`${f.rota}/`)));
   useEffect(() => { window.scrollTo(0, 0); setAberto(false); }, [local.pathname]);
-
-  const linkItem = (f: Funcao) => (
-    <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `dropdown-item ${isActive ? "ativo" : ""}`} onClick={() => setFechado(f.grupo)}>
-      <span>{rotuloFuncao(f, marca.assistente.nome)}</span>{f.novo && <span className="etiqueta-novo">NOVO</span>}
-    </NavLink>
-  );
+  const alternarMenu = () => { const novo = !recolhido; gravar("menuLateral", novo ? "recolhido" : "aberto"); setRecolhido(novo); };
 
   const usuarioMenu = (
     <div className="nav-grupo usuario">
@@ -180,90 +174,67 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
     </div>
   );
 
-  return (
-    <div className="app">
-      {/* Menu do topo (computador) */}
-      <header className="barra-topo">
-        <div className="barra-centro">
-          <Link to="/" className="logo-topo" aria-label={marca.produto}>{logo}</Link>
-          <span className="divisor-v" />
-          <nav className="nav-itens" aria-label="Menu principal">
-            {grupos.map(({ g, itens }) => {
-              if (itens.length === 1 && g !== "Mais") {
-                const f = itens[0];
-                return <NavLink key={g} to={f.rota} end className={({ isActive }) => `nav-link ${isActive ? "ativo" : ""}`}>{f.nome}</NavLink>;
-              }
-              return (
-                <div key={g} className={`nav-grupo ${fechado === g ? "fechar" : ""}`} onMouseLeave={() => setFechado(null)}>
-                  <button className={`nav-link ${ativoGrupo(itens) ? "ativo" : ""}`} aria-haspopup="menu">{g}<ChevronDown size={13} className="seta" /></button>
-                  <div className="nav-dropdown">
-                    {porSecao(itens).map(([secao, lista]) => (
-                      <div key={secao}>{secao && <div className="dropdown-header">{secao}</div>}{lista.map(linkItem)}</div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </nav>
-        </div>
-        <div className="barra-lado">
-          {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} />}
-          <Sino />
-          <button className="botao-tema" onClick={trocarTema} aria-label="Alternar Tema" title="Alternar Tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
-          {usuarioMenu}
-        </div>
-      </header>
+  const cabecalhoMenu = (
+    <Link to="/" className="ml-cabecalho" title={sessao.empresa.nome}>
+      <FotoEmpresa />
+      <span className="ml-texto ml-empresa"><strong>{sessao.empresa.nome}</strong><small>Painel Administrativo</small></span>
+    </Link>
+  );
 
-      {/* Barra do celular com hambúrguer */}
-      <header className="barra-celular">
-        <button className="hamburguer" onClick={() => setAberto(true)} aria-label="Abrir menu"><Menu size={24} /></button>
-        <Link to="/" className="logo-topo" aria-label={marca.produto}>{logo}</Link>
-        <Sino />
-        <Link to="/alterar-senha" className="avatar" aria-label="Minha conta">{iniciais(nomeUsuario)}</Link>
-      </header>
-      {aberto && <div className="cortina" onClick={() => setAberto(false)} />}
-      <aside className={`lateral ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
-        <div className="lateral-topo"><strong>{marca.produto}</strong><button onClick={() => setAberto(false)} aria-label="Fechar menu"><X size={22} /></button></div>
-        <nav>
-          {grupos.map(({ g, itens }) => {
-            if (itens.length === 1 && g !== "Mais") {
-              return <NavLink key={g} to={itens[0].rota} end className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span>{itens[0].nome}</span></NavLink>;
-            }
-            const abre = grupoMobile === g;
-            return (
-              <div key={g}>
-                <button className="mobile-link" onClick={() => setGrupoMobile(abre ? null : g)} aria-expanded={abre}><span>{g}</span><ChevronDown size={16} className={abre ? "girar" : ""} /></button>
-                {abre && (
-                  <div className="mobile-sub">
-                    {porSecao(itens).map(([secao, lista]) => (
-                      <div key={secao}>
-                        {secao && <div className="mobile-secao">{secao}</div>}
-                        {lista.map((f) => <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `mobile-sublink ${isActive ? "ativo" : ""}`}>{rotuloFuncao(f, marca.assistente.nome)}</NavLink>)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div className="lateral-pref">
-            <p>Preferências</p>
-            {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} classe="lateral" />}
-            <NavLink to="/alterar-senha" className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span><KeyRound size={16} /> Alterar Senha</span></NavLink>
-            <button className="mobile-link" onClick={trocarTema}><span>{escuro ? <Sun size={16} /> : <Moon size={16} />} Alternar Tema</span></button>
-          </div>
-        </nav>
-        <div className="lateral-rodape"><button onClick={sair}><LogOut size={18} /> Sair do Sistema</button></div>
+  return (
+    <div className={`app ${recolhido ? "menu-recolhido" : ""}`}>
+      {/* Menu lateral fixo (computador) */}
+      <aside className="ml-lateral" aria-label="Menu lateral">
+        {cabecalhoMenu}
+        <div className="ml-rolagem"><MenuItens admin={admin} assistente={marca.assistente.nome} recolhido={recolhido} /></div>
+        <div className="ml-rodape"><BotaoRecolher recolhido={recolhido} alternar={alternarMenu} /></div>
       </aside>
 
-      <main className="conteudo">
-        <FaixaAlerta />
-        <Routes>
-          {funcoes.map((f) => <Route key={f.id} path={f.rota} element={tela(f)} />)}
-          {funcoes.flatMap((f) => (f.antigas ?? []).map((a) => <Route key={a} path={a} element={<Navigate to={f.rota} replace />} />))}
-          <Route path="*" element={<p className="vazio">Página não encontrada.</p>} />
-        </Routes>
-      </main>
+      <div className="coluna">
+        {/* Barra do topo (computador): só empresa, tema, sino e perfil */}
+        <header className="barra-topo">
+          <Link to="/" className="topo-empresa" aria-label={sessao.empresa.nome}><FotoEmpresa classe="pequena" /><strong>{sessao.empresa.nome}</strong></Link>
+          <div className="barra-lado">
+            {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} />}
+            <Sino />
+            <button className="botao-tema" onClick={trocarTema} aria-label="Alternar Tema" title="Alternar Tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
+            {usuarioMenu}
+          </div>
+        </header>
+
+        {/* Barra do celular com hambúrguer */}
+        <header className="barra-celular">
+          <button className="hamburguer" onClick={() => setAberto(true)} aria-label="Abrir menu"><Menu size={24} /></button>
+          <Link to="/" className="logo-topo" aria-label={sessao.empresa.nome}><FotoEmpresa classe="pequena" /></Link>
+          <Sino />
+          <Link to="/alterar-senha" className="avatar" aria-label="Minha conta">{iniciais(nomeUsuario)}</Link>
+        </header>
+        {aberto && <div className="cortina" onClick={() => setAberto(false)} />}
+        <aside className={`lateral ml-lateral-gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
+          <div className="lateral-topo">
+            {cabecalhoMenu}
+            <button onClick={() => setAberto(false)} aria-label="Fechar menu"><X size={22} /></button>
+          </div>
+          <div className="ml-rolagem">
+            <MenuItens admin={admin} assistente={marca.assistente.nome} aoEscolher={() => setAberto(false)} />
+            <div className="lateral-pref">
+              <p>Preferências</p>
+              {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} classe="lateral" />}
+              <button className="mobile-link" onClick={trocarTema}><span>{escuro ? <Sun size={16} /> : <Moon size={16} />} Alternar Tema</span></button>
+            </div>
+          </div>
+          <div className="lateral-rodape"><button onClick={sair}><LogOut size={18} /> Sair do Sistema</button></div>
+        </aside>
+
+        <main className="conteudo">
+          <FaixaAlerta />
+          <Routes>
+            {funcoes.map((f) => <Route key={f.id} path={f.rota} element={tela(f)} />)}
+            {funcoes.flatMap((f) => (f.antigas ?? []).map((a) => <Route key={a} path={a} element={<Navigate to={f.rota} replace />} />))}
+            <Route path="*" element={<p className="vazio">Página não encontrada.</p>} />
+          </Routes>
+        </main>
+      </div>
     </div>
   );
 }
