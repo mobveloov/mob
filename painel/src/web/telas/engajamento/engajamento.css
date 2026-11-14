@@ -47,7 +47,7 @@
 .me-secao__coluna-explicacao { padding-left: 14px; min-width: 0; }
 .me-secao__explicacao-titulo { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
 .me-secao__explicacao-texto { margin: 0; font-size: 15px; line-height: 1.35; color: var(--suave); }
-.me-pill { display: inline-block; border-radius: 20px; padding: 5px 13px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.me-pill { color: var(--pc-claro); display: inline-block; border-radius: 20px; padding: 5px 13px; font-size: 14px; font-weight: 700; white-space: nowrap; }
 .me-pill--vazio { background: var(--campo); color: var(--suave); }
 
 .me-regua { position: relative; display: flex; flex-direction: column; flex: 1; padding-bottom: 28px; touch-action: none; min-height: 160px; }
@@ -134,3 +134,7 @@
   .me-tabs__item { font-size: 18px; }
   .me-lista__linha { grid-template-columns: 1.5fr 1fr; } .me-lista__linha span:nth-child(3) { display: none; }
 }
+
+:root[data-theme="dark"] .me-pill { color: var(--pc-escuro); }
+
+.me-config .me-regua { height: 200px; flex: none; }

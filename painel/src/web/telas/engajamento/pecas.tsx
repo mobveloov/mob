@@ -284,7 +284,7 @@ export function Secao({ papel, ind, aberta, onAlternar, filtro, podeAgir, podeSa
         <span className="me-secao__icone"><Icone size={19} /></span>
         <span className="me-secao__titulo">{ind.rotulo}</span>
         <span className="me-secao__faixa">{([0, 1, 2] as const).map((i) => <i key={i} className="me-secao__faixa-segmento" style={{ width: `${ind.percentuais[i]}%`, background: corDe(ind, i) }} />)}</span>
-        <span className="me-secao__status">{ind.predominante ? <span className="me-pill" style={{ background: `${corDe(ind, ind.predominante.indice)}26`, color: corTexto(ind, ind.predominante.indice) }}>{ind.predominante.nome} {num(ind.predominante.percentual, 1)}%</span> : <span className="me-pill me-pill--vazio">Sem dados</span>}</span>
+        <span className="me-secao__status">{ind.predominante ? <span className="me-pill" style={{ background: `${corDe(ind, ind.predominante.indice)}26`, ["--pc-claro" as string]: corTexto(ind, ind.predominante.indice), ["--pc-escuro" as string]: corDe(ind, ind.predominante.indice) }}>{ind.predominante.nome} {num(ind.predominante.percentual, 1)}%</span> : <span className="me-pill me-pill--vazio">Sem dados</span>}</span>
         <span className={`me-secao__seta ${aberta ? "me-secao__seta--aberta" : ""}`}><ChevronDown size={20} /></span>
       </button>
       {aberta && <div className="me-secao__corpo"><CorpoIndicador papel={papel} ind={ind} filtro={filtro} podeAgir={podeAgir} podeSalvar={podeSalvar} onMudou={onMudou} /></div>}
