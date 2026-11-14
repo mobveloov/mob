@@ -105,3 +105,8 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Carga corrigida:** 500 corridas em 31 a 43 s, 0 erros (antes 85 a 122 s e até 288 erros). Números em `docs/AUDITORIA_COMPLETA.md`. 253 testes passando.
 - **Docker refeito** com o main; `up.veloov.com` responde.
 - **Falta:** comparar mais telas lado a lado com a Machine (imagem), "Enviar mais de um carro" no despacho, desconto da empresa por forma de pagamento no preço, observação da empresa para o motorista no app, passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
+
+## Cargos, filiais e painel do dono (branch worktree-agent-a1a2562b7d9420c54)
+- **Cargos:** ADMIN Mestre (`plataforma`), ADMIN, Gestor (novo) e Operador, como na Machine. Menu e servidor (403 com requisição forjada) seguem o cargo mínimo de cada função. Matriz em `docs/CARGOS.md`. Operadores antigos passam a ter menos acesso (sem financeiro, regras e equipe).
+- **Filiais:** Cadastro > Gestão > Filiais. Motorista e usuário ligados a uma filial; corrida guarda a filial; Histórico e relatórios filtram por filial; Operador e Gestor ligados a uma filial só veem as corridas dela (Histórico e relatórios). Pendente: restringir Monitoramento, Mapa e Programadas por filial.
+- **Painel do dono:** Mais > Painel do dono (só ADMIN Mestre): empresas, suspender/reativar (suspensa não loga), entrar como a empresa, planos e recursos, marca e domínio, uso e faturamento, centrais. Pendente: cobrança real (hoje o valor a pagar é calculado, sem gateway).
