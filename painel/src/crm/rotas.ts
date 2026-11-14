@@ -8,6 +8,7 @@ import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr } from "../servidor/util.ts";
 import { ErroIa } from "../ia/roteador.ts";
 import { banco } from "../servidor/banco.ts";
+import { filtroAuditoria, rotasCrm2 } from "../crm2/rotas.ts";
 import * as A from "./armazem.ts";
 import * as T from "./templates.ts";
 import { waOptOutKey, withOptOutFooter } from "./optout.ts";
@@ -21,6 +22,7 @@ import { caixaSimulada, provedorDaEmpresa } from "./whatsapp.ts";
 
 export const router = express.Router();
 export default router;
+router.use(filtroAuditoria, rotasCrm2); // CRM-2: Contatos, RFM, Conversão, Mapa de Calor, Recompensas, Cidades, Governança, Auditoria
 
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
   try { await fn(req, res); } catch (e) {
