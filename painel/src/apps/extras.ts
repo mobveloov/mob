@@ -242,15 +242,22 @@ export function saldos(empresaId: string) {
 // ====================================================================== documentos do motorista
 
 /** Documentos que o app aceita: os configurados no painel (Gerais do App) e as fotos das laterais do veículo. */
+/** Documentos a mais da Machine (certidão, alvará e documentos do veículo): a central envia, o app não exige. */
+export const DOCUMENTOS_MACHINE: Record<string, string> = {
+  antecedentes: "Certidão de antecedentes criminais", alvara: "Alvará",
+  autonomiaFrente: "Autonomia (frente)", autonomiaVerso: "Autonomia (verso)", fotoVeiculo: "Foto do veículo",
+};
 export const tiposDoApp = (empresaId: string): Record<string, string> => ({
   ...tiposDeDocumento(empresaId),
   lateralEsquerda: "Foto da lateral esquerda do veículo", lateralDireita: "Foto da lateral direita do veículo",
+  ...DOCUMENTOS_MACHINE,
 });
 export const TIPOS_DOCUMENTO: Record<string, string> = {
   cnh: "CNH (frente e verso)", residencia: "Comprovante de residência", crlv: "CRLV do veículo",
   lateralEsquerda: "Foto da lateral esquerda do veículo", lateralDireita: "Foto da lateral direita do veículo",
   /** Do app antigo; continuam valendo. */
   veiculo: "Documento do veículo (CRLV)", foto: "Foto do rosto",
+  ...DOCUMENTOS_MACHINE,
 };
 const MIME_DOC: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf" };
 export const MAX_DOC = 5 * 1024 * 1024;
@@ -280,6 +287,18 @@ export function enviarDocumento(empresaId: string, motoristaId: string, tipo: st
   salvarPessoa(empresaId, "motorista", motoristaId, p);
   if (antigo) fs.rmSync(arquivo(empresaId, "documentos", motoristaId, antigo), { force: true });
   return d;
+}
+
+/** Exclui o arquivo de um documento do motorista (o motorista volta a ver "Pendente"). */
+export function removerDocumento(empresaId: string, motoristaId: string, tipo: string): void {
+  if (!/^[\w-]{6,64}$/.test(motoristaId) || !tiposDoApp(empresaId)[tipo]) throw new Error("Tipo de documento inválido.");
+  const p = linhaPessoa(empresaId, "motorista", motoristaId);
+  const d = p?.documentos[tipo];
+  if (!p || !d) throw new Error("Documento não encontrado.");
+  const { [tipo]: _tirado, ...resto } = p.documentos;
+  p.documentos = resto;
+  salvarPessoa(empresaId, "motorista", motoristaId, p);
+  fs.rmSync(arquivo(empresaId, "documentos", motoristaId, d.arquivo), { force: true });
 }
 
 export function arquivoDoDocumento(empresaId: string, motoristaId: string, tipo: string): { caminho: string; mime: string } | null {
