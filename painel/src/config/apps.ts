@@ -28,6 +28,8 @@ export function configDosApps(empresaId: string) {
       id: c.id, nome: c.nome, descricao: c.descricao, grupo: c.extra.grupo, ordem: c.extra.ordem, capacidade: c.extra.capacidade, tipoFisico: c.extra.tipoFisico,
       icone: c.extra.icone.modo === "personalizado" ? c.extra.icone.imagem : c.extra.icone.biblioteca, negociacao: c.extra.negociacao, tempoToque: c.extra.tempoToque,
       permiteAgendamento: c.extra.permiteAgendamento, mostrarGanhoKm: c.extra.mostrarGanhoKm,
+      detalhes: c.extra.detalhes, ocultarCapacidade: c.extra.ocultarCapacidade, macaneta: c.extra.macaneta, impulsionamentoAuto: c.extra.impulsionamentoAuto,
+      valorExtraPassageiro: c.extra.valorExtraPassageiro, segurancaMulheres: c.extra.segurancaMulheres, solicitacoes: c.extra.solicitacoes,
     })),
     pagamentos: p,
     termos: { versao: t.versao, atualizadoEm: t.atualizadoEm },

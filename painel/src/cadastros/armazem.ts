@@ -65,7 +65,7 @@ function limparCampo(c: Campo, bruto: unknown): Valor {
       if (s.length > 4000) throw new Error(`"${c.rotulo}" ficou grande demais.`);
       return s.replace(/[<>]/g, "");
     }
-    case "textoLongo": return s.replace(/[<>]/g, "").slice(0, 3000);
+    case "textoLongo": return s.replace(/[<>]/g, "").slice(0, 5000);
     default: return s.replace(/[<>]/g, "").slice(0, 200);
   }
 }

@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Edit3, Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { api } from "../../api";
+import { pedirConfig } from "../demais/comum";
 import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEndereco";
 import { Aviso, L, fone, hojeBr, msgErro, op, pino, reais, soDig, useDados, useMapa } from "./comum";
 import "./corridas.css";
 
-const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App", "Voucher"];
+const PAGAMENTOS = ["Dinheiro", "Crédito", "Débito", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App", "Voucher"];
 const EXIGENCIAS = ["Porta-malas grande", "Aceita encomendas", "Adaptado para cadeirante", "Ficar à disposição do passageiro"];
 const P0: PontoEscolhido = { texto: "" };
 
@@ -32,6 +33,9 @@ export default function Solicitar() {
   const [exigencias, setExigencias] = useState<string[]>([]);
   const [observacao, setObservacao] = useState("");
   const [empresaConv, setEmpresaConv] = useState(""), [centroCusto, setCentroCusto] = useState(""), [voucher, setVoucher] = useState("");
+  const [infoAntes, setInfoAntes] = useState(""), [infoDepois, setInfoDepois] = useState(""), [infoInterna, setInfoInterna] = useState("");
+  const [cpf, setCpf] = useState(""), [variosCarros, setVariosCarros] = useState(false), [favOrigem, setFavOrigem] = useState(false), [favDestino, setFavDestino] = useState(false);
+  const [finalModo, setFinalModo] = useState<"livre" | "prefixado">("livre"), [prefixado, setPrefixado] = useState("");
   const [est, setEst] = useState<{ valor: number | null; distanciaKm: number | null } | null>(null);
   const [manual, setManual] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -39,6 +43,7 @@ export default function Solicitar() {
   const [ok, setOk] = useState<string | null>(null);
 
   const cats = useDados(() => api.registros("categorias"), []);
+  const cfg = useDados<{ categorias: Array<{ nome: string; extra: { solicitacoes: string } }> }>(() => pedirConfig("/categorias"), []);
   const conv = useDados(() => api.registros("conveniadas"), []);
   const conveniadas = (conv.dados?.registros ?? []).filter((c) => !c.status || c.status === "Ativa");
   const centros = String(conveniadas.find((c) => String(c.nome) === empresaConv)?.centrosCusto ?? "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -53,7 +58,7 @@ export default function Solicitar() {
     setBuscando(true); setErro(null);
     try {
       const r = await op<any>(`/passageiro?${tipo === "tel" ? "telefone" : "cpf"}=${encodeURIComponent(soDig(v))}`);
-      setTelCadastro(r.telefone); setRecentes(r.enderecos ?? []);
+      setTelCadastro(r.telefone); if (r.cpf) setCpf(r.cpf); setRecentes(r.enderecos ?? []);
       if (r.nome) setNome(r.nome);
       if (!r.encontrado) setErro("Passageiro não encontrado. Preencha o nome para cadastrar na primeira corrida.");
     } catch (e) { setErro(msgErro(e)); } finally { setBuscando(false); }
@@ -101,15 +106,20 @@ export default function Solicitar() {
     if (!semDestino && !destino.texto.trim()) return setErro("Informe o destino ou marque \"Sem Destino\".");
     if (agendar && !quando) return setErro("Escolha a data e a hora do agendamento.");
     if (!pagamento) return setErro("Escolha a forma de pagamento.");
+    const fixo = Number(prefixado.replace(/\./g, "").replace(",", "."));
+    if (finalModo === "prefixado" && !(fixo > 0)) return setErro("Informe o valor prefixado da corrida.");
+    const modoCat = cfg.dados?.categorias.find((c) => c.nome === categoria)?.extra.solicitacoes;
+    if (agendar && modoCat === "imediatas") return setErro("Esta categoria aceita apenas solicitações imediatas.");
+    if (!agendar && modoCat === "agendadas") return setErro("Esta categoria aceita apenas corridas agendadas: marque \"Agendar Corrida\".");
     if (pagamento === "Voucher" && (!empresaConv || !voucher.trim())) return setErro("Para pagar com voucher, escolha a empresa e informe o número do voucher.");
     setEnviando(true);
     try {
       const r = await op<any>("/solicitar", {
-        passageiro: { nome, telefone: tel }, embarque: origem, complemento, paradas: paradas.filter((p) => p.texto.trim()), destino: semDestino ? undefined : destino, referencia,
-        motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, exigencias, observacao, empresaConveniada: empresaConv || undefined, centroCusto: centroCusto || undefined, voucher: pagamento === "Voucher" ? voucher : undefined, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
+        passageiro: { nome, telefone: tel, cpf: soDig(cpf) || undefined }, embarque: origem, complemento, paradas: paradas.filter((p) => p.texto.trim()), destino: semDestino ? undefined : destino, referencia,
+        motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, exigencias, observacao, infoAntes, infoDepois, infoInterna, telefoneContato: contato || undefined, enviarVariosCarros: variosCarros, favoritarOrigem: favOrigem, favoritarDestino: favDestino, valorFinalModo: finalModo, valorPrefixado: finalModo === "prefixado" ? fixo : undefined, empresaConveniada: empresaConv || undefined, centroCusto: centroCusto || undefined, voucher: pagamento === "Voucher" ? voucher : undefined, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
       });
       setOk(`Corrida solicitada: OS ${r.corrida.os}${r.corrida.valor != null ? ` · ${reais(r.corrida.valor)}` : ""}.${r.avisos?.length ? ` ${r.avisos.join(" ")}` : ""}`);
-      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
+      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setInfoAntes(""); setInfoDepois(""); setInfoInterna(""); setCpf(""); setVariosCarros(false); setFavOrigem(false); setFavDestino(false); setFinalModo("livre"); setPrefixado(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
       setBusca(""); setNome(""); setContato(""); setTelCadastro(""); setRecentes([]);
     } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
   }
@@ -140,13 +150,15 @@ export default function Solicitar() {
               <label className="oc-l">Nome Passageiro *<input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Digite o nome do passageiro" maxLength={80} /></label>
               <label className="oc-l">Contato (Manual)<input value={contato} onChange={(e) => setContato(e.target.value)} placeholder="Auto" inputMode="tel" />{telCadastro && !contato && <small className="suave" style={{ textTransform: "none" }}>{fone(telCadastro)}</small>}</label>
             </div>
+            <label className="oc-l" style={{ marginTop: 10 }}>CPF (opcional)<input value={cpf} onChange={(e) => setCpf(e.target.value)} inputMode="numeric" placeholder="000.000.000-00" maxLength={14} /></label>
           </div>
 
           <div className="oc-card">
             <h3>2. Rota</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <CampoEndereco rotulo="Origem" valor={origem} onChange={setOrigem} />
-              <input placeholder="Complemento (Opcional)" value={complemento} onChange={(e) => setComplemento(e.target.value)} maxLength={80} />
+              <label className="oc-sw"><input type="checkbox" checked={favOrigem} onChange={(e) => setFavOrigem(e.target.checked)} /> Favoritar endereço de partida</label>
+              <input placeholder="Sala/Bloco/Apart (Opcional)" value={complemento} onChange={(e) => setComplemento(e.target.value)} maxLength={80} />
               {paradas.map((p, i) => (
                 <div key={i} className="oc-fila" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}><CampoEndereco rotulo={`Parada ${i + 1}`} valor={p} onChange={(v) => setParadas(paradas.map((x, j) => (j === i ? v : x)))} /></div>
@@ -160,6 +172,7 @@ export default function Solicitar() {
                 </div>
               )}
               <input placeholder="Referência (Portão, Cor...)" value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} />
+              {!semDestino && <label className="oc-sw"><input type="checkbox" checked={favDestino} onChange={(e) => setFavDestino(e.target.checked)} /> Favoritar endereço de destino</label>}
               <label className="oc-sw"><input type="checkbox" checked={semDestino} onChange={(e) => setSemDestino(e.target.checked)} /> Sem Destino</label>
             </div>
             <div className="oc-mapa-solic"><div ref={ref} className="oc-mapa" /></div>
@@ -194,7 +207,11 @@ export default function Solicitar() {
               {pagamento === "Voucher" && <label className="oc-l">Número do voucher<input value={voucher} maxLength={30} onChange={(e) => setVoucher(e.target.value)} placeholder="Ex.: A-1234" /></label>}
               <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Filtros (Opcionais)</span>
                 <div className="oc-pagto">{EXIGENCIAS.map((x) => <label key={x} className={exigencias.includes(x) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x] : exigencias.filter((y) => y !== x))} />{x}</label>)}</div></div>
+              <label className="oc-sw"><input type="checkbox" checked={variosCarros} onChange={(e) => setVariosCarros(e.target.checked)} /> Enviar mais de um carro</label>
               <textarea placeholder="Observação para o motorista..." value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={300} />
+              <label className="oc-l">Informação antes do aceite<textarea placeholder="Será visualizada pelo motorista antes do aceite" value={infoAntes} onChange={(e) => setInfoAntes(e.target.value)} maxLength={300} /></label>
+              <label className="oc-l">Informação após o aceite<textarea placeholder="Só aparece para o motorista que aceitar" value={infoDepois} onChange={(e) => setInfoDepois(e.target.value)} maxLength={300} /></label>
+              <label className="oc-l">Informação interna<textarea placeholder="Só a central vê" value={infoInterna} onChange={(e) => setInfoInterna(e.target.value)} maxLength={500} /></label>
             </div>
           </div>
           <div className="oc-estimativa">
@@ -203,6 +220,11 @@ export default function Solicitar() {
               <button className="oc-btn peq" type="button" onClick={() => setManual(manual == null ? (est?.valor != null ? String(est.valor).replace(".", ",") : "") : null)}><Edit3 size={13} /> {manual == null ? "Editar valor" : "Usar estimativa"}</button>
             </div>
             {manual != null ? <input value={manual} onChange={(e) => setManual(e.target.value)} inputMode="decimal" style={{ margin: "8px 0", fontSize: 22 }} aria-label="Valor manual" /> : <div><strong>{valor != null ? reais(valor) : "R$ 0,00"}</strong></div>}
+            <div className="oc-pagto" style={{ margin: "8px 0" }}>
+              <label className={finalModo === "livre" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "livre"} onChange={() => setFinalModo("livre")} />Valor final livre</label>
+              <label className={finalModo === "prefixado" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "prefixado"} onChange={() => setFinalModo("prefixado")} />Valor final prefixado</label>
+            </div>
+            {finalModo === "prefixado" && <input value={prefixado} onChange={(e) => setPrefixado(e.target.value)} inputMode="decimal" placeholder="Valor da corrida (R$)" aria-label="Valor prefixado" style={{ marginBottom: 8 }} />}
             <div className="oc-dado"><span>Distância</span><b>{est?.distanciaKm != null ? `${est.distanciaKm.toLocaleString("pt-BR")} km` : "0.0 km"}</b></div>
             <button className="oc-btn pri" style={{ width: "100%", marginTop: 12, minHeight: 46, fontSize: 15 }} disabled={enviando} onClick={solicitar}>{enviando ? <Loader2 size={16} className="gira" /> : null} Solicitar Corrida</button>
           </div>

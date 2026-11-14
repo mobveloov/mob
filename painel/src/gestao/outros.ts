@@ -51,7 +51,7 @@ function rotasPassageiros(r: Router) {
     res.json({ passageiro: c, nota: notasDosPassageiros(listarProprias(emp(req))).get(String(c.telefone)) ?? null });
   }));
 
-  const CAMPOS = ["nome", "genero", "telefone", "email", "avaliouApp", "notaApp", "origemCadastro", "motoristaOrigem", "cidade", "status", "dispositivo"];
+  const CAMPOS = ["nome", "genero", "telefone", "email", "avaliouApp", "notaApp", "origemCadastro", "motoristaOrigem", "cidade", "status", "dispositivo", "cpf", "observacao"];
   const salvar = (req: import("express").Request, anterior: Registro | null) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const d: Record<string, unknown> = { ...(anterior ?? { status: "Ativo", origemCadastro: "Painel" }) };

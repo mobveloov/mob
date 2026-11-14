@@ -12,14 +12,16 @@ import { avaliacoesNps, csvAvaliacoes, PERIODOS_NPS, TIPOS_NPS, configNps, reset
 import { alertasAtivos, criarAlerta, encerrarAlerta, listarAlertas } from "./alertas.ts";
 import { central, marcarCentralLidas } from "./central-notificacoes.ts";
 import { ajuda, salvarAjuda } from "./ajuda.ts";
-import { categoriasCompletas, ICONES, removerCategoria, salvarCategoria } from "./categorias.ts";
+import { categoriasCompletas, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
+import { ROTULO_METODO } from "./tarifa-calculo.ts";
+import { pedidosRecentes } from "../corridas/index.ts";
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
 import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
-import { ativarDinamica, dinamicas, removerDinamica, salvarDinamica } from "./dinamica.ts";
+import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
 import { csvExtratoOnline, csvVisaoGeral, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, termos } from "./gerais.ts";
@@ -138,15 +140,34 @@ rotasConfig.put("/credito", admin, ok((req, res) => res.json(salvarCredito(emp(r
 rotasConfig.post("/credito/regras", admin, ok((req, res) => res.json(salvarRegraComissao(emp(req), req.body))));
 rotasConfig.delete("/credito/regras/:id", admin, ok((req, res) => res.json(removerRegraComissao(emp(req), req.params.id))));
 
-rotasConfig.get("/categorias", ok((req, res) => res.json({ categorias: categoriasCompletas(emp(req)), dinamicas: dinamicas(emp(req)), regras: credito(emp(req)).regras, icones: ICONES })));
+rotasConfig.get("/categorias", ok((req, res) => res.json({ categorias: categoriasCompletas(emp(req)), dinamicas: dinamicas(emp(req)), automacoes: automacoes(emp(req)), metodos: ROTULO_METODO, regras: credito(emp(req)).regras, icones: ICONES })));
 rotasConfig.post("/categorias", admin, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), null, req.body ?? {}, quem(req)) })));
 rotasConfig.put("/categorias/:id", admin, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
 rotasConfig.delete("/categorias/:id", admin, ok((req, res) => { removerCategoria(emp(req), req.params.id); res.json({ ok: true }); }));
 
-rotasConfig.get("/dinamicas", ok((req, res) => res.json({ regras: dinamicas(emp(req)) })));
-rotasConfig.post("/dinamicas", admin, ok((req, res) => res.json({ regras: salvarDinamica(emp(req), req.body) })));
-rotasConfig.post("/dinamicas/:id/ativa", admin, ok((req, res) => res.json({ regras: ativarDinamica(emp(req), req.params.id, req.body?.ativa === true) })));
-rotasConfig.delete("/dinamicas/:id", admin, ok((req, res) => res.json({ regras: removerDinamica(emp(req), req.params.id) })));
+// Editar tarifa (Machine): tarifa padrão e tarifas extras por dia e horário. Só o admin altera.
+rotasConfig.put("/categorias/:id/tarifa", admin, ok((req, res) => res.json({ categoria: salvarTarifaPadrao(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
+rotasConfig.post("/categorias/:id/tarifas-extras", admin, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: undefined }) })));
+rotasConfig.put("/categorias/:id/tarifas-extras/:extra", admin, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
+rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", admin, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
+
+/** Tudo da tela Tarifas dinâmicas: regras manuais (com a faixa da legenda), automações, áreas automáticas abertas agora e a prioridade. */
+const painelDinamicas = (empresaId: string) => ({
+  regras: dinamicas(empresaId).map((r) => ({ ...r, nivel: nivelDinamica(r) })),
+  automacoes: automacoes(empresaId).map((a) => ({ ...a, nivel: nivelDinamica(a) })),
+  automaticas: areasAutomaticas(empresaId, pedidosRecentes(empresaId)),
+  prioridade: prioridadeDinamicas(empresaId),
+  prioridades: PRIORIDADES.map((id) => ({ id, rotulo: ROTULO_PRIORIDADE[id] })),
+  legenda: LEGENDA_DINAMICA,
+});
+rotasConfig.get("/dinamicas", ok((req, res) => res.json(painelDinamicas(emp(req)))));
+rotasConfig.post("/dinamicas", admin, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas/:id/ativa", admin, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.put("/dinamicas-prioridade", admin, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas-automacoes", admin, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas-automacoes/:id/ativa", admin, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.delete("/dinamicas-automacoes/:id", admin, ok((req, res) => { removerAutomacao(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.delete("/dinamicas/:id", admin, ok((req, res) => { removerDinamica(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
 
 rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
 rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));

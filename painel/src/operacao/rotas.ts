@@ -21,7 +21,7 @@ import { arquivoDoAudio } from "../apps/chat.ts";
 import { aposCancelar } from "../apps/extras.ts";
 import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
-import { listar } from "../cadastros/armazem.ts";
+import { alterarCampos, listar } from "../cadastros/armazem.ts";
 import { alertas } from "../apps/despacho.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
@@ -289,16 +289,36 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
     exig.length ? `Exigências: ${exig.join(", ")}` : "",
   ].filter((x) => x.trim()).join(" · ");
   const corporativo = dadosCorporativos(emp(req), b);
+  const modoFinal = String(b.valorFinalModo ?? "livre") === "prefixado" ? "prefixado" : "livre";
+  const prefixado = num(b.valorPrefixado);
+  if (modoFinal === "prefixado" && !(prefixado != null && prefixado > 0)) throw new Error("Informe o valor prefixado da corrida.");
+  const contato = String(b.telefoneContato ?? "").replace(/\D/g, "");
+  if (contato && (contato.length < 10 || contato.length > 13)) throw new Error("Telefone para contato precisa de DDD e número.");
+  const limpar = (v: unknown, n: number) => String(v ?? "").replace(/[<>]/g, "").trim().slice(0, n);
   const c = await criarCorridaPropria(emp(req), {
     passageiro: { nome: String(pass.nome ?? ""), telefone: String(pass.telefone ?? "") }, embarque: ponto(b.embarque),
     destino: b.destino ? ponto(b.destino) : undefined, paradas: Array.isArray(b.paradas) ? b.paradas.map(ponto) : [],
     categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
     cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
     osExterna: b.osExterna ? String(b.osExterna) : undefined,
+    infoAntes: limpar(b.infoAntes, 300), infoDepois: limpar(b.infoDepois, 300), infoInterna: limpar(b.infoInterna, 500),
+    telefoneContato: contato || undefined, enviarVariosCarros: b.enviarVariosCarros === true,
+    valorFinal: { modo: modoFinal, ...(modoFinal === "prefixado" ? { valor: prefixado! } : {}) },
     ...corporativo,
   }, quem(req));
   const avisos: string[] = [];
-  const valor = num(b.valor);
+  const valor = modoFinal === "prefixado" ? prefixado : num(b.valor);
+  // Dados do passageiro e favoritos: CPF só entra se o cadastro ainda não tem; "Favoritar" grava o endereço.
+  try {
+    const cad = cadastroPorId("clientes")!;
+    const cli = listar(emp(req), cad).find((r) => r.telefone === String(c.passageiro.telefone));
+    const cpf = String(pass.cpf ?? "").replace(/\D/g, "");
+    const mud: Record<string, unknown> = {};
+    if (cli && cpf.length === 11 && !cli.cpf) mud.cpf = cpf;
+    if (cli && b.favoritarOrigem === true) mud.enderecoFavorito = c.embarque.texto;
+    else if (cli && b.favoritarDestino === true && c.destino?.texto) mud.enderecoFavorito = c.destino.texto;
+    if (cli && Object.keys(mud).length) alterarCampos(emp(req), cad, cli.id, mud, quem(req));
+  } catch (e) { avisos.push(`Dados do passageiro não atualizados: ${e instanceof Error ? e.message : e}`); }
   if (valor != null && valor !== c.estimativa.valor) {
     try { await editarCorridaPropria(emp(req), c.id, { valorInicial: valor }, quem(req)); } catch (e) { avisos.push(`Valor não mudou: ${e instanceof Error ? e.message : e}`); }
   }

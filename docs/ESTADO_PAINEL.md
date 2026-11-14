@@ -39,6 +39,13 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Central de notificações** (sino): avisos montados do que está pendente, leitura por pessoa, "Somente não lidas" (`config/central-notificacoes.ts`).
 - Exportar CSV com proteção de fórmula em Pix, pendências e taxas. Só admin muda situação. Teste: `painel/test/pix-pendencias.test.ts`.
 
+## Centrais (branch machine-centr)
+- **Modelo:** uma empresa pode ser central principal e ter centrais associadas (só um nível). Vínculos, códigos, controle financeiro, plano e serviços ficam em `dados/centrais.json` (`painel/src/centrais/rede.ts`). Cada central continua sendo uma empresa isolada.
+- **Isolamento:** a central consultada vem de `?central=ID` e só vale se for a própria empresa ou uma associada dela; senão 404 igual ao de central inexistente. A principal NÃO entra no painel da associada: vê só controle, plano, demonstrativo (quando o débito é da principal) e o extrato se a associada permitir, sem nomes de pessoas. Só o papel plataforma troca de empresa (X-Empresa), como antes. Operador não acessa nada de cobrança; tudo é admin.
+- **Telas** (menu novo "Cobrança", `painel/src/web/telas/centrais/`): Controle financeiro de centrais (exibir extrato = consentimento da associada; débito automático e conta online = decisão da principal), Meus planos (Essencial, Plus, Ultra, serviços adicionais, categoria de bonificação da rede só para a principal), Demonstrativo Mensal (por central e competência, Exportar CSV com apóstrofo contra fórmula) e o seletor "Central principal e centrais associadas" no topo (só quando há rede; muda só o que as telas de Cobrança mostram).
+- **Abrir uma central associada:** admin da principal cria a empresa nova (e o primeiro admin, opcional). Ligar uma empresa existente e desfazer vínculo: só a plataforma.
+- **Sem gateway:** nada é cobrado; valores dos planos são exemplos nossos. API em `/api/centrais` (`painel/src/centrais/rotas.ts`). Teste: `painel/test/centrais.test.ts`.
+
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
 - **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
 - **Saldo mínimo** existe em duas configurações (Regras de Crédito e gestão do motorista); só a da gestão vale no despacho.
@@ -77,3 +84,8 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Empresa (Criar/Alterando Empresa):** bandeira, CPF ou CNPJ (alternar), número do contrato, razão social, endereço, situação (Ativo, Suspenso, Aguardando ativação, Deletado), permitir especificar motorista, categorias e pagamentos permitidos com desconto de cada um, observação para o motorista e dados extras. Filtros por nome, documento e situação, última solicitação e Exportar. Só admin grava; excluir = situação Encerrada (histórico mantido).
 - **Nova Solicitação respeita a empresa:** situação diferente de Ativa, categoria e pagamento fora da lista e motorista específico (quando "Não") são recusados pelo servidor. Pendente: aplicar o desconto por pagamento no cálculo do preço e mostrar a observação para o motorista no app.
 - Código: `painel/src/gestao/validacao.ts`, `gestao/empresas.ts`, `gestao/motoristas.ts`, telas `MotoristaJanela.tsx`, `Motoristas.tsx`, `Empresas.tsx`. Testes: `painel/test/cadastro-motorista-empresa.test.ts` e `empresa-solicitacao.test.ts`.
+
+### Atualização (13/11/2026, noite)
+- **Também no main:** Pix, pendências, taxas de cancelamento, alertas e central de notificações; Relatórios e Vouchers; Tarifa (Editar tarifa) e Dinâmica; matriz de descontos já entra no preço da corrida. 203 testes passando.
+- **Em andamento (ramos machine-*):** cadmot (motorista e empresa), cadcat (categoria e nova solicitação), plarua (Plantão, Ruas, Áreas, Funil de Clientes, Mapa de Bairros), centr (telas de centrais).
+- **Depois:** comparar tela a tela com a Machine no navegador, carga de 500 corridas, Docker, up.veloov.com.
