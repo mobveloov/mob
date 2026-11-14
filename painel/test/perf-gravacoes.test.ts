@@ -111,3 +111,25 @@ test("chat: o JSON antigo da corrida entra no banco, mensagens novas só acresce
   assert.throws(() => C.enviarTexto(um, cheia, "passageiro", "Ana", "mais uma"), /limite de mensagens/);
   assert.equal(C.mensagens(um, cheia).length, 500);
 });
+
+test("sessões: o sessoes.json antigo entra no banco (só as válidas); entrar e sair mexem numa linha só", async () => {
+  const S = await import("../src/apps/sessoes.ts");
+  const Cad = await import("../src/cadastros/armazem.ts");
+  const m = Cad.criar(um, cadastroPorId("motoristas")!, { nome: "Sess", telefone: "11955550001", status: "Ativo" }, "t");
+  const agora = Date.now();
+  const antiga = { hash: "h-antiga", empresaId: um, papel: "motorista", telefone: "11955550001", chave: m.id, criadaEm: agora, expira: agora + 100000 };
+  const vencida = { ...antiga, hash: "h-vencida", expira: agora - 1 };
+  fs.mkdirSync(pasta(um, "apps"), { recursive: true });
+  fs.writeFileSync(pasta(um, "apps", "sessoes.json"), JSON.stringify([vencida, antiga]));
+  const { token } = S.criarSessao(um, "motorista", "11955550001");
+  assert.ok(!fs.existsSync(pasta(um, "apps", "sessoes.json")));
+  assert.ok(fs.existsSync(pasta(um, "apps", "sessoes.json.migrado")), "o JSON antigo fica guardado");
+  assert.equal(S.sessaoDoToken(um, token)?.chave, m.id);
+  assert.equal(S.sessaoDoToken(dois, token), null, "outra empresa não reconhece o token");
+  assert.equal(S.sessaoDoToken(um, "token-que-nao-existe"), null);
+  S.sair(um, token);
+  assert.equal(S.sessaoDoToken(um, token), null);
+  const n = (banco: { prepare: (s: string) => { get: (...a: string[]) => unknown } }) => (banco.prepare("SELECT COUNT(*) AS n FROM app_sessoes WHERE empresa = ?").get(um) as { n: number }).n;
+  const { banco } = await import("../src/servidor/banco.ts");
+  assert.equal(n(banco()), 1, "sobrou só a sessão antiga válida (a vencida não entrou)");
+});

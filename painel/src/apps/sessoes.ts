@@ -13,7 +13,8 @@ import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar, mesclar } from "../cadastros/armazem.ts";
 import { provedorDaEmpresa } from "../crm/whatsapp.ts";
-import { arquivo, gravar, ler, limitador, soDigitos } from "./armazem.ts";
+import { arquivo, limitador, soDigitos } from "./armazem.ts";
+import { banco, migrarUmaVez } from "../servidor/banco.ts";
 
 export type PapelApp = "passageiro" | "motorista";
 export const PAPEIS: PapelApp[] = ["passageiro", "motorista"];
@@ -35,6 +36,18 @@ const MAX_SESSOES = 20_000;
 
 const hash = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 const arqSessoes = (empresaId: string) => arquivo(empresaId, "sessoes.json");
+
+// As sessões ficam no banco (tabela app_sessoes, uma linha por sessão): login e sair não reescrevem mais o sessoes.json inteiro.
+// O sessoes.json antigo entra na primeira vez (só as que ainda valem) e vira sessoes.json.migrado (guardado).
+function preparar(empresaId: string) {
+  migrarUmaVez(empresaId, "app_sessoes", arqSessoes(empresaId), (conteudo) => {
+    const agora = Date.now();
+    const l = (Array.isArray(conteudo) ? (conteudo as SessaoApp[]) : []).filter((s) => s && typeof s.hash === "string" && s.expira > agora).slice(-MAX_SESSOES);
+    const ins = banco().prepare("INSERT OR IGNORE INTO app_sessoes (empresa, hash, expira, dados) VALUES (?, ?, ?, ?)");
+    for (const s of l) ins.run(empresaId, s.hash, s.expira, JSON.stringify(s));
+    return l.length;
+  });
+}
 
 export function telefoneValido(t: string) {
   return t.length >= 10 && t.length <= 13;
@@ -110,8 +123,12 @@ export function criarSessao(empresaId: string, papel: PapelApp, telefone: string
   const token = crypto.randomBytes(32).toString("base64url");
   const agora = Date.now();
   const sessao: SessaoApp = { hash: hash(token), empresaId, papel, telefone, chave, criadaEm: agora, expira: agora + DURACAO_MS };
-  const lista = ler<SessaoApp[]>(arqSessoes(empresaId), []).filter((s) => s.expira > agora).slice(-MAX_SESSOES);
-  gravar(arqSessoes(empresaId), [...lista, sessao]);
+  preparar(empresaId);
+  const db = banco();
+  db.prepare("INSERT INTO app_sessoes (empresa, hash, expira, dados) VALUES (?, ?, ?, ?)").run(empresaId, sessao.hash, sessao.expira, JSON.stringify(sessao));
+  // Apaga as vencidas e guarda só as MAX_SESSOES mais novas da empresa.
+  db.prepare("DELETE FROM app_sessoes WHERE empresa = ? AND expira <= ?").run(empresaId, agora);
+  db.prepare("DELETE FROM app_sessoes WHERE empresa = ? AND seq <= (SELECT seq FROM app_sessoes WHERE empresa = ? ORDER BY seq DESC LIMIT 1 OFFSET ?)").run(empresaId, empresaId, MAX_SESSOES);
   return { token, sessao };
 }
 
@@ -119,7 +136,9 @@ export function criarSessao(empresaId: string, papel: PapelApp, telefone: string
 export function sessaoDoToken(empresaId: string, token: string): SessaoApp | null {
   if (!token || token.length > 100) return null;
   const h = hash(token);
-  const s = ler<SessaoApp[]>(arqSessoes(empresaId), []).find((x) => x.hash === h);
+  preparar(empresaId);
+  const linha = banco().prepare("SELECT dados FROM app_sessoes WHERE empresa = ? AND hash = ?").get(empresaId, h) as { dados: string } | undefined;
+  const s = linha ? (JSON.parse(linha.dados) as SessaoApp) : undefined;
   if (!s || s.empresaId !== empresaId || s.expira < Date.now()) return null;
   if (impedimento(empresaId, s.papel, s.telefone)) return null;
   return s;
@@ -127,7 +146,8 @@ export function sessaoDoToken(empresaId: string, token: string): SessaoApp | nul
 
 export function sair(empresaId: string, token: string) {
   const h = hash(token);
-  gravar(arqSessoes(empresaId), ler<SessaoApp[]>(arqSessoes(empresaId), []).filter((s) => s.hash !== h));
+  preparar(empresaId);
+  banco().prepare("DELETE FROM app_sessoes WHERE empresa = ? AND hash = ?").run(empresaId, h);
 }
 
 // ------------------------------------------------------------------ quem sou eu
