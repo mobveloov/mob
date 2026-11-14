@@ -187,7 +187,7 @@ export function rotasMotoristas(r: Router) {
   r.get("/motoristas-busca", ok((req, res) => {
     const b = texto(req.query.q, 60);
     res.json({ motoristas: registros(emp(req), "motoristas").filter((m) => m.status !== "Lixeira" && (contem(m.nome, b) || (digitos(b) && String(m.cpf ?? "").includes(digitos(b)))))
-      .slice(0, 30).map((m) => ({ id: m.id, nome: String(m.nome ?? ""), email: String(m.email ?? ""), cpf: String(m.cpf ?? ""), status: String(m.status ?? "") })) });
+      .slice(0, 30).map((m) => ({ id: m.id, nome: String(m.nome ?? ""), email: String(m.email ?? ""), cpf: String(m.cpf ?? ""), status: String(m.status ?? ""), telefone: String(m.telefone ?? ""), cidade: String(m.cidade ?? "") })) });
   }));
 
   r.get("/motoristas/:id", ok((req, res) => {
@@ -422,7 +422,13 @@ export function rotasMotoristas(r: Router) {
   }));
   r.post("/punicoes", ok((req, res) => {
     const b = req.body ?? {};
-    res.json({ punicao: punir(emp(req), String(b.motoristaId ?? ""), Number(b.tempo), b.unidade === "dias" ? "dias" : "horas", String(b.motivo ?? ""), quem(req)) });
+    res.json({ punicao: punir(emp(req), String(b.motoristaId ?? ""), Number(b.tempo), b.unidade === "dias" ? "dias" : b.unidade === "minutos" ? "minutos" : "horas", String(b.motivo ?? ""), quem(req)) });
+  }));
+  r.get("/punicoes-historico/:motoristaId", ok((req, res) => {
+    const e = emp(req), agora = Date.now();
+    const l = punicoes(e).filter((p) => p.motoristaId === req.params.motoristaId).sort((a, b) => b.inicio.localeCompare(a.inicio))
+      .map((p) => ({ id: p.id, motivo: p.motivo, inicio: p.inicio, fim: p.fim, por: p.por, liberadaEm: p.liberadaEm, emVigor: !p.liberadaEm && Date.parse(p.fim) > agora }));
+    res.json({ punicoes: l });
   }));
   r.delete("/punicoes/:id", ok((req, res) => res.json({ punicao: liberarPunicao(emp(req), req.params.id, quem(req)) })));
 

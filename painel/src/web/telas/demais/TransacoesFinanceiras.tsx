@@ -34,10 +34,10 @@ export function TransacoesFinanceiras() {
       <p className="sub">Aqui você pode configurar as cobranças de cartão de crédito no aplicativo do passageiro e pix na recarga automática para o motorista diretamente do seu aplicativo, sem a necessidade de maquininhas ou outros dispositivos, fornecendo segurança e comodidade para a realização de corridas.</p>
       <section className="dm-cartao dm-secao"><h2>Condições</h2>
         <h3>Cartão no app</h3>
-        {f.planos.map((p: any, i: number) => <p key={p.id} className="sub">Opção {i + 1}: para recebimento no plano {p.nome}, a taxa é de até {pct(p.taxa)} sobre o valor das corridas.</p>)}
+        {f.planos.map((p: any, i: number) => <p key={p.id} className="sub">Opção {i + 1}: para recebimento no plano {p.nome}, a taxa é de até {Number(p.taxa).toFixed(2).replace(".", ",")}% sobre o valor das corridas.</p>)}
         <p className="sub">Você decide para onde o valor das corridas vai: direto para os motoristas, dividido entre a central e os motoristas ou direto para a conta da central. Para o cadastro ser aprovado é preciso escolher um plano, mesmo sem usar o pagamento por cartão agora.</p>
         <h3>Pix</h3>
-        <p className="sub">O valor das recargas é transferido diariamente, somando as recargas desde a última transferência. Valor mínimo de R$ {String(f.pixMinimo).replace(".", ",")} por transação.</p>
+        <p className="sub">O valor das recargas é transferido diariamente, somando as recargas desde a última transferência. Valor mínimo de R$ {Number(f.pixMinimo).toFixed(2).replace(".", ",")} por transação.</p>
         {f.taxasPix.map((t: any) => <p key={t.taxa} className="sub">Taxa de {pct(t.taxa)} por transação nos planos {t.planos.join(", ")}.</p>)}
       </section>
 

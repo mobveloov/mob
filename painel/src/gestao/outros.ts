@@ -1,5 +1,6 @@
 // Cadastro › Passageiros, Cupons, Empresas, Áreas, Desafios e Indicações (rotas da gestão).
 
+import { montarCsv } from "../config/financeiro-visao.ts";
 import type { Router } from "express";
 import { atualizar, criar, type Registro } from "../cadastros/armazem.ts";
 import { listarProprias, type CorridaPropria } from "../corridas/index.ts";
@@ -13,6 +14,7 @@ import { contaParaDesafio, corridaFicouPendente, TIPOS_DESAFIO_CORRIDA } from ".
 import { areas, FUSOS, removerArea, salvarArea } from "./regras.ts";
 import { rotasEmpresas } from "./empresas.ts";
 
+const dataBrasil = (iso: string) => { const d = new Date(Date.parse(iso) - 3 * 3_600_000).toISOString(); return `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)} às ${d.slice(11, 16)}`; };
 const diaBr = (iso: unknown) => (typeof iso === "string" && iso ? new Date(Date.parse(iso) - 3 * 3_600_000).toISOString().slice(0, 10) : "");
 
 // ====================================================================== passageiros
@@ -306,6 +308,40 @@ function rotasIndicacoes(r: Router) {
       kpis: { total: historico.length, metas: historico.filter((h) => h.metaBatida).length, pago: pagoTotal, gastoTotal: pagoTotal },
       historico: historico.slice(0, 100), motoristas: ranking("motorista"), passageiros: ranking("passageiro"),
     });
+  }));
+  /** Recompensas por indicação (Machine): uma linha por indicado, com a recompensa de quem indicou e o progresso do indicado na meta de corridas. */
+  r.get("/recompensas-indicacao", ok((req, res) => {
+    const e = emp(req), q = req.query;
+    const tipo = q.tipo === "passageiro" ? "passageiro" : "motorista";
+    const status = q.status === "pendente" || q.status === "concluido" ? String(q.status) : "todos";
+    const [de, ate] = periodo(String(q.periodo ?? "todo"), q.inicio, q.fim);
+    const busca = texto(q.busca, 60);
+    const corridas = listarProprias(e).filter((c) => c.status === "finalizada");
+    const feitasMot = new Map<string, number>(), feitasPas = new Map<string, number>();
+    for (const c of corridas) { if (c.motoristaId) feitasMot.set(c.motoristaId, (feitasMot.get(c.motoristaId) ?? 0) + 1); feitasPas.set(c.passageiro.telefone, (feitasPas.get(c.passageiro.telefone) ?? 0) + 1); }
+    const mot = new Map(registros(e, "motoristas").map((m) => [m.id, m]));
+    const cli = new Map(registros(e, "clientes").map((c) => [String(c.telefone), c]));
+    const nomeDe = (papel: string, chave: string) => String((papel === "motorista" ? mot.get(chave)?.nome : cli.get(chave)?.nome) ?? (papel === "passageiro" ? chave : "Sem nome"));
+    const linhas = banco().prepare("SELECT papel, chave, codigo, indicado_por AS indicadoPor FROM app_pessoas WHERE empresa = ?").all(e) as Array<{ papel: string; chave: string; codigo: string; indicadoPor: string }>;
+    const porCodigo = new Map(linhas.map((l) => [l.codigo, l]));
+    const desafios = registros(e, "desafios").filter((d) => d.ativo === true && String(d.tipo).startsWith("Indicação"));
+    const regra = (papel: string) => desafios.find((d) => d.tipo === (papel === "passageiro" ? "Indicação de passageiro" : "Indicação de motorista"));
+    const itens = linhas.filter((l) => l.indicadoPor && l.papel === tipo).map((l) => {
+      const emb = porCodigo.get(l.indicadoPor);
+      const reg = l.papel === "motorista" ? mot.get(l.chave) : cli.get(l.chave);
+      const em = String(reg?.criadoEm ?? "");
+      const r0 = regra(l.papel);
+      const meta = Math.max(1, Number(r0?.meta) || 1);
+      const feitas = (l.papel === "motorista" ? feitasMot.get(l.chave) : feitasPas.get(l.chave)) ?? 0;
+      return { em, quemIndicou: emb ? nomeDe(emb.papel, emb.chave) : `Código ${l.indicadoPor}`, recompensa: Number(r0?.premio) || 0, indicado: nomeDe(l.papel, l.chave), tipoUsuario: l.papel === "motorista" ? "Motorista" : "Cliente", tipoRecompensa: "Quantidade mínima", realizadas: Math.min(feitas, meta), meta, concluido: feitas >= meta };
+    }).filter((x) => (!x.em || (diaBr(x.em) >= de && diaBr(x.em) <= ate)) && (status === "todos" || (status === "concluido") === x.concluido) && (!busca || contem(x.quemIndicou, busca) || contem(x.indicado, busca)))
+      .sort((a, b) => b.em.localeCompare(a.em));
+    if (q.csv === "1") {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8"); res.setHeader("Content-Disposition", 'attachment; filename="recompensas-indicacao.csv"');
+      return res.send(montarCsv(["Indicado em", "Quem indicou", "Recompensa de quem indicou", "Indicado", "Tipo do usuário", "Tipo da recompensa", "Corridas realizadas", "Meta de corridas"], itens.map((x) => [x.em ? dataBrasil(x.em) : "", x.quemIndicou, x.recompensa, x.indicado, x.tipoUsuario, x.tipoRecompensa, x.realizadas, x.meta])));
+    }
+    const pg = paginar(itens, q.pagina, 10);
+    res.json({ itens: pg.itens, paginacao: pg.paginacao });
   }));
 }
 

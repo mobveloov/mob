@@ -69,6 +69,7 @@ export const FUNCOES: Funcao[] = [
   { id: "os-operador", grupo: "Financeiro", secao: "Estatísticas", nome: "OS por operador", rota: "/os-operador" },
   { id: "os-percentual-motorista", grupo: "Financeiro", secao: "Estatísticas", nome: "% de OS por motorista", rota: "/os-percentual-motorista" },
   { id: "km-rodados", grupo: "Financeiro", secao: "Estatísticas", nome: "Km rodados por motorista", rota: "/km-rodados" },
+  { id: "recompensas-indicacao", grupo: "Financeiro", secao: "Estatísticas", nome: "Recompensas por indicação", rota: "/recompensas-indicacao", novo: true },
   { id: "carteiras", grupo: "Financeiro", secao: "Transações", nome: "Carteiras", rota: "/carteiras" },
   { id: "extrato", grupo: "Financeiro", secao: "Transações", nome: "Extrato Geral", rota: "/extrato" },
   { id: "saques", grupo: "Financeiro", secao: "Transações", nome: "Saques", rota: "/saques" },
