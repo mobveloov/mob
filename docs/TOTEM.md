@@ -153,3 +153,18 @@ totem acompanha em até 5 segundos.
 - Busca de endereço com sugestões e coordenadas (hoje o destino é texto; com latitude e longitude no local e no
   destino o preço já sai pela distância).
 - Vínculo do aparelho (um aparelho por local) e senha para fechar o app.
+
+## O que veio do mobveloov (14/11/2026)
+
+A tela do totem agora segue a do sistema de referência (com endereço fixo de embarque):
+
+1. **Primeira tela:** nome completo, telefone, destino (opcional) e forma de pagamento, botão **Solicitar corrida**.
+   Mensagens de erro iguais: "Digite seu nome completo", "Digite um telefone válido com DDD", "Selecione a forma de pagamento.".
+2. **Escolha sua viagem:** origem e destino ("A definir pelo motorista"), categorias disponíveis (uma só: botão direto) e a forma de pagamento escolhida.
+3. **Acompanhamento** (já existia).
+4. **Totem bloqueado:** fechar ou recarregar a página pede a senha do local ("Digite a senha para fechar o aplicativo", "Senha incorreta", "Cancelar e continuar usando").
+5. **Tela sempre acesa** (wake lock) e recarregar remoto só com a primeira tela vazia.
+
+Diferenças: o preço aparece como estimativa (o painel calcula pelas tarifas); a logo vem da marca da empresa; sem checagem do número no WhatsApp,
+sem jogos de recompensa e sem a ponte do app Android (senha de fechamento nativa).
+Arquivos: `web/totem/Totem.tsx` (reescrito), `web/totem/Bloqueio.tsx` (novo).

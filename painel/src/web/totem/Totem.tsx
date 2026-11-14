@@ -5,12 +5,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowLeft, Car, Check, CircleX, Loader2, MapPin, Navigation } from "lucide-react";
+import { ArrowLeft, ArrowRight, Car, Check, CircleX, Loader2, MapPin, Wallet } from "lucide-react";
 import { MARCA_PADRAO, variaveisTema, type Marca } from "../../comum/marca.ts";
 import { apiTotem, ErroTotem, mascaraTelefone, novoPedidoId, reais, urlArquivo, type CategoriaTotem, type SituacaoTotem } from "./api";
+import { TotemBloqueio, useTelaAcesa } from "./Bloqueio";
 import "./totem.css";
 
-type Passo = "carregando" | "senha" | "inicio" | "destino" | "categoria" | "pagamento" | "dados" | "confirmar" | "acompanhar" | "indisponivel" | "nao-existe";
+type Passo = "carregando" | "senha" | "inicio" | "categoria" | "acompanhar" | "indisponivel" | "nao-existe";
 interface Config { local: { id: string; nome: string; endereco: string; pagamentos: string[]; versao: number }; categorias: CategoriaTotem[] }
 interface Pedido { destino: string; semDestino: boolean; categoria: string; pagamento: string; nome: string; telefone: string }
 const PEDIDO_VAZIO: Pedido = { destino: "", semDestino: false, categoria: "", pagamento: "", nome: "", telefone: "" };
@@ -67,9 +68,9 @@ export default function Totem(props: { empresa?: string; local?: string }) {
   const sairDoAparelho = useCallback(() => { gravar(`${K}:chave`, null); setChave(null); setPasso("senha"); }, [K]);
 
   const recomecar = useCallback(() => {
-    setPedido(PEDIDO_VAZIO); setPedidoId(novoPedidoId()); setErro(null); setEnviando(false);
+    setPedido({ ...PEDIDO_VAZIO, pagamento: config?.local.pagamentos.length === 1 ? config.local.pagamentos[0] : "" }); setPedidoId(novoPedidoId()); setErro(null); setEnviando(false);
     setCorridaId(null); gravar(`${K}:corrida`, null); setPasso("inicio");
-  }, [K]);
+  }, [K, config]);
 
   // Marca e nome do local (público) e, com a chave, a configuração.
   const carregar = useCallback(async () => {
@@ -83,6 +84,7 @@ export default function Totem(props: { empresa?: string; local?: string }) {
       setMarca(c.marca); aplicarMarca(c.marca, empresa);
       setConfig(c); versao.current = c.local.versao;
       setErro(null);
+      setPedido((p) => (c.local.pagamentos.length === 1 && !p.pagamento ? { ...p, pagamento: c.local.pagamentos[0] } : p));
       setPasso(ler(`${K}:corrida`) ? "acompanhar" : "inicio");
     } catch (e) {
       if (e instanceof ErroTotem && e.status === 401) sairDoAparelho();
@@ -101,12 +103,14 @@ export default function Totem(props: { empresa?: string; local?: string }) {
   // Recarregar remoto (o admin salvou o local ou clicou em "Recarregar totem").
   const passoRef = useRef(passo);
   passoRef.current = passo;
+  const preenchidoRef = useRef(false);
+  preenchidoRef.current = !!(pedido.nome || pedido.telefone || pedido.destino);
   useEffect(() => {
     if (!chave) return;
     const t = setInterval(async () => {
       try {
         const v = (await api.versao(chave)).versao;
-        if (versao.current != null && v !== versao.current && passoRef.current === "inicio") location.reload();
+        if (versao.current != null && v !== versao.current && passoRef.current === "inicio" && !preenchidoRef.current) location.reload();
       } catch (e) { if (e instanceof ErroTotem && e.status === 401) sairDoAparelho(); }
     }, VERSAO_MS);
     return () => clearInterval(t);
@@ -114,13 +118,13 @@ export default function Totem(props: { empresa?: string; local?: string }) {
 
   // Ninguém mexeu por 90 s no meio do pedido: volta para o início.
   useEffect(() => {
-    if (!["destino", "categoria", "pagamento", "dados", "confirmar"].includes(passo)) return;
+    if (passo !== "categoria" && !(passo === "inicio" && (pedido.nome || pedido.telefone || pedido.destino))) return;
     let t = setTimeout(recomecar, INATIVO_MS);
     const mexeu = () => { clearTimeout(t); t = setTimeout(recomecar, INATIVO_MS); };
     window.addEventListener("pointerdown", mexeu);
     window.addEventListener("keydown", mexeu);
     return () => { clearTimeout(t); window.removeEventListener("pointerdown", mexeu); window.removeEventListener("keydown", mexeu); };
-  }, [passo, recomecar]);
+  }, [passo, recomecar, pedido.nome, pedido.telefone, pedido.destino]);
 
   // Quiosque: sem menu do botão direito; tela cheia no primeiro toque (quando o navegador deixa).
   useEffect(() => {
@@ -131,30 +135,27 @@ export default function Totem(props: { empresa?: string; local?: string }) {
     return () => { document.removeEventListener("contextmenu", menu); document.removeEventListener("pointerdown", cheia); };
   }, []);
 
-  // Ordem dos passos: pula categoria ou pagamento quando só existe uma opção.
-  const ordem = useMemo<Passo[]>(() => {
-    const l: Passo[] = ["destino"];
-    if ((config?.categorias.length ?? 0) > 1) l.push("categoria");
-    if ((config?.local.pagamentos.length ?? 0) > 1) l.push("pagamento");
-    l.push("dados", "confirmar");
-    return l;
-  }, [config]);
-  const avancar = () => { setErro(null); const i = ordem.indexOf(passo); setPasso(i < 0 ? ordem[0] : ordem[Math.min(i + 1, ordem.length - 1)]); };
-  const voltar = () => { setErro(null); const i = ordem.indexOf(passo); setPasso(i <= 0 ? "inicio" : ordem[i - 1]); };
-  const comecar = () => {
+  const voltar = () => { setErro(null); setPasso("inicio"); };
+
+  /** Primeira tela: confere nome, telefone e pagamento. Com categorias, escolhe a viagem; sem elas, pede direto. */
+  const solicitar = () => {
     if (!config) return;
-    setPedido({ ...PEDIDO_VAZIO, categoria: config.categorias.length === 1 ? config.categorias[0].nome : "", pagamento: config.local.pagamentos.length === 1 ? config.local.pagamentos[0] : "" });
-    setPedidoId(novoPedidoId());
-    setErro(null); setPasso("destino");
+    if (pedido.nome.trim().length < 3) return setErro("Digite seu nome completo");
+    if (pedido.telefone.replace(/\D/g, "").length < 10) return setErro("Digite um telefone válido com DDD");
+    if (config.local.pagamentos.length && !pedido.pagamento) return setErro("Selecione a forma de pagamento.");
+    setErro(null);
+    if (config.categorias.length === 0) return void enviar("");
+    setPasso("categoria");
   };
 
-  const confirmar = async () => {
+  const enviar = async (categoria: string) => {
     if (!chave || enviando) return;
+    setPedido((p) => ({ ...p, categoria }));
     setEnviando(true); setErro(null);
     try {
       const r = await api.pedir(chave, {
-        pedidoId, destino: pedido.semDestino ? undefined : { texto: pedido.destino.trim() }, semDestino: pedido.semDestino,
-        categoria: pedido.categoria, pagamento: pedido.pagamento, nome: pedido.nome.trim(), telefone: pedido.telefone,
+        pedidoId, destino: pedido.destino.trim() ? { texto: pedido.destino.trim() } : undefined, semDestino: !pedido.destino.trim(),
+        categoria, pagamento: pedido.pagamento, nome: pedido.nome.trim(), telefone: pedido.telefone,
       });
       gravar(`${K}:corrida`, r.corrida.id);
       setCorridaId(r.corrida.id); setPasso("acompanhar");
@@ -164,9 +165,8 @@ export default function Totem(props: { empresa?: string; local?: string }) {
     } finally { setEnviando(false); }
   };
 
-  const cat = config?.categorias.find((c) => c.nome === pedido.categoria);
+  useTelaAcesa();
   const logo = escuroDa(marca) ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro;
-  const nPasso = ordem.indexOf(passo);
 
   return (
     <div className="tt">
@@ -192,90 +192,55 @@ export default function Totem(props: { empresa?: string; local?: string }) {
           {passo === "senha" && <Senha nomeLocal={nomeLocal} entrar={async (s) => { const r = await api.entrar(s); gravar(`${K}:chave`, r.chave); setChave(r.chave); }} />}
 
           {passo === "inicio" && config && (
-            <>
-              <h1>{marca.textos.saudacao && marca.textos.saudacao !== MARCA_PADRAO.textos.saudacao ? marca.textos.saudacao : "Peça seu carro aqui"}</h1>
-              <p>Rápido e sem aplicativo. O motorista vem até você.</p>
+            <form className="tt-caixa" onSubmit={(e) => { e.preventDefault(); solicitar(); }}>
               <div className="tt-partida"><small><MapPin size={14} /> Você está em</small>{config.local.endereco}</div>
-              <button className="tt-botao primario grande" onClick={comecar}><Car size={34} /> Pedir corrida</button>
-            </>
-          )}
-
-          {passo === "destino" && (
-            <form className="tt-caixa" onSubmit={(e) => { e.preventDefault(); if (pedido.destino.trim().length >= 3) avancar(); }}>
-              <h2>Para onde você vai?</h2>
-              <label className="tt-campo">Destino
-                <input autoFocus value={pedido.destino} enterKeyHint="next" maxLength={200} placeholder="Rua e número, bairro ou lugar"
-                  onChange={(e) => setPedido({ ...pedido, destino: e.target.value, semDestino: false })} />
+              <label className="tt-campo">Nome completo
+                <input autoFocus value={pedido.nome} maxLength={60} enterKeyHint="next" autoComplete="off" placeholder="Seu nome" onChange={(e) => { setPedido({ ...pedido, nome: e.target.value }); setErro(null); }} />
               </label>
-              <button type="submit" className="tt-botao primario" disabled={pedido.destino.trim().length < 3}>Continuar</button>
-              <button type="button" className="tt-botao" onClick={() => { setPedido({ ...pedido, destino: "", semDestino: true }); avancar(); }}>
-                <Navigation size={22} /> Vou dizer ao motorista
-              </button>
-              <button type="button" className="tt-botao" onClick={voltar}><ArrowLeft size={22} /> Voltar</button>
+              <label className="tt-campo">Telefone
+                <input value={pedido.telefone} inputMode="numeric" enterKeyHint="next" autoComplete="off" placeholder="(11) 99999-9999" onChange={(e) => { setPedido({ ...pedido, telefone: mascaraTelefone(e.target.value) }); setErro(null); }} />
+              </label>
+              <label className="tt-campo"><span className="tt-linha-rotulo">Destino <small>Opcional</small></span>
+                <input value={pedido.destino} maxLength={200} enterKeyHint="done" placeholder="Para onde deseja ir? (opcional)" onChange={(e) => setPedido({ ...pedido, destino: e.target.value, semDestino: !e.target.value.trim() })} />
+              </label>
+              <div>
+                <p className="tt-rotulo">Forma de pagamento</p>
+                <div className="tt-pagamentos">
+                  {config.local.pagamentos.map((p) => (
+                    <button type="button" key={p} className={`tt-botao tt-opcao ${p === pedido.pagamento ? "ativo" : ""}`} onClick={() => { setPedido({ ...pedido, pagamento: p }); setErro(null); }}><span>{p}</span></button>
+                  ))}
+                </div>
+              </div>
+              {erro && <div className="tt-erro" role="alert">{erro}</div>}
+              <button type="submit" className="tt-botao primario grande" disabled={enviando}>{enviando ? <><Loader2 size={30} className="tt-gira" /> Pedindo...</> : <>Solicitar corrida <ArrowRight size={30} /></>}</button>
             </form>
           )}
 
           {passo === "categoria" && config && (
             <>
-              <h2>Escolha o carro</h2>
-              <div className="tt-opcoes">
-                {config.categorias.map((c) => (
-                  <button key={c.nome} className={`tt-botao tt-opcao ${c.nome === pedido.categoria ? "ativo" : ""}`} onClick={() => { setPedido({ ...pedido, categoria: c.nome }); avancar(); }}>
-                    <span>{c.nome}{c.descricao && <small>{c.descricao}</small>}</span>
-                    <strong>{c.preco == null ? "" : <><small>a partir de</small>{reais(c.preco)}</>}</strong>
-                  </button>
-                ))}
-              </div>
-              <button className="tt-botao" onClick={voltar}><ArrowLeft size={22} /> Voltar</button>
-            </>
-          )}
-
-          {passo === "pagamento" && config && (
-            <>
-              <h2>Como você vai pagar?</h2>
-              <p>O pagamento é feito direto ao motorista.</p>
-              <div className="tt-opcoes">
-                {config.local.pagamentos.map((p) => (
-                  <button key={p} className={`tt-botao tt-opcao ${p === pedido.pagamento ? "ativo" : ""}`} onClick={() => { setPedido({ ...pedido, pagamento: p }); avancar(); }}>
-                    <span>{p}</span>
-                  </button>
-                ))}
-              </div>
-              <button className="tt-botao" onClick={voltar}><ArrowLeft size={22} /> Voltar</button>
-            </>
-          )}
-
-          {passo === "dados" && config && (
-            <form className="tt-caixa" onSubmit={(e) => { e.preventDefault(); avancar(); }}>
-              <h2>Seus dados</h2>
-              <p>O motorista usa para chamar você.</p>
-              <label className="tt-campo">Seu nome
-                <input autoFocus value={pedido.nome} maxLength={60} enterKeyHint="next" autoComplete="off" onChange={(e) => setPedido({ ...pedido, nome: e.target.value })} />
-              </label>
-              <label className="tt-campo">Celular com DDD
-                <input value={pedido.telefone} inputMode="tel" enterKeyHint="done" autoComplete="off" placeholder="(11) 90000-0000" onChange={(e) => setPedido({ ...pedido, telefone: mascaraTelefone(e.target.value) })} />
-              </label>
-              <button type="submit" className="tt-botao primario" disabled={pedido.nome.trim().length < 2 || pedido.telefone.replace(/\D/g, "").length < 10}>Continuar</button>
-              <button type="button" className="tt-botao" onClick={voltar}><ArrowLeft size={22} /> Voltar</button>
-            </form>
-          )}
-
-          {passo === "confirmar" && config && (
-            <>
-              <h2>Confira o pedido</h2>
+              <button className="tt-botao" onClick={voltar} disabled={enviando}><ArrowLeft size={22} /> Voltar</button>
+              <h1>Escolha sua viagem</h1>
               <div className="tt-resumo">
-                <div><span>Embarque</span><b>{config.local.endereco}</b></div>
-                <div><span>Destino</span><b>{pedido.semDestino ? "Vou dizer ao motorista" : pedido.destino}</b></div>
-                {cat && <div><span>Carro</span><b>{cat.nome}</b></div>}
-                {cat?.preco != null && <div><span>Preço a partir de</span><b>{reais(cat.preco)}</b></div>}
-                {pedido.pagamento && <div><span>Pagamento</span><b>{pedido.pagamento}</b></div>}
-                <div><span>Passageiro</span><b>{pedido.nome}{pedido.telefone && <><br />{pedido.telefone}</>}</b></div>
+                <div><span>Origem</span><b>{config.local.endereco}</b></div>
+                <div><span>Destino</span><b>{pedido.semDestino || !pedido.destino.trim() ? "A definir pelo motorista" : pedido.destino}</b></div>
               </div>
+              <p><MapPin size={16} /> O valor é uma estimativa e o motorista confirma no final.</p>
+              {config.categorias.length > 1 && <p className="tt-rotulo">Categorias disponíveis</p>}
               {erro && <div className="tt-erro" role="alert">{erro}</div>}
-              <div className="tt-linha">
-                <button className="tt-botao" onClick={voltar} disabled={enviando}><ArrowLeft size={22} /> Voltar</button>
-                <button className="tt-botao primario" onClick={confirmar} disabled={enviando}>{enviando ? <><Loader2 size={24} className="tt-gira" /> Pedindo...</> : <><Check size={24} /> Confirmar</>}</button>
-              </div>
+              {config.categorias.length === 1 ? (
+                <button className="tt-botao primario grande" disabled={enviando} onClick={() => enviar(config.categorias[0].nome)}>{enviando ? <><Loader2 size={30} className="tt-gira" /> Pedindo...</> : <>Solicitar corrida <ArrowRight size={30} /></>}</button>
+              ) : (
+                <div className="tt-opcoes">
+                  {config.categorias.map((c) => (
+                    <button key={c.nome} disabled={enviando} className={`tt-botao tt-opcao ${c.nome === pedido.categoria ? "ativo" : ""}`} onClick={() => enviar(c.nome)}>
+                      <span>{c.nome}{c.descricao && <small>{c.descricao}</small>}<small>Solicitar <ArrowRight size={14} /></small></span>
+                      <strong>{c.preco == null ? "" : <><small>a partir de</small>{reais(c.preco)}</>}</strong>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p><Wallet size={16} /> Forma de pagamento: {pedido.pagamento || "não selecionada"}</p>
+              <p className="tt-centro">Operado por {marca.nomeExibido}</p>
             </>
           )}
 
@@ -284,7 +249,7 @@ export default function Totem(props: { empresa?: string; local?: string }) {
           )}
         </div>
       </main>
-      {nPasso >= 0 && <div className="tt-passos" aria-hidden>{ordem.map((p, i) => <i key={p} className={i <= nPasso ? "feito" : ""} />)}</div>}
+      {chave && <TotemBloqueio verificar={(senha) => api.entrar(senha).then(() => true, () => false)} />}
       {(marca.textos.suporteTelefone || passo === "inicio") && <footer className="tt-rodape">{marca.nomeExibido}{marca.textos.suporteTelefone && ` · Ajuda: ${marca.textos.suporteTelefone}`}</footer>}
     </div>
   );

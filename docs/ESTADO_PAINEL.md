@@ -209,3 +209,34 @@ Cada tela da Machine foi lida e comparada com a nossa, com banco de teste própr
 - **Cargos:** ADMIN Mestre (`plataforma`), ADMIN, Gestor (novo) e Operador, como na Machine. Menu e servidor (403 com requisição forjada) seguem o cargo mínimo de cada função. Matriz em `docs/CARGOS.md`. Operadores antigos passam a ter menos acesso (sem financeiro, regras e equipe).
 - **Filiais:** Cadastro > Gestão > Filiais. Motorista e usuário ligados a uma filial; corrida guarda a filial; Histórico e relatórios filtram por filial; Operador e Gestor ligados a uma filial só veem as corridas dela (Histórico e relatórios). Pendente: restringir Monitoramento, Mapa e Programadas por filial.
 - **Painel do dono:** Mais > Painel do dono (só ADMIN Mestre): empresas, suspender/reativar (suspensa não loga), entrar como a empresa, planos e recursos, marca e domínio, uso e faturamento, centrais. Pendente: cobrança real (hoje o valor a pagar é calculado, sem gateway).
+
+## CRM, Bot e Totem copiados do sistema de referência (14/11/2026)
+
+Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é nativa).
+
+| Tela/função do sistema de referência | Portada? | Diferença |
+|---|---|---|
+| CRM › Visão Geral | Sim | Sem "receita recuperada" e "viraram corrida" (dependem da conversão) e sem eventos da Machine. |
+| CRM › Automação › Jornadas | Já existia | Só os gatilhos "sem corrida" e "cancelou". |
+| CRM › Automação › Gatilhos, Fila de Dispatches, Régua, Templates comportamentais | Não | Falta. |
+| CRM › Comunicação › Campanhas, WhatsApp | Já existiam | Só o canal WhatsApp. |
+| CRM › Comunicação › Templates | Sim | Título/imagem/botão ficam guardados, mas só o texto sai pelo WhatsApp. |
+| CRM › Comunicação › Descadastros | Sim | A resposta "NÃO QUERO MAIS" no WhatsApp ainda não descadastra sozinha (as regras de texto estão prontas em `crm/optout.ts`). |
+| CRM › Comunicação › Notificações, Histórico de Disparos | Não | Falta. |
+| CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
+| CRM › Público › Comportamentos, Contatos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
+| CRM › Análises (RFM, Conversão, Mapa de Calor), Recompensas | Não | Falta. |
+| CRM › Configurações › Cidades, Governança, Auditoria | Não | Falta. A aba Machine foi retirada de propósito. |
+| CRM › Emojis nas mensagens | Sim | |
+| SpinText `{a|b}` e variáveis `{{x}}` | Sim | Variáveis antigas `{x}` continuam valendo. |
+| Bot › Ajustes (fluxo, textos, saudação, respostas prontas, comandos, status) | Sim | Ver docs/BOT.md. |
+| Bot › Conversas: bloquear e pausar o bot | Sim | |
+| Bot › várias conexões, Z-API, Z-Pro, Meta, cidades, voz, áudio | Não | Falta. |
+| whatsapp-webhook (11 mil linhas: endereços aprendidos, casas, agendamento, repasse de mídia) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento e as regras acima. O resto falta. |
+| Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
+| Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
+| Totem: jogos de recompensa, checagem do número no WhatsApp, logo e rodapé próprios | Não | Falta. |
+| Locais do totem (cadastro) | Já existia | |
+
+Conferência no navegador: CRM (Visão Geral, Templates com modelos prontos) e o totem (ativação por senha e primeira tela). O sistema de referência
+não foi aberto lado a lado: a comparação foi feita pelo código das telas.

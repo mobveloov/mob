@@ -53,3 +53,10 @@
   .tt-botao.grande { font-size: 24px; min-height: 88px; }
   .tt-linha { flex-direction: column-reverse; }
 }
+.tt-rotulo { font-size: 16px; font-weight: 700; color: var(--suave); margin-bottom: 8px; }
+.tt-pagamentos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tt-linha-rotulo { display: flex; justify-content: space-between; }
+.tt-centro { text-align: center; font-size: 14px; }
+.tt-bloqueio { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #000e; padding: 16px; }
+.tt-bloqueio > div { width: 100%; max-width: 380px; background: var(--cartao); border: 2px solid var(--primaria); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 18px; text-align: center; }
+.tt-bloqueio input { font: inherit; font-size: 22px; text-align: center; letter-spacing: 4px; background: var(--fundo); color: var(--texto); border: 2px solid var(--borda); border-radius: 14px; padding: 14px; user-select: text; }

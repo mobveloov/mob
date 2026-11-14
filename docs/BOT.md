@@ -101,3 +101,22 @@ No `.env.example`: `WHATSAPP_EVOLUTION_URL=`, `WHATSAPP_EVOLUTION_TOKEN=`, `BOT_
 - Áudio (transcrição com o caso "voz"), endereços salvos, agendamento.
 - Conversa entre passageiro e motorista pelo número do bot.
 - Mover conversas para o banco quando a fase 1.4 chegar (tabelas `bot_*` com `empresa_id`).
+
+## O que veio do mobveloov (14/11/2026)
+
+Tela **Bot de WhatsApp › Ajustes do bot** (só admin muda) e regras do bot de referência, sem a Machine (a corrida é nativa).
+
+| Parte | Situação |
+|---|---|
+| Etapas do fluxo (menu de boas-vindas, pedir destino, permitir "não informar", confirmar endereços, pedir categoria, pedir pagamento) | Veio. Sem pagamento perguntado, a corrida vai como Dinheiro (a corrida própria exige uma forma). Sem "Preço fixo": o preço já vem das categorias e tarifas. |
+| Destino obrigatório (`destSkip`) | Veio, com os dois textos de aviso. |
+| Mensagens do Bot (textos editáveis) | Veio, com os mesmos grupos e chaves. Ficaram de fora as perguntas de cidade e "não quer corrida" (não existem neste fluxo). O texto padrão do menu continua com a marca (assistente e empresa); o texto editado vale no lugar. |
+| Saudação com imagem (no máximo uma a cada 12 h) | Veio. Só endereço `https`. |
+| Respostas prontas (base de conhecimento) | Veio. No começo vale qualquer pergunta; no meio do pedido só com "?" e o bot volta à pergunta. |
+| Comandos da central (`#bloquear`, `#desbloquear`, `#pausar`, `#voltar`, com ou sem número) | Veio, também pelos botões em Conversas. Bloqueado ou pausado: o bot fica quieto e a conversa fica no painel. |
+| Mensagens de status | Veio: textos padrão do sistema de referência, editáveis com `{passageiro}`, `{motorista}`, `{empresa}`; aceite e troca de motorista levam os dados do carro. |
+| Grupos de WhatsApp | Já ignorados (`@g.us`). |
+| Falta | Várias conexões por empresa e outros provedores (Z-API, Z-Pro, Meta), cidades ativas, voz do bot, áudio, endereços aprendidos, agendamento pelo bot, repasse de mídia entre motorista e passageiro, descadastro por resposta (PARAR/SAIR) ligado ao CRM. |
+
+Arquivos novos: `bot/textos-editaveis.ts`, `bot/mensagens-status.ts`, `bot/controle.ts`, `bot/destino.ts`, `web/bot/Ajustes.tsx`.
+Testes: `test/bot-fluxo-avancado.test.ts` e `test/bot-regras-*.test.ts`.
