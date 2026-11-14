@@ -50,6 +50,7 @@ code { background: var(--fundo); padding: 1px 5px; border-radius: 4px; }
 .nav-link .seta { opacity: .5; }
 .nav-dropdown { position: absolute; top: calc(100% + 5px); left: 0; min-width: 250px; padding: 8px; background: var(--barra); border: 1px solid var(--barra-borda); border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, .1), 0 8px 10px -6px rgba(0, 0, 0, .01); opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.98); transition: all .2s; z-index: 60; }
 .nav-dropdown::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.nav-dropdown { top: 100%; max-height: calc(100vh - 70px); overflow-y: auto; } /* sem vão entre o botão e o menu: o menu longo rola */
 .nav-dropdown.direita { left: auto; right: 0; }
 .nav-grupo:hover > .nav-dropdown, .nav-grupo:focus-within > .nav-dropdown { opacity: 1; visibility: visible; transform: none; }
 .nav-grupo.fechar > .nav-dropdown { opacity: 0; visibility: hidden; }

@@ -250,11 +250,11 @@ function statOperador(empresaId: string, f: Filtros): Tabela {
     g.set(normal(nome), a);
   }
   const linhas = [...g.values()].sort((a, b) => ordemTexto(a.nome, b.nome)).map((a) => ({ operador: a.nome, finalizadas: a.fin, cancPass: a.pass, cancMotorista: a.mot, cancOpe: a.ope, naoAtend: a.nat, totais: a.fin + a.pass + a.mot + a.ope + a.nat }));
-  const t = (k: "finalizadas" | "cancPass" | "cancMotorista" | "cancOpe" | "naoAtend" | "totais") => linhas.reduce((s, l) => s + l[k], 0);
   return {
     colunas: [{ chave: "operador", rotulo: "Operador", tipo: "texto" }, { chave: "finalizadas", rotulo: "FINALIZADAS", tipo: "numero" }, { chave: "cancPass", rotulo: "CANC PASS", tipo: "numero" }, { chave: "cancMotorista", rotulo: "CANC MOTORISTA", tipo: "numero" },
       { chave: "cancOpe", rotulo: "CANC OPE", tipo: "numero" }, { chave: "naoAtend", rotulo: "N/ATEND", tipo: "numero" }, { chave: "totais", rotulo: "TOTAIS", tipo: "numero" }],
-    linhas, totais: { operador: "Total", finalizadas: t("finalizadas"), cancPass: t("cancPass"), cancMotorista: t("cancMotorista"), cancOpe: t("cancOpe"), naoAtend: t("naoAtend"), totais: t("totais") },
+    // a Machine não mostra linha de total nesta tela
+    linhas,
   };
 }
 
@@ -341,10 +341,23 @@ export function lerFiltros(b: Record<string, unknown>): Filtros {
   };
 }
 
-export function gerarRelatorio(empresaId: string, id: string, f: Filtros, pagina = 1) {
+/** Ordena as linhas pela coluna pedida (números como número, texto em português). Coluna desconhecida: mantém a ordem. */
+export function ordenarLinhas(t: Tabela, ordem?: string, dir?: string): Tabela {
+  const col = t.colunas.find((c) => c.chave === ordem);
+  if (!col) return t;
+  const sinal = dir === "desc" ? -1 : 1;
+  const linhas = [...t.linhas].sort((a, b) => {
+    const x = a[col.chave], y = b[col.chave];
+    const r = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""), "pt-BR", { numeric: true });
+    return r * sinal;
+  });
+  return { ...t, linhas };
+}
+
+export function gerarRelatorio(empresaId: string, id: string, f: Filtros, pagina = 1, ordem?: string, dir?: string) {
   const d = definicao(id);
   if (!d) throw new Error("Relatório não encontrado.");
-  const t = d.gerar(empresaId, f);
+  const t = ordenarLinhas(d.gerar(empresaId, f), ordem, dir);
   const total = t.linhas.length, paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const p = Math.min(paginas, Math.max(1, Math.floor(pagina) || 1));
   return { id: d.id, titulo: d.titulo, periodo: { inicio: f.inicio, fim: f.fim }, colunas: t.colunas, linhas: t.linhas.slice((p - 1) * POR_PAGINA, p * POR_PAGINA), totais: t.totais ?? null, total, pagina: p, paginas, porPagina: POR_PAGINA };

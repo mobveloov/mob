@@ -46,7 +46,7 @@ rotasRelatorios.get("/indice", ok((req, res) => res.json({
 rotasRelatorios.post("/modelos", admin, ok((req, res) => res.status(201).json({ modelo: criarModelo(emp(req), req.body ?? {}, quem(req)) })));
 rotasRelatorios.delete("/modelos/:id", admin, ok((req, res) => { removerModelo(emp(req), req.params.id); res.json({ ok: true }); }));
 
-rotasRelatorios.get("/relatorio/:id", ok((req, res) => res.json(gerarRelatorio(emp(req), req.params.id, lerFiltros(req.query), Number(q(req, "pagina")) || 1))));
+rotasRelatorios.get("/relatorio/:id", ok((req, res) => res.json(gerarRelatorio(emp(req), req.params.id, lerFiltros(req.query), Number(q(req, "pagina")) || 1, q(req, "ordem"), q(req, "dir")))));
 rotasRelatorios.get("/relatorio/:id/csv", ok((req, res) => {
   const csv = csvDoRelatorio(emp(req), req.params.id, lerFiltros(req.query));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");

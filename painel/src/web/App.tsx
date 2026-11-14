@@ -131,11 +131,14 @@ const rotuloFuncao = (f: Funcao, assistente: string) => (f.id === "analise" ? `A
 const iniciais = (nome: string) => (nome.trim().charAt(0) || "?").toUpperCase();
 const CARGO: Record<string, string> = { plataforma: "Plataforma", admin: "Gestor", operador: "Operador" };
 
-/** Itens de um grupo, separados por seção (títulos pequenos no menu suspenso). */
+/** Itens de um grupo, separados por seção (títulos pequenos no menu suspenso), na ordem do menu. */
 function porSecao(itens: Funcao[]) {
-  const m = new Map<string, Funcao[]>();
-  for (const f of itens) { const k = f.secao ?? ""; m.set(k, [...(m.get(k) ?? []), f]); }
-  return [...m.entries()];
+  const blocos: Array<[string, Funcao[]]> = [];
+  for (const f of itens) {
+    const k = f.secao ?? "", ult = blocos[blocos.length - 1];
+    if (ult && ult[0] === k) ult[1].push(f); else blocos.push([k, [f]]);
+  }
+  return blocos;
 }
 
 function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; trocarTema: () => void; trocarEmpresa: (id: string) => void; sair: () => void }) {
@@ -173,9 +176,9 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
             <select value={sessao.empresa.id} onChange={(e) => trocarEmpresa(e.target.value)}>{sessao.empresas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}</select>
           </label>
         )}
-        <NavLink to="/alterar-senha" className="dropdown-item"><KeyRound size={16} /> Alterar Senha</NavLink>
+        <NavLink to="/alterar-senha" className="dropdown-item"><KeyRound size={16} /> Trocar senha</NavLink>
         <div className="separador" />
-        <button className="dropdown-item sair" onClick={sair}><LogOut size={16} /> Sair do Sistema</button>
+        <button className="dropdown-item sair" onClick={sair}><LogOut size={16} /> Sair</button>
       </div>
     </div>
   );
@@ -189,7 +192,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
           <span className="divisor-v" />
           <nav className="nav-itens" aria-label="Menu principal">
             {grupos.map(({ g, itens }) => {
-              if (itens.length === 1 && g !== "Mais") {
+              if (g === "Painel") {
                 const f = itens[0];
                 return <NavLink key={g} to={f.rota} end className={({ isActive }) => `nav-link ${isActive ? "ativo" : ""}`}>{f.nome}</NavLink>;
               }
@@ -197,8 +200,8 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
                 <div key={g} className={`nav-grupo ${fechado === g ? "fechar" : ""}`} onMouseLeave={() => setFechado(null)}>
                   <button className={`nav-link ${ativoGrupo(itens) ? "ativo" : ""}`} aria-haspopup="menu">{g}<ChevronDown size={13} className="seta" /></button>
                   <div className="nav-dropdown">
-                    {porSecao(itens).map(([secao, lista]) => (
-                      <div key={secao}>{secao && <div className="dropdown-header">{secao}</div>}{lista.map(linkItem)}</div>
+                    {porSecao(itens).map(([secao, lista], i) => (
+                      <div key={`${i}-${secao}`}>{secao && <div className="dropdown-header">{secao}</div>}{lista.map(linkItem)}</div>
                     ))}
                   </div>
                 </div>
@@ -226,7 +229,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
         <div className="lateral-topo"><strong>{marca.produto}</strong><button onClick={() => setAberto(false)} aria-label="Fechar menu"><X size={22} /></button></div>
         <nav>
           {grupos.map(({ g, itens }) => {
-            if (itens.length === 1 && g !== "Mais") {
+            if (g === "Painel") {
               return <NavLink key={g} to={itens[0].rota} end className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span>{itens[0].nome}</span></NavLink>;
             }
             const abre = grupoMobile === g;
@@ -235,8 +238,8 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
                 <button className="mobile-link" onClick={() => setGrupoMobile(abre ? null : g)} aria-expanded={abre}><span>{g}</span><ChevronDown size={16} className={abre ? "girar" : ""} /></button>
                 {abre && (
                   <div className="mobile-sub">
-                    {porSecao(itens).map(([secao, lista]) => (
-                      <div key={secao}>
+                    {porSecao(itens).map(([secao, lista], i) => (
+                      <div key={`${i}-${secao}`}>
                         {secao && <div className="mobile-secao">{secao}</div>}
                         {lista.map((f) => <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `mobile-sublink ${isActive ? "ativo" : ""}`}>{rotuloFuncao(f, marca.assistente.nome)}</NavLink>)}
                       </div>
@@ -249,11 +252,11 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
           <div className="lateral-pref">
             <p>Preferências</p>
             {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} classe="lateral" />}
-            <NavLink to="/alterar-senha" className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span><KeyRound size={16} /> Alterar Senha</span></NavLink>
+            <NavLink to="/alterar-senha" className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span><KeyRound size={16} /> Trocar senha</span></NavLink>
             <button className="mobile-link" onClick={trocarTema}><span>{escuro ? <Sun size={16} /> : <Moon size={16} />} Alternar Tema</span></button>
           </div>
         </nav>
-        <div className="lateral-rodape"><button onClick={sair}><LogOut size={18} /> Sair do Sistema</button></div>
+        <div className="lateral-rodape"><button onClick={sair}><LogOut size={18} /> Sair</button></div>
       </aside>
 
       <main className="conteudo">

@@ -33,7 +33,7 @@ export function TermosApp() {
 const Documento = ({ texto }: { texto: string }) => <div className="dm-documento">{texto.split("\n").map((l, i) => (/^\d+\.\s/.test(l) ? <h3 key={i}>{l}</h3> : l.trim() ? <p key={i}>{l}</p> : null))}</div>;
 
 export function Juridico() {
-  const [aba, setAba] = useState<"termos" | "privacidade">("termos");
+  const [aba, setAba] = useState<"termos" | "privacidade">("privacidade");
   const d = useCarregar(() => pedirConfig("/termos"), []);
   return (
     <>
