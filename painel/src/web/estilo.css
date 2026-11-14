@@ -418,3 +418,14 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 .trocando-tema, .trocando-tema *, .trocando-tema *::before, .trocando-tema *::after { transition: none !important; }
 :root[data-theme="dark"] .barra-topo { box-shadow: 0 1px 0 rgba(255, 255, 255, .02), 0 4px 12px rgba(0, 0, 0, .25); }
 :root[data-theme="dark"] .nav-dropdown { box-shadow: 0 12px 28px rgba(0, 0, 0, .5); }
+
+/* Barra do topo em qualquer zoom: o logo nunca some, as abas não quebram linha e o que não cabe vai para "Mais". */
+.barra-centro { overflow: visible; }
+.logo-topo, .divisor-v, .barra-lado, .nav-itens > *, .nav-grupo { flex-shrink: 0; }
+.nav-itens { flex-wrap: nowrap; min-width: 0; }
+.barra-lado { gap: 2px; }
+.logo-topo img { max-width: 150px; }
+.nav-medida { position: absolute; left: -9999px; top: 0; height: 0; overflow: hidden; visibility: hidden; display: flex; white-space: nowrap; pointer-events: none; }
+.nav-dropdown .grupo-titulo { color: var(--primaria-viva); opacity: 1; }
+.nav-dropdown .dropdown-header.sub { padding-left: 16px; text-transform: none; letter-spacing: 0; font-weight: 600; }
+@media (max-width: 1180px) { .usuario-nome { display: none; } }

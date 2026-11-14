@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ChevronDown, KeyRound, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { FUNCOES, GRUPOS, type Funcao, type Grupo } from "../comum/funcoes.ts";
@@ -161,11 +161,59 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
   const ativoGrupo = (itens: Funcao[]) => itens.some((f) => (f.rota === "/" ? local.pathname === "/" : local.pathname === f.rota || local.pathname.startsWith(`${f.rota}/`)));
   useEffect(() => { window.scrollTo(0, 0); setAberto(false); }, [local.pathname]);
 
-  const linkItem = (f: Funcao) => (
-    <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `dropdown-item ${isActive ? "ativo" : ""}`} onClick={() => setFechado(f.grupo)}>
+  // Barra do topo: mede o espaço e manda o que não cabe para o menu "Mais" (sem quebrar linha nem sobrepor).
+  const gruposTopo = grupos.filter((x) => x.g !== "Mais"), gruposMais = grupos.find((x) => x.g === "Mais");
+  const centroRef = useRef<HTMLDivElement>(null), medidaRef = useRef<HTMLDivElement>(null);
+  const [cabem, setCabem] = useState(gruposTopo.length);
+  const chaveGrupos = grupos.map((x) => x.g).join("|");
+  useLayoutEffect(() => {
+    const medir = () => {
+      const centro = centroRef.current, med = medidaRef.current;
+      if (!centro || !med) return;
+      const larg = (n: Element | null) => (n ? n.getBoundingClientRect().width : 0);
+      const fixo = larg(centro.querySelector(".logo-topo")) + larg(centro.querySelector(".divisor-v")) + 64;
+      const livre = centro.getBoundingClientRect().width - fixo;
+      const ws = Array.from(med.querySelectorAll<HTMLElement>("[data-g]")).filter((e) => e.dataset.g !== "__mais").map((e) => larg(e) + 8);
+      const wMais = larg(med.querySelector('[data-g="__mais"]')) + 8;
+      let n = ws.length, soma = ws.reduce((s, w) => s + w, 0);
+      const temExtra = !!gruposMais;
+      if (soma + (temExtra ? wMais : 0) > livre) {
+        n = 0; soma = 0;
+        while (n < ws.length && soma + ws[n] + wMais <= livre) { soma += ws[n]; n++; }
+      }
+      setCabem((a) => (a === n ? a : n));
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    if (centroRef.current) ro.observe(centroRef.current);
+    window.addEventListener("resize", medir);
+    document.fonts?.ready.then(medir).catch(() => undefined);
+    return () => { ro.disconnect(); window.removeEventListener("resize", medir); };
+  }, [chaveGrupos, escuro, marca.fonte, marca.produto]);
+  const noTopo = gruposTopo.slice(0, cabem), noMais = [...gruposTopo.slice(cabem), ...(gruposMais ? [gruposMais] : [])];
+
+  const linkItem = (f: Funcao, fecha: string = f.grupo) => (
+    <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `dropdown-item ${isActive ? "ativo" : ""}`} onClick={() => setFechado(fecha)}>
       <span>{rotuloFuncao(f, marca.assistente.nome)}</span>
     </NavLink>
   );
+
+  const botaoGrupo = (g: Grupo, itens: Funcao[]) => {
+    if (g === "Painel") {
+      const f = itens[0];
+      return <NavLink key={g} to={f.rota} end className={({ isActive }) => `nav-link ${isActive ? "ativo" : ""}`}>{f.nome}</NavLink>;
+    }
+    return (
+      <div key={g} className={`nav-grupo ${fechado === g ? "fechar" : ""}`} onMouseLeave={() => setFechado(null)}>
+        <button className={`nav-link ${ativoGrupo(itens) ? "ativo" : ""}`} aria-haspopup="menu">{g}<ChevronDown size={13} className="seta" /></button>
+        <div className="nav-dropdown">
+          {porSecao(itens).map(([secao, lista], i) => (
+            <div key={`${i}-${secao}`}>{secao && <div className="dropdown-header">{secao}</div>}{lista.map((f) => linkItem(f))}</div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const usuarioMenu = (
     <div className="nav-grupo usuario">
@@ -192,27 +240,32 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
     <div className="app">
       {/* Menu do topo (computador) */}
       <header className="barra-topo">
-        <div className="barra-centro">
+        <div className="barra-centro" ref={centroRef}>
           <Link to="/" className="logo-topo" aria-label={marca.produto}>{logo}</Link>
           <span className="divisor-v" />
           <nav className="nav-itens" aria-label="Menu principal">
-            {grupos.map(({ g, itens }) => {
-              if (g === "Painel") {
-                const f = itens[0];
-                return <NavLink key={g} to={f.rota} end className={({ isActive }) => `nav-link ${isActive ? "ativo" : ""}`}>{f.nome}</NavLink>;
-              }
-              return (
-                <div key={g} className={`nav-grupo ${fechado === g ? "fechar" : ""}`} onMouseLeave={() => setFechado(null)}>
-                  <button className={`nav-link ${ativoGrupo(itens) ? "ativo" : ""}`} aria-haspopup="menu">{g}<ChevronDown size={13} className="seta" /></button>
-                  <div className="nav-dropdown">
-                    {porSecao(itens).map(([secao, lista], i) => (
-                      <div key={`${i}-${secao}`}>{secao && <div className="dropdown-header">{secao}</div>}{lista.map(linkItem)}</div>
-                    ))}
-                  </div>
+            {noTopo.map(({ g, itens }) => botaoGrupo(g, itens))}
+            {noMais.length > 0 && (
+              <div className={`nav-grupo ${fechado === "__mais" ? "fechar" : ""}`} onMouseLeave={() => setFechado(null)}>
+                <button className={`nav-link ${noMais.some((x) => ativoGrupo(x.itens)) ? "ativo" : ""}`} aria-haspopup="menu">Mais<ChevronDown size={13} className="seta" /></button>
+                <div className="nav-dropdown direita">
+                  {noMais.map(({ g, itens }) => (
+                    <div key={g}>
+                      <div className="dropdown-header grupo-titulo">{g === "Mais" ? "Outras telas" : g}</div>
+                      {porSecao(itens).map(([secao, lista], i) => (
+                        <div key={`${i}-${secao}`}>{secao && <div className="dropdown-header sub">{secao}</div>}{lista.map((f) => linkItem(f, "__mais"))}</div>
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </nav>
+          {/* medida (escondida): largura de cada grupo, para decidir o que cabe */}
+          <div className="nav-medida" ref={medidaRef} aria-hidden="true">
+            {gruposTopo.map(({ g }) => <span key={g} data-g={g} className="nav-link">{g}{g !== "Painel" && <ChevronDown size={13} className="seta" />}</span>)}
+            <span data-g="__mais" className="nav-link">Mais<ChevronDown size={13} className="seta" /></span>
+          </div>
         </div>
         <div className="barra-lado">
           {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} />}
