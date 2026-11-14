@@ -16,16 +16,18 @@ Arquivo de passagem de bastão: o que está pronto, onde está e o que falta. At
 Reclamações: o app do passageiro "nada vê com os prints"; no motorista o mapa fica por cima das opções; o trajeto vai em linha reta;
 na tela de destino aparece "Base de endereços (CNEFE) não configurada"; mapa escuro e sem ruas.
 
-Ordem combinada:
+Ordem combinada (situação em 13/11, ramo `apps-igual-prints`):
 
-1. [feito] Ver todos os prints e listar cada tela: `docs/APPS_PRINTS_REFERENCIA.md`.
-2. [falta] Refazer cada tela dos dois apps igual ao print, conferindo com captura nossa ao lado da referência.
-3. [feito no código, falta ver no navegador] Motorista: botões e opções **por cima** do mapa. Causa achada: o CSS novo tirou o `isolation: isolate` do mapa, e as camadas do Leaflet (z-index 400+) cobrem tudo.
-4. [feito no código: `enderecos/externo.ts`, rota `/rota`, `comum/rota.ts`, mapas dos dois apps; falta ver no navegador] Rota pelas ruas (OSRM; público só para teste, configurável), desenhada no pedido e no acompanhamento; distância e tempo do preço pela rota.
-5. [Nominatim pronto em `/enderecos` e `/enderecos/ponto`; falta ligar o CNEFE no ambiente de teste da UP]
-6. [feito no CSS, falta ver] Mapa claro com ruas e nomes nos dois apps (no motorista, mapa escuro só se ele escolher o tema escuro).
-7. [falta] Testes, APKs novos da UP na página de download, PR.
-8. [falta] Tabela tela por tela (referência x nosso x situação) para a sessão principal.
+1. [feito] Todos os prints vistos e listados: `docs/APPS_PRINTS_REFERENCIA.md`.
+2. [em andamento] Refazer cada tela igual ao print. Passageiro conferido lado a lado: Login, Início, Para onde vamos?, Opções, Procurando, Motivo do cancelamento, Minha Conta, Editar Perfil, Suas Viagens, Carteira, Crie sua conta. Motorista refeito por outra sessão (commit 6377ee0 e seguintes), ainda NÃO conferido lado a lado.
+3. [feito] Motorista: mapa em camada própria (`.mapa-m` com isolation), opções acima do mapa.
+4. [feito] Rota pelas ruas: `enderecos/externo.ts` (OSRM), rota `/api/apps/<empresa>/rota`, `comum/rota.ts` (hook), nos dois mapas. O app nunca desenha linha reta; sem rota, não desenha. OSRM público só para teste (`OSRM_URL` para o próprio; `OSRM_PUBLICO=0` desliga).
+5. [feito] Endereços: CNEFE primeiro, Nominatim (OpenStreetMap) quando não acha, usando a posição da pessoa. O ambiente de teste monta o CNEFE (`CNEFE_PASTA`).
+6. [feito] Mapa claro com ruas e nomes nos dois apps (escuro só no tema escuro do motorista).
+7. [em andamento] Testes (152 passando), APKs novos e página de download, PR.
+8. [falta] Tabela tela por tela final (referência x nosso x situação).
+
+Faltam, comparando com a referência: Meus Cartões e Meus Cupons (passageiro; sem meio de pagamento por cartão ainda), selo de min/km no pino do destino, botão QR da carteira, filtro "Filtrar Data" em Suas Viagens, ícone flutuante/alerta por cima de outros apps (nativo), Acompanhar viagem e Chat do passageiro ainda não conferidos lado a lado.
 
 ## Já pronto de antes (não refazer)
 
