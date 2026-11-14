@@ -133,3 +133,37 @@ test("sessões: o sessoes.json antigo entra no banco (só as válidas); entrar e
   const { banco } = await import("../src/servidor/banco.ts");
   assert.equal(n(banco()), 1, "sobrou só a sessão antiga válida (a vencida não entrou)");
 });
+
+test("cadastros: o JSON antigo entra no banco; criar, editar, mesclar e remover gravam só os registros mexidos", async () => {
+  const Cad = await import("../src/cadastros/armazem.ts");
+  const { banco } = await import("../src/servidor/banco.ts");
+  const cli = cadastroPorId("clientes")!;
+  const velho = [{ id: "r1", criadoEm: "2025-01-01T00:00:00.000Z", atualizadoEm: "2025-01-01T00:00:00.000Z", atualizadoPor: "t", nome: "Velho", telefone: "11944440001", status: "Ativo" }];
+  fs.mkdirSync(pasta(dois, "cadastros"), { recursive: true });
+  fs.writeFileSync(pasta(dois, "cadastros", "clientes.json"), JSON.stringify(velho));
+  assert.deepEqual(Cad.listar(dois, cli).map((r) => r.id), ["r1"]);
+  assert.ok(fs.existsSync(pasta(dois, "cadastros", "clientes.json.migrado")), "o JSON antigo fica guardado");
+  assert.deepEqual(Cad.listar(um, cli).filter((r) => r.id === "r1"), [], "outra empresa não vê");
+
+  const novo = Cad.criar(dois, cli, { nome: "Novo", telefone: "11944440002", status: "Ativo" }, "t");
+  assert.deepEqual(Cad.listar(dois, cli).map((r) => r.id), ["r1", novo.id], "ordem de criação mantida");
+  const ed = Cad.atualizar(dois, cli, "r1", { nome: "Velho Editado", telefone: "11944440001", status: "Ativo" }, "t");
+  assert.equal(ed.nome, "Velho Editado");
+  assert.deepEqual(Cad.listar(dois, cli).map((r) => r.id), ["r1", novo.id], "editar não muda a posição");
+  assert.equal(Cad.alterarCampos(dois, cli, novo.id, { nome: "Novo 2" }, "t").nome, "Novo 2");
+  assert.throws(() => Cad.criar(dois, cli, { nome: "Dup", telefone: "11944440002", status: "Ativo" }, "t"), /Já existe/);
+
+  const mudancas = () => (banco().prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const antes = mudancas();
+  const r = Cad.mesclar(dois, cli, [{ nome: "Merge", telefone: "11944440003", status: "Ativo" }, { nome: "", telefone: "11944440001", email: "velho@teste.com" }], "t");
+  assert.deepEqual(r, { criados: 1, atualizados: 1 });
+  assert.equal(mudancas() - antes, 2, "só as duas linhas mexidas foram gravadas");
+
+  Cad.remover(dois, cli, novo.id);
+  assert.equal(Cad.listar(dois, cli).length, 2);
+  assert.throws(() => Cad.remover(dois, cli, novo.id), /não encontrado/);
+  // Tudo está no banco (reabre a memória).
+  const { fecharBanco } = await import("../src/servidor/banco.ts");
+  fecharBanco();
+  assert.deepEqual(Cad.listar(dois, cli).map((r) => r.nome), ["Velho Editado", "Merge"]);
+});
