@@ -99,11 +99,11 @@ app.use("/api/crm", exigirLogin, rotasCrm);
 `painel/src/web/App.tsx` (import e mapa `PAGINAS`):
 
 ```tsx
-import { CrmCampanhas, CrmJornadas, CrmPublico } from "./crm";
-"crm-publico": <CrmPublico />, "crm-campanhas": <CrmCampanhas />, "crm-jornadas": <CrmJornadas />,
+import { CrmPainel } from "./crm";
+crm: <CrmPainel />,
 ```
 
-`painel/src/comum/funcoes.ts`: `situacao: "pronto"` nos itens `crm-campanhas`, `crm-jornadas` e `crm-publico`.
+`painel/src/comum/funcoes.ts`: item único `crm` ("CRM & Engajamento", rota `/crm`; as rotas antigas `/crm/campanhas`, `/crm/jornadas` e `/crm/publico` redirecionam).
 
 ## Ainda não
 
@@ -111,3 +111,25 @@ import { CrmCampanhas, CrmJornadas, CrmPublico } from "./crm";
   Hoje marca na tela Público.
 - Gatilhos por evento em tempo real (corrida finalizada agora): hoje a jornada confere a cada hora.
 - Push no app e outros canais: só WhatsApp por enquanto.
+
+## O que veio do mobveloov (14/11/2026)
+
+O CRM agora é uma tela só, **CRM & Engajamento**, com os mesmos grupos e abas do CRM de referência (sem a aba da Machine:
+a corrida é nativa). Também veio o botão "Emojis nas mensagens".
+
+| Aba | Situação |
+|---|---|
+| Visão Geral | Veio: enviadas, falhas, puladas, pessoas notificadas, por dia e por origem (a conversão em corrida depende da aba Conversão, ainda não portada). |
+| Automação › Jornadas | Já existia (jornadas por "sem corrida" e "cancelou"). |
+| Comunicação › Campanhas, WhatsApp | Já existiam. |
+| Comunicação › Templates | Veio: título, conteúdo com SpinText `{a|b}` e variáveis `{{x}}`, modelos prontos, pré-visualização, teste A/B, rodapé de descadastro, emojis, "Corrigir com IA + SpinText". |
+| Comunicação › Descadastros | Veio: lista, busca, "Descadastrar número", reativar só com a autorização escrita. Regras de texto (NÃO QUERO MAIS, PARAR, SAIR...) em `painel/src/crm/optout.ts`. |
+| Público › Passageiros, Motoristas | Já existiam (tela Público). |
+| Falta | Gatilhos por evento, Fila, Régua, Templates comportamentais, Notificações, Histórico, Comportamentos, Contatos, Segmentos (hoje dentro de Público), RFM, Conversão, Mapa de Calor, Recompensas, Cidades, Governança, Auditoria. |
+
+Texto das mensagens: `{{nome}}` é o primeiro nome, `{{nome_completo}}` o nome todo, e o SpinText sorteia uma opção por pessoa.
+As variáveis antigas `{primeiro_nome}`, `{nome}` etc. continuam valendo nas campanhas e jornadas já criadas.
+
+Arquivos novos: `crm/spintext.ts`, `crm/optout.ts`, `crm/catalogo.ts`, `crm/emojis.ts`, `crm/templates.ts` (tabelas
+`crm_templates` e `crm_descadastros` no banco), `web/crm/Painel.tsx`, `Templates.tsx`, `Descadastros.tsx`, `Visao.tsx`.
+Testes: `test/crm-spintext.test.ts`, `crm-optout.test.ts`, `crm-templates.test.ts`.

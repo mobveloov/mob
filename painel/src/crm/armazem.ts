@@ -136,6 +136,10 @@ export function marcarOptOut(e: string, chave: string, sair: boolean) {
   gravar(e, "contatos.json", m);
 }
 
+/** "Emojis nas mensagens" (chave do painel do CRM). Desligado por padrão. */
+export const emojisLigados = (e: string) => ler<{ ligado?: boolean }>(e, "emojis.json", {}).ligado === true;
+export const ligarEmojis = (e: string, ligado: boolean) => gravar(e, "emojis.json", { ligado });
+
 export function config(e: string): ConfigEnvio {
   return sanearConfig(ler<Partial<ConfigEnvio>>(e, "config.json", {}));
 }

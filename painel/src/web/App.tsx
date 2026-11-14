@@ -26,7 +26,7 @@ import Carteiras from "./apps/Carteiras";
 import DocumentosMotoristas from "./apps/DocumentosMotoristas";
 import { BotWhatsApp, ConversasWhatsApp } from "./bot";
 import { LocaisTotem, SolicitarCorrida } from "./totem";
-import { CrmCampanhas, CrmJornadas, CrmPublico } from "./crm";
+import { CrmPainel } from "./crm";
 
 interface Ctx { sessao: Sessao; marca: Marca; setMarca: (m: Marca) => void; recarregar: () => void }
 const SessaoCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -119,7 +119,7 @@ const PROVISORIAS: Record<string, JSX.Element> = {
   carteiras: <Carteiras />, relatorios: <Financeiro />, conversas: <ConversasWhatsApp />, notificacoes: cad("notificacoes"),
   categorias: cad("categorias"), integracoes: <Integracoes />, avaliacoes: <Avaliacoes />,
   // Telas próprias (grupo "Mais")
-  "crm-publico": <CrmPublico />, "crm-campanhas": <CrmCampanhas />, "crm-jornadas": <CrmJornadas />,
+  crm: <CrmPainel />,
   bot: <BotWhatsApp />, totem: <LocaisTotem />, analise: <Analise />, apps: <AppsCentral />, documentos: <DocumentosMotoristas />,
   enderecos: <Enderecos />, marca: <MarcaAparencia />,
 };

@@ -7,10 +7,14 @@ import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr } from "../servidor/util.ts";
 import { ErroIa } from "../ia/roteador.ts";
+import { banco } from "../servidor/banco.ts";
 import * as A from "./armazem.ts";
+import * as T from "./templates.ts";
+import { waOptOutKey, withOptOutFooter } from "./optout.ts";
+import { extractVariables, processTemplate, validateSpinText } from "./spintext.ts";
 import { conferirCupom, cuponsDaEmpresa } from "./cupons.ts";
 import * as E from "./envio.ts";
-import { montarTexto, variacoesComIa, variaveisDesconhecidas } from "./mensagem.ts";
+import { montarTexto, spintextComIa, variacoesComIa, variaveisDesconhecidas } from "./mensagem.ts";
 import { aplicarRegras, destinatarios, opcoes, publico, sanearRegras, selecionar } from "./publico.ts";
 import { VARIAVEIS, type Campanha, type Jornada, type Lista } from "./tipos.ts";
 import { caixaSimulada, provedorDaEmpresa } from "./whatsapp.ts";
@@ -324,6 +328,110 @@ router.put("/config", admin, ok((req, res) => {
   if (b.whatsapp && typeof b.whatsapp === "object") A.salvarCredWhatsApp(e, b.whatsapp as Record<string, unknown>);
   A.salvarConfig(e, c);
   res.json({ config: c });
+}));
+
+// ------------------------------------------------------------------ templates (portado do mobveloov)
+
+router.get("/templates", ok((req, res) => res.json({ templates: T.templates(emp(req)) })));
+
+router.post("/templates", ok((req, res) => res.json({ template: T.salvarTemplate(emp(req), null, T.sanearTemplate(req.body ?? {})) })));
+
+router.put("/templates/:id", ok((req, res) => res.json({ template: T.salvarTemplate(emp(req), req.params.id, T.sanearTemplate(req.body ?? {})) })));
+
+router.post("/templates/:id/ligar", ok((req, res) => res.json({ template: T.ligarTemplate(emp(req), req.params.id) })));
+
+router.delete("/templates/:id", ok((req, res) => {
+  if (!T.apagarTemplate(emp(req), req.params.id)) return res.status(404).json({ erro: "Template não encontrado." });
+  res.json({ ok: true });
+}));
+
+/** "Modelos prontos": acrescenta os que ainda não estão na lista. */
+router.post("/templates-modelos", ok((req, res) => {
+  const n = T.adicionarModelos(emp(req));
+  res.json({ adicionados: n, aviso: n ? "" : "Todos os modelos prontos já estão na lista." });
+}));
+
+/** "Corrigir com IA + SpinText". Sem chave de IA, avisa e o resto continua funcionando. */
+router.post("/templates-spintext", ok(async (req, res) => {
+  const e = emp(req);
+  const t = texto(req.body?.content, 4000);
+  if (!t) return res.status(400).json({ erro: "Escreva a mensagem primeiro." });
+  try {
+    const r = await spintextComIa(t, D.segredos(e).ia);
+    if (!r.spintext) return res.status(502).json({ erro: "A IA não devolveu um texto válido. Tente de novo." });
+    res.json(r);
+  } catch (err) {
+    if (err instanceof ErroIa) return res.status(502).json({ erro: err.semChave ? "Nenhuma chave de IA configurada. Cadastre em Integrações." : "A IA não respondeu agora. Tente de novo." });
+    throw err;
+  }
+}));
+
+/** Pré-visualização com dados de exemplo (variáveis {{x}} e SpinText). */
+router.post("/templates-previa", ok((req, res) => {
+  const e = emp(req);
+  const corpo = texto(req.body?.content, 4000);
+  const v = validateSpinText(corpo);
+  if (!v.valid) return res.status(400).json({ erro: v.errors.join(" ") });
+  const exemplo: Record<string, string> = { nome: "Maria", nome_completo: "Maria Souza", empresa: D.marca(e).nomeExibido, os: "770488034", valor: "R$ 18,50", motorista: "Carlos", cidade: "Pitangueiras", dias_sem_corrida: "15", cupom: "VOLTA7K2P" };
+  for (const k of extractVariables(corpo)) if (!exemplo[k]) exemplo[k] = `[${k}]`;
+  const titulo = texto(req.body?.title, 120);
+  const t = titulo ? processTemplate(titulo, exemplo) : "";
+  const msg = (t ? `${t}
+` : "") + processTemplate(corpo, exemplo);
+  res.json({ previa: req.body?.wa_optout_footer ? withOptOutFooter(msg, true) : msg });
+}));
+
+// ------------------------------------------------------------------ descadastros do WhatsApp
+
+router.get("/descadastros", ok((req, res) => res.json({ descadastros: T.descadastros(emp(req)) })));
+
+router.post("/descadastros", ok((req, res) => {
+  const tel = texto(req.body?.telefone, 30);
+  if (waOptOutKey(tel).length < 10) return res.status(400).json({ erro: "Digite o número com DDD." });
+  const origem = T.ORIGENS_DESCADASTRO.includes(String(req.body?.origem)) ? String(req.body?.origem) : "atendente";
+  T.descadastrar(emp(req), { telefone: tel, nome: texto(req.body?.nome, 120), origem, por: req.ctx?.usuario.nome ?? "" });
+  res.json({ ok: true });
+}));
+
+router.post("/descadastros/reativar", admin, ok((req, res) => {
+  const aut = texto(req.body?.autorizacao, 500);
+  if (aut.length < 5) return res.status(400).json({ erro: "Descreva quando e como o passageiro autorizou voltar a receber." });
+  if (!T.reativar(emp(req), texto(req.body?.telefone, 30), aut, req.ctx?.usuario.nome ?? "")) return res.status(400).json({ erro: "Este número não está descadastrado." });
+  res.json({ ok: true });
+}));
+
+router.get("/emojis", ok((req, res) => res.json({ ligado: A.emojisLigados(emp(req)) })));
+router.put("/emojis", admin, ok((req, res) => { A.ligarEmojis(emp(req), req.body?.ligado === true); res.json({ ligado: req.body?.ligado === true }); }));
+
+// ------------------------------------------------------------------ visão geral
+
+router.post("/visao", ok((req, res) => {
+  const e = emp(req);
+  const dias = Math.min(90, Math.max(1, Math.floor(Number(req.body?.dias)) || 30));
+  const desde = Date.now() - dias * 86_400_000;
+  const linhas = banco().prepare("SELECT origem, estado, criado_em, enviado_em, dados FROM crm_fila WHERE empresa = ? AND criado_em >= ?").all(e, desde) as Array<{ origem: string; estado: string; criado_em: number; enviado_em: number | null; dados: string }>;
+  const porOrigem: Record<string, number> = {};
+  const porDia: Record<string, { enviadas: number; falhas: number }> = {};
+  const unicos = new Set<string>();
+  let enviadas = 0, falhas = 0, puladas = 0;
+  for (const l of linhas) {
+    let item: { chave?: string; origem?: { tipo?: string } } = {};
+    try { item = JSON.parse(l.dados); } catch { /* linha ruim */ }
+    const o = item.origem?.tipo ?? "campanha";
+    const dia = new Date((l.enviado_em ?? l.criado_em) - 3 * 3_600_000).toISOString().slice(0, 10);
+    porDia[dia] ??= { enviadas: 0, falhas: 0 };
+    if (l.estado === "enviado") { enviadas++; porOrigem[o] = (porOrigem[o] ?? 0) + 1; porDia[dia].enviadas++; if (item.chave) unicos.add(item.chave); }
+    else if (l.estado === "falha") { falhas++; porDia[dia].falhas++; }
+    else if (l.estado === "cancelado") puladas++;
+  }
+  const camps = A.campanhas(e);
+  res.json({
+    dias, enviadas, falhas, puladas, pessoasNotificadas: unicos.size, porOrigem,
+    porDia: Object.entries(porDia).sort(([a], [b]) => a.localeCompare(b)).map(([dia, v]) => ({ dia, ...v })),
+    campanhas: { total: camps.length, enviando: camps.filter((c) => c.estado === "enviando").length, agendadas: camps.filter((c) => c.estado === "agendada").length },
+    jornadasLigadas: A.jornadas(e).filter((j) => j.ativa).length, templates: T.templates(e).length,
+    descadastrados: T.descadastros(e).filter((d) => d.estado === "descadastrado").length,
+  });
 }));
 
 // Trabalhador da fila (não roda nos testes).

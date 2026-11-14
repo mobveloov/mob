@@ -99,9 +99,7 @@ export const FUNCOES: Funcao[] = [
   { id: "central-ajuda", grupo: "Ajuda", nome: "Central de Ajuda", rota: "/central-ajuda" },
 
   // Telas próprias (não existem na referência).
-  { id: "crm-campanhas", grupo: "Mais", secao: "CRM", nome: "Campanhas", rota: "/crm/campanhas" },
-  { id: "crm-jornadas", grupo: "Mais", secao: "CRM", nome: "Jornadas", rota: "/crm/jornadas" },
-  { id: "crm-publico", grupo: "Mais", secao: "CRM", nome: "Público", rota: "/crm/publico" },
+  { id: "crm", grupo: "Mais", secao: "CRM", nome: "CRM & Engajamento", rota: "/crm", antigas: ["/crm/campanhas", "/crm/jornadas", "/crm/publico"] },
   { id: "bot", grupo: "Mais", secao: "Atendimento", nome: "Bot de WhatsApp", rota: "/bot" },
   { id: "totem", grupo: "Mais", secao: "Atendimento", nome: "Totem", rota: "/totem" },
   { id: "analise", grupo: "Mais", secao: "Operação", nome: "Análise com IA", rota: "/analise" },

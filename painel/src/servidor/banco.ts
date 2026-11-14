@@ -138,6 +138,14 @@ export function banco(): Banco {
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, hash TEXT NOT NULL, expira INTEGER NOT NULL, dados TEXT NOT NULL,
       UNIQUE (empresa, hash));
     CREATE INDEX IF NOT EXISTS app_sessoes_expira ON app_sessoes (empresa, expira);
+    CREATE TABLE IF NOT EXISTS crm_templates (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL,
+      UNIQUE (empresa, id));
+    CREATE TABLE IF NOT EXISTS crm_descadastros (
+      empresa TEXT NOT NULL, chave TEXT NOT NULL, estado TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '',
+      origem TEXT NOT NULL DEFAULT '', texto TEXT NOT NULL DEFAULT '', em TEXT NOT NULL, por TEXT NOT NULL DEFAULT '',
+      autorizacao TEXT NOT NULL DEFAULT '', reativado_em TEXT, reativado_por TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (empresa, chave));
     CREATE TABLE IF NOT EXISTS cadastros_itens (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, cadastro TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL,
       UNIQUE (empresa, cadastro, id));

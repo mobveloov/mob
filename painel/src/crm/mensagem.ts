@@ -2,9 +2,10 @@
 
 import crypto from "node:crypto";
 import { gerarJson, type PedidoIa } from "../ia/roteador.ts";
+import { processTemplate } from "./spintext.ts";
 import { VARIAVEIS, type Contato } from "./tipos.ts";
 
-export interface DadosTexto { contato: Pick<Contato, "nome" | "cidade" | "diasSemCorrida" | "corridas">; cupom: string; empresa: string }
+export interface DadosTexto { contato: Pick<Contato, "nome" | "cidade" | "diasSemCorrida" | "corridas">; cupom: string; empresa: string; os?: string; valor?: string; motorista?: string }
 
 /** Troca {variavel} pelo valor. Sem {cupom} no texto e com cupom definido, o cupom vai no fim. */
 export function montarTexto(modelo: string, d: DadosTexto): string {
@@ -14,15 +15,20 @@ export function montarTexto(modelo: string, d: DadosTexto): string {
     cupom: d.cupom, empresa: d.empresa, dias_sem_corrida: d.contato.diasSemCorrida == null ? "" : String(d.contato.diasSemCorrida),
     corridas: String(d.contato.corridas),
   };
-  let t = modelo.replace(/\{(\w+)\}/g, (inteiro, k: string) => (k in valores ? valores[k] : inteiro));
-  if (d.cupom && !/\{cupom\}/.test(modelo)) t = `${t.trimEnd()}\n\nCupom: ${d.cupom}`;
+  // Estilo do mobveloov: {{variavel}} e SpinText {a|b}. Primeiro nome em {{nome}}; {{nome_completo}} traz o nome todo.
+  const duplas: Record<string, string> = { ...valores, nome: valores.primeiro_nome, nome_completo: nome || "tudo bem", os: d.os ?? "", valor: d.valor ?? "", motorista: d.motorista ?? "" };
+  let t = modelo.replace(/\{\{(\w+)\}\}/g, (inteiro, k: string) => (k in duplas ? duplas[k] : inteiro));
+  t = t.replace(/\{(\w+)\}/g, (inteiro, k: string) => (k in valores ? valores[k] : inteiro));
+  t = processTemplate(t.replace(/\{(\w+)\}/g, "$1")).replace(/(\w+)/g, "{$1}"); // variável desconhecida fica como está
+  if (d.cupom && !/\{\{?cupom\}?\}/.test(modelo)) t = `${t.trimEnd()}\n\nCupom: ${d.cupom}`;
   return t.replace(/[ \t]+\n/g, "\n").trim();
 }
 
 /** Variáveis desconhecidas no texto (para avisar antes de salvar). */
 export function variaveisDesconhecidas(texto: string): string[] {
   const conhecidas = new Set<string>(VARIAVEIS);
-  return [...new Set([...texto.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((k) => !conhecidas.has(k)))];
+  const extras = new Set(["os", "valor", "motorista", "nome_completo"]);
+  return [...new Set([...texto.matchAll(/\{\{?(\w+)\}?\}/g)].map((m) => m[1]).filter((k) => !conhecidas.has(k) && !extras.has(k)))];
 }
 
 /** Escolhe a variação de cada pessoa sempre igual (mesma pessoa, mesma campanha, mesmo texto). */
@@ -57,4 +63,22 @@ export async function variacoesComIa(texto: string, quantidade: number, empresa:
     .filter((v) => v && v.toLowerCase() !== base && vars(v) === alvo)
     .slice(0, n);
   return { variacoes: [...new Set(variacoes)], modelo: `${r.provedor}/${r.modelo}` };
+}
+
+/**
+ * "Corrigir com IA + SpinText" (portado do mobveloov): corrige a ortografia e põe {opcao1|opcao2} nas saudações e verbos.
+ * Só aceita a resposta se as {{variáveis}} ficaram iguais e o SpinText é válido.
+ */
+export async function spintextComIa(texto: string, chavesEmpresa: Record<string, string>, extra: Pick<PedidoIa, "fetch" | "env"> = {}) {
+  const sistema = [
+    "Você é uma IA de um sistema de mensagens de WhatsApp. Receba uma mensagem, corrija erros de ortografia e digitação e aplique SpinText {opcao1|opcao2|opcao3} nas saudações, verbos e termos principais, para o WhatsApp não bloquear o número por spam.",
+    "Regras: 1) corrija ortografia e gramática; 2) use de 2 a 4 opções por bloco; 3) NUNCA altere as tags {{...}}; 4) mantenha o sentido; 5) não invente links, preços ou prazos.",
+    "Exemplo: entrada \"ola cliente seu login ira vencer amanha\" -> saída \"{Olá|Oi|Opa} {{nome}} seu login {irá vencer|expira|vence} amanhã\".",
+    'Responda só JSON: {"spintext": "..."}',
+  ].join("\n");
+  const r = await gerarJson({ caso: "chat", sistema, usuario: texto.slice(0, 2000), maxTokens: 1000, chavesEmpresa, ...extra });
+  const novo = String((r.dados as { spintext?: unknown })?.spintext ?? "").trim().slice(0, 4000);
+  const dupla = (t: string) => [...new Set([...t.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))].sort().join(",");
+  if (!novo || dupla(novo) !== dupla(texto)) return { spintext: "" };
+  return { spintext: novo };
 }

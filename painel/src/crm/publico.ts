@@ -9,6 +9,8 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import type { CorridaPainel } from "../comum/corrida.ts";
 import { buscarCorridas } from "../servidor/fontes/index.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
+import { waOptOutKey } from "./optout.ts";
+import { chavesDescadastradas } from "./templates.ts";
 import * as A from "./armazem.ts";
 import type { Contato, Lista, Regras, TipoPublico } from "./tipos.ts";
 
@@ -164,7 +166,10 @@ export async function publico(empresaId: string, tipo: TipoPublico): Promise<{ c
   const r = await corridasDoPublico(empresaId);
   const cad = cadastroPorId(tipo === "passageiro" ? "clientes" : "motoristas");
   const registros = cad ? Cad.listar(empresaId, cad) : [];
-  return { contatos: montarContatos(r.corridas, tipo, agoraBr(), A.optOuts(empresaId), registros), avisos: r.avisos };
+  const contatos = montarContatos(r.corridas, tipo, agoraBr(), A.optOuts(empresaId), registros);
+  const descad = chavesDescadastradas(empresaId);
+  if (descad.size) for (const c of contatos) if (!c.optOut && descad.has(waOptOutKey(c.telefone))) c.optOut = true;
+  return { contatos, avisos: r.avisos };
 }
 
 /** Público já filtrado pelas regras. */

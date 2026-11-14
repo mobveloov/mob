@@ -6,8 +6,8 @@ import { crm, quando, type Regras } from "./api";
 import { EditorRegras, useRetorno } from "./comum";
 
 /** CRM › Público e listas: passageiros e motoristas (cadastro + corridas), segmentos e listas salvas. */
-export default function CrmPublico() {
-  const [regras, setRegras] = useState<Regras>({ tipo: "passageiro" });
+export default function CrmPublico({ tipoInicial = "passageiro" }: { tipoInicial?: "passageiro" | "motorista" }) {
+  const [regras, setRegras] = useState<Regras>({ tipo: tipoInicial });
   const [busca, setBusca] = useState("");
   const r = { ...regras, busca: busca || undefined };
   const { dados, erro, recarregar } = useCarregar(() => crm.publico(r), [JSON.stringify(r)]);
