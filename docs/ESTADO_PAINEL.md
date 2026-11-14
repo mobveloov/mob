@@ -99,3 +99,9 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 ## Página inicial e Mapa de engajamento iguais à Machine (branch machine-painel)
 - Comparação bloco a bloco em `docs/COMPARACAO_PAINEL_INICIAL.md`. Página inicial com períodos por bloco, NPS de passageiros e motoristas, engajamento e comparativos; Mapa de engajamento com os indicadores, faixas, régua, filtros e ações da Machine (sem mapa, como na Machine).
 - Testes: `painel/test/painel-inicial.test.ts` e `painel/test/engajamento.test.ts`.
+
+### Atualização (14/11/2026)
+- **Tudo no main:** todas as 15 prioridades do pente fino, telas de centrais, Plantão/Ruas/Áreas, Funil de Clientes, Mapa de Bairros, cadastros de motorista, empresa, categoria e solicitação, Painel inicial e Mapa de engajamento no formato da Machine, casas corrigidas (`npm run importar-casas`).
+- **Carga corrigida:** 500 corridas em 31 a 43 s, 0 erros (antes 85 a 122 s e até 288 erros). Números em `docs/AUDITORIA_COMPLETA.md`. 253 testes passando.
+- **Docker refeito** com o main; `up.veloov.com` responde.
+- **Falta:** comparar mais telas lado a lado com a Machine (imagem), "Enviar mais de um carro" no despacho, desconto da empresa por forma de pagamento no preço, observação da empresa para o motorista no app, passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
