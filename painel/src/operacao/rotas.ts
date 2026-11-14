@@ -242,7 +242,8 @@ rotasOperacao.post("/pix/:id/situacao", exigirPapel("admin"), ok((req, res) => r
 
 rotasOperacao.get("/objetos", ok((req, res) => {
   const s = ["todos", "pendente", "resolvido"].includes(q(req, "status")) ? (q(req, "status") as "todos") : "todos";
-  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req)));
+  const d = (k: string) => (dataOk(q(req, k)) || undefined);
+  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req), { dataIni: d("dataIni"), dataFim: d("dataFim"), os: q(req, "os").slice(0, 30), motorista: q(req, "motorista").slice(0, 80), passageiro: q(req, "passageiro").slice(0, 80) }));
 }));
 rotasOperacao.post("/objetos/:id/status", central, ok((req, res) => res.json({ registro: S.alternarObjeto(emp(req), req.params.id, quem(req)) })));
 rotasOperacao.delete("/objetos/:id", central, ok((req, res) => { S.apagarObjeto(emp(req), req.params.id); res.json({ ok: true }); }));

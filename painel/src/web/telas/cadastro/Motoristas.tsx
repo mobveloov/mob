@@ -2,6 +2,7 @@
 // e ações (editar, alterar status, mudar cidade, nova senha, histórico). Servidor: /api/gestao/motoristas.
 
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Download, Ghost, Plus, Smartphone, Wifi, WifiOff } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { empresaEscolhidaAgora } from "../../api";
@@ -30,7 +31,9 @@ export default function Motoristas() {
   const opcoes = useCarregar(() => chamar<{ cidades: string[]; categorias: string[] }>("GET", "/cidades"), []);
   const lista = useCarregar(() => chamar<Resposta>("GET", `/motoristas${consulta({ ...filtro, categorias: filtro.categorias.join(","), cnh: filtro.cnh.join(","), licenciamento: filtro.licenciamento.join(","), aba, pagina })}`), [filtro, aba, pagina], 30_000);
   const { aviso, tentar } = useAviso();
-  const [editando, setEditando] = useState<string | "novo" | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [editando, setEditandoBruto] = useState<string | "novo" | null>(params.get("editar"));
+  const setEditando = (v: string | "novo" | null) => { setEditandoBruto(v); if (!v && params.get("editar")) { params.delete("editar"); setParams(params, { replace: true }); } };
   const [status, setStatus] = useState<LinhaMotorista | null>(null);
   const [senha, setSenha] = useState<LinhaMotorista | null>(null);
   const [cidade, setCidade] = useState<LinhaMotorista | null>(null);

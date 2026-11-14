@@ -1,6 +1,7 @@
 // Histórico (Consultar corridas): filtros avançados, atalhos de tempo, atualização automática, janela da corrida.
 // Mantém os extras da central: planilha e análise com IA.
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, FileDown, Filter, HelpCircle, Loader2, Send, Sparkles, X } from "lucide-react";
 import { api, baixar, corridasCsv, type CorridaPainel, type Relatorio } from "../../api";
 import { useSessao } from "../../App";
@@ -20,9 +21,11 @@ const dataIso = (s: string) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s.
 
 export default function Historico({ programadas = false }: { programadas?: boolean }) {
   const { marca } = useSessao();
-  const [rapido, setRapido] = useState("hoje");
-  const [f, setF] = useState<Filtros>(VAZIO);
-  const [rasc, setRasc] = useState<Filtros>(VAZIO);
+  const [rapido, setRapido] = useState(new URLSearchParams(window.location.search).get("motorista") ? "" : "hoje");
+  const [params] = useSearchParams();
+  const inicial: Filtros = { ...VAZIO, motorista: params.get("motorista") ?? "" };
+  const [f, setF] = useState<Filtros>(inicial);
+  const [rasc, setRasc] = useState<Filtros>(inicial);
   const [filtroAberto, setFiltroAberto] = useState(false);
   const [auto, setAuto] = useState(true);
   const [pagina, setPagina] = useState(1);

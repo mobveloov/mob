@@ -382,8 +382,15 @@ export function programadasFiltradas(empresaId: string, f: FiltroProgramadas, pa
 
 const OBJ = () => cadastroPorId("objetos")!;
 const resolvido = (r: Record<string, unknown>) => r.situacao === "Devolvido";
-export function objetos(empresaId: string, status: "todos" | "pendente" | "resolvido", busca: string, pagina: number) {
+export interface FiltroObjetos { dataIni?: string; dataFim?: string; os?: string; motorista?: string; passageiro?: string }
+export function objetos(empresaId: string, status: "todos" | "pendente" | "resolvido", busca: string, pagina: number, f: FiltroObjetos = {}) {
   let l = [...listar(empresaId, OBJ())];
+  const dataDe = (r: Record<string, unknown>) => String(r.data ?? String(r.criadoEm).slice(0, 10)).slice(0, 10);
+  if (f.dataIni) l = l.filter((r) => dataDe(r) >= f.dataIni!);
+  if (f.dataFim) l = l.filter((r) => dataDe(r) <= f.dataFim!);
+  if (f.os) l = l.filter((r) => String(r.os ?? "").includes(f.os!.trim()));
+  if (f.motorista) l = l.filter((r) => normal(r.motorista).includes(normal(f.motorista)));
+  if (f.passageiro) l = l.filter((r) => normal(r.passageiro).includes(normal(f.passageiro)));
   if (status !== "todos") l = l.filter((r) => (status === "resolvido") === resolvido(r));
   if (busca) l = l.filter((r) => [r.descricao, r.os, r.passageiro, r.motorista, r.observacao].some((v) => normal(v).includes(normal(busca))));
   l.sort((a, b) => String(b.data ?? b.criadoEm).localeCompare(String(a.data ?? a.criadoEm)) || b.criadoEm.localeCompare(a.criadoEm));

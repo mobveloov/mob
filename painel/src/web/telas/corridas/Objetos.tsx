@@ -1,45 +1,93 @@
-// Objetos Perdidos: gestão de SAC e recuperação (registro até a devolução).
-import { useEffect, useState } from "react";
-import { CheckCircle2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
-import { Aviso, Paginacao, Selo, Vazio, dia, msgErro, op, qs, useDados } from "./comum";
+// Objetos perdidos (Machine): abas Abertos e Finalizados, período, "Mais filtros" e menu por linha (Finalizar, Dados do passageiro, Chat com motorista).
+import { useState } from "react";
+import { CheckCircle2, Filter, MoreVertical } from "lucide-react";
+import { Aviso, Janela, Paginacao, Selo, Vazio, dia, fone, msgErro, op, qs, useDados } from "./comum";
 import "./corridas.css";
 
+const hojeIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+const somaDias = (n: number) => new Date(Date.now() - 3 * 3600_000 + n * 86_400_000).toISOString().slice(0, 10);
+const PERIODOS: Array<[string, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["7", "Últimos 7 dias"], ["30", "Últimos 30 dias"], ["todos", "Todos os períodos"], ["pers", "Personalizado"]];
+const VAZIO = { os: "", motorista: "", passageiro: "" };
+
 export default function Objetos() {
-  const [status, setStatus] = useState("todos");
-  const [busca, setBusca] = useState("");
-  const [b, setB] = useState("");
+  const [aba, setAba] = useState<"pendente" | "resolvido">("pendente");
+  const [periodo, setPeriodo] = useState("30");
+  const [de, setDe] = useState(""), [ate, setAte] = useState("");
+  const [maisAberto, setMaisAberto] = useState(false);
+  const [rasc, setRasc] = useState(VAZIO), [f, setF] = useState(VAZIO);
   const [pagina, setPagina] = useState(1);
+  const [menu, setMenu] = useState<string | null>(null);
+  const [passageiro, setPassageiro] = useState<any>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
-  useEffect(() => { const t = setTimeout(() => { setB(busca); setPagina(1); }, 350); return () => clearTimeout(t); }, [busca]);
-  const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/objetos${qs({ status, busca: b, pagina })}`), [status, b, pagina]);
+  const faixa = periodo === "hoje" ? { dataIni: hojeIso(), dataFim: hojeIso() } : periodo === "ontem" ? { dataIni: somaDias(-1), dataFim: somaDias(-1) }
+    : periodo === "7" ? { dataIni: somaDias(-6), dataFim: hojeIso() } : periodo === "30" ? { dataIni: somaDias(-29), dataFim: hojeIso() }
+    : periodo === "pers" ? { dataIni: de, dataFim: ate } : {};
+  const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/objetos${qs({ status: aba, ...faixa, ...f, pagina })}`), [aba, JSON.stringify(faixa), JSON.stringify(f), pagina]);
   const fazer = async (fn: () => Promise<unknown>) => { setErroAcao(null); try { await fn(); recarregar(); } catch (e) { setErroAcao(msgErro(e)); } };
+  async function verPassageiro(o: any) {
+    setMenu(null); setErroAcao(null);
+    try {
+      if (o.os) { const d = await op<any>(`/corridas/${encodeURIComponent(o.os)}`); setPassageiro({ nome: d.passageiro.nome, telefone: d.passageiro.telefone, cpf: d.passageiro.cpf, os: o.os }); }
+      else setPassageiro({ nome: o.passageiro, telefone: "", cpf: "", os: "" });
+    } catch { setPassageiro({ nome: o.passageiro, telefone: "", cpf: "", os: o.os }); }
+  }
+  const total = dados?.itens.length ?? 0;
+  const de1 = dados ? (dados.pagina - 1) * 20 + 1 : 0;
   return (
     <div className="oc">
-      <div className="oc-topo">
-        <div><h1>Objetos Perdidos <Selo tom="info">{dados?.total ?? 0}</Selo></h1><p className="suave" style={{ margin: "2px 0 0" }}>Gestão de SAC e Recuperação</p></div>
-        <button className="oc-btn" onClick={recarregar}><RefreshCw size={16} className={carregando ? "gira" : ""} /> Atualizar</button>
-      </div>
-      <div className="oc-card oc-fila">
-        <input style={{ maxWidth: 360 }} placeholder="Localizar por cliente, OS ou descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar" />
-        <select style={{ maxWidth: 180 }} value={status} onChange={(e) => { setStatus(e.target.value); setPagina(1); }} aria-label="Situação"><option value="todos">Todos Status</option><option value="pendente">Pendentes</option><option value="resolvido">Resolvidos</option></select>
+      <div className="oc-topo"><h1>Objetos perdidos</h1></div>
+      <div className="oc-card oc-fila" style={{ justifyContent: "space-between" }}>
+        <div className="oc-fila">
+          {([["pendente", "Abertos"], ["resolvido", "Finalizados"]] as const).map(([k, r]) => <button key={k} className={`oc-chip ${aba === k ? "on" : ""}`} onClick={() => { setAba(k); setPagina(1); }}>{r}</button>)}
+        </div>
+        <div className="oc-fila">
+          <select style={{ maxWidth: 200 }} value={periodo} onChange={(e) => { setPeriodo(e.target.value); setPagina(1); }} aria-label="Período">{PERIODOS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select>
+          {periodo === "pers" && <><input type="date" value={de} onChange={(e) => setDe(e.target.value)} aria-label="Data inicial" /><input type="date" value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Data final" /></>}
+          <button className="oc-btn" onClick={() => { setRasc(f); setMaisAberto(true); }}><Filter size={16} /> Mais filtros</button>
+        </div>
       </div>
       <Aviso texto={erro} erro /><Aviso texto={erroAcao} erro />
       <div className="oc-card">
         {carregando && !dados && <Vazio>Carregando...</Vazio>}
-        {dados && !dados.total && <Vazio>Nenhum objeto registrado. Cadastre em Cadastro &gt; Objetos perdidos.</Vazio>}
+        {dados && !dados.total && <Vazio>Nenhum resultado encontrado.</Vazio>}
         {!!dados?.total && <>
-          <div className="oc-rola"><table><thead><tr><th>Data</th><th>OS</th><th>Detalhe da Falha</th><th>Passageiro</th><th>Motorista</th><th>Status</th><th>Ações</th></tr></thead>
+          <p className="suave" style={{ marginTop: 0 }}>Exibindo {de1}-{de1 + total - 1} de {dados.total} {dados.total === 1 ? "resultado" : "resultados"}.</p>
+          <div className="oc-rola"><table><thead><tr><th>Data</th><th>Dados informados da corrida</th><th>Passageiro</th><th>Descrição do objeto perdido</th><th>Motorista</th><th>Status</th><th /></tr></thead>
             <tbody>{dados.itens.map((o: any) => (
-              <tr key={o.id}><td>{dia(o.data)}</td><td className="forte">{o.os || "—"}</td>
-                <td style={{ whiteSpace: "normal", minWidth: 200 }}><b>{o.descricao}</b>{o.ondeEsta && <><br /><small>Onde está: {o.ondeEsta}</small></>}{o.observacao && <><br /><small>{o.observacao}</small></>}</td>
-                <td>{o.passageiro || "—"}</td><td>{o.motorista || "—"}</td>
-                <td><Selo tom={o.resolvido ? "ok" : "alerta"}>{o.resolvido ? <><CheckCircle2 size={12} /> Resolvido</> : o.situacao || "Pendente"}</Selo></td>
-                <td><span className="oc-fila">
-                  <button className="oc-btn peq" onClick={() => fazer(() => op(`/objetos/${o.id}/status`, {}))}>{o.resolvido ? <><RotateCcw size={13} /> Reabrir</> : <><CheckCircle2 size={13} /> Resolver</>}</button>
-                  <button className="oc-btn peq ruim" aria-label="Apagar registro" onClick={() => confirm("Apagar este registro? Não dá para desfazer.") && fazer(() => op(`/objetos/${o.id}`, undefined, "DELETE"))}><Trash2 size={13} /></button></span></td></tr>))}</tbody></table></div>
+              <tr key={o.id}><td>{dia(o.data)}</td><td className="forte">{o.os ? `OS ${o.os}` : "—"}</td>
+                <td>{o.passageiro || "—"}</td>
+                <td style={{ whiteSpace: "normal", minWidth: 200 }}>{o.descricao}{o.ondeEsta && <><br /><small>Onde está: {o.ondeEsta}</small></>}{o.observacao && <><br /><small>{o.observacao}</small></>}</td>
+                <td>{o.motorista || "—"}</td>
+                <td><Selo tom={o.resolvido ? "ok" : "alerta"}>{o.resolvido ? "Finalizado" : "Aberto"}</Selo></td>
+                <td style={{ position: "relative" }}>
+                  <button className="oc-btn peq" aria-label={`Ações do objeto ${o.descricao}`} onClick={() => setMenu(menu === o.id ? null : o.id)}><MoreVertical size={14} /></button>
+                  {menu === o.id && <div className="oc-card" style={{ position: "absolute", right: 0, zIndex: 5, minWidth: 190, padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                    <button className="oc-btn peq" onClick={() => { setMenu(null); void fazer(() => op(`/objetos/${o.id}/status`, {})); }}><CheckCircle2 size={13} /> {o.resolvido ? "Reabrir" : "Finalizar"}</button>
+                    <button className="oc-btn peq" onClick={() => void verPassageiro(o)}>Dados do passageiro</button>
+                    <a className="oc-btn peq" style={{ textDecoration: "none", textAlign: "center" }} href="/conversas" onClick={() => setMenu(null)}>Chat com motorista</a>
+                  </div>}
+                </td></tr>))}</tbody></table></div>
           <Paginacao pagina={dados.pagina} paginas={dados.paginas} total={dados.total} onMudar={setPagina} rotulo="registros" />
         </>}
       </div>
+      {maisAberto && (
+        <Janela onFechar={() => setMaisAberto(false)} titulo="Mais filtros" tamanho="estreita"
+          rodape={<><button className="oc-btn" type="button" onClick={() => { setRasc(VAZIO); setF(VAZIO); setPagina(1); setMaisAberto(false); }}>Limpar filtros</button><button className="oc-btn pri" type="button" onClick={() => { setF(rasc); setPagina(1); setMaisAberto(false); }}>Filtrar</button></>}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <label className="oc-l">Motorista<input value={rasc.motorista} onChange={(e) => setRasc({ ...rasc, motorista: e.target.value })} /></label>
+            <label className="oc-l">OS<input value={rasc.os} onChange={(e) => setRasc({ ...rasc, os: e.target.value })} inputMode="numeric" /></label>
+            <label className="oc-l">Passageiro<input value={rasc.passageiro} onChange={(e) => setRasc({ ...rasc, passageiro: e.target.value })} /></label>
+          </div>
+        </Janela>
+      )}
+      {passageiro && (
+        <Janela onFechar={() => setPassageiro(null)} titulo="Dados do passageiro" tamanho="estreita" nivel="centro">
+          <div className="oc-dado"><span>Nome</span><b>{passageiro.nome || "—"}</b></div>
+          <div className="oc-dado"><span>Telefone</span><b>{passageiro.telefone ? fone(passageiro.telefone) : "—"}</b></div>
+          <div className="oc-dado"><span>CPF</span><b>{passageiro.cpf || "—"}</b></div>
+          <div className="oc-dado"><span>Corrida</span><b>{passageiro.os ? `OS ${passageiro.os}` : "—"}</b></div>
+        </Janela>
+      )}
     </div>
   );
 }
