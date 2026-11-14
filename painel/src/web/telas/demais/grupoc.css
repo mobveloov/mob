@@ -1,0 +1,4 @@
+/* Tarifas, categorias, descontos, termos e afins no formato da Machine (grupo C). */
+.dm-opcao { padding: 8px 0; border-bottom: 1px solid var(--borda); } .dm-opcao h4 { margin: 0 0 2px; }
+.dm-opcao-chave { display: flex; align-items: center; gap: 10px; margin-top: 4px; } .dm-opcao-chave .dm-interruptor-linha { margin: 0; }
+.dm-radios-col { flex-direction: column; align-items: flex-start; } .dm-radios-col label { display: flex; gap: 8px; align-items: flex-start; }

@@ -204,3 +204,14 @@
 .dm-guia { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; } .dm-guia p { flex: 1; margin: 0; }
 .dm-etiqueta { font-weight: 700; background: #fff; border: 1px solid #cbd5e1; }
 .dm-tarifas { margin-top: 10px; border-top: 1px solid var(--borda, #e2e8f0); padding-top: 10px; } .dm-cat:has(.dm-tarifas) { grid-column: 1 / -1; }
+
+/* Tarifas e categorias: lista numerada como na Machine */
+.dm-cat-lista { display: flex; flex-direction: column; gap: 8px; }
+.dm-cat-linha { background: var(--cartao); border: 1px solid var(--borda); border-radius: 12px; padding: 10px 14px; }
+.dm-cat-topo { display: flex; align-items: center; gap: 12px; }
+.dm-cat-num { width: 28px; text-align: center; font-weight: 700; color: var(--suave); }
+.dm-cat-nome { flex: 1; display: flex; flex-direction: column; min-width: 0; } .dm-cat-nome span { color: var(--suave); font-size: 13px; }
+.dm-cat-app { display: inline-flex; align-items: center; gap: 4px; color: var(--suave); font-size: 11px; }
+.dm-menu-pontos { position: relative; } .dm-menu-pontos summary { list-style: none; cursor: pointer; padding: 6px; border-radius: 8px; display: grid; place-items: center; } .dm-menu-pontos summary::-webkit-details-marker { display: none; }
+.dm-menu-pontos-lista { position: absolute; right: 0; top: 100%; z-index: 20; min-width: 190px; background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 4px; display: flex; flex-direction: column; }
+.dm-menu-pontos-lista button { display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 8px 10px; text-align: left; color: inherit; cursor: pointer; border-radius: 8px; } .dm-menu-pontos-lista button:hover { background: var(--fundo); }

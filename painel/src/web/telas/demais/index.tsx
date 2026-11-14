@@ -2,6 +2,7 @@
 
 import type { JSX } from "react";
 import "./demais.css";
+import "./grupoc.css";
 import { Carteiras, Extrato, Recargas, Relatorios, Saques } from "./Financeiro";
 import { ExtratoCentral, ExtratoOnline, VisaoGeral } from "./FinanceiroMachine";
 import { TransacaoPix } from "./Pix";

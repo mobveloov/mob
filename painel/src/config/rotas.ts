@@ -27,6 +27,8 @@ import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaqu
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
+import { cadastroPorId } from "../comum/cadastros.ts";
+import { listar } from "../cadastros/armazem.ts";
 
 export const rotasConfig = express.Router();
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
@@ -173,8 +175,9 @@ rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(e
 rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
 rotasConfig.delete("/descontos/:id", admin, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
 // Matriz por forma de pagamento x site/app #1 a #4 e desconto máximo da empresa (convive com os descontos por campanha acima).
-rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)) })));
-rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
+const motoristasAtivos = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!).filter((m) => m.status === "Ativo").length;
+rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)), motoristasAtivos: motoristasAtivos(emp(req)) })));
+rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body), motoristasAtivos: motoristasAtivos(emp(req)) })));
 
 // ------------------------------------------------------------------ config: despacho, transbordos, integrações
 
