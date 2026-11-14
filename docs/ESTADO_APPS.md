@@ -27,7 +27,9 @@ Ordem combinada (situação em 13/11, ramo `apps-igual-prints`):
 7. [em andamento] Testes (152 passando), APKs novos e página de download, PR.
 8. [falta] Tabela tela por tela final (referência x nosso x situação).
 
-Faltam, comparando com a referência: Meus Cartões e Meus Cupons (passageiro; sem meio de pagamento por cartão ainda), selo de min/km no pino do destino, botão QR da carteira, filtro "Filtrar Data" em Suas Viagens, ícone flutuante/alerta por cima de outros apps (nativo), Acompanhar viagem e Chat do passageiro ainda não conferidos lado a lado.
+Também feito (14/11): sons originais e permissões do Android por função (`docs/SONS_E_PERMISSOES.md`), ícone flutuante nativo do motorista, Meus Cupons, Meus Cartões, Filtrar Data, selo de min/km, chat e acompanhar viagem do passageiro. Tabela completa em `docs/TABELA_TELAS.md`.
+
+Falta: conferir no aparelho (o emulador não abriu nesta rodada), passos 2 a 5 do cadastro e a tela de senha do motorista, botão de QR da carteira (não se sabe o que ele faz), conferir os seletores de data e hora e a tela Cidade, reconstruir o `mob-painel` (sessão do painel).
 
 ## Já pronto de antes (não refazer)
 

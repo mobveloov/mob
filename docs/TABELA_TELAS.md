@@ -12,16 +12,16 @@ Referências: `docs/APPS_PRINTS_REFERENCIA.md` (P## = passageiro, M## = motorist
 | Início (P26) | Degradê da cor da marca, "Para onde você vai?" com IR, Casa/Trabalho/Recentes em cartões brancos, mapa cinza claro com ruas e nomes, menu de baixo flutuante | Conferido. Igual na estrutura |
 | Menu de baixo (P26 etc.) | Início, Histórico, Carteira, Conta | Conferido. Igual |
 | Para onde vamos? (P23/P17) | Partida e Destino em cartão, favoritos, Escolher no mapa, Não informar destino; sugestões de rua (CNEFE, depois OpenStreetMap) | Conferido. Igual; o aviso "CNEFE não configurada" saiu |
-| Opções da corrida Agora/Agendar (P15/P11/P16/P14) | Mapa com rota pelas ruas e etiquetas, lista de categorias com − e +, pagamento, descontos, SOLICITAR | Conferido (Agora). Falta: selo de min/km no pino do destino. Agendar não conferido |
+| Opções da corrida Agora/Agendar (P15/P11/P16/P14) | Mapa com rota pelas ruas e etiquetas, lista de categorias com − e +, pagamento, descontos, SOLICITAR | Conferido (Agora), com selo de min e km ao lado do pino do destino. Agendar não conferido |
 | Data e hora do agendamento (P13/P12) | Seletores de data e relógio | Não conferido lado a lado |
 | Procurando (P10) | Barra, "Procurando", cronômetro, oferta atual − e +, embarque e destino, chips | Conferido. Igual na estrutura |
 | Contra-oferta do motorista (P10) | Existe (contra-oferta com Aceitar/Recusar) | Não conferido |
-| Acompanhar viagem (P08/P03) | Existe, com rota pelas ruas e carro | Não conferido lado a lado (precisa de motorista aceitando) |
+| Acompanhar viagem (P08/P03) | Topo da marca, mapa claro com a rota pelas ruas e o carro, balão "Motorista a caminho" com min e km, cartão do motorista (foto, nota, viagens, Ligar, Chat, veículo, placa), detalhes da corrida | Conferido com uma corrida simulada. Igual na estrutura; "Seu motorista está chegando!" aparece só quando o carro chega perto |
 | Motivo do cancelamento (P02) | Opções em cartões com borda e CONFIRMAR | Conferido. Igual |
-| Chat (P05/P07) | Existe | Não conferido |
-| Suas Viagens (P22/P24) | Título, pílulas (Todas, Finalizadas, Canceladas, Em andamento, Agendadas), vazio com ícone | Conferido. Falta "Filtrar Data" |
+| Chat (P05/P07) | Topo da marca com foto, nome e telefone, bolhas (recebida branca, enviada verde), campo arredondado com microfone | Conferido. Falta só ver com mensagens de áudio de verdade |
+| Suas Viagens (P22/P24) | Título, pílulas (Todas, Finalizadas, Canceladas, Em andamento, Agendadas, Filtrar Data), vazio com ícone | Conferido (o filtro de data foi acrescentado depois e não foi visto na tela) |
 | Sua Carteira (P20) | Cartão preto com saldo, + Adicionar Saldo, histórico de movimentações | Conferido. Falta o botão de QR |
-| Minha Conta (P21/P19) | Topo da marca, foto, nome, telefone, Editar Perfil, cartão Carteira, Financeiro, Minhas atividades, Conta | Conferido. Faltam Meus Cartões e Meus Cupons (sem pagamento por cartão ainda) |
+| Minha Conta (P21/P19) | Topo da marca, foto, nome, telefone, Editar Perfil, cartão Carteira, Financeiro, Minhas atividades, Conta | Conferido. Agora com Meus Cartões, Indique e Ganhe e Meus Cupons. Meus Cartões só informa as formas de pagamento que existem (não há cartão salvo no app); Meus Cupons lista os cupons ativos da empresa |
 | Editar Perfil (P18) | Foto, nome, e-mail, telefone, gênero, alterar senha, SALVAR | Conferido pela estrutura (a captura saiu em branco por causa do painel oculto) |
 
 ## Motorista
@@ -48,8 +48,9 @@ Refeito por outra sessão (commit `6377ee0` e seguintes). Conferi lado a lado, n
 | Diagnóstico (M18) | Conferido. Os mesmos 7 itens, com situação |
 | Chat com suporte (M19) | Conferido. Cabeçalho Suporte Central, respostas rápidas e microfone |
 | Senha / Bem-vindo (M03) | Refeito, não conferido |
-| Chamada com valor líquido grande, bruto e taxa menores (cartaz) | Já existia e foi mantida; não reconferida |
-| Em corrida (P09/P04/P01), chat da corrida (P06) | Rota pelas ruas no mapa; layout não conferido (precisa de uma corrida em andamento) |
+| Chamada com valor líquido grande, bruto e taxa menores (cartaz) | Conferido com uma corrida simulada: "Oferta do passageiro" com contagem, − valor +, "Ganhe R$/km", min/avaliação/viagens, embarque e destino com km, pagamento e categoria, RECUSAR e ACEITAR. Igual ao cartaz |
+| Em corrida (P09/P04/P01) | Conferido: faixa de navegação, passageiro, LOCAL DE EMBARQUE, VER ROTA COMPLETA / EDITAR ROTA, pagamento, valor, categoria, identificação, "Cheguei ao local" |
+| Chat da corrida (P06) | Refeito, não conferido |
 
 Diferença conhecida: o menu lateral da referência (M27) tem também "Termos de uso" e "Política de privacidade"; o nosso ainda não.
 
