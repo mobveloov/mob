@@ -9,7 +9,7 @@ import { Clock, House, User, Wallet } from "lucide-react";
 import { Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 import { esperandoHorario, lerLugares, quandoAgendada, type Corrida, type Endereco, type Eu, type Lugares, type Ponto, type Rota } from "./apoio";
 import { Agendadas, CarteiraTela, Conta } from "./Conta";
-import { MenuBaixo } from "./pecas";
+import { Avatar, MenuBaixo } from "./pecas";
 import { Acompanhar, Procurando } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Inicio } from "./Inicio";
@@ -98,7 +98,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, (ligado) => { setConectado(ligado); if (ligado) void carregar().catch(() => undefined); }), [carregar]);
 
   if (!eu) return <Carregando />;
-  if (chat && corrida) return <Chat corridaId={corrida.id} papel="passageiro" mensagens={mensagens} aberto={!!corrida.motorista && corrida.aberta} fechar={() => { setChat(false); void api(`/corridas/${corrida.id}/chat/lida`, { corpo: {} }).catch(() => undefined); }} />;
+  if (chat && corrida) return <Chat corridaId={corrida.id} papel="passageiro" mensagens={mensagens} titulo={corrida.motorista?.nome} avatar={corrida.motorista ? <Avatar foto={corrida.motorista.foto} nome={corrida.motorista.nome} tamanho={40} /> : undefined} telefone={corrida.motorista?.telefone} aberto={!!corrida.motorista && corrida.aberta} fechar={() => { setChat(false); void api(`/corridas/${corrida.id}/chat/lida`, { corpo: {} }).catch(() => undefined); }} />;
   if (avaliar) return <Avaliar corrida={avaliar} fechar={() => setAvaliar(null)} />;
 
   // Corrida em andamento: procurando motorista ou acompanhando a viagem (tela cheia, sem abas).

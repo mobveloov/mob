@@ -208,3 +208,12 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .motorista-foto { display: flex; flex-direction: column; align-items: center; gap: .25rem; } .motorista-foto small { color: var(--suave); font-weight: 700; } .motorista-foto .motorista-veiculo-icone { right: 8px; bottom: 44px; }
 .motorista-dados { align-items: flex-start; padding-top: .3rem; } .motorista-carro, .motorista-placa { align-items: center; text-align: center; }
 .faixa-chegando { background: var(--cor); color: var(--cor-texto); border-radius: 14px; margin: .5rem; padding: .85rem 1rem; text-align: left; box-shadow: 0 3px 10px rgba(0,0,0,.12); }
+
+/* chat do passageiro: topo na cor da marca com foto e telefone, bolhas e campo arredondado */
+.chat { background: #f2f3f7; }
+.chat .chat-topo { background: var(--cor); color: var(--cor-texto); border: 0; border-radius: 0 0 24px 24px; justify-content: flex-start; gap: .7rem; } .chat-topo .botao-link { color: inherit; font-size: 2rem; line-height: 1; padding: 0 .4rem; } .chat-topo strong { flex: 1; font-size: 1.1rem; } .chat-ligar { text-decoration: none; font-size: 1.3rem; }
+.chat-lista { padding: 1.2rem 1rem; }
+.balao { background: #fff; border: 0; border-radius: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06); } .balao.meu { background: #d6f7d4; color: #111; border-radius: 18px; } .balao time { color: #8a8f98; opacity: 1; }
+.chat-entrada { background: #fff; border-top: 0; padding: .8rem 1rem calc(.8rem + env(safe-area-inset-bottom)); } .chat-entrada input { border: 2px solid var(--cor); border-radius: 16px; padding: .8rem 1rem; background: #fff; color: #111; }
+.chat-entrada .botao.microfone { background: transparent; color: #111; box-shadow: none; width: auto; }
+.chat-ligar { filter: grayscale(1) contrast(2); }
