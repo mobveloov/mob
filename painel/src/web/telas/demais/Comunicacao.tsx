@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, MessageSquare, Radio, Search, Send } from "lucide-react";
+import { CriarNotificacao } from "./CriarNotificacao";
 import { Abas, Aviso, Cab, Campo, Carregando, Modal, dataHoraBr, pedirConfig, useCarregar, useSalvar } from "./comum";
 
 // ------------------------------------------------------------------ Conversas
@@ -113,9 +114,12 @@ const SEG: Array<[string, string]> = [["todos", "Todos"], ["com_corridas", "Com 
 
 export function Notificacoes() {
   const [aba, setAba] = useState<"imediato" | "agendamento">("imediato");
+  const [criando, setCriando] = useState(false);
+  if (criando) return <CriarNotificacao onVoltar={() => setCriando(false)} />;
   return (
     <>
       <Cab titulo={aba === "imediato" ? "Central de Notificações" : "Agendamento Inteligente"} sub={aba === "imediato" ? "Dispare mensagens PUSH para o celular de seus usuários na hora." : "Programe mensagens para rodarem sozinhas no piloto automático."}>
+        <button className="botao primario" onClick={() => setCriando(true)}>Nova notificação</button>
         <Abas abas={[["imediato", "Disparo Imediato"], ["agendamento", "Agendar Notificações"]]} valor={aba} onChange={setAba} />
       </Cab>
       <Formulario agendar={aba === "agendamento"} />

@@ -63,14 +63,32 @@ export function marcarLidas(empresaId: string, papel?: PapelApp, chave?: string)
 // ------------------------------------------------------------------ notificações push
 
 export type Segmento = "todos" | "com_corridas" | "sem_corridas" | "individual";
-export interface PedidoPush { papel: "motorista" | "passageiro"; segmento: Segmento; titulo: string; mensagem: string; usarNome?: boolean; usuario?: string }
+/** Filtros da tela "Criando Notificação" (Machine): todos opcionais; sem nenhum, vale para todos os destinatários. */
+export interface FiltrosPush { corridasMin?: number; corridasMax?: number; cadastroDe?: string; cadastroAte?: string; genero?: string[]; categorias?: string[]; status?: string[] }
+export interface PedidoPush { papel: "motorista" | "passageiro"; segmento: Segmento; titulo: string; mensagem: string; usarNome?: boolean; usuario?: string; filtros?: FiltrosPush }
 
-function destinatarios(empresaId: string, papel: "motorista" | "passageiro", segmento: Segmento, usuario = ""): Array<{ chave: string; nome: string }> {
+function destinatarios(empresaId: string, papel: "motorista" | "passageiro", segmento: Segmento, usuario = "", filtros?: FiltrosPush): Array<{ chave: string; nome: string }> {
   const proprias = listarProprias(empresaId);
-  const fez = new Set(proprias.map((c) => (papel === "motorista" ? c.motoristaId : c.passageiro.telefone.replace(/\D/g, ""))).filter(Boolean) as string[]);
+  const chaveDe = (c: (typeof proprias)[number]) => (papel === "motorista" ? c.motoristaId : c.passageiro.telefone.replace(/\D/g, ""));
+  const fez = new Set(proprias.map(chaveDe).filter(Boolean) as string[]);
+  const finalizadas = new Map<string, number>();
+  for (const c of proprias) { const k = chaveDe(c); if (k && c.status === "finalizada") finalizadas.set(k, (finalizadas.get(k) ?? 0) + 1); }
+  const f = filtros ?? {};
+  const noFiltro = (r: { criadoEm: string; genero?: unknown; categorias?: unknown; status?: unknown }, chave: string) => {
+    const qtd = finalizadas.get(chave) ?? 0;
+    if (f.corridasMin !== undefined && qtd < f.corridasMin) return false;
+    if (f.corridasMax !== undefined && qtd > f.corridasMax) return false;
+    const dia = String(r.criadoEm ?? "").slice(0, 10);
+    if (f.cadastroDe && dia < f.cadastroDe) return false;
+    if (f.cadastroAte && dia > f.cadastroAte) return false;
+    if (f.genero?.length && !f.genero.includes(String(r.genero ?? ""))) return false;
+    if (f.status?.length && !f.status.includes(String(r.status ?? ""))) return false;
+    if (f.categorias?.length) { const tem = String(r.categorias ?? "").split(",").map((x) => x.trim()); if (!f.categorias.some((c) => tem.includes(c))) return false; }
+    return true;
+  };
   const todos = papel === "motorista"
-    ? listar(empresaId, cadastroPorId("motoristas")!).filter((m) => m.status === "Ativo").map((m) => ({ chave: m.id, nome: String(m.nome ?? "") }))
-    : listar(empresaId, cadastroPorId("clientes")!).filter((c) => c.status !== "Bloqueado").map((c) => ({ chave: String(c.telefone ?? "").replace(/\D/g, ""), nome: String(c.nome ?? "") }));
+    ? listar(empresaId, cadastroPorId("motoristas")!).filter((m) => (f.status?.length ? true : m.status === "Ativo") && noFiltro(m, m.id)).map((m) => ({ chave: m.id, nome: String(m.nome ?? "") }))
+    : listar(empresaId, cadastroPorId("clientes")!).filter((c) => c.status !== "Bloqueado" && noFiltro(c, String(c.telefone ?? "").replace(/\D/g, ""))).map((c) => ({ chave: String(c.telefone ?? "").replace(/\D/g, ""), nome: String(c.nome ?? "") }));
   if (segmento === "individual") return todos.filter((x) => x.chave === (papel === "motorista" ? usuario : usuario.replace(/\D/g, "")));
   if (segmento === "com_corridas") return todos.filter((x) => fez.has(x.chave));
   if (segmento === "sem_corridas") return todos.filter((x) => !fez.has(x.chave));
@@ -85,14 +103,28 @@ export function buscarPessoas(empresaId: string, papel: "motorista" | "passageir
     .map((r) => ({ chave: papel === "motorista" ? r.id : String(r.telefone ?? ""), nome: String(r.nome ?? ""), telefone: String(r.telefone ?? "") }));
 }
 
+const lista5 = (v: unknown, max = 20) => (Array.isArray(v) ? v.map((x) => texto(x, 40)).filter(Boolean).slice(0, max) : []);
+const inteiro = (v: unknown) => (v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? undefined : Math.max(0, Math.round(Number(v))));
+const diaIso = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "")) ? String(v) : undefined);
+export function sanearFiltrosPush(e: unknown): FiltrosPush | undefined {
+  const o = (e ?? {}) as Record<string, unknown>;
+  const f: FiltrosPush = { corridasMin: inteiro(o.corridasMin), corridasMax: inteiro(o.corridasMax), cadastroDe: diaIso(o.cadastroDe), cadastroAte: diaIso(o.cadastroAte), genero: lista5(o.genero), categorias: lista5(o.categorias), status: lista5(o.status) };
+  if (f.corridasMin !== undefined && f.corridasMax !== undefined && f.corridasMin > f.corridasMax) throw new Error("A quantidade mínima de corridas não pode ser maior que a máxima.");
+  if (f.cadastroDe && f.cadastroAte && f.cadastroDe > f.cadastroAte) throw new Error("A data inicial do cadastro não pode ser depois da final.");
+  const limpo = Object.fromEntries(Object.entries(f).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length)));
+  return Object.keys(limpo).length ? limpo as FiltrosPush : undefined;
+}
+
 export function sanearPedido(e: unknown): PedidoPush {
   const o = (e ?? {}) as Record<string, unknown>;
   const papel = umDe(o.papel, ["motorista", "passageiro"] as const, "passageiro");
   const segmento = umDe(o.segmento, ["todos", "com_corridas", "sem_corridas", "individual"] as const, "todos");
-  const titulo = texto(o.titulo, 60), mensagem = texto(o.mensagem, 240);
-  if (!titulo || !mensagem) throw new Error("Preencha o título e a mensagem.");
+  const titulo = texto(o.titulo, 60), mensagem = texto(o.mensagem, 255);
+  if (!mensagem) throw new Error("Preencha a mensagem.");
+  if (!titulo && o.tituloOpcional !== true) throw new Error("Preencha o título e a mensagem.");
+  const tituloFinal = titulo || "Aviso da central";
   if (segmento === "individual" && !texto(o.usuario, 80)) throw new Error("Escolha o usuário.");
-  return { papel, segmento, titulo, mensagem, usarNome: o.usarNome === true || o.usarNome === "1", usuario: texto(o.usuario, 80) };
+  return { papel, segmento, titulo: tituloFinal, mensagem, usarNome: o.usarNome === true || o.usarNome === "1", usuario: texto(o.usuario, 80), filtros: sanearFiltrosPush(o.filtros) };
 }
 
 const personalizar = (t: string, nome: string, usar: boolean, tituloDaMsg: boolean) => {
@@ -103,10 +135,10 @@ const personalizar = (t: string, nome: string, usar: boolean, tituloDaMsg: boole
 };
 
 export async function dispararNotificacao(empresaId: string, p: PedidoPush, por: string, agendamentoId = "") {
-  const alvos = destinatarios(empresaId, p.papel, p.segmento, p.usuario);
+  const alvos = destinatarios(empresaId, p.papel, p.segmento, p.usuario, p.filtros);
   if (!alvos.length) throw new Error("Nenhum destinatário neste filtro.");
   // Caixa de notificações do app: só quando é para todos (vale para quem abrir o app depois).
-  if (p.segmento === "todos") {
+  if (p.segmento === "todos" && !p.filtros) {
     const hoje = agoraBr().toISOString().slice(0, 10);
     const fim = new Date(agoraBr().getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
     criar(empresaId, cadastroPorId("notificacoes")!, { titulo: p.titulo, texto: p.mensagem.replace(/\{nome\}/g, ""), publico: p.papel === "motorista" ? "Motoristas" : "Passageiros", inicio: hoje, fim, ativa: true }, por);

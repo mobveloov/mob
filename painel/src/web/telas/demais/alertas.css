@@ -1,0 +1,18 @@
+/* Telas com filtros na lateral, como na Machine (Alertas para empresas, Notificações, NPS). */
+.dm-com-filtros { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 14px; align-items: start; }
+.dm-lateral { flex-direction: column; align-items: stretch; }
+.dm-lateral > * { flex: 0 0 auto; width: 100%; }
+.dm-lateral h3 { margin: 0 0 4px; text-align: center; }
+.dm-marcas { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.dm-marcas .dm-check { display: flex; flex-direction: row; justify-content: flex-start; gap: 8px; width: 100%; text-align: left; }
+.dm-marcas .dm-check input { flex: 0 0 auto; margin: 0; width: auto; min-height: 0; padding: 0; }
+.dm-marcas legend { font-weight: 700; padding: 0; margin-bottom: 4px; }
+@media (max-width: 860px) { .dm-com-filtros { grid-template-columns: 1fr; } }
+
+/* Criando Notificação: filtros que se adicionam um a um */
+.dm-notif-criar { display: grid; gap: 12px; max-width: 880px; width: 100%; margin: 0; min-width: 0; }
+.dm-notif-criar h3 { margin: 8px 0 0; }
+.dm-filtros-box { margin-top: 14px; border-top: 1px solid var(--borda); padding-top: 12px; }
+.dm-filtro-sec { border: 1px solid var(--borda); border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+.dm-filtro-add { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; color: var(--primaria); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 0; }
+.dm-filtro-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

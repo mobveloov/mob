@@ -157,3 +157,11 @@
   .cg-filtros { display: none; position: static; max-height: none; }
   .cg-filtros.aberto { display: block; }
 }
+
+/* Áreas, Plantão e Desafios no formato da Machine */
+.cg-info-bloco { padding: 10px 14px; border-radius: 12px; background: var(--cg-cartao); border: 1px solid var(--cg-borda); font-size: 13px; }
+.cg-ordenar { background: none; border: 0; color: inherit; font: inherit; font-weight: 800; cursor: pointer; padding: 0; }
+.cg-cores { display: flex; gap: 4px; flex-wrap: wrap; }
+.cg-cor { border: 2px solid transparent; border-radius: 8px; padding: 3px 8px; color: #fff; font-size: 11px; cursor: pointer; text-shadow: 0 1px 2px #0008; }
+.cg-cor.ativa { border-color: var(--cg-txt, #fff); box-shadow: 0 0 0 2px #0006; }
+.cg-resumo-lista { color: var(--cg-suave); font-size: 12px; margin: 0 0 6px; min-height: 1em; }
