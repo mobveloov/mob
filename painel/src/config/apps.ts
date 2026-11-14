@@ -4,6 +4,7 @@ import { categoriasCompletas } from "./categorias.ts";
 import { configNps } from "./avaliacoes.ts";
 import { gerais, termos } from "./gerais.ts";
 import { pagamentos } from "./pagamentos.ts";
+import { personalizacao } from "./personalizacao.ts";
 
 /** Documentos que o app do motorista aceita enviar (todos os cadastrados em Gerais do App: id -> nome). */
 export function tiposDeDocumento(empresaId: string): Record<string, string> {
@@ -33,5 +34,6 @@ export function configDosApps(empresaId: string) {
     })),
     pagamentos: p,
     termos: { versao: t.versao, atualizadoEm: t.atualizadoEm },
+    personalizacao: personalizacao(empresaId),
   };
 }
