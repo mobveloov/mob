@@ -30,6 +30,8 @@ export const FUNCOES: Funcao[] = [
   { id: "cupons", grupo: "Cadastro", secao: "Gestão", nome: "Cupons", rota: "/cupons" },
   { id: "empresas", grupo: "Cadastro", secao: "Gestão", nome: "Empresas", rota: "/empresas", antigas: ["/conveniadas"] },
   { id: "areas", grupo: "Cadastro", secao: "Gestão", nome: "Áreas", rota: "/areas" },
+  { id: "plantao", grupo: "Cadastro", secao: "Gestão", nome: "Plantão", rota: "/plantao" },
+  { id: "ruas", grupo: "Cadastro", secao: "Gestão", nome: "Ruas", rota: "/ruas" },
   { id: "punicoes", grupo: "Cadastro", secao: "Gestão", nome: "Punições", rota: "/punicoes" },
   { id: "desafios", grupo: "Cadastro", secao: "Gestão", nome: "Desafios", rota: "/desafios" },
   { id: "indicacoes", grupo: "Cadastro", secao: "Gestão", nome: "Indicações", rota: "/indicacoes", novo: true },
@@ -46,6 +48,8 @@ export const FUNCOES: Funcao[] = [
   { id: "taxas-cancelamento", grupo: "Corridas", nome: "Taxas de cancelamento", rota: "/taxas-cancelamento", novo: true },
   { id: "objetos", grupo: "Corridas", nome: "Objetos Perdidos", rota: "/objetos" },
   { id: "engajamento", grupo: "Corridas", nome: "Mapa de engajamento", rota: "/engajamento", novo: true },
+  { id: "funil-clientes", grupo: "Corridas", nome: "Funil de Clientes", rota: "/funil-clientes", novo: true },
+  { id: "mapa-bairros", grupo: "Corridas", nome: "Mapa de Bairros e Demanda", rota: "/mapa-bairros", novo: true },
   { id: "entrega-voucher", grupo: "Corridas", nome: "Entrega de voucher", rota: "/entrega-voucher" },
 
   { id: "visao-geral", grupo: "Financeiro", secao: "Relatórios", nome: "Visão geral do financeiro", rota: "/visao-geral" },
