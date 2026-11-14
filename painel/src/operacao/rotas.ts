@@ -26,7 +26,7 @@ import { alertas } from "../apps/despacho.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
-import { agoraBr, normal } from "../servidor/util.ts";
+import { agoraBr, celulaCsv, normal } from "../servidor/util.ts";
 import { ehVoucher, nomesConveniadas, validarVoucher } from "../relatorios/vouchers.ts";
 import "./ondas.ts"; // liga o registro das ofertas do despacho
 import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
@@ -177,10 +177,24 @@ rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   res.json(await S.ocorrencias(emp(req), h > 0 && h <= 72 ? h : 1, pag(req)));
 }));
 
-const FILTROS_PROG: S.FiltroProgramadas[] = ["hoje", "amanha", "futuras", "todas"];
+const filtroProg = (req: Request): S.FiltroProgramadas => ({
+  centralChamada: q(req, "centralChamada", 60), empresa: q(req, "empresa", 80), os: q(req, "os", 30), categoria: q(req, "categoria", 60),
+  passageiro: q(req, "passageiro", 80), motorista: q(req, "motorista", 80), dataIni: dataOk(q(req, "dataIni")) || undefined, dataFim: dataOk(q(req, "dataFim")) || undefined,
+  pagamento: q(req, "pagamento", 40), situacao: S.SITUACOES_DISPARO[q(req, "situacao")] ? q(req, "situacao") : undefined,
+});
 rotasOperacao.get("/programadas", ok((req, res) => {
-  const f = FILTROS_PROG.includes(q(req, "filtro") as S.FiltroProgramadas) ? (q(req, "filtro") as S.FiltroProgramadas) : "futuras";
-  res.json(S.programadas(emp(req), f, q(req, "busca"), pag(req)));
+  res.json({
+    ...S.programadasFiltradas(emp(req), filtroProg(req), pag(req), false, empresasPorTelefone(emp(req))),
+    opcoes: { ...OPCOES_FIXAS(req), categorias: S.opcoesRapidas(emp(req)).categorias, situacoes: Object.entries(S.SITUACOES_DISPARO).map(([id, nome]) => ({ id, nome })) },
+  });
+}));
+/** Exportar (CSV com proteção contra fórmula). */
+rotasOperacao.get("/programadas/exportar", ok((req, res) => {
+  const r = S.programadasFiltradas(emp(req), filtroProg(req), 1, true, empresasPorTelefone(emp(req)));
+  const cab = ["Nº OS programada", "Data", "Hora", "Antecedência (minutos)", "Nome do passageiro", "Empresa", "Situação do disparo"];
+  const dia = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
+  const linhas = [cab.map(celulaCsv).join(";"), ...r.itens.map((c) => [c.os, dia(c.agendadaPara!), c.agendadaPara!.slice(11, 16), c.antecedencia, c.passageiro, c.empresa || "---", c.situacaoTexto].map(celulaCsv).join(";"))];
+  baixarCsv(res, "corridas-programadas", "﻿" + linhas.join("\n"));
 }));
 rotasOperacao.put("/programadas/:id", central, ok(async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
