@@ -9,6 +9,8 @@ import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
 import { configDosApps } from "./apps.ts";
 import { avaliacoesNps, csvAvaliacoes, PERIODOS_NPS, TIPOS_NPS, configNps, resetarRecusas, resumoNps, salvarConfigNps, type PapelNps } from "./avaliacoes.ts";
+import { alertasAtivos, criarAlerta, encerrarAlerta, listarAlertas } from "./alertas.ts";
+import { central, marcarCentralLidas } from "./central-notificacoes.ts";
 import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, ICONES, removerCategoria, salvarCategoria } from "./categorias.ts";
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
@@ -95,6 +97,14 @@ rotasConfig.post("/conversas/transmissao", ok(async (req, res) => {
   res.json(await dispararNotificacao(emp(req), sanearPedido({ ...req.body, segmento: "todos", titulo: req.body?.titulo || "Aviso da central", mensagem: req.body?.texto }), quem(req)));
 }));
 
+// Alertas para empresas: leitura para quem está logado; criar e encerrar para admin e operador (como as notificações push).
+rotasConfig.get("/alertas", ok((req, res) => res.json(listarAlertas(emp(req), { empresa: q(req, "empresa"), conteudo: q(req, "conteudo").slice(0, 80), tipo: q(req, "tipo"), status: q(req, "status") }))));
+rotasConfig.get("/alertas/ativos", ok((req, res) => res.json({ alertas: alertasAtivos(emp(req)).map((a) => ({ id: a.id, tipo: a.tipo, conteudo: a.conteudo, empresaAlvo: a.empresaAlvo, terminoEm: a.terminoEm })) })));
+rotasConfig.post("/alertas", exigirPapel("admin", "operador"), ok((req, res) => res.status(201).json({ alerta: criarAlerta(emp(req), (req.body ?? {}) as Record<string, unknown>, quem(req)) })));
+rotasConfig.post("/alertas/:id/encerrar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ alerta: encerrarAlerta(emp(req), req.params.id, quem(req)) })));
+// Central de notificações (sino): cada pessoa marca só as suas leituras.
+rotasConfig.get("/central-notificacoes", ok((req, res) => res.json(central(emp(req), quem(req), q(req, "somenteNaoLidas") === "1"))));
+rotasConfig.post("/central-notificacoes/lidas", ok((req, res) => res.json({ marcadas: marcarCentralLidas(emp(req), quem(req), req.body?.chaves, req.body?.todas === true), ...central(emp(req), quem(req), false) })));
 rotasConfig.get("/notificacoes", ok((req, res) => res.json({ historico: historicoNotificacoes(emp(req)), agendamentos: agendamentos(emp(req)) })));
 rotasConfig.get("/notificacoes/pessoas", ok((req, res) => res.json({ pessoas: buscarPessoas(emp(req), papelCart(q(req, "papel")), q(req, "busca")) })));
 rotasConfig.post("/notificacoes", exigirPapel("admin", "operador"), ok(async (req, res) => res.json(await dispararNotificacao(emp(req), sanearPedido(req.body), quem(req)))));

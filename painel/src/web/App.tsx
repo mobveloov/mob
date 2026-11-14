@@ -12,6 +12,7 @@ import Avaliacoes from "./paginas/Avaliacoes";
 import AlterarSenha from "./paginas/AlterarSenha";
 import { EmConstrucao } from "./componentes/ui";
 import { TELAS_ENTREGUES } from "./telas/registro";
+import { FaixaAlerta, Sino } from "./telas/demais/CentralNotificacoes";
 import TelaCadastro from "./cadastros/TelaCadastro";
 import Financeiro from "./paginas/Financeiro";
 import Analise from "./paginas/Analise";
@@ -205,6 +206,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
           </nav>
         </div>
         <div className="barra-lado">
+          <Sino />
           <button className="botao-tema" onClick={trocarTema} aria-label="Alternar Tema" title="Alternar Tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
           {usuarioMenu}
         </div>
@@ -214,6 +216,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
       <header className="barra-celular">
         <button className="hamburguer" onClick={() => setAberto(true)} aria-label="Abrir menu"><Menu size={24} /></button>
         <Link to="/" className="logo-topo" aria-label={marca.produto}>{logo}</Link>
+        <Sino />
         <Link to="/alterar-senha" className="avatar" aria-label="Minha conta">{iniciais(nomeUsuario)}</Link>
       </header>
       {aberto && <div className="cortina" onClick={() => setAberto(false)} />}
@@ -251,6 +254,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
       </aside>
 
       <main className="conteudo">
+        <FaixaAlerta />
         <Routes>
           {funcoes.map((f) => <Route key={f.id} path={f.rota} element={tela(f)} />)}
           {funcoes.flatMap((f) => (f.antigas ?? []).map((a) => <Route key={a} path={a} element={<Navigate to={f.rota} replace />} />))}
