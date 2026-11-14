@@ -73,8 +73,8 @@ test("chat: o JSON antigo da corrida entra no banco, mensagens novas só acresce
   const C = await import("../src/apps/chat.ts");
   const id = "11111111-1111-4111-8111-111111111111", outra = "22222222-2222-4222-8222-222222222222";
   const velhas = [
-    { id: "m1", de: "passageiro", nome: "Ana", texto: "Oi", em: "2026-11-01T10:00:00.000Z" },
-    { id: "m2", de: "motorista", nome: "Dora", audio: { id: "a1", mime: "audio/ogg", bytes: 10, segundos: 2 }, em: "2026-11-01T10:01:00.000Z" },
+    { id: "m1", de: "passageiro", nome: "Ana", texto: "Oi", em: "2025-11-01T10:00:00.000Z" },
+    { id: "m2", de: "motorista", nome: "Dora", audio: { id: "a1", mime: "audio/ogg", bytes: 10, segundos: 2 }, em: "2025-11-01T10:01:00.000Z" },
   ];
   fs.mkdirSync(pasta(um, "apps", "chat"), { recursive: true });
   fs.writeFileSync(pasta(um, "apps", "chat", `${id}.json`), JSON.stringify(velhas));
@@ -97,7 +97,7 @@ test("chat: o JSON antigo da corrida entra no banco, mensagens novas só acresce
   await new Promise((r) => setTimeout(r, 5));
   C.enviarTexto(um, id, "passageiro", "Ana", "Estou aqui");
   assert.equal(C.naoLidas(um, id, "motorista"), 1);
-  assert.equal(C.naoLidas(um, id, "passageiro"), 0);
+  assert.equal(C.naoLidas(um, id, "passageiro"), 1, "só a do motorista (o áudio)");
 
   // Áudio guardado e achado pelo id, só na corrida certa.
   const ogg = Buffer.concat([Buffer.from("OggS"), Buffer.alloc(40)]);
