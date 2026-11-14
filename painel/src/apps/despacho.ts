@@ -414,7 +414,7 @@ export async function desistir(empresaId: string, motoristaId: string, corridaId
 
 const assinatura = (c: CorridaPropria) => `${c.status}|${c.motoristaId ?? ""}|${c.historico.length}|${c.avaliacao ?? ""}`;
 const TEXTO_PUSH: Partial<Record<CorridaPropria["status"], string>> = {
-  a_caminho: "Seu motorista está a caminho.", no_local: "Seu motorista chegou.", em_andamento: "Boa viagem!",
+  a_caminho: "Seu motorista está a caminho.", no_local: "Seu motorista está no local.", em_andamento: "Boa viagem!",
   finalizada: "Corrida finalizada. Avalie o motorista.", cancelada: "A corrida foi cancelada.", nao_atendida: "Não achamos motorista agora. Tente de novo.",
 };
 
@@ -444,7 +444,7 @@ export function vigiar(empresaId: string) {
     }
     const statusAntes = antes?.split("|")[0];
     if (statusAntes !== c.status && TEXTO_PUSH[c.status] && c.canal === "app") {
-      void avisar(empresaId, passageiroAlvo(c), { titulo: STATUS_TEXTO[c.status], texto: TEXTO_PUSH[c.status]!, dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
+      void avisar(empresaId, passageiroAlvo(c), { titulo: STATUS_TEXTO[c.status], texto: TEXTO_PUSH[c.status]!, dados: { tipo: "corrida", corridaId: c.id }, canal: c.status === "no_local" ? "chegada" : "corridas" });
     }
     if (c.status === "cancelada" && c.motoristaId && statusAntes && statusAntes !== "cancelada" && c.canceladaPor !== "Motorista") {
       void avisar(empresaId, motoristaAlvo(c.motoristaId), { titulo: "Corrida cancelada", texto: `OS ${c.os} foi cancelada.`, dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });

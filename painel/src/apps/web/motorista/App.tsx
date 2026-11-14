@@ -142,6 +142,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     try {
       if (contra) { await api(`/corridas/${oferta.corrida.id}/contraoferta`, { corpo: { valor } }); setOferta(null); setAviso("Contra-oferta enviada. Se o passageiro aceitar, a corrida vem para você."); return; }
       const r = await api<{ corrida: Corrida }>(`/ofertas/${oferta.id}/aceitar`, { corpo: {} });
+      tocarAlerta(1, "aceite");
       setCorrida(r.corrida.aberta ? r.corrida : null); setTerminada(null); setTela(""); setOferta(null);
     } catch (e) { setErroOferta(mensagemDeErro(e)); }
   };

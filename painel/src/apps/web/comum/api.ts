@@ -239,8 +239,8 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
   try {
     const p = await Push.requestPermissions();
     if (p.receive !== "granted") return;
-    for (const [id, nome] of [["corridas", "Corridas"], ["chat", "Mensagens"], ["geral", "Avisos"]]) {
-      await Push.createChannel({ id, name: nome, importance: id === "corridas" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: "chamada" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
+    for (const [id, nome] of [["corridas", "Corridas"], ["chegada", "Motorista no local"], ["chat", "Mensagens"], ["geral", "Avisos"]]) {
+      await Push.createChannel({ id, name: nome, importance: id === "corridas" || id === "chegada" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: "chamada" } : id === "chegada" ? { sound: "buzina" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
     }
     await Push.addListener("registration", (t: { value: string }) => { void api("/push", { corpo: { token: t.value } }).catch(() => undefined); });
     await Push.addListener("pushNotificationActionPerformed", (a: { notification?: { data?: Record<string, string> } }) => aoTocar(a.notification?.data ?? {}));
@@ -269,13 +269,14 @@ export const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleString(
 export const vibrar = (ms: number | number[]) => { try { navigator.vibrate?.(ms); } catch { /* sem vibração */ } };
 
 /** Toque curto (chamada de corrida), sem arquivo de som. */
-export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado";
+export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado" | "buzina";
 const ARQUIVOS: Record<Som, string> = {
   chamada: new URL("./sons/chamada.wav", import.meta.url).href,
   mensagem: new URL("./sons/mensagem.wav", import.meta.url).href,
   aceite: new URL("./sons/aceite.wav", import.meta.url).href,
   alerta: new URL("./sons/alerta.wav", import.meta.url).href,
   cancelado: new URL("./sons/cancelado.wav", import.meta.url).href,
+  buzina: new URL("./sons/buzina.wav", import.meta.url).href,
 };
 /** Toca um dos sons do app (arquivos em comum/sons, gerados por scripts/gerar-sons.mjs). `vezes` repete o som; sem `som`, escolhe pelo número de repetições. */
 export function tocarAlerta(vezes = 3, som?: Som) {
@@ -289,6 +290,27 @@ export function tocarAlerta(vezes = 3, som?: Som) {
     } catch { bipe(); }
   };
   uma();
+}
+/** Fala um aviso em português (voz do aparelho). Sem voz disponível, não faz nada. */
+export function falarAviso(texto: string) {
+  try {
+    const s = window.speechSynthesis;
+    if (!s) return;
+    const f = new SpeechSynthesisUtterance(texto);
+    f.lang = "pt-BR"; f.rate = 1; f.volume = 1;
+    f.voice = s.getVoices().find((v) => v.lang.replace("_", "-").toLowerCase() === "pt-br") ?? null;
+    s.cancel(); s.speak(f);
+  } catch { /* sem voz */ }
+}
+/** Avisos de cada marco da corrida para o passageiro: som forte e voz. `no_local` toca a buzina e depois fala. */
+export function avisoDoMarco(status: string) {
+  switch (status) {
+    case "a_caminho": tocarAlerta(1, "aceite"); setTimeout(() => falarAviso("Seu motorista está a caminho."), 900); break;
+    case "no_local": tocarAlerta(1, "buzina"); setTimeout(() => falarAviso("Seu motorista está no local."), 1500); vibrar([500, 200, 500, 200, 500]); break;
+    case "em_andamento": setTimeout(() => falarAviso("Sua corrida começou. Boa viagem."), 200); break;
+    case "finalizada": tocarAlerta(1, "aceite"); setTimeout(() => falarAviso("Corrida finalizada."), 900); break;
+    case "cancelada": case "nao_atendida": tocarAlerta(1, "cancelado"); setTimeout(() => falarAviso(status === "cancelada" ? "Sua corrida foi cancelada." : "Não encontramos motorista agora."), 900); break;
+  }
 }
 /** Reserva, se o navegador não deixar tocar o arquivo: um bipe simples. */
 function bipe() {

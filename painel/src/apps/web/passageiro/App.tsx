@@ -4,7 +4,7 @@
 // avaliar com etiquetas, histórico, agendadas e conta.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { api, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
+import { api, avisoDoMarco, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
 import { Clock, House, User, Wallet } from "lucide-react";
 import { Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 import { duracaoDaViagem, esperandoHorario, lerLugares, quandoAgendada, type Corrida, type Endereco, type Eu, type Lugares, type Ponto, type Rota } from "./apoio";
@@ -57,6 +57,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [conectado, setConectado] = useState(false);
   const [aviso, setAviso] = useState("");
   const atualRef = useRef<string | null>(null);
+  const statusVisto = useRef<Record<string, string>>({});
 
   const carregar = useCallback(async () => {
     const [e, s] = await Promise.all([api<{ eu: Eu }>("/eu"), api<{ corrida: Corrida | null; posicaoMotorista: Posicao | null }>("/estado")]);
@@ -83,6 +84,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     if (tipo === "corrida") {
       const c = d as Corrida;
       if (esperandoHorario(c)) return; // agendada: aparece na aba Agendadas até chegar a hora
+      const visto = statusVisto.current[c.id];
+      if (visto && visto !== c.status) avisoDoMarco(c.status); // som forte e voz em cada marco (só quando o status muda de verdade)
+      statusVisto.current[c.id] = c.status;
       setCorrida((antes) => {
         if (antes && antes.id === c.id && antes.status !== c.status) vibrar([200, 100, 200]);
         return c.aberta ? c : antes?.id === c.id ? null : antes;
