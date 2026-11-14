@@ -7,7 +7,7 @@ import {
   MapPin, MessageCircle, MessageSquare, Navigation, Pencil, Phone, Play, Plus, Radar, RefreshCw, ScanFace, Settings, ShieldCheck, SlidersHorizontal, Trash2, User, UserRound, Wallet, X,
   BatteryCharging, Globe, Layers, Map as IconeMapa, Music, Smartphone, SquareDashed, Volume2, Vibrate, Timer, Mic, Radio, Bolt,
 } from "lucide-react";
-import { api, hora, reais, telefoneBonito, tempoReal, type Posicao } from "../comum/api";
+import { api, flutuante, hora, reais, telefoneBonito, tempoReal, type Posicao } from "../comum/api";
 import { mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { FormDados, FormDocumentos, FormEndereco, FormFoto, FormVeiculo, type DadosCadastro } from "./Cadastro";
 import { Chamada } from "./Chamada";
@@ -335,7 +335,7 @@ export function Configuracoes({ voltar }: Voltar) {
         {linha(Settings, "Tema do Aplicativo", undefined, NOMES_TEMA[a.tema], () => setAbrir("tema"))}
         {linha(IconeMapa, "Navegador Padrão", undefined, NOMES_NAVEGADOR[a.navegador], () => setAbrir("navegador"))}
         <Chave icone={MessageSquare} ligado={a.prioritarias} mudar={(v) => mudar({ prioritarias: v })} titulo="Mensagens Prioritárias" texto="O app abrirá automaticamente ao receber mensagens." />
-        <Chave icone={Layers} ligado={a.flutuante} mudar={(v) => mudar({ flutuante: v })} titulo="Ícone Flutuante (Segundo Plano)" texto="Exibir bolinha com logo ao minimizar o app" />
+        <Chave icone={Layers} ligado={a.flutuante} mudar={(v) => { mudar({ flutuante: v }); if (v) void flutuante.permitido().then((ok) => { if (!ok) void flutuante.pedir(); }); }} titulo="Ícone Flutuante (Segundo Plano)" texto="Exibir bolinha com logo ao minimizar o app" />
       </div>
       <div className="config-divisor" />
       <div className="config-titulo">Alertas &amp; Notificações</div>
@@ -362,10 +362,12 @@ export function Diagnostico({ voltar, eu, conectado, posicao, online }: Voltar &
   const lerNotif = () => (typeof Notification === "undefined" ? "indisponível" : Notification.permission);
   const [notif, setNotif] = useState<string>(lerNotif());
   const [agora, setAgora] = useState(Date.now());
+  const [sobreApps, setSobreApps] = useState<boolean | null>(null);
+  useEffect(() => { if (flutuante.disponivel()) void flutuante.permitido().then(setSobreApps); }, []);
   const itens: Array<{ I: typeof User; nome: string; texto: string; ok: boolean; estado: string }> = [
     { I: ClipboardList, nome: "Conta e cadastro", texto: eu.aprovado ? "Cadastro regularizado" : `Cadastro em análise${eu.pendencias?.length ? `: falta ${eu.pendencias.length} item(ns)` : ""}`, ok: !!eu.aprovado, estado: eu.aprovado ? "Aprovado" : "Em análise" },
     { I: LocateFixed, nome: "GPS e localização", texto: "Permissão e localização disponíveis", ok: !!posicao, estado: posicao ? "Ativo" : "Sem posição" },
-    { I: Layers, nome: "Alerta de corridas na tela", texto: "Exibição sobre outros aplicativos permitida", ok: true, estado: "Ativado" },
+    { I: Layers, nome: "Alerta de corridas na tela", texto: sobreApps === false ? "Libere \"Exibir sobre outros apps\" para o ícone flutuante" : "Exibição sobre outros aplicativos permitida", ok: sobreApps !== false, estado: sobreApps === false ? "Não permitido" : "Ativado" },
     { I: Radio, nome: "Canal de chamadas", texto: "Comunicação ativa para recebimento de corridas", ok: conectado, estado: conectado ? "Conectado" : "Reconectando…" },
     { I: Bell, nome: "Notificações e alertas", texto: "Avisos sonoros e notificações habilitados", ok: notif === "granted" || notif === "indisponível", estado: notif === "granted" ? "Permitido" : notif === "indisponível" ? "Pelo sistema" : "Não permitido" },
     { I: BatteryCharging, nome: "Execução em segundo plano", texto: "Sem restrições de energia em segundo plano", ok: true, estado: online ? "Ativo" : "Pronto" },

@@ -123,14 +123,36 @@ passo("Gerando ícones e telas de abertura do Android");
 rodar(npx, ["capacitor-assets", "generate", "--android", "--iconBackgroundColor", fundoIcone, "--splashBackgroundColor", fundo]);
 rodar(npx, ["cap", "sync", "android"]);
 
-// Permissões: GPS, microfone (áudio do chat) e notificações; motorista também GPS em segundo plano.
+// Permissões, conforme o que cada app faz (cada uma tem uso no código):
+//  passageiro e motorista: GPS, rede, câmera (foto do perfil e documentos), microfone (áudio do chat), notificações, vibração, tela ligada;
+//  motorista: GPS em segundo plano (online com a tela apagada), serviço em primeiro plano, ícone flutuante (por cima de outros apps),
+//  chamada com a tela bloqueada e pedir para ficar fora da economia de bateria.
 const manifesto = path.join(saida, "android", "app", "src", "main", "AndroidManifest.xml");
-const perms = ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS", "POST_NOTIFICATIONS", "VIBRATE"];
-if (papel === "motorista") perms.push("ACCESS_BACKGROUND_LOCATION", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION", "WAKE_LOCK");
+const perms = ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "ACCESS_NETWORK_STATE", "CAMERA", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS", "POST_NOTIFICATIONS", "VIBRATE", "WAKE_LOCK"];
+if (papel === "motorista") perms.push("ACCESS_BACKGROUND_LOCATION", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_LOCATION", "SYSTEM_ALERT_WINDOW", "USE_FULL_SCREEN_INTENT", "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS");
 let xml = fs.readFileSync(manifesto, "utf8");
 const faltam = perms.filter((p) => !xml.includes(`android.permission.${p}"`));
-if (faltam.length) xml = xml.replace("</manifest>", `${faltam.map((p) => `    <uses-permission android:name="android.permission.${p}" />`).join("\n")}\n</manifest>`);
+const recursos = ['<uses-feature android:name="android.hardware.location.gps" android:required="false" />', '<uses-feature android:name="android.hardware.camera" android:required="false" />']
+  .filter((f) => !xml.includes(f.match(/android:name="([^"]+)"/)[1]));
+if (faltam.length || recursos.length) xml = xml.replace("</manifest>", `${[...faltam.map((p) => `    <uses-permission android:name="android.permission.${p}" />`), ...recursos.map((f) => `    ${f}`)].join("\n")}\n</manifest>`);
 if (cleartext && !xml.includes("usesCleartextTraffic")) xml = xml.replace("<application", '<application android:usesCleartextTraffic="true"');
+
+// Sons do app como recursos do Android (canais de notificação "corridas" e "chat" usam chamada e mensagem).
+const raw = path.join(saida, "android", "app", "src", "main", "res", "raw");
+fs.mkdirSync(raw, { recursive: true });
+const sonsDir = path.join(RAIZ, "painel", "src", "apps", "web", "comum", "sons");
+if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsWith(".wav")) fs.copyFileSync(path.join(sonsDir, f), path.join(raw, f));
+
+// Motorista: plugin do ícone flutuante, serviço e abrir por cima da tela bloqueada quando chega uma corrida.
+if (papel === "motorista") {
+  const pastaJava = path.join(saida, "android", "app", "src", "main", "java", ...pacote.split("."));
+  fs.mkdirSync(pastaJava, { recursive: true });
+  for (const f of ["MainActivity.java", "FlutuantePlugin.java", "FlutuanteService.java"]) {
+    fs.writeFileSync(path.join(pastaJava, f), fs.readFileSync(path.join(RAIZ, "scripts", "nativo", f), "utf8").replaceAll("__PACOTE__", pacote));
+  }
+  if (!xml.includes("FlutuanteService")) xml = xml.replace("</application>", '    <service android:name=".FlutuanteService" android:exported="false" />\n    </application>');
+  if (!xml.includes("showWhenLocked")) xml = xml.replace("<activity", '<activity android:showWhenLocked="true" android:turnScreenOn="true"');
+}
 fs.writeFileSync(manifesto, xml);
 
 const cores = path.join(saida, "android", "app", "src", "main", "res", "values", "colors.xml");

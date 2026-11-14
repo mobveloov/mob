@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LayoutGrid, LocateFixed, Power, SlidersHorizontal } from "lucide-react";
-import { api, ErroApi, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
+import { api, ErroApi, flutuante, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { ChatCorrida } from "./Conversa";
@@ -98,6 +98,14 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
       if (d.mensagem.de !== "motorista") { vibrar(200); tocarAlerta(1); }
     }
   }, (ligado) => { setConectado(ligado); if (ligado) void carregar().catch(() => undefined); }), [carregar]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ícone flutuante: online, com a opção ligada e o app minimizado, mostra a bolinha por cima de outros apps; ao voltar, some.
+  useEffect(() => {
+    if (!online || !ajustes.flutuante || !flutuante.disponivel()) { void flutuante.esconder(); return; }
+    const mudou = () => { void (document.hidden ? flutuante.mostrar() : flutuante.esconder()); };
+    document.addEventListener("visibilitychange", mudou);
+    return () => { document.removeEventListener("visibilitychange", mudou); void flutuante.esconder(); };
+  }, [online, ajustes.flutuante]);
 
   // GPS: online manda a posição (a cada 5 s no máximo); parado, reenvia a última a cada 30 s; se o servidor esqueceu, liga de novo.
   useEffect(() => {
