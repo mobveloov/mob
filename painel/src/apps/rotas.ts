@@ -201,7 +201,7 @@ r.get("/estimativa", ok(async (req, res) => {
     km = rr.distanciaKm; minutos = rr.minutos;
   }
   km ??= distanciaEstimada({ texto: "", ...a } as never, { texto: "", ...b } as never);
-  const est = estimarPreco(ctx(req).empresaId, { categoria: txt(q.categoria, 60), distanciaKm: km, minutos });
+  const est = estimarPreco(ctx(req).empresaId, { categoria: txt(q.categoria, 60), distanciaKm: km, minutos, embarque: { texto: "", ...a }, destino: { texto: txt(q.destinoTexto, 200), ...b }, paradas: Math.min(3, Math.max(0, Math.round(num(q.paradas) ?? 0))) });
   // Radar de intenções (Recuperação de Vendas): guarda a cotação do passageiro para ver quem cotou e não pediu.
   if (ctx(req).sessao.papel === "passageiro") registrarCotacao(ctx(req).empresaId, ctx(req).sessao.chave, { embarque: a, destino: b, categoria: est.categoria ?? txt(q.categoria, 60), valor: est.valor, distanciaKm: est.distanciaKm });
   res.json(est);
