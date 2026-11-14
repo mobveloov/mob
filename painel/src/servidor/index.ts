@@ -37,6 +37,7 @@ import { rotasConfig } from "../config/rotas.ts";
 import { rotasRelatorios } from "../relatorios/rotas.ts";
 import { rotasAreas } from "../areas/rotas.ts";
 import { rotasCentrais } from "../centrais/rotas.ts";
+import { rotasFiliais } from "../filiais/rotas.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 // Cargos: garante um cargo válido para todo usuário (ninguém perde o acesso). Veja docs/CARGOS.md.
@@ -472,6 +473,7 @@ app.use("/api/config", rotasConfig);
 app.use("/api/relatorios", rotasRelatorios);
 app.use("/api/areas", rotasAreas);
 app.use("/api/centrais", rotasCentrais);
+app.use("/api/filiais", rotasFiliais);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 

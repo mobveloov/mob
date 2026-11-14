@@ -34,6 +34,8 @@ export interface FiltroConsulta {
   nomePax?: string; cpfPax?: string; telPax?: string; endereco?: string; motorista?: string;
   dataIni?: string; dataFim?: string; horaIni?: string; horaFim?: string;
   pagamento?: string; status?: string; urgencia?: string; via?: string; origem?: string; cashback?: boolean;
+  /** Só as corridas desta filial (pedidas por alguém dela ou com motorista dela). */
+  filial?: string;
 }
 
 const soDig = (s: unknown) => String(s ?? "").replace(/\D/g, "");
@@ -86,6 +88,11 @@ function montar(empresaId: string, f: FiltroConsulta, nomeCentral: string) {
     const alvo = normal(f.empresa);
     w.push("dig(telefone) IN (SELECT value FROM json_each(?))");
     p.push(JSON.stringify(clientes.filter((c) => normal(c.conveniada) === alvo).map((c) => soDig(c.telefone)).filter(Boolean)));
+  }
+  if (f.filial) {
+    // A filial gravada na corrida manda; corrida antiga, sem filial, vale pela filial do motorista.
+    w.push(`(${J("filialId")} = ? OR (coalesce(${J("filialId")}, '') = '' AND motorista_id IN (SELECT chave FROM filiais_vinculos WHERE empresa = ? AND tipo = 'motorista' AND filial_id = ?)))`);
+    p.push(f.filial, empresaId, f.filial);
   }
   if (f.motorista) {
     const q = normal(f.motorista), qPlaca = q.replace(/[^a-z0-9]/g, "");

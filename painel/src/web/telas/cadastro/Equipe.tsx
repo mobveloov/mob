@@ -8,7 +8,8 @@ import { funcoesDoCargo } from "../../../comum/funcoes.ts";
 import { useCarregar } from "../../componentes/ui";
 import { Abas, Cabecalho, Campo, chamar, ComFiltros, Janela, Selo, useAviso, Vazio } from "./base";
 
-interface Membro { id: string; nome: string; email: string; papel: Cargo; criadoEm: string }
+interface Membro { id: string; nome: string; email: string; papel: Cargo; criadoEm: string; filialId?: string }
+interface OpcaoFilial { id: string; nome: string; ativa: boolean }
 // Cargos como na Machine. A lista de funções de cada cargo vem do menu (src/comum/funcoes.ts), então nunca fica desatualizada.
 const SIGLA: Record<Cargo, string> = { plataforma: "ADMIN MESTRE", admin: "ADMIN", gestor: "GESTOR", operador: "OPERADOR" };
 const resumoFuncoes = (c: Cargo) => {
@@ -20,7 +21,7 @@ const tomDoCargo = (c: Cargo) => (c === "operador" ? "info" : c === "gestor" ? "
 
 export default function Equipe() {
   const { sessao } = useSessao();
-  const l = useCarregar(() => chamar<{ equipe: Membro[] }>("GET", "/equipe"), []);
+  const l = useCarregar(() => chamar<{ equipe: Membro[]; filiais: OpcaoFilial[] }>("GET", "/equipe"), []);
   const [aba, setAba] = useState<"membros" | "cargos">("membros");
   const [busca, setBusca] = useState("");
   const [cargo, setCargo] = useState("");
@@ -48,6 +49,7 @@ export default function Equipe() {
             <div className="cg-cartao" key={m.id}>
               <div className="cg-pessoa"><span className="cg-avatar">{m.nome.slice(0, 1).toUpperCase()}</span><div><strong>{m.nome}</strong><div><Selo tom={tomDoCargo(m.papel)}>{SIGLA[m.papel] ?? m.papel}</Selo></div></div></div>
               <span className="cg-mono">{m.email}</span>
+              {m.filialId && <span className="cg-mono">Filial: {l.dados?.filiais.find((x) => x.id === m.filialId)?.nome ?? "—"}</span>}
               {admin && <div className="cg-acoes">
                 <button className="cg-botao" onClick={() => setEditando(m)}>Editar Perfil</button>
                 {m.id !== sessao.usuario.id && <button className="cg-botao perigo" onClick={() => confirm(`Remover ${m.nome}?`) && void tentar(async () => { await chamar("DELETE", `/equipe/${m.id}`); l.recarregar(); }, "Membro removido.")}>Remover</button>}
@@ -60,13 +62,13 @@ export default function Equipe() {
           </div>
         )}
       </ComFiltros>
-      {editando && <FormMembro m={editando === "novo" ? null : editando} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
+      {editando && <FormMembro filiais={l.dados?.filiais ?? []} m={editando === "novo" ? null : editando} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
     </div>
   );
 }
 
-function FormMembro({ m, onFechar, onSalvo }: { m: Membro | null; onFechar: () => void; onSalvo: () => void }) {
-  const [f, setF] = useState({ nome: m?.nome ?? "", email: m?.email ?? "", papel: (m?.papel === "plataforma" ? "admin" : m?.papel ?? "operador") as Cargo, senha: "" });
+function FormMembro({ m, filiais, onFechar, onSalvo }: { m: Membro | null; filiais: OpcaoFilial[]; onFechar: () => void; onSalvo: () => void }) {
+  const [f, setF] = useState({ nome: m?.nome ?? "", email: m?.email ?? "", papel: (m?.papel === "plataforma" ? "admin" : m?.papel ?? "operador") as Cargo, senha: "", filialId: m?.filialId ?? "" });
   const { aviso, tentar } = useAviso();
   const salvar = async () => {
     if (await tentar(() => (m ? chamar("PUT", `/equipe/${m.id}`, f) : chamar("POST", "/equipe", f)), "Membro salvo.")) { onSalvo(); onFechar(); }
@@ -82,6 +84,7 @@ function FormMembro({ m, onFechar, onSalvo }: { m: Membro | null; onFechar: () =
       <h4 className="cg-secao">Acesso e Cargo</h4>
       <div style={{ display: "grid", gap: 12 }}>
         <Campo rotulo="Cargo *"><select value={f.papel} onChange={(e) => setF({ ...f, papel: e.target.value as Cargo })} disabled={m?.papel === "plataforma"}>{(["admin", "gestor", "operador"] as Cargo[]).map((c) => <option key={c} value={c}>{NOME_CARGO[c]}</option>)}</select></Campo>
+        {filiais.length > 0 && <Campo rotulo="Filial" dica="Operador e Gestor ligados a uma filial só veem as corridas dela."><select value={f.filialId} onChange={(e) => setF({ ...f, filialId: e.target.value })}><option value="">Todas (sem filial)</option>{filiais.map((x) => <option key={x.id} value={x.id}>{x.nome}{x.ativa ? "" : " (inativa)"}</option>)}</select></Campo>}
         <Campo rotulo="Senha" dica={m ? "Deixe vazio para manter. Mínimo de 8 caracteres." : "Obrigatória apenas no cadastro (mínimo de 8 caracteres)."}><input type="password" autoComplete="new-password" value={f.senha} onChange={(e) => setF({ ...f, senha: e.target.value })} /></Campo>
       </div>
     </Janela>

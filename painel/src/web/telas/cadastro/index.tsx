@@ -6,6 +6,7 @@ import Desafios from "./Desafios";
 import Destravar from "./Destravar";
 import Empresas from "./Empresas";
 import Equipe from "./Equipe";
+import Filiais from "./Filiais";
 import Indicacoes from "./Indicacoes";
 import Motoristas from "./Motoristas";
 import Passageiros from "./Passageiros";
@@ -24,4 +25,5 @@ export const TELAS_CADASTRO: Record<string, JSX.Element> = {
   punicoes: <Punicoes />,
   desafios: <Desafios />,
   indicacoes: <Indicacoes />,
+  filiais: <Filiais />,
 };

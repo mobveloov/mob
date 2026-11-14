@@ -9,7 +9,7 @@ import { Aviso, Paginacao, Selo, GRUPO_CLASSE, Janela, Vazio, dh, op, qs, reais,
 import { JanelaCorrida, JanelaExterna } from "./JanelaCorrida";
 
 const ATALHOS: Array<[string, string]> = [["15min", "15 minutos"], ["30min", "30 minutos"], ["1h", "1 hora"], ["2h", "2 horas"], ["3h", "3 horas"], ["4h", "4 horas"], ["hoje", "Hoje"]];
-const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "" };
+const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "", filial: "" };
 type Filtros = typeof VAZIO;
 
 /** Dd/mm/aaaa -> aaaa-mm-dd (aceita também a data já no formato do campo de data). */
@@ -154,6 +154,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
                 {Object.entries(dados?.status ?? {}).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}</select></label>
               {lista("urgencia", "Urgência", op_?.urgencias, "Selecione")}
               {lista("via", "Corrida via", op_?.vias, "Selecione")}
+              {(op_?.filiais?.length ?? 0) > 0 && lista("filial", "Filial", op_.filiais, "Todas")}
               {marca.mostrarOrigem && (op_?.fontes?.length ?? 0) > 1 && lista("fonte", "Fonte dos dados", op_.fontes, "Todas")}
             </div>
             <label className="oc-sw"><input type="checkbox" checked={rasc.cashback === "1"} onChange={(e) => setRasc({ ...rasc, cashback: e.target.checked ? "1" : "" })} /> Corridas que geraram cashback</label>

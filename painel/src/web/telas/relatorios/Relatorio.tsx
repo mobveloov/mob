@@ -73,6 +73,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
       <form className="dm-cartao dm-filtros" onSubmit={filtrar}>
         <Campo rotulo="Data inicial *"><input type="date" required value={form.inicio ?? ""} onChange={(e) => setForm({ ...form, inicio: e.target.value })} /></Campo>
         <Campo rotulo="Data final *"><input type="date" required value={form.fim ?? ""} onChange={(e) => setForm({ ...form, fim: e.target.value })} /></Campo>
+        {(opc?.filiais?.length ?? 0) > 0 && <Campo rotulo="Filial"><select value={form.filial ?? ""} onChange={(e) => setForm({ ...form, filial: e.target.value })}><option value="">Todas</option>{opc.filiais.map((f: { id: string; nome: string }) => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></Campo>}
         {(def.filtros as any[]).map((f) => {
           const rot = f.obrigatorio ? `${f.rotulo} *` : f.rotulo;
           if (f.tipo === "empresa") return <Campo key={f.chave} rotulo={rot}><select value={form[f.chave] ?? ""} onChange={(e) => setForm({ ...form, [f.chave]: e.target.value })}><option value="">Selecione</option>{opc?.empresas.map((n: string) => <option key={n}>{n}</option>)}</select></Campo>;

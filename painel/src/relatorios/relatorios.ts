@@ -2,6 +2,7 @@
 // estatísticas (bairro, empresa, operador, forma de pagamento, % por motorista), corrida por motorista e km rodados.
 // Todos com período, paginação de 10 em 10 e CSV (com proteção contra injeção de fórmula). Sempre da central do login.
 
+import { corridaDaFilial, listarFiliais, pessoasDaFilial } from "../filiais/filiais.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar, type Registro } from "../cadastros/armazem.ts";
 import { CANAL_TEXTO, listarProprias, type CorridaPropria } from "../corridas/index.ts";
@@ -48,6 +49,8 @@ export function casaForma(pagamento: string, forma: string): boolean {
 export interface Filtros {
   inicio: string; fim: string; empresa?: string; pagamento?: string; pagamentos?: string[]; motorista?: string; viatura?: string; categoria?: string;
   taxa?: number; valorFixo?: number; valorPorCorrida?: number;
+  /** Só as corridas desta filial (Cadastro › Filiais). */
+  filial?: string;
 }
 export type TipoColuna = "texto" | "dinheiro" | "numero" | "pct" | "km";
 export interface Coluna { chave: string; rotulo: string; tipo: TipoColuna }
@@ -113,8 +116,10 @@ function corridasDo(empresaId: string, f: Filtros, status: string[] = ["finaliza
   const x = contexto(empresaId);
   const motorista = normal(f.motorista), viatura = normal(f.viatura), empresa = normal(f.empresa), categoria = normal(f.categoria);
   const formas = f.pagamentos?.length ? f.pagamentos : f.pagamento ? [f.pagamento] : [];
+  const daFilial = f.filial ? new Set(pessoasDaFilial(empresaId, f.filial, "motorista")) : null;
   const lista = listarProprias(empresaId).filter((c) => {
     if (!status.includes(c.status)) return false;
+    if (f.filial && !corridaDaFilial(c, f.filial, daFilial!)) return false;
     const d = diaDaCorrida(c);
     if (d < f.inicio || d > f.fim) return false;
     if (status.length === 1 && status[0] === "finalizada" && !(c.valor != null && c.valor >= 0)) return false;
@@ -336,7 +341,7 @@ export function lerFiltros(b: Record<string, unknown>): Filtros {
   const lista = Array.isArray(b.pagamentos) ? b.pagamentos : typeof b.pagamentos === "string" && b.pagamentos ? b.pagamentos.split("|") : [];
   return {
     inicio, fim, empresa: limpar(b.empresa, 80), pagamento: limpar(b.pagamento, 40), pagamentos: lista.map((p) => limpar(p, 40)).filter(Boolean).slice(0, 15),
-    motorista: limpar(b.motorista, 80), viatura: limpar(b.viatura, 20), categoria: limpar(b.categoria, 60),
+    motorista: limpar(b.motorista, 80), viatura: limpar(b.viatura, 20), categoria: limpar(b.categoria, 60), filial: limpar(b.filial, 60),
     taxa: num(b.taxa), valorFixo: num(b.valorFixo), valorPorCorrida: num(b.valorPorCorrida),
   };
 }
@@ -362,7 +367,7 @@ export function csvDoRelatorio(empresaId: string, id: string, f: Filtros): strin
 /** Listas para os filtros: empresas conveniadas, categorias e formas de pagamento. */
 export function opcoesDosFiltros(empresaId: string) {
   const cats = listar(empresaId, cadastroPorId("categorias")!).filter((c) => c.ativa !== false).map((c) => String(c.nome ?? "")).filter(Boolean);
-  return { empresas: nomesConveniadas(empresaId), categorias: cats, formas: FORMAS_PAGAMENTO };
+  return { empresas: nomesConveniadas(empresaId), categorias: cats, formas: FORMAS_PAGAMENTO, filiais: listarFiliais(empresaId).filter((f) => f.ativa).map((f) => ({ id: f.id, nome: f.nome })) };
 }
 
 // ------------------------------------------------------------------ modelos de relatório

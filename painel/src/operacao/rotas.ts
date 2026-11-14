@@ -15,6 +15,7 @@
 //   GET  /monitoramento, /mapa, /ocorrencias, /programadas, /objetos, /recuperacao, /passageiro, /motoristas
 //   POST /solicitar                    nova solicitação (com paradas, agendamento, motorista e valor manual)
 
+import { filialDe, filialForcada, listarFiliais } from "../filiais/filiais.ts";
 import fs from "node:fs";
 import { Router, type Request, type Response } from "express";
 import { arquivoDoAudio } from "../apps/chat.ts";
@@ -69,6 +70,8 @@ const filtrosHistorico = (req: Request): S.FiltroHistorico => ({
   endereco: q(req, "endereco"), nomePax: q(req, "nomePax"), cpfPax: q(req, "cpfPax", 20), telPax: q(req, "telPax", 20), motorista: q(req, "motorista"),
   dataIni: dataOk(q(req, "dataIni")), dataFim: dataOk(q(req, "dataFim")), horaIni: horaOk(q(req, "horaIni")), horaFim: horaOk(q(req, "horaFim")),
   pagamento: q(req, "pagamento"), origem: q(req, "origem"), status: q(req, "status"), fonte: q(req, "fonte", 60),
+  // Operador e Gestor ligados a uma filial só veem as corridas dela; os demais podem escolher.
+  filial: filialForcada(emp(req), req.ctx!.usuario) ?? (q(req, "filial", 60) || undefined),
   urgencia: q(req, "urgencia", 2), via: q(req, "via", 10), cashback: q(req, "cashback", 2) === "1",
 });
 const nomeDaCentral = (req: Request) => D.empresa(emp(req))?.nome ?? "";
@@ -78,6 +81,7 @@ const soProprias = (req: Request, f: S.FiltroHistorico) => f.fonte === "propria"
 const OPCOES_FIXAS = (req: Request) => ({
   pagamentos: PAGAMENTOS_LISTA, urgencias: Object.entries(URGENCIAS).map(([id, nome]) => ({ id, nome })), vias: Object.entries(VIAS).map(([id, nome]) => ({ id, nome })),
   centrais: [nomeDaCentral(req)].filter(Boolean),
+  filiais: listarFiliais(emp(req)).filter((f) => f.ativa).map((f) => ({ id: f.id, nome: f.nome })),
   empresas: listar(emp(req), cadastroPorId("conveniadas")!).map((e) => String(e.nome ?? "")).filter(Boolean).sort(),
 });
 
@@ -102,7 +106,7 @@ rotasOperacao.get("/historico", ok(async (req, res) => {
   const itens = r.corridas.slice((pagina - 1) * porPagina, pagina * porPagina);
   const empresas = empresasPorTelefone(emp(req));
   res.json({
-    avisos: [...r.avisos, ...(f.osExterna || f.centralChamada || f.centralCorrida || f.empresa || f.urgencia || f.via || f.cashback ? ["Os filtros de nº externo, central, empresa, urgência, via e cashback valem só para as corridas próprias."] : [])],
+    avisos: [...r.avisos, ...(f.osExterna || f.centralChamada || f.centralCorrida || f.empresa || f.urgencia || f.via || f.cashback || f.filial ? ["Os filtros de nº externo, central, empresa, urgência, via, cashback e filial valem só para as corridas próprias."] : [])],
     stats: r.stats, opcoes: { ...r.opcoes, ...OPCOES_FIXAS(req) }, filtroBase: r.filtroBase, pagina, paginas, total: r.corridas.length,
     corridas: itens.map((c) => ({ ...c, osExterna: "", empresa: empresas.get(c.telefonePassageiro.replace(/\D/g, "")) ?? "", alerta: r.alerta(c) })), status: S.STATUS_FILTRO,
   });
@@ -301,6 +305,7 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
     categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
     cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
     osExterna: b.osExterna ? String(b.osExterna) : undefined,
+    filialId: filialDe(emp(req), "operador", req.ctx!.usuario.id) ?? undefined,
     infoAntes: limpar(b.infoAntes, 300), infoDepois: limpar(b.infoDepois, 300), infoInterna: limpar(b.infoInterna, 500),
     telefoneContato: contato || undefined, enviarVariosCarros: b.enviarVariosCarros === true,
     valorFinal: { modo: modoFinal, ...(modoFinal === "prefixado" ? { valor: prefixado! } : {}) },

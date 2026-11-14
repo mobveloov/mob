@@ -37,6 +37,7 @@ export const FUNCOES: Funcao[] = [
   { id: "punicoes", grupo: "Cadastro", secao: "Gestão", nome: "Punições", rota: "/punicoes", minimo: "gestor" },
   { id: "desafios", grupo: "Cadastro", secao: "Gestão", nome: "Desafios", rota: "/desafios", minimo: "gestor" },
   { id: "indicacoes", grupo: "Cadastro", secao: "Gestão", nome: "Indicações", rota: "/indicacoes", novo: true, minimo: "admin" },
+  { id: "filiais", grupo: "Cadastro", secao: "Gestão", nome: "Filiais", rota: "/filiais", minimo: "gestor", novo: true },
   { id: "faixas-vouchers", grupo: "Cadastro", secao: "Gestão", nome: "Faixa de Vouchers", rota: "/faixas-vouchers", minimo: "gestor" },
 
   { id: "solicitar", grupo: "Corridas", nome: "Nova Solicitação", rota: "/solicitar" },

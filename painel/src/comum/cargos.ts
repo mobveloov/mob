@@ -75,6 +75,10 @@ export const REGRAS_API: RegraApi[] = [
   { metodos: ESCRITA, caminho: /^\/areas\/ruas(\/|$)/, minimo: "gestor" },
   { caminho: /^\/areas\/(funil|bairros)(\/|$)/, minimo: "gestor" },
   { caminho: /^\/crm(\/|$)/, minimo: "gestor" },
+
+  // Filiais: a lista curta serve de filtro para todos; o cadastro e os vínculos são do Gestor para cima.
+  { caminho: /^\/filiais\/opcoes$/, minimo: "operador" },
+  { caminho: /^\/filiais(\/|$)/, minimo: "gestor" },
 ];
 
 /** Cargo mínimo para o pedido, ou null se só exige login. */

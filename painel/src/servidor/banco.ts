@@ -141,6 +141,13 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS cadastros_itens (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, cadastro TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL,
       UNIQUE (empresa, cadastro, id));
+    CREATE TABLE IF NOT EXISTS filiais (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, nome TEXT NOT NULL, cidade TEXT NOT NULL DEFAULT '', endereco TEXT NOT NULL DEFAULT '',
+      responsavel TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '', ativa INTEGER NOT NULL DEFAULT 1,
+      criada_em TEXT NOT NULL, por TEXT NOT NULL, PRIMARY KEY (empresa, id));
+    CREATE TABLE IF NOT EXISTS filiais_vinculos (
+      empresa TEXT NOT NULL, tipo TEXT NOT NULL, chave TEXT NOT NULL, filial_id TEXT NOT NULL, PRIMARY KEY (empresa, tipo, chave));
+    CREATE INDEX IF NOT EXISTS filiais_vinculos_filial ON filiais_vinculos (empresa, filial_id, tipo);
   `);
   aberto = { arquivo, db };
   db.exec("BEGIN");
