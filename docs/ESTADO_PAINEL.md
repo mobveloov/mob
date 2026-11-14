@@ -189,3 +189,9 @@ Cada tela da Machine foi lida e comparada com a nossa, com banco de teste própr
 | E | Página inicial (Painel) | igual, com adaptação | Nada novo: já estava igual (ver `docs/COMPARACAO_PAINEL_INICIAL.md`). Conferi de novo no navegador: aviso de atenção, períodos, corridas… |
 | E | Menu do topo | igual, com adaptação | Grupos na ordem: Painel, Cadastro, Corridas, Financeiro, Comunicação, Configurações (era "Config"), Avaliações, Ajuda. Submenus como na Machine:… |
 | E | Menu do usuário | igual, com adaptação | "Alterar Senha" virou "Trocar senha" e "Sair do Sistema" virou "Sair" (menu do topo e menu do celular). Sino de notificações antes do nome, como… |
+
+## Barra do topo em qualquer zoom (14/11/2026)
+- A barra mede o espaço e manda os grupos que não cabem para o menu "Mais" (sem quebrar linha nem sobrepor); logo, sino, tema e perfil ficam inteiros à direita. Conferido em 1920, 1536, 1366, 1280, 1100 e 1024, nos temas claro e escuro.
+- As telas de Corridas seguiam um tema escuro fixo (título sumia no claro); agora seguem o tema do painel.
+- Teste de navegador das telas: 82 telas, 1 aviso (`/bot` sem título no teste; conferir).
+- Em andamento (agentes, 14/11): taxas da central e carteira; cargos, filiais e superadmin; menu lateral e foto da empresa; segurança; CRM/Bot/Totem do mobveloov.

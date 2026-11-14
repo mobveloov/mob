@@ -20,7 +20,7 @@ Escrito em português do Brasil. Cada sessão pega a sua parte, faz commits pequ
       recursos, marca e domínio, uso e faturamento, centrais/franquias.
 - [ ] **CRM, Bot e Totem**: copiar EXATAMENTE como está no mobveloov (repo `D:\mobveloov-git`, é o que funciona),
       tirando só a integração com a Machine, que no `mob` já é nativa.
-- [ ] **Barra de cima em qualquer zoom** (100%, 90%, 80%; 1920 a 1024) e título "Corridas" legível; remover o "NOVO".
+- [x] **Barra de cima em qualquer zoom** (100%, 90%, 80%; 1920 a 1024) e título "Corridas" legível; remover o "NOVO".
 - [ ] **Segurança do painel** (ver bloco abaixo, tarefas 2 e 3).
 
 ## Sessão dos APPS (painel/src/apps, painel/src/apps/web)
