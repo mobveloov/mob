@@ -47,7 +47,7 @@ export function clienteDoTelefone(empresaId: string, telefone: string) {
   const c = listar(empresaId, cadastroPorId("clientes")!).find((r) => mesmoTelefone(String(r.telefone ?? ""), telefone));
   if (!c) return null;
   const status = String(c.status ?? "");
-  return { nome: String(c.nome ?? ""), status, bloqueado: status === "Bloqueado" || status === "Suspenso", telefone: String(c.telefone ?? "") };
+  return { nome: String(c.nome ?? ""), status, bloqueado: ["Bloqueado", "Suspenso", "Suspenso por nota", "Deletado"].includes(status), telefone: String(c.telefone ?? "") };
 }
 
 function veiculoDe(empresaId: string, motoristaId: string | null) {

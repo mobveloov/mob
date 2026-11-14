@@ -7,7 +7,7 @@ import { montarCsv } from "../config/financeiro-visao.ts";
 import { lancar, pessoa, salvarPessoa } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
 import { hashSenha } from "../servidor/dados.ts";
-import { arred, normal } from "../servidor/util.ts";
+import { arred, celulaCsv, normal } from "../servidor/util.ts";
 import { gravarG, lerG } from "./armazem.ts";
 import { cad, contem, digitos, emp, hojeBr, ok, paginar, perfisApp, periodo, quem, registros, soAdmin, texto } from "./comum.ts";
 import { contaParaDesafio, corridaFicouPendente, TIPOS_DESAFIO_CORRIDA } from "./desafio-regra.ts";
@@ -20,31 +20,73 @@ const diaBr = (iso: unknown) => (typeof iso === "string" && iso ? new Date(Date.
 // ====================================================================== passageiros
 
 const ORIGENS: Record<string, string> = { App: "App", Painel: "Central", Motorista: "Motorista" };
+/** Rótulo do tipo de cliente (Machine). */
+const TIPOS_CLIENTE: Record<string, string> = { App: "Passageiro App", Painel: "Passageiro Call-Center", Motorista: "Passageiro Maçaneta", Estabelecimento: "Estabelecimento" };
+const ABREV_TIPO: Record<string, string> = { App: "Pass. App", Painel: "Call-Center", Motorista: "Maçaneta", Estabelecimento: "Estabelecimento" };
+const BLOQUEADOS = new Set(["Bloqueado", "Suspenso", "Suspenso por nota", "Deletado"]);
+/** Menos avaliações que isso: "Avaliações Insuficientes" (como na Machine). */
+const MIN_AVALIACOES = 3;
 
 function notasDosPassageiros(corridas: CorridaPropria[]) {
   const m = new Map<string, number[]>();
   for (const c of corridas) if (c.avaliacaoPassageiro?.nota) m.set(c.passageiro.telefone, [...(m.get(c.passageiro.telefone) ?? []), c.avaliacaoPassageiro.nota]);
   return new Map([...m].map(([t, l]) => [t, arred(l.reduce((a, b) => a + b, 0) / l.length)]));
 }
+function qtdNotas(corridas: CorridaPropria[]) {
+  const m = new Map<string, number>();
+  for (const c of corridas) if (c.avaliacaoPassageiro?.nota) m.set(c.passageiro.telefone, (m.get(c.passageiro.telefone) ?? 0) + 1);
+  return m;
+}
 
 function rotasPassageiros(r: Router) {
-  r.get("/passageiros", ok((req, res) => {
-    const e = emp(req), q = req.query as Record<string, unknown>;
-    const notas = notasDosPassageiros(listarProprias(e));
-    const todos = registros(e, "clientes").map((c) => ({
-      id: c.id, nome: String(c.nome ?? ""), telefone: String(c.telefone ?? ""), email: String(c.email ?? ""), cidade: String(c.cidade ?? ""),
-      genero: String(c.genero ?? ""), dispositivo: String(c.dispositivo ?? "Não identificado"), origem: String(c.origemCadastro ?? "Painel"),
-      nota: notas.get(String(c.telefone)) ?? null, status: String(c.status ?? "Ativo"), bloqueado: c.status === "Bloqueado" || c.status === "Suspenso",
-    }));
+  /** Lista e filtros da tela Clientes (os mesmos para a planilha). */
+  const listaClientes = (e: string, q: Record<string, unknown>) => {
+    const proprias = listarProprias(e);
+    const notas = notasDosPassageiros(proprias), qtd = qtdNotas(proprias);
+    const todos = registros(e, "clientes").map((c) => {
+      const origem = String(c.origemCadastro ?? "Painel"), tel = String(c.telefone ?? "");
+      const nota = (qtd.get(tel) ?? 0) >= MIN_AVALIACOES ? notas.get(tel) ?? null : null;
+      return {
+        id: c.id, nome: String(c.nome ?? ""), telefone: tel, email: String(c.email ?? ""), cidade: String(c.cidade ?? ""), cpf: String(c.cpf ?? ""),
+        genero: String(c.genero ?? ""), dispositivo: String(c.dispositivo ?? "Não identificado"), origem, tipo: TIPOS_CLIENTE[origem] ?? origem, tipoCurto: ABREV_TIPO[origem] ?? origem,
+        nota, avaliacoes: qtd.get(tel) ?? 0, status: String(c.status ?? "Ativo"), bloqueado: BLOQUEADOS.has(String(c.status ?? "")),
+        nascimento: String(c.nascimento ?? ""), criadoEm: diaBr(c.criadoEm),
+      };
+    });
     const st = String(q.status ?? "Todos"), disp = String(q.dispositivo ?? "Todos");
+    const listaSt = st.split("|").filter((x) => x && x !== "Todos");
+    const tipoQ = String(q.tipo ?? "");
+    const aval = Number(q.avaliacao) || 0;
     const f = todos.filter((c) => (!texto(q.cidade) || normal(c.cidade) === normal(q.cidade)) && contem(c.nome, texto(q.nome))
       && (!digitos(q.telefone) || c.telefone.includes(digitos(q.telefone)))
+      && (!digitos(q.cpf) || c.cpf.replace(/\D/g, "").includes(digitos(q.cpf)))
+      && contem(c.email, texto(q.email))
+      && (!q.nascIni || (c.nascimento && c.nascimento >= String(q.nascIni))) && (!q.nascFim || (c.nascimento && c.nascimento <= String(q.nascFim)))
+      && (!q.cadIni || c.criadoEm >= String(q.cadIni)) && (!q.cadFim || c.criadoEm <= String(q.cadFim))
+      && (!aval || (c.nota != null && c.nota >= aval))
       && (disp === "Todos" || normal(c.dispositivo) === normal(disp))
-      && (st === "Todos" || (st === "Bloqueados" ? c.bloqueado : !c.bloqueado)));
+      && (!listaSt.length ? true : listaSt.some((x) => x === "Ativos" ? !c.bloqueado : x === "Bloqueados" ? c.bloqueado : normal(c.status) === normal(x)))
+      && (!tipoQ || c.origem === tipoQ));
+    return { todos, f };
+  };
+
+  r.get("/passageiros", ok((req, res) => {
+    const e = emp(req), q = req.query as Record<string, unknown>;
+    const { f } = listaClientes(e, q);
     const tipo = String(q.tipo ?? "Todos");
     const daAba = f.filter((c) => tipo === "Todos" || c.origem === tipo).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-    const pg = paginar(daAba, q.pagina);
+    const pg = paginar(daAba, q.pagina, 10);
     res.json({ passageiros: pg.itens, paginacao: pg.paginacao, contadores: { todos: f.length, ...Object.fromEntries(Object.keys(ORIGENS).map((o) => [o, f.filter((c) => c.origem === o).length])) } });
+  }));
+
+  /** Exportar (CSV com proteção contra fórmula). */
+  r.get("/passageiros/exportar", ok((req, res) => {
+    const { f } = listaClientes(emp(req), req.query as Record<string, unknown>);
+    const cab = ["Nome", "Telefone", "E-mail", "Avaliação", "Status", "Tipo"];
+    const linhas = [cab.map(celulaCsv).join(";"), ...f.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).map((c) => [c.nome, c.telefone, c.email, c.nota == null ? "Avaliações Insuficientes" : String(c.nota).replace(".", ","), c.status, c.tipoCurto].map(celulaCsv).join(";"))];
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="clientes-${hojeBr()}.csv"`);
+    res.send("\ufeff" + linhas.join("\n"));
   }));
 
   r.get("/passageiros/:id", ok((req, res) => {
@@ -53,7 +95,7 @@ function rotasPassageiros(r: Router) {
     res.json({ passageiro: c, nota: notasDosPassageiros(listarProprias(emp(req))).get(String(c.telefone)) ?? null });
   }));
 
-  const CAMPOS = ["nome", "genero", "telefone", "email", "avaliouApp", "notaApp", "origemCadastro", "motoristaOrigem", "cidade", "status", "dispositivo", "cpf", "observacao"];
+  const CAMPOS = ["nome", "genero", "telefone", "email", "nascimento", "avaliouApp", "notaApp", "origemCadastro", "motoristaOrigem", "cidade", "status", "dispositivo", "cpf", "observacao"];
   const salvar = (req: import("express").Request, anterior: Registro | null) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const d: Record<string, unknown> = { ...(anterior ?? { status: "Ativo", origemCadastro: "Painel" }) };

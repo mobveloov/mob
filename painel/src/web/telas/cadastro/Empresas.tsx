@@ -46,14 +46,14 @@ export default function Empresas() {
   return (
     <div className="cg-pagina-solta">
       {aviso}
-      <Cabecalho titulo="Empresas" sub="Gestão de Empresas (parceiros B2B)">
-        <button className="cg-botao" onClick={exportar}><Download size={16} /> Exportar relatório</button>
+      <Cabecalho titulo="Empresas">
         <button className="cg-botao primario" onClick={() => setEditando("nova")}><Plus size={16} /> Criar Empresa</button>
+        <button className="cg-botao" onClick={exportar}><Download size={16} /> Exportar relatório</button>
       </Cabecalho>
       <ComFiltros filtros={
         <form onSubmit={(e) => { e.preventDefault(); setPagina(1); setFiltro(form); }}>
           <Campo rotulo="Nome fantasia"><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo>
-          <Campo rotulo="CPF/CNPJ"><input value={form.documento} placeholder="Somente números" onChange={(e) => setForm({ ...form, documento: e.target.value })} /></Campo>
+          <Campo rotulo="CPF/CNPJ"><input value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} /></Campo>
           <Campo rotulo="Status da empresa"><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="">Selecione</option>{SITUACOES.map((s) => <option key={s} value={s}>{ROTULO[s]}</option>)}</select></Campo>
           <button className="cg-botao primario cheio">Filtrar</button>
           <button type="button" className="cg-botao cheio" onClick={() => { setForm(VAZIO); setFiltro(VAZIO); setPagina(1); }}>Limpar filtros</button>
@@ -65,16 +65,16 @@ export default function Empresas() {
         </div>
         <div className="cg-tabela-caixa">
           <div className="cg-rolagem"><table className="cg-tabela">
-            <thead><tr><th>Nome fantasia</th><th>CPF/CNPJ</th><th>Responsável</th><th>Cidade</th><th>Última solicitação</th><th>Funcionários</th><th>Fatura Mês</th><th>Status da empresa</th><th className="direita">Ações</th></tr></thead>
+            <thead><tr><th>Nome fantasia</th><th>CPF/CNPJ</th><th>Status da empresa</th><th>Responsável</th><th>Cidade</th><th>Última solicitação</th><th>Funcionários</th><th>Fatura Mês</th><th className="direita" /></tr></thead>
             <tbody>{d?.empresas.map((e) => (
               <tr key={e.id}>
                 <td><strong>{String(e.nome)}</strong>{e.numeroContrato ? <><br /><small className="cg-mono">Contrato {String(e.numeroContrato)}</small></> : null}</td>
                 <td className="cg-mono">{documentoBonito(e.cnpj)}</td>
+                <td><Selo tom={TOM[String(e.status)] ?? "neutro"}>{ROTULO[String(e.status)] ?? String(e.status)}</Selo></td>
                 <td>{String(e.contato ?? "")}<br /><small className="cg-mono">{String(e.telefone ?? "")}</small></td>
                 <td>{String(e.cidade ?? "")}</td>
                 <td>{e.ultimaSolicitacao ? dataHoraBr(e.ultimaSolicitacao) : "---"}</td>
                 <td>{e.funcionarios}</td><td>{dinheiro(e.faturaMes)}</td>
-                <td><Selo tom={TOM[String(e.status)] ?? "neutro"}>{ROTULO[String(e.status)] ?? String(e.status)}</Selo></td>
                 <td className="direita"><MenuAcoes itens={[
                   { rotulo: "Editar", onClick: () => setEditando(e) }, { rotulo: "Adicionar funcionário", onClick: () => setFunc(e) },
                   ...(e.status !== "Encerrada" ? [{ rotulo: "Excluir", perigo: true, onClick: () => confirm(`Excluir ${e.nome}? A empresa fica como Deletado e o histórico é mantido.`) && void tentar(async () => { await chamar("DELETE", `/empresas/${e.id}`); l.recarregar(); }, "Empresa excluída.") }] : []),

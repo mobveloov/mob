@@ -15,7 +15,7 @@ import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
 import { pedidosRecentes } from "../corridas/index.ts";
-import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
@@ -118,6 +118,7 @@ rotasConfig.post("/alertas/:id/encerrar", exigirPapel("admin", "operador"), ok((
 rotasConfig.get("/central-notificacoes", ok((req, res) => res.json(central(emp(req), quem(req), q(req, "somenteNaoLidas") === "1"))));
 rotasConfig.post("/central-notificacoes/lidas", ok((req, res) => res.json({ marcadas: marcarCentralLidas(emp(req), quem(req), req.body?.chaves, req.body?.todas === true), ...central(emp(req), quem(req), false) })));
 rotasConfig.get("/notificacoes", ok((req, res) => res.json({ historico: historicoNotificacoes(emp(req)), agendamentos: agendamentos(emp(req)) })));
+rotasConfig.get("/notificacoes/lista", ok((req, res) => res.json(listaNotificacoes(emp(req), { destinatario: q(req, "destinatario"), dataIni: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataIni")) ? q(req, "dataIni") : undefined, dataFim: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataFim")) ? q(req, "dataFim") : undefined, titulo: q(req, "titulo"), mensagem: q(req, "mensagem") }, Number(q(req, "pagina")) || 1))));
 rotasConfig.get("/notificacoes/pessoas", ok((req, res) => res.json({ pessoas: buscarPessoas(emp(req), papelCart(q(req, "papel")), q(req, "busca")) })));
 rotasConfig.post("/notificacoes", exigirPapel("admin", "operador"), ok(async (req, res) => res.json(await dispararNotificacao(emp(req), sanearPedido(req.body), quem(req)))));
 rotasConfig.post("/notificacoes/agendar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ agendamentos: criarAgendamento(emp(req), req.body) })));

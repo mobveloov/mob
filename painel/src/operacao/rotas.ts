@@ -26,7 +26,7 @@ import { alertas } from "../apps/despacho.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
-import { agoraBr, normal } from "../servidor/util.ts";
+import { agoraBr, celulaCsv, normal } from "../servidor/util.ts";
 import { ehVoucher, nomesConveniadas, validarVoucher } from "../relatorios/vouchers.ts";
 import "./ondas.ts"; // liga o registro das ofertas do despacho
 import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
@@ -170,17 +170,31 @@ rotasOperacao.put("/corridas/:id", central, ok(async (req, res) => {
 
 // ------------------------------------------------------------------ telas
 
-rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20) }))));
+rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20), motorista: q(req, "motorista", 80), endereco: q(req, "endereco", 120), empresa: q(req, "empresa", 80) }))));
 rotasOperacao.get("/mapa", ok((req, res) => res.json(S.mapa(emp(req)))));
 rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   const h = Number(req.query.horas);
   res.json(await S.ocorrencias(emp(req), h > 0 && h <= 72 ? h : 1, pag(req)));
 }));
 
-const FILTROS_PROG: S.FiltroProgramadas[] = ["hoje", "amanha", "futuras", "todas"];
+const filtroProg = (req: Request): S.FiltroProgramadas => ({
+  centralChamada: q(req, "centralChamada", 60), empresa: q(req, "empresa", 80), os: q(req, "os", 30), categoria: q(req, "categoria", 60),
+  passageiro: q(req, "passageiro", 80), motorista: q(req, "motorista", 80), dataIni: dataOk(q(req, "dataIni")) || undefined, dataFim: dataOk(q(req, "dataFim")) || undefined,
+  pagamento: q(req, "pagamento", 40), situacao: S.SITUACOES_DISPARO[q(req, "situacao")] ? q(req, "situacao") : undefined,
+});
 rotasOperacao.get("/programadas", ok((req, res) => {
-  const f = FILTROS_PROG.includes(q(req, "filtro") as S.FiltroProgramadas) ? (q(req, "filtro") as S.FiltroProgramadas) : "futuras";
-  res.json(S.programadas(emp(req), f, q(req, "busca"), pag(req)));
+  res.json({
+    ...S.programadasFiltradas(emp(req), filtroProg(req), pag(req), false, empresasPorTelefone(emp(req))),
+    opcoes: { ...OPCOES_FIXAS(req), categorias: S.opcoesRapidas(emp(req)).categorias, situacoes: Object.entries(S.SITUACOES_DISPARO).map(([id, nome]) => ({ id, nome })) },
+  });
+}));
+/** Exportar (CSV com proteção contra fórmula). */
+rotasOperacao.get("/programadas/exportar", ok((req, res) => {
+  const r = S.programadasFiltradas(emp(req), filtroProg(req), 1, true, empresasPorTelefone(emp(req)));
+  const cab = ["Nº OS programada", "Data", "Hora", "Antecedência (minutos)", "Nome do passageiro", "Empresa", "Situação do disparo"];
+  const dia = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
+  const linhas = [cab.map(celulaCsv).join(";"), ...r.itens.map((c) => [c.os, dia(c.agendadaPara!), c.agendadaPara!.slice(11, 16), c.antecedencia, c.passageiro, c.empresa || "---", c.situacaoTexto].map(celulaCsv).join(";"))];
+  baixarCsv(res, "corridas-programadas", "﻿" + linhas.join("\n"));
 }));
 rotasOperacao.put("/programadas/:id", central, ok(async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
@@ -228,7 +242,8 @@ rotasOperacao.post("/pix/:id/situacao", exigirPapel("admin"), ok((req, res) => r
 
 rotasOperacao.get("/objetos", ok((req, res) => {
   const s = ["todos", "pendente", "resolvido"].includes(q(req, "status")) ? (q(req, "status") as "todos") : "todos";
-  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req)));
+  const d = (k: string) => (dataOk(q(req, k)) || undefined);
+  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req), { dataIni: d("dataIni"), dataFim: d("dataFim"), os: q(req, "os").slice(0, 30), motorista: q(req, "motorista").slice(0, 80), passageiro: q(req, "passageiro").slice(0, 80) }));
 }));
 rotasOperacao.post("/objetos/:id/status", central, ok((req, res) => res.json({ registro: S.alternarObjeto(emp(req), req.params.id, quem(req)) })));
 rotasOperacao.delete("/objetos/:id", central, ok((req, res) => { S.apagarObjeto(emp(req), req.params.id); res.json({ ok: true }); }));
