@@ -183,6 +183,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
 
         <div className="bloco">
           <div className="pilula-pagamento"><Banknote size={18} /> Pagamento: <strong>{c.pagamento}</strong></div>
+          {valor != null && c.estimativa?.distanciaKm && c.estimativa.minutos ? <p className="dica centro">{reais(valor / c.estimativa.distanciaKm)}/km · {reais(valor / c.estimativa.minutos)}/min · {reais((valor / c.estimativa.minutos) * 60)}/h <small>(bruto, estimado)</small></p> : null}
           <div className="grade">
             {taximetro && emViagem ? (
               <>

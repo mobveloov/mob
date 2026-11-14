@@ -302,14 +302,27 @@ const ARQUIVOS: Record<Som, string> = {
 export function tocarAlerta(vezes = 3, som?: Som) {
   const qual: Som = som ?? (vezes <= 1 ? "mensagem" : vezes === 2 ? "cancelado" : "chamada");
   let n = 0;
+  const minha = ++geracaoDeSom;
   const uma = () => {
+    if (minha !== geracaoDeSom) return; // alguém mandou parar
     try {
       const a = new Audio(ARQUIVOS[qual]);
-      a.onended = () => { if (++n < Math.min(vezes, 3)) setTimeout(uma, 250); };
+      a.volume = 1;
+      tocando.add(a);
+      a.onended = () => { tocando.delete(a); if (++n < Math.min(vezes, 3)) setTimeout(uma, 250); };
       void a.play().catch(() => bipe());
     } catch { bipe(); }
   };
   uma();
+}
+const tocando = new Set<HTMLAudioElement>();
+let geracaoDeSom = 0;
+/** Para na hora o toque da chamada (aceitou, recusou, venceu ou outro motorista pegou a corrida) e a vibração. */
+export function pararSons() {
+  geracaoDeSom++;
+  for (const a of tocando) { try { a.pause(); a.currentTime = 0; } catch { /* já parou */ } }
+  tocando.clear();
+  try { navigator.vibrate?.(0); } catch { /* sem vibração */ }
 }
 /** Fala um aviso em português (voz do aparelho). Sem voz disponível, não faz nada. */
 export function falarAviso(texto: string) {

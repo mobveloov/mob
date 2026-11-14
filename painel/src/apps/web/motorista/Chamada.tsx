@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { CalendarClock, Flag, Minus, Plus, Star, UserRound, Users } from "lucide-react";
-import { reais } from "../comum/api";
+import { pararSons, reais } from "../comum/api";
 import { ajustes, tocar, tremer } from "./ajustes";
 import { Erro } from "./Pecas";
 import { diaHora, distanciaTexto, nomePassageiro, notaPassageiro, valorDe, type DadosChamada } from "./tipos";
@@ -35,6 +35,7 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
     return () => clearInterval(t);
   }, [expira]);
 
+  useEffect(() => () => { if (tocarSom) pararSons(); }, []); // fechou a chamada (aceitou, recusou, venceu ou outro pegou): o som para na hora
   useEffect(() => {
     if (!tocarSom) return;
     const avisar = () => { tocar(4); tremer([400, 200, 400, 200, 400]); };
@@ -76,7 +77,12 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
           {base != null && <button type="button" className="redondo marca" aria-label="Aumentar valor" onClick={() => mudar(PASSO)}><Plus size={20} /></button>}
         </div>
         {bruto != null && <div className="chamada-bruto">Bruto {reais(bruto)}{taxa ? ` · taxa ${reais(taxa)}` : ""}</div>}
-        {porKm != null && <span className="chamada-km">Ganhe {reais(porKm)}/km</span>}
+        {porKm != null && (() => {
+          // Ganho por tempo: líquido ÷ (minutos até o passageiro + minutos da viagem).
+          const min = (c.minutosAteEmbarque ?? 0) + (c.estimativa?.minutos ?? 0);
+          const porMin = liquido != null && min > 0 ? centavos(liquido / min) : null;
+          return <span className="chamada-km">{reais(porKm)}/km{porMin != null ? ` · ${reais(porMin)}/min · ${reais(centavos(porMin * 60))}/h` : ""}</span>;
+        })()}
         {contra && <p className="dica centro">Contra-oferta: o passageiro ofereceu {reais(base)}.</p>}
         {c.agendadaPara && <span className="chip aviso" style={{ alignSelf: "center" }}><CalendarClock size={13} /> {diaHora(c.agendadaPara)}</span>}
 

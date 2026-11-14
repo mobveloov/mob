@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LayoutGrid, LocateFixed, Power, SlidersHorizontal } from "lucide-react";
-import { api, ErroApi, flutuante, manterTelaLigada, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
+import { api, ErroApi, flutuante, manterTelaLigada, pararSons, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { ChatCorrida } from "./Conversa";
@@ -82,7 +82,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   // Tempo real.
   useEffect(() => tempoReal((tipo, d) => {
     if (tipo === "oferta") { setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
-    else if (tipo === "oferta_encerrada") setOferta((o) => (o?.id === d.id ? null : o));
+    else if (tipo === "oferta_encerrada") { setOferta((o) => (o?.id === d.id ? null : o)); pararSons(); if (d.motivo) setAviso(String(d.motivo)); }
     else if (tipo === "corrida") {
       const c = d as Corrida;
       setCorrida((antes) => {

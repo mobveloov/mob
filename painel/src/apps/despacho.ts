@@ -86,6 +86,8 @@ interface Estado {
   ofertas: Map<string, Oferta>;
   /** corridaId → (motoristaId → quando recusou/deixou passar) */
   tentados: Map<string, Map<string, number>>;
+  /** corridaId → rodadas de chamada já feitas, até quando está em pendência e quantas pendências já passou */
+  rodadas: Map<string, { n: number; pausaAte: number; pendencias: number }>;
   /** corridaId → assinatura do último estado avisado */
   vistos: Map<string, string>;
   /** Já passou a primeira volta do vigia (a primeira só anota, não avisa). */
@@ -96,7 +98,7 @@ interface Estado {
 const estados = new Map<string, Estado>();
 function estado(empresaId: string): Estado {
   let e = estados.get(empresaId);
-  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
+  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), rodadas: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
   return e;
 }
 /** Só para os testes. */
@@ -294,6 +296,14 @@ export function ofertaParaApp(empresaId: string, o: Oferta) {
 }
 
 /** Oferece cada corrida "procurando" (sem oferta pendente) ao motorista livre mais perto. */
+/** Grupo que recebe a chamada junto no modo "primeiro a aceitar": até o limite de motoristas; com "só prioritários", apenas o primeiro nível. */
+function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: { limiteMotoristas: number; prioritarios: number; secundarios: number; reserva: number; notificarGrupo: "prioritario" | "todos" }): T[] {
+  const limite = Math.max(1, regras.limiteMotoristas);
+  if (regras.notificarGrupo === "todos") return ordenados.slice(0, limite);
+  const prioritarios = ordenados.filter((c) => c.nivel === 0);
+  return (prioritarios.length ? prioritarios : ordenados).slice(0, Math.min(limite, Math.max(1, regras.prioritarios)));
+}
+
 export function despachar(empresaId: string) {
   const e = estado(empresaId);
   if (!e.online.size) return 0;
@@ -304,6 +314,12 @@ export function despachar(empresaId: string) {
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
   const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
+  // "Aceitar próxima": motorista em viagem a menos de "distância" metros do destino final também recebe chamada.
+  const emViagemPorMotorista = new Map(lista.filter((x) => x.status === "em_andamento" && x.motoristaId).map((x) => [x.motoristaId!, x]));
+  const pertoDoDestino = (id: string, p: { lat: number; lng: number }) => {
+    const v = emViagemPorMotorista.get(id), d = v?.destino;
+    return !!d && d.lat != null && d.lng != null && linhaReta({ lat: p.lat, lng: p.lng }, { lat: d.lat, lng: d.lng }) * 1000 <= regras.distanciaProxima;
+  };
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
   // Transbordo (motorista de outra cidade): o resultado só depende da cidade e da categoria, então vale por rodada.
   const transbordos = new Map<string, boolean>();
@@ -322,7 +338,7 @@ export function despachar(empresaId: string) {
     const areaDaCorrida = areasEmpresa.principal(c.embarque.lat, c.embarque.lng);
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
     type Candidato = { id: string; km: number | null; fav: boolean; plantao: boolean; nivel: number; naArea: boolean; desde: number };
-    let melhor: Candidato | null = null;
+    const candidatos: Candidato[] = [];
     // Ordem: favorito do passageiro, plantão, nível (prioritário, secundário, reserva), mesma área do embarque; depois, com a fila
     // virtual ligada (Config › Regras de Despacho), quem está online há mais tempo; senão, o mais perto.
     const vence = (a: Candidato, b: Candidato) => {
@@ -334,7 +350,7 @@ export function despachar(empresaId: string) {
       return (a.km ?? Infinity) < (b.km ?? Infinity) || (a.km == null && b.km == null && a.desde < b.desde);
     };
     for (const [id, p] of e.online) {
-      if (busy.has(id) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
+      if ((busy.has(id) && !(regras.permitirProxima && pertoDoDestino(id, p))) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
       if (!filtros.podeAtender(c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
@@ -348,9 +364,24 @@ export function despachar(empresaId: string) {
         id, km, fav: filtros.ehFavorito(c.passageiro.telefone, id), plantao: emPlantao.has(id), nivel: gestao.nivel(id),
         naArea: !!areaDaCorrida && areasEmpresa.principal(p.lat, p.lng)?.id === areaDaCorrida.id, desde: p.desde,
       };
-      if (!melhor || vence(cand, melhor)) melhor = cand;
+      candidatos.push(cand);
     }
-    if (!melhor) continue;
+    if (!candidatos.length) continue;
+    candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0));
+    // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
+    // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
+    const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras) : candidatos.slice(0, 1);
+    // Tentativas: depois de "máx. tentativas" rodadas sem aceite a corrida fica em pendência por "tempo em pendência" minutos; passada a pendência, tenta de novo uma vez; sem aceite, não atendida.
+    const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
+    if (rod.pausaAte > agora) continue;
+    if (rod.n >= regras.maxTentativas) {
+      if (rod.pendencias >= 1 || regras.tempoPendencia <= 0) { void mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined); e.rodadas.delete(c.id); continue; }
+      e.rodadas.set(c.id, { n: 0, pausaAte: agora + regras.tempoPendencia * 60_000, pendencias: rod.pendencias + 1 });
+      void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
+      continue;
+    }
+    e.rodadas.set(c.id, { ...rod, n: rod.n + 1 });
+    for (const melhor of escolhidos) {
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
     avisarOferta(empresaId, o, "oferecida");
@@ -361,6 +392,7 @@ export function despachar(empresaId: string) {
       dados: { tipo: "oferta", ofertaId: o.id, corridaId: c.id }, canal: "corridas",
     });
     n++;
+    }
   }
   return n;
 }
@@ -382,16 +414,33 @@ export function recusar(empresaId: string, motoristaId: string, ofertaId: string
   despachar(empresaId);
 }
 
+const JA_ACEITA = "Corrida já aceita por outro motorista";
+
+/** Fecha (com aviso) as chamadas que ainda tocam em outros motoristas para esta corrida: o som para e a tela fecha. */
+function encerrarOfertasDaCorrida(empresaId: string, corridaId: string, motivo: string, exceto?: string) {
+  const e = estado(empresaId);
+  for (const o of [...e.ofertas.values()]) {
+    if (o.corridaId !== corridaId || o.id === exceto) continue;
+    e.ofertas.delete(o.id);
+    avisarOferta(empresaId, o, "saiu"); // não conta como ignorada: o motorista não teve como responder
+    emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id, motivo });
+  }
+}
+
 export async function aceitar(empresaId: string, motoristaId: string, ofertaId: string): Promise<CorridaPropria> {
   const e = estado(empresaId);
   const o = e.ofertas.get(ofertaId);
   if (!o || o.motoristaId !== motoristaId || o.expira < Date.now()) throw new Error("Esta chamada já passou.");
   e.ofertas.delete(o.id);
   const c = listarProprias(empresaId).find((x) => x.id === o.corridaId);
-  if (!c || c.status !== "procurando") throw new Error("Esta corrida não está mais disponível.");
-  const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
-  if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
+  if (!c || c.status !== "procurando") throw new Error(c?.motoristaId ? JA_ACEITA : "Esta corrida não está mais disponível.");
+  let feita: CorridaPropria;
+  try { feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista"); }
+  catch (err) { const agora = listarProprias(empresaId).find((x) => x.id === c.id); throw new Error(agora?.motoristaId && agora.motoristaId !== motoristaId ? JA_ACEITA : err instanceof Error ? err.message : "Esta corrida não está mais disponível."); }
+  if (feita.motoristaId !== motoristaId) throw new Error(JA_ACEITA);
+  encerrarOfertasDaCorrida(empresaId, c.id, JA_ACEITA, o.id);
   avisarOferta(empresaId, o, "aceitou");
+  e.rodadas.delete(c.id);
   e.tentados.delete(c.id);
   vigiar(empresaId);
   return feita;
@@ -404,6 +453,7 @@ export async function desistir(empresaId: string, motoristaId: string, corridaId
   const t = e.tentados.get(corridaId) ?? new Map<string, number>();
   t.set(motoristaId, Date.now());
   e.tentados.set(corridaId, t);
+  e.rodadas.delete(corridaId); // a corrida recomeça a procurar do zero para os outros
   emitir(empresaId, motoristaAlvo(motoristaId), "corrida", { ...corridaParaApp(empresaId, c, "motorista"), aberta: false, statusTexto: "Você desistiu da corrida" });
   vigiar(empresaId);
   despachar(empresaId);
@@ -428,7 +478,7 @@ export function vigiar(empresaId: string) {
   // Chamada pendente de corrida que já não procura motorista (aceita por outro, cancelada, contra-oferta aceita): some, sempre.
   if (e.ofertas.size) {
     const porId = new Map(lista.map((c) => [c.id, c]));
-    for (const o of [...e.ofertas.values()]) if (porId.get(o.corridaId)?.status !== "procurando") { e.ofertas.delete(o.id); emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id }); }
+    for (const o of [...e.ofertas.values()]) { const x = porId.get(o.corridaId); if (x?.status !== "procurando") { e.ofertas.delete(o.id); emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id, motivo: x?.motoristaId ? JA_ACEITA : "A corrida foi cancelada" }); } }
   }
   for (const c of lista) {
     if (!ABERTA.has(c.status) && Date.parse(c.solicitadaEm) < limite) continue;
