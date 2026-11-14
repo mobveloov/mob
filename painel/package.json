@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx src/servidor/index.ts",
     "typecheck": "tsc --noEmit",
+    "importar-casas": "tsx src/enderecos/importar.ts",
     "test": "tsx --test \"test/**/*.test.ts\"",
     "empresa:importar": "tsx src/servidor/cli-importar-empresa.ts"
   },

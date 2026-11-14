@@ -51,3 +51,10 @@ CNEFE_PASTA=D:/CNEFE_Brasil docker compose up -d --build
 - Memória: uma cidade pequena usa poucos MB. A capital de São Paulo (cerca de 2 milhões de endereços) pede perto de 1,3 GB no servidor, e a primeira preparação leva cerca de 1 minuto.
 - Os nomes das cidades vêm sem acento (é assim no nome dos arquivos do IBGE).
 - O código fica em `painel/src/enderecos/`. O teste fica em `painel/test/enderecos.test.ts` e usa uma base pequena inventada.
+
+## Casas corrigidas (base extra, 13/11/2026)
+Além do CNEFE, o painel aceita um arquivo de **correções**: casas e pontos de rua que o CNEFE não tem. Ficam no banco do painel (tabela `enderecos_correcoes`), valem para todas as empresas e só aparecem na busca das cidades que a empresa atende. Nenhuma ligação com outro sistema: só lê o arquivo que você entregar.
+- **Formato (TSV):** `cod_municipio`, `numero`, `nome_logradouro`, `bairro`, `tipo`, `latitude`, `longitude` (número 0 = ponto da rua; linhas com # são comentário).
+- **Importar:** `cd painel` e `npm run importar-casas -- caminho/do/arquivo.tsv` (pode repetir, não duplica). Ou, como dono da plataforma, `POST /api/enderecos/correcoes` com `{ "conteudo": "..." }` (até 1 MB).
+- **Busca:** as correções vêm antes do CNEFE (casa exata, senão a mais próxima da mesma rua) e funcionam mesmo sem o CNEFE. Também valem para "endereço do ponto do mapa".
+- **Arquivo de exemplo (só leitura, de outro projeto):** `D:\mobveloov-git\vps\cnefe\correcoes\35_SP_correcoes.tsv` (400 linhas). O arquivo completo, se houver mais, precisa ser exportado do servidor pelo usuário; os dados não vão para o Git.

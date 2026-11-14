@@ -87,6 +87,10 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS app_online (
       empresa TEXT NOT NULL, motorista TEXT NOT NULL, dia TEXT NOT NULL, segundos INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (empresa, motorista, dia));
+    CREATE TABLE IF NOT EXISTS enderecos_correcoes (
+      municipio TEXT NOT NULL, numero INTEGER NOT NULL, rua TEXT NOT NULL, rua_norm TEXT NOT NULL, bairro TEXT NOT NULL, bairro_norm TEXT NOT NULL,
+      tipo TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, PRIMARY KEY (municipio, rua_norm, bairro_norm, numero));
+    CREATE INDEX IF NOT EXISTS enderecos_correcoes_rua ON enderecos_correcoes (municipio, rua_norm);
   `);
   aberto = { arquivo, db };
   return db;
