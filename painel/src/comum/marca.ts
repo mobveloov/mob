@@ -19,7 +19,7 @@ export interface Marca {
   fonte: string;
   tema: Tema;
   /** Nomes dos arquivos enviados (ficam na pasta da empresa). Vazio = sem imagem. */
-  arquivos: { logoClaro: string; logoEscuro: string; favicon: string; iconeApp: string; abertura: string };
+  arquivos: { logoClaro: string; logoEscuro: string; favicon: string; iconeApp: string; abertura: string; fotoEmpresa: string };
   textos: {
     saudacao: string; suporteEmail: string; suporteTelefone: string; rodapeRelatorio: string;
     /** Contatos que aparecem nos apps (Fale conosco, termos e privacidade). */
@@ -33,7 +33,7 @@ export interface Marca {
 }
 
 export type TipoArquivo = keyof Marca["arquivos"];
-export const TIPOS_ARQUIVO: TipoArquivo[] = ["logoClaro", "logoEscuro", "favicon", "iconeApp", "abertura"];
+export const TIPOS_ARQUIVO: TipoArquivo[] = ["logoClaro", "logoEscuro", "favicon", "iconeApp", "abertura", "fotoEmpresa"];
 
 export const FONTES = ["Plus Jakarta Sans", "Inter", "Poppins", "Montserrat", "Nunito", "Roboto", "Open Sans", "Lato"];
 
@@ -45,7 +45,7 @@ export const MARCA_PADRAO: Marca = {
   cores: { primaria: "#2563eb", secundaria: "#0f1b2d", fundo: "#f4f6fa", texto: "#1c2434" },
   fonte: "Plus Jakarta Sans",
   tema: "sistema",
-  arquivos: { logoClaro: "", logoEscuro: "", favicon: "", iconeApp: "", abertura: "" },
+  arquivos: { logoClaro: "", logoEscuro: "", favicon: "", iconeApp: "", abertura: "", fotoEmpresa: "" },
   textos: { saudacao: "Olá! Bom trabalho hoje.", suporteEmail: "", suporteTelefone: "", rodapeRelatorio: "", suporteWhatsapp: "", suporteSite: "", termosUrl: "", privacidadeUrl: "" },
   dominios: [],
   mostrarOrigem: true,
@@ -83,6 +83,7 @@ export function sanearMarca(entrada: unknown, base: Marca = MARCA_PADRAO): Marca
       favicon: "favicon" in f ? arquivo(f.favicon) : base.arquivos.favicon,
       iconeApp: "iconeApp" in f ? arquivo(f.iconeApp) : base.arquivos.iconeApp,
       abertura: "abertura" in f ? arquivo(f.abertura) : base.arquivos.abertura,
+      fotoEmpresa: "fotoEmpresa" in f ? arquivo(f.fotoEmpresa) : base.arquivos.fotoEmpresa ?? "",
     },
     textos: {
       saudacao: texto(t.saudacao, 120, base.textos.saudacao),

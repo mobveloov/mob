@@ -5,7 +5,7 @@ import { api, urlImagem } from "../api";
 import { useSessao } from "../App";
 import { Cartao, Titulo } from "../componentes/ui";
 
-const ROTULO_ARQ: Record<TipoArquivo, string> = { logoClaro: "Logo (fundo claro)", logoEscuro: "Logo (fundo escuro)", favicon: "Ícone da aba (favicon)", iconeApp: "Ícone do app (512×512)", abertura: "Tela de abertura do app" };
+const ROTULO_ARQ: Record<TipoArquivo, string> = { logoClaro: "Logo (fundo claro)", logoEscuro: "Logo (fundo escuro)", favicon: "Ícone da aba (favicon)", iconeApp: "Ícone do app (512×512)", abertura: "Tela de abertura do app", fotoEmpresa: "Foto da empresa" };
 
 /** Marca e aparência: cada empresa coloca a sua marca, com pré-visualização ao vivo. Nada disso fica no código. */
 export default function MarcaAparencia() {
@@ -32,6 +32,17 @@ export default function MarcaAparencia() {
     try { const r = await api.enviarImagem(tipo, arq); setM({ ...m, arquivos: r.marca.arquivos }); setMarca({ ...marca, arquivos: r.marca.arquivos }); setMsg({ texto: "Imagem enviada." }); }
     catch (e) { setMsg({ texto: e instanceof Error ? e.message : String(e), erro: true }); }
   }
+  async function enviarFoto(arq?: File) {
+    if (!arq) return;
+    setMsg(null);
+    try { const r = await api.enviarFotoEmpresa(arq); setM({ ...m, arquivos: r.marca.arquivos }); setMarca({ ...marca, arquivos: r.marca.arquivos }); setMsg({ texto: "Foto da empresa salva." }); }
+    catch (e) { setMsg({ texto: e instanceof Error ? e.message : String(e), erro: true }); }
+  }
+  async function apagarFoto() {
+    setMsg(null);
+    try { const r = await api.apagarFotoEmpresa(); setM({ ...m, arquivos: r.marca.arquivos }); setMarca({ ...marca, arquivos: r.marca.arquivos }); setMsg({ texto: "Foto removida." }); }
+    catch (e) { setMsg({ texto: e instanceof Error ? e.message : String(e), erro: true }); }
+  }
   async function apagar(tipo: TipoArquivo) {
     const r = await api.apagarImagem(tipo);
     setM({ ...m, arquivos: r.marca.arquivos }); setMarca({ ...marca, arquivos: r.marca.arquivos });
@@ -50,6 +61,18 @@ export default function MarcaAparencia() {
 
       <div className="marca-grade">
         <div>
+          <Cartao titulo="Foto da empresa">
+            <div className="foto-empresa">
+              <div className="foto-empresa-quadro">{m.arquivos.fotoEmpresa ? <img src={urlImagem(empresaId, m.arquivos.fotoEmpresa)} alt="Foto da empresa" /> : <span>{(sessao.empresa.nome.trim().charAt(0) || "?").toUpperCase()}</span>}</div>
+              <div>
+                <div className="acoes">
+                  <label className="botao"><Upload size={14} /> {m.arquivos.fotoEmpresa ? "Trocar foto" : "Enviar foto"}<input type="file" hidden accept="image/png,image/jpeg,image/webp" onChange={(e) => { const a = e.target.files?.[0]; e.target.value = ""; enviarFoto(a); }} /></label>
+                  {m.arquivos.fotoEmpresa && <button className="botao perigo" onClick={apagarFoto}><Trash2 size={14} /> Remover</button>}
+                </div>
+                <p className="sub">PNG, JPG ou WEBP, até 2 MB. Aparece no topo do menu e no perfil. Salva na hora.</p>
+              </div>
+            </div>
+          </Cartao>
           <Cartao titulo="Nomes">
             <div className="form">
               {txt("Nome do produto", m.produto, (v) => set("produto", v), "Aparece no topo, na aba do navegador e no relatório.")}
@@ -72,7 +95,7 @@ export default function MarcaAparencia() {
           </Cartao>
           <Cartao titulo="Imagens">
             <div className="imagens">
-              {TIPOS_ARQUIVO.map((t) => (
+              {TIPOS_ARQUIVO.filter((t) => t !== "fotoEmpresa").map((t) => (
                 <div key={t} className="imagem">
                   <span>{ROTULO_ARQ[t]}</span>
                   <div className={`miniatura ${t === "logoEscuro" ? "escura" : ""}`}>{m.arquivos[t] ? <img src={urlImagem(empresaId, m.arquivos[t])} alt="" /> : <small>sem imagem</small>}</div>

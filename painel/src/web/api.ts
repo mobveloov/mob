@@ -89,6 +89,8 @@ export const api = {
   perguntar: (filtro: Filtro, pergunta: string) => pedir<{ resposta: string }>("/api/perguntar", json("POST", { filtro, pergunta })),
   salvarMarca: (m: Marca) => pedir<{ marca: Marca }>("/api/marca", json("PUT", m)),
   enviarImagem: (tipo: string, arq: File) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }),
+  enviarFotoEmpresa: (arq: File) => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }),
+  apagarFotoEmpresa: () => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "DELETE" }),
   apagarImagem: (tipo: string) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "DELETE" }),
   integracoes: () => pedir<Integracoes>("/api/integracoes"),
   novaIntegracao: (tipo: string) => pedir("/api/integracoes", json("POST", { tipo })),
