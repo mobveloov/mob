@@ -126,3 +126,23 @@ test("o que o painel altera chega ao app: cancelar e mudar status", async () => 
   const lista = (await chamar("GET", `${API}/corridas`, undefined, tokP)).corpo.corridas;
   assert.equal(lista.find((x: any) => x.id === id).status, "cancelada");
 });
+
+test("passageiro vê os carros livres por perto (sem dados pessoais) e a rota de casas responde", async () => {
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Rui Livre", telefone: "11900000009", status: "Ativo", veiculo: "Hatch azul", placa: "RUI1A23" }, "teste");
+  const tokP = await entrar("passageiro", "11988881111");
+  const tokM = await entrar("motorista", "11900000009");
+  assert.equal((await chamar("POST", `${API}/online`, { lat: -23.553, lng: -46.631 }, tokM)).status, 200);
+  const r = await chamar("GET", `${API}/motoristas-perto?lat=-23.55&lng=-46.63`, undefined, tokP);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const m = r.corpo.motoristas.find((x: any) => Math.abs(x.lat + 23.553) < 0.001);
+  assert.ok(m, "o motorista online e livre aparece");
+  assert.equal(m.tipo, "carro");
+  assert.deepEqual(Object.keys(m).sort(), ["categoria", "lat", "lng", "tipo"], "só tipo e posição: nada de nome, placa ou id");
+  // Longe demais não aparece; motorista não usa essa rota.
+  assert.equal((await chamar("GET", `${API}/motoristas-perto?lat=-10&lng=-40`, undefined, tokP)).corpo.motoristas.length, 0);
+  assert.equal((await chamar("GET", `${API}/motoristas-perto?lat=-23.55&lng=-46.63`, undefined, tokM)).status, 403);
+  // Sem base de casas ligada a lista vem vazia, sem erro.
+  const c = await chamar("GET", `${API}/enderecos/casas?lat=-23.55&lng=-46.63&raio=100`, undefined, tokP);
+  assert.equal(c.status, 200);
+  assert.deepEqual(c.corpo.casas, []);
+});

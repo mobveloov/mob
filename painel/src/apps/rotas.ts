@@ -18,7 +18,7 @@ import fs from "node:fs";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
-import { buscarEndereco, enderecoDoPonto, rota } from "../enderecos/index.ts";
+import { buscarEndereco, casasPerto, enderecoDoPonto, rota } from "../enderecos/index.ts";
 import { buscarFora, caminhoPelasRuas, pontoFora } from "../enderecos/externo.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
@@ -199,6 +199,19 @@ r.get("/enderecos/ponto", ok(async (req, res) => {
   const lat = num(req.query.lat), lng = num(req.query.lng);
   if (lat == null || lng == null) throw new Error("Posição inválida.");
   res.json({ endereco: enderecoDoPonto(ctx(req).empresaId, lat, lng) ?? await pontoFora(lat, lng) });
+}));
+
+// Número das casas em volta (base de endereços da empresa), para escrever no mapa quando o zoom é grande.
+r.get("/enderecos/casas", ok((req, res) => {
+  const lat = num(req.query.lat), lng = num(req.query.lng);
+  if (lat == null || lng == null) throw new Error("Posição inválida.");
+  res.json({ casas: casasPerto(ctx(req).empresaId, lat, lng, num(req.query.raio) ?? 120) });
+}));
+// Motoristas livres por perto (só tipo e posição), para o mapa de quem vai pedir.
+r.get("/motoristas-perto", so("passageiro"), ok((req, res) => {
+  const lat = num(req.query.lat), lng = num(req.query.lng);
+  if (lat == null || lng == null) throw new Error("Posição inválida.");
+  res.json({ motoristas: P.motoristasPerto(ctx(req).empresaId, lat, lng) });
 }));
 
 // Caminho pelas ruas para desenhar no mapa: ?pontos=lat,lng;lat,lng (de 2 a 6 pontos, na ordem).

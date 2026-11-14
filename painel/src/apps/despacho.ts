@@ -678,6 +678,26 @@ export function ganhosPeriodo(empresaId: string, motoristaId: string, periodo: "
   };
 }
 
+/**
+ * Motoristas livres e online por perto, para o passageiro ver no mapa na hora de pedir. Sem nome, placa nem identificador
+ * (só tipo e posição, com o código mudando a cada consulta). Modo fantasma e motoristas em corrida ou em chamada não aparecem.
+ */
+export function motoristasPerto(empresaId: string, lat: number, lng: number, raioKm = 6, limite = 25): Array<{ lat: number; lng: number; tipo: "carro" | "moto"; categoria: string }> {
+  const e = estado(empresaId);
+  const busy = ocupados(listarProprias(empresaId));
+  const ocultos = fantasmas(empresaId);
+  const cad = new Map(motoristas(empresaId).map((m) => [m.id, m]));
+  const emOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
+  return [...e.online.entries()]
+    .filter(([id, p]) => !ocultos.has(id) && !busy.has(id) && !emOferta.has(id) && Date.now() - p.em < 120_000 && linhaReta({ lat, lng }, p) <= raioKm)
+    .map(([id, p]) => {
+      const cats = String(cad.get(id)?.categorias ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      const moto = cats.length > 0 && cats.every((c) => /moto/i.test(c));
+      return { d: linhaReta({ lat, lng }, p), lat: arred(p.lat, 5), lng: arred(p.lng, 5), tipo: (moto ? "moto" : "carro") as "carro" | "moto", categoria: cats[0] ?? "" };
+    })
+    .sort((a, b) => a.d - b.d).slice(0, limite).map(({ d: _d, ...m }) => m);
+}
+
 /** Motoristas online (para o mapa da central). */
 export function motoristasOnline(empresaId: string) {
   const e = estado(empresaId);

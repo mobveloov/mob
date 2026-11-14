@@ -10,6 +10,7 @@ import {
   quandoAgendada, ruaCurta, temCoord, type Categoria, type Corrida, type Rota,
 } from "./apoio";
 import { Mapa, type PontoMapa } from "./Mapa";
+import type { Posicao } from "../comum/api";
 import { Aviso, FolhaModal, PrecoAjustavel } from "./pecas";
 
 interface Opcional { id: string; nome: string }
@@ -95,7 +96,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota({ embarque: rota.partida, paradas: rota.paradas, destino: rota.destino })} folga={folga} />
+      <Mapa pontos={pontosDaRota({ embarque: rota.partida, paradas: rota.paradas, destino: rota.destino })} perto={temCoord(rota.partida) ? rota.partida as Posicao : null} folga={folga} />
       <div className="topo-flutuante">
         <button className="redondo-branco" onClick={voltar} aria-label="Voltar"><ArrowLeft size={22} /></button>
         <div className="segmento" role="tablist">

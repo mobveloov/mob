@@ -80,7 +80,7 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota(c)} folga={360} />
+      <Mapa pontos={pontosDaRota(c)} perto={temCoord(c.embarque) ? c.embarque as Posicao : null} folga={360} />
       <div className="topo-flutuante">
         <button className="pilula-branca vermelho" onClick={() => setCancelar(true)}>Cancelar</button>
       </div>
@@ -215,7 +215,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota(c)} carro={pos} escuro={escuro} centralizar={centralizar} folga={folga} />
+      <Mapa pontos={pontosDaRota(c)} carro={pos} alvoCarro={c.status !== "em_andamento" && temCoord(c.embarque) ? c.embarque as Posicao : null} linha={c.status === "em_andamento" || !pos} escuro={escuro} centralizar={centralizar} folga={folga} />
       <header className="topo-marca arredondado">
         <button className="icone-botao" aria-label={escuro ? "Mapa claro" : "Mapa escuro"} onClick={() => setEscuro(!escuro)}>{escuro ? <Sun size={24} /> : <Moon size={24} />}</button>
         <div className="topo-titulo"><strong>Acompanhar viagem</strong></div>

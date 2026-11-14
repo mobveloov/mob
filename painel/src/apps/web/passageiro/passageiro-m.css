@@ -220,3 +220,9 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 
 .cupom-codigo { font-size: 1.4rem; letter-spacing: .08em; } .pilula-data { position: relative; display: inline-flex; align-items: center; padding: .45rem .9rem; border-radius: 999px; background: color-mix(in srgb, var(--suave) 14%, transparent); font-weight: 700; cursor: pointer; overflow: hidden; } .pilula-data.ativa { background: var(--cor); color: var(--cor-texto); } .pilula-data input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .pino-selo { position: absolute; left: 36px; top: -6px; width: 38px; padding: 2px 0; border-radius: 6px; background: var(--cor); color: var(--cor-texto); display: flex; flex-direction: column; align-items: center; line-height: 1.05; box-shadow: 0 2px 6px rgba(0,0,0,.3); } .pino-selo b { font-size: .8rem; } .pino-selo small { font-size: .5rem; font-weight: 700; }
+
+/* Carros e motos livres por perto, e o número das casas (zoom alto). */
+.pino-perto { width: 30px; height: 30px; border-radius: 50%; background: var(--cor, #ffc400); color: #111; border: 2px solid #111; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.pino-perto-moto { background: #111; color: var(--cor, #ffc400); border-color: var(--cor, #ffc400); }
+.casa-num { display: block; min-width: 22px; padding: 1px 4px; text-align: center; font: 700 11px/14px system-ui, sans-serif; color: #333; background: rgba(255,255,255,.88); border: 1px solid rgba(0,0,0,.25); border-radius: 4px; white-space: nowrap; pointer-events: none; }
+.detalhe-valor { display: flex; flex-direction: column; align-items: center; padding: 6px 0 10px; } .detalhe-valor small { color: #777; } .detalhe-valor strong { font-size: 30px; }

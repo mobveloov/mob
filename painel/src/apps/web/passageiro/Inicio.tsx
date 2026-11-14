@@ -14,7 +14,7 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
   const primeiro = eu.nome.split(" ")[0];
   return (
     <div className="inicio">
-      <Mapa eu={aqui} className="fundo" />
+      <Mapa eu={aqui} perto={aqui} className="fundo" />
       <div className="inicio-topo">
         <div className="inicio-ola">
           <Avatar foto={eu.foto} nome={eu.nome} tamanho={52} />
