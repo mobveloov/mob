@@ -1,4 +1,4 @@
-// Testes do Mapa de engajamento (src/engajamento): classificação, faixas por empresa, período e isolamento entre empresas.
+// Testes do Mapa de engajamento no formato da Machine (src/engajamento): faixas, limites por empresa, filtros, ações e isolamento.
 // Rodar: npm test (na pasta painel). Sem rede e sem chaves.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,45 +61,56 @@ const pedido = (nome: string, tel: string, lat: number, lng: number) => ({
 
 let ca = "", co = "", cb = "";
 
-test("classificação: menor é melhor no cancelamento e maior é melhor nos demais", () => {
-  const menor = { sentido: "menor" as const }, maior = { sentido: "maior" as const };
-  assert.equal(E.classificar(menor, { bom: 8, aceitavel: 30 }, 8), "bom");
-  assert.equal(E.classificar(menor, { bom: 8, aceitavel: 30 }, 8.1), "aceitavel");
-  assert.equal(E.classificar(menor, { bom: 8, aceitavel: 30 }, 30), "aceitavel");
-  assert.equal(E.classificar(menor, { bom: 8, aceitavel: 30 }, 30.5), "ruim");
-  assert.equal(E.classificar(maior, { bom: 4.5, aceitavel: 4 }, 4.5), "bom");
-  assert.equal(E.classificar(maior, { bom: 4.5, aceitavel: 4 }, 4), "aceitavel");
-  assert.equal(E.classificar(maior, { bom: 4.5, aceitavel: 4 }, 3.9), "ruim");
+test("faixas: três faixas por dois limites, texto no jeito da Machine", () => {
+  const c = { a: 8, b: 30 };
+  assert.equal(E.faixaDe(c, 8), 0);
+  assert.equal(E.faixaDe(c, 8.1), 1);
+  assert.equal(E.faixaDe(c, 30), 1);
+  assert.equal(E.faixaDe(c, 30.1), 2);
+  const canc = E.INDICADORES.passageiros.find((d) => d.id === "cancelamento")!;
+  assert.deepEqual([0, 1, 2].map((i) => E.textoFaixa(canc, c, i as 0 | 1 | 2)), ["≤ 8%", "> 8 – 30%", "> 30%"]);
+  const on = E.INDICADORES.motoristas.find((d) => d.id === "tempoOnline")!;
+  assert.deepEqual([0, 1, 2].map((i) => E.textoFaixa(on, { a: 4, b: 8.5 }, i as 0 | 1 | 2)), ["≤ 4 h", "> 4 – 8,5 h", "> 8,5 h"]);
 });
 
-test("período e faixas: validação em português", () => {
-  assert.deepEqual(E.validarPeriodo({ tipo: "7" }), { tipo: "7" });
-  assert.throws(() => E.validarPeriodo({ tipo: "1000" }), /Período inválido/);
-  assert.throws(() => E.validarPeriodo({ tipo: "personalizado", inicio: "2026-02-10", fim: "2026-02-01" }), /data inicial/);
-  assert.throws(() => E.validarPeriodo({ tipo: "personalizado", inicio: "2024-01-01", fim: "2026-01-01" }), /366 dias/);
-  assert.deepEqual(E.intervalo({ tipo: "7" }, "2026-03-10"), { inicio: "2026-03-04", fim: "2026-03-10", dias: 7 });
-  assert.throws(() => E.validarFaixas("passageiros", { cancelamento: { bom: 30, aceitavel: 8 } }), /menor que o de "Aceitável"/);
-  assert.throws(() => E.validarFaixas("passageiros", { avaliacoes: { bom: 3, aceitavel: 4 } }), /maior que o de "Aceitável"/);
-  assert.throws(() => E.validarFaixas("passageiros", { avaliacoes: { bom: 9, aceitavel: 4 } }), /entre 0 e 5/);
-  assert.throws(() => E.validarFaixas("passageiros", { cancelamento: { bom: "x", aceitavel: 4 } }), /números/);
+test("indicadores iguais aos da Machine, com os limites padrão", () => {
+  assert.deepEqual(E.INDICADORES.motoristas.map((d) => d.rotulo), ["Tempo online", "Hora trabalhada", "Corridas", "Ausência", "Frequência de trabalho", "Avaliações", "Tempo de casa"]);
+  assert.deepEqual(E.INDICADORES.passageiros.map((d) => d.rotulo), ["Solicitações", "Frequência de uso", "Cancelamento", "Estimativas", "Avaliações", "Tempo de casa"]);
+  const sol = E.INDICADORES.passageiros[0];
+  assert.deepEqual(sol.nomes, ["Baixo", "Médio", "Alto"]);
+  assert.deepEqual([sol.padrao.a, sol.padrao.b], [4, 10]);
+});
+
+test("período e limites: validação em português", () => {
+  const corr = E.INDICADORES.motoristas.find((d) => d.id === "corridas")!;
+  const freq = E.INDICADORES.motoristas.find((d) => d.id === "frequenciaTrabalho")!;
+  const aus = E.INDICADORES.motoristas.find((d) => d.id === "ausencia")!;
+  assert.deepEqual(E.validarPeriodo(corr, { tipo: "7" }), { tipo: "7" });
+  assert.deepEqual(E.validarPeriodo(freq, { tipo: "8" }), { tipo: "8" });
+  assert.throws(() => E.validarPeriodo(corr, { tipo: "8" }), /Período inválido/);
+  assert.deepEqual(E.validarPeriodo(aus, { tipo: "30" }), { tipo: "nenhum" });
+  assert.throws(() => E.validarPeriodo(corr, { tipo: "personalizado", inicio: "2026-02-10", fim: "2026-02-01" }), /data inicial/);
+  assert.throws(() => E.validarPeriodo(corr, { tipo: "personalizado", inicio: "2024-01-01", fim: "2026-01-01" }), /366 dias/);
+  assert.deepEqual(E.intervalo(corr, { tipo: "7" }, "2026-03-10"), { inicio: "2026-03-04", fim: "2026-03-10", dias: 7 });
+  assert.deepEqual(E.intervalo(freq, { tipo: "2" }, "2026-03-14"), { inicio: "2026-03-01", fim: "2026-03-14", dias: 14 });
+  assert.throws(() => E.validarLimites(corr, 80, 20), /menor que o segundo/);
+  assert.throws(() => E.validarLimites(corr, "x", 20), /números/);
+  assert.throws(() => E.validarLimites(corr, 10, 5000), /entre 0 e 1000/);
 });
 
 test("exige login e papel; padrão da configuração", async () => {
   ca = await cookieDe(adminA.id); co = await cookieDe(operA.id); cb = await cookieDe(adminB.id);
   assert.equal((await pedir("/mapa")).status, 401);
   const c = await pedir("/config", { cookie: co });
-  assert.equal(c.status, 200);
-  assert.deepEqual(c.corpo.periodo, { tipo: "30" });
-  assert.deepEqual(c.corpo.faixas.passageiros.cancelamento, { bom: 8, aceitavel: 30 });
+  assert.equal(c.status, 200, c.texto);
+  assert.deepEqual(c.corpo.config.passageiros.cancelamento, { a: 8, b: 30, periodo: { tipo: "30" } });
   assert.equal((await pedir("/mapa?papel=outro", { cookie: ca })).status, 400);
 });
 
-test("passageiros: indicadores calculados das corridas da empresa", async () => {
-  // Maria: 5 corridas hoje, 1 cancelada por ela (20%). João: 1 corrida cancelada por ele (100%).
-  const ids: string[] = [];
+test("passageiros: contagem por faixa calculada das corridas da empresa", async () => {
+  // Maria: 5 corridas, 1 cancelada por ela (20%). João: 1 corrida cancelada por ele (100%).
   for (let i = 0; i < 5; i++) {
     const c = await C.criarCorridaPropria(A.id, pedido("Maria Teste", "11988887777", -21.12 + i * 0.001, -48.3));
-    ids.push(c.id);
     if (i === 0) { await C.cancelarCorrida(A.id, c.id, "Passageiro", "Desisti"); continue; }
     if (i === 1) {
       await C.atribuirMotorista(A.id, c.id, String(carlos.id));
@@ -109,70 +120,59 @@ test("passageiros: indicadores calculados das corridas da empresa", async () => 
   }
   const joao = await C.criarCorridaPropria(A.id, pedido("João Outro", "11977776666", -21.2, -48.4));
   await C.cancelarCorrida(A.id, joao.id, "Passageiro", "Desisti");
-  // Outra empresa: uma corrida que nunca pode aparecer na empresa A.
   await C.criarCorridaPropria(B.id, pedido("Estranha Sul", "11955554444", -23.5, -46.6));
 
   const r = await pedir("/mapa?papel=passageiros", { cookie: co });
   assert.equal(r.status, 200, r.texto);
-  const nomes = r.corpo.pontos.map((p: { nome: string }) => p.nome).sort();
-  assert.deepEqual(nomes, ["João Outro", "Maria Teste"]);
-  const maria = r.corpo.pontos.find((p: { nome: string }) => p.nome === "Maria Teste");
-  assert.equal(maria.valores.solicitacoes, 5);
-  assert.equal(maria.valores.cancelamento, 20);
-  assert.equal(maria.classes.cancelamento, "aceitavel");
-  assert.equal(maria.classes.solicitacoes, "bom");
-  assert.ok(maria.lat != null && maria.lng != null);
-  const joaoPt = r.corpo.pontos.find((p: { nome: string }) => p.nome === "João Outro");
-  assert.equal(joaoPt.classes.cancelamento, "ruim");
+  assert.equal(r.corpo.total, 2, "só as duas pessoas da empresa A");
+  const sol = r.corpo.indicadores.find((i: { id: string }) => i.id === "solicitacoes");
+  assert.deepEqual(sol.contagem, [1, 1, 0]); // João 1 (baixo), Maria 5 (médio)
+  assert.deepEqual(sol.limites, ["≤ 4 solicitações", "> 4 – 10 solicitações", "> 10 solicitações"]);
   const canc = r.corpo.indicadores.find((i: { id: string }) => i.id === "cancelamento");
-  assert.deepEqual(canc.contagem, { bom: 0, aceitavel: 1, ruim: 1 });
-  assert.equal(canc.total, 2);
-  assert.equal(r.corpo.indicadores.length, 6);
-  assert.ok(!r.texto.includes("Estranha"), "dados de outra empresa não aparecem");
+  assert.deepEqual(canc.contagem, [0, 1, 1]); // Maria 20% (aceitável), João 100% (ruim)
+  assert.equal(canc.barras.length, 20);
+  const lista = await pedir("/lista?papel=passageiros&indicador=cancelamento&faixa=2", { cookie: co });
+  assert.deepEqual(lista.corpo.pessoas.map((p: { nome: string }) => p.nome), ["João Outro"]);
+  assert.equal((await pedir("/lista?papel=passageiros&indicador=nada&faixa=2", { cookie: co })).status, 400);
 });
 
-test("motoristas: corridas atendidas e avaliação", async () => {
-  const r = await pedir("/mapa?papel=motoristas", { cookie: ca });
-  assert.equal(r.status, 200, r.texto);
-  const c = r.corpo.pontos.find((p: { nome: string }) => p.nome === "Carlos Souza");
-  assert.ok(c);
-  assert.equal(c.valores.solicitacoes, 1);
-  assert.equal(c.valores.avaliacoes, 5);
-  assert.equal(c.classes.avaliacoes, "bom");
-  assert.equal(c.classes.solicitacoes, "ruim"); // 1 corrida, abaixo do aceitável (8)
+test("motoristas: filtro por situação e valores", async () => {
+  criar(A.id, MOT, { nome: "Dora Bloqueada", telefone: "11911110000", status: "Bloqueado", veiculo: "Sedã", placa: "XYZ1A11" }, "teste");
+  const so = await pedir("/mapa?papel=motoristas", { cookie: co });
+  assert.equal(so.corpo.total, 1, "padrão: só ativos");
+  assert.deepEqual(so.corpo.indicadores.map((i: { id: string }) => i.id), E.INDICADORES.motoristas.map((d) => d.id));
+  assert.equal(so.corpo.filtros.situacoes[0].rotulo, "Ativos");
+  const todos = await pedir("/mapa?papel=motoristas&situacao=A,S", { cookie: co });
+  assert.equal(todos.corpo.total, 2);
+  const corr = todos.corpo.indicadores.find((i: { id: string }) => i.id === "corridas");
+  assert.deepEqual(corr.contagem, [2, 0, 0]); // 1 corrida finalizada hoje; limite padrão "Ruim ≤ 20"
+  assert.equal(corr.predominante.nome, "Ruim");
 });
 
-test("faixas e período salvos por empresa; só administrador altera", async () => {
-  const salvo = await pedir("/config", { metodo: "PUT", cookie: ca, corpo: { periodo: { tipo: "7" }, papel: "passageiros", faixas: { cancelamento: { bom: 25, aceitavel: 60 } } } });
-  assert.equal(salvo.status, 200, salvo.texto);
-  assert.deepEqual(salvo.corpo.periodo, { tipo: "7" });
-  assert.equal((await pedir("/config", { metodo: "PUT", cookie: co, corpo: { periodo: { tipo: "90" } } })).status, 403);
-  assert.equal((await pedir("/config", { metodo: "PUT", cookie: ca, corpo: { papel: "passageiros", faixas: { cancelamento: { bom: 50, aceitavel: 10 } } } })).status, 400);
-
-  const r = await pedir("/mapa?papel=passageiros", { cookie: co });
-  assert.equal(r.corpo.periodo.dias, 7);
-  const maria = r.corpo.pontos.find((p: { nome: string }) => p.nome === "Maria Teste");
-  assert.equal(maria.classes.cancelamento, "bom", "com o novo limite de 25%, 20% é bom");
-  // A outra empresa continua com o padrão.
-  const b = await pedir("/config", { cookie: cb });
-  assert.deepEqual(b.corpo.periodo, { tipo: "30" });
-  assert.deepEqual(b.corpo.faixas.passageiros.cancelamento, { bom: 8, aceitavel: 30 });
-  // Fica gravado em disco, na pasta da empresa.
-  assert.ok(fs.existsSync(path.join(DADOS, "empresas", A.id, "operacao", "engajamento.json")));
-  assert.ok(!fs.existsSync(path.join(DADOS, "empresas", B.id, "operacao", "engajamento.json")));
+test("só o administrador salva limites; ficam por empresa", async () => {
+  const corpo = { papel: "passageiros", indicador: "cancelamento", a: 10, b: 50, periodo: { tipo: "15" } };
+  assert.equal((await pedir("/config", { metodo: "PUT", corpo, cookie: co })).status, 403);
+  assert.equal((await pedir("/config", { metodo: "PUT", corpo: { ...corpo, a: 60 }, cookie: ca })).status, 400);
+  assert.equal((await pedir("/config", { metodo: "PUT", corpo, cookie: ca })).status, 200);
+  const a = await pedir("/config", { cookie: ca }), b = await pedir("/config", { cookie: cb });
+  assert.deepEqual(a.corpo.config.passageiros.cancelamento, { a: 10, b: 50, periodo: { tipo: "15" } });
+  assert.deepEqual(b.corpo.config.passageiros.cancelamento, { a: 8, b: 30, periodo: { tipo: "30" } });
+  const r = await pedir("/mapa?papel=passageiros", { cookie: cb });
+  assert.equal(r.corpo.total, 1, "a empresa B só vê a própria passageira");
 });
 
-test("histórico: dia a dia, totais e pontos de embarque", async () => {
-  await pedir("/config", { metodo: "PUT", cookie: ca, corpo: { periodo: { tipo: "personalizado", inicio: "2000-01-01", fim: "2000-01-02" } } });
-  assert.equal((await pedir("/historico", { cookie: ca })).corpo.totais.pedidas, 0);
-  await pedir("/config", { metodo: "PUT", cookie: ca, corpo: { periodo: { tipo: "7" } } });
+test("ações: mensagem e mudança de situação ficam no histórico; operador não muda situação", async () => {
+  const sem = await pedir("/acao", { corpo: { papel: "motoristas", indicador: "corridas", faixa: 0, tipo: "mensagem", texto: "Oi {nome}, vamos rodar mais?" }, cookie: co });
+  assert.equal(sem.status, 200, sem.texto);
+  assert.equal(sem.corpo.destinatarios, 1);
+  assert.equal((await pedir("/acao", { corpo: { papel: "motoristas", indicador: "corridas", faixa: 0, tipo: "status", status: "Inativo" }, cookie: co })).status, 400);
+  assert.equal((await pedir("/acao", { corpo: { papel: "passageiros", indicador: "solicitacoes", faixa: 2, tipo: "mensagem", texto: "x" }, cookie: ca })).status, 400, "faixa vazia");
+  assert.equal((await pedir("/acao", { corpo: { papel: "passageiros", indicador: "solicitacoes", faixa: 1, tipo: "desafio", titulo: "t", texto: "x" }, cookie: ca })).status, 400, "desafio é só de motorista");
   const h = await pedir("/historico", { cookie: ca });
-  assert.equal(h.status, 200, h.texto);
-  assert.equal(h.corpo.serie.length, 7);
-  assert.equal(h.corpo.totais.pedidas, 6);
-  assert.equal(h.corpo.totais.finalizadas, 1);
-  assert.equal(h.corpo.totais.canceladas, 5);
-  assert.equal(h.corpo.totais.passageiros, 2);
-  assert.equal(h.corpo.pontos.length, 6);
-  assert.equal((await pedir("/historico", { cookie: cb })).corpo.totais.pedidas, 1);
+  assert.equal(h.corpo.acoes.length, 1);
+  assert.equal(h.corpo.acoes[0].tipo, "mensagem");
+  assert.equal((await pedir("/historico", { cookie: cb })).corpo.acoes.length, 0);
+  const alt = await pedir("/acao", { corpo: { papel: "motoristas", indicador: "corridas", faixa: 0, tipo: "status", status: "Inativo" }, cookie: ca });
+  assert.equal(alt.status, 200, alt.texto);
+  assert.equal((await pedir("/mapa?papel=motoristas", { cookie: ca })).corpo.total, 0);
 });
