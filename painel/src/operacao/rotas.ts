@@ -25,7 +25,8 @@ import { alertas } from "../apps/despacho.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
-import { agoraBr } from "../servidor/util.ts";
+import { agoraBr, normal } from "../servidor/util.ts";
+import { ehVoucher, nomesConveniadas, validarVoucher } from "../relatorios/vouchers.ts";
 import "./ondas.ts"; // liga o registro das ofertas do despacho
 import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
 import * as S from "./servico.ts";
@@ -219,6 +220,26 @@ rotasOperacao.post("/recuperacao/contato", central, ok((req, res) => res.json({ 
 rotasOperacao.get("/passageiro", ok((req, res) => res.json(S.buscarPassageiro(emp(req), { telefone: q(req, "telefone", 20), cpf: q(req, "cpf", 20) }))));
 rotasOperacao.get("/motoristas", ok((req, res) => res.json({ motoristas: S.opcoesMotoristas(emp(req)) })));
 
+/** Empresa conveniada, centro de custo e voucher da solicitação. Voucher exige empresa e um número dentro de uma faixa dela, ainda não usado. */
+function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
+  const nomes = nomesConveniadas(empresaId);
+  const pedida = String(b.empresaConveniada ?? "").trim();
+  const conveniada = pedida ? nomes.find((n) => normal(n) === normal(pedida)) : undefined;
+  if (pedida && !conveniada) throw new Error("Empresa não encontrada no cadastro de Empresas.");
+  const centro = String(b.centroCusto ?? "").trim();
+  if (centro && conveniada) {
+    const cad = listar(empresaId, cadastroPorId("conveniadas")!).find((r) => normal(r.nome) === normal(conveniada));
+    const centros = String(cad?.centrosCusto ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    if (centros.length && !centros.some((x) => normal(x) === normal(centro))) throw new Error("Centro de custo não cadastrado nesta empresa.");
+  }
+  let numero: string | undefined;
+  if (ehVoucher(String(b.pagamento ?? ""))) {
+    if (!conveniada) throw new Error("Pagamento com voucher exige a empresa conveniada.");
+    numero = validarVoucher(empresaId, conveniada, String(b.voucher ?? ""));
+  }
+  return { ...(conveniada ? { empresaConveniada: conveniada } : {}), ...(centro ? { centroCusto: centro.slice(0, 80) } : {}), ...(numero ? { voucher: numero } : {}) };
+}
+
 rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   const pass = (b.passageiro ?? {}) as Record<string, unknown>;
@@ -227,12 +248,14 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
     String(b.observacao ?? ""), b.complemento ? `Complemento: ${String(b.complemento).slice(0, 80)}` : "", b.referencia ? `Referência: ${String(b.referencia).slice(0, 120)}` : "",
     exig.length ? `Exigências: ${exig.join(", ")}` : "",
   ].filter((x) => x.trim()).join(" · ");
+  const corporativo = dadosCorporativos(emp(req), b);
   const c = await criarCorridaPropria(emp(req), {
     passageiro: { nome: String(pass.nome ?? ""), telefone: String(pass.telefone ?? "") }, embarque: ponto(b.embarque),
     destino: b.destino ? ponto(b.destino) : undefined, paradas: Array.isArray(b.paradas) ? b.paradas.map(ponto) : [],
     categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
     cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
     osExterna: b.osExterna ? String(b.osExterna) : undefined,
+    ...corporativo,
   }, quem(req));
   const avisos: string[] = [];
   const valor = num(b.valor);

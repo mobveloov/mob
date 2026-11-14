@@ -59,6 +59,10 @@ export interface NovaCorridaPropria {
   /** Central que recebeu a chamada e central que atendeu a corrida (transbordo). Vazio: a própria central. */
   centralChamada?: string;
   centralCorrida?: string;
+  /** Empresa conveniada que paga a corrida (nome do cadastro de Empresas), centro de custo e nº do voucher (relatórios e entrega de voucher). */
+  empresaConveniada?: string;
+  centroCusto?: string;
+  voucher?: string;
 }
 
 export interface CorridaPropria {
@@ -110,6 +114,9 @@ export interface CorridaPropria {
   osExterna?: string;
   centralChamada?: string;
   centralCorrida?: string;
+  empresaConveniada?: string;
+  centroCusto?: string;
+  voucher?: string;
 }
 
 /** Hora de referência da corrida: a agendada (se houver) ou a do pedido. */
@@ -240,6 +247,8 @@ export function descontoDoCupom(empresaId: string, codigo: string, valor: number
 const soDigitos = (s: string) => String(s ?? "").replace(/\D/g, "");
 
 /** Pede uma corrida própria. Endereço só em texto ganha coordenada pelo CNEFE (se houver); distância e tempo pela rota (OSRM, se houver). */
+const limpo = (v: unknown, max: number) => String(v ?? "").replace(/[<>]/g, "").trim().slice(0, max);
+
 export async function criarCorridaPropria(empresaId: string, pedido: NovaCorridaPropria, por = "sistema"): Promise<CorridaPropria> {
   const pedidas = (pedido.paradas ?? []).filter((p) => String(p?.texto ?? "").trim());
   if (pedidas.length > 3) throw new Error("No máximo 3 paradas.");
@@ -320,6 +329,9 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(n.osExterna ? { osExterna: String(n.osExterna).replace(/[<>]/g, "").trim().slice(0, 40) } : {}),
       ...(n.centralChamada ? { centralChamada: String(n.centralChamada).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
       ...(n.centralCorrida ? { centralCorrida: String(n.centralCorrida).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
+      ...(limpo(n.empresaConveniada || cliente?.conveniada, 80) ? { empresaConveniada: limpo(n.empresaConveniada || cliente?.conveniada, 80) } : {}),
+      ...(limpo(n.centroCusto, 80) ? { centroCusto: limpo(n.centroCusto, 80) } : {}),
+      ...(limpo(n.voucher, 30) ? { voucher: limpo(n.voucher, 30) } : {}),
     };
     gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
