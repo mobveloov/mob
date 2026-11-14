@@ -8,7 +8,6 @@ import { sanearMarca } from "../comum/marca.ts";
 import { listar, atualizar, remover } from "../cadastros/armazem.ts";
 import { alertas, estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
 import { mensagens } from "../apps/chat.ts";
-import { extrato, lancar } from "../apps/extras.ts";
 import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import * as D from "../servidor/dados.ts";
@@ -347,38 +346,7 @@ export function programadas(empresaId: string, filtro: FiltroProgramadas, busca:
   };
 }
 
-// ====================================================================== pagamentos pendentes (taxas de cancelamento)
-
-export type SituacaoPendencia = "pendente" | "paga" | "abonada";
-interface EstadoPendencia { status: SituacaoPendencia; em: string; por: string }
-const estadoPendencias = (empresaId: string) => lerOperacao<Record<string, EstadoPendencia>>(empresaId, "pendencias.json", {});
-
-export function pendencias(empresaId: string, status: SituacaoPendencia | "todos", busca: string, pagina: number) {
-  const est = estadoPendencias(empresaId);
-  const todas = listarProprias(empresaId).filter((c) => c.status === "cancelada" && (c.taxaCancelamento ?? 0) > 0).map((c) => ({
-    id: c.id, os: c.os, data: c.historico.at(-1)?.em ?? c.solicitadaEm, passageiro: c.passageiro.nome, telefone: c.passageiro.telefone, motorista: c.motorista,
-    valor: c.taxaCancelamento!, tipo: "Taxa de cancelamento", status: est[c.id]?.status ?? "pendente" as SituacaoPendencia, resolvidoEm: est[c.id]?.em ?? null, resolvidoPor: est[c.id]?.por ?? null,
-  }));
-  let l = status === "todos" ? todas : todas.filter((x) => x.status === status);
-  if (busca) l = l.filter((x) => normal(x.passageiro).includes(normal(busca)) || x.os === busca.trim() || x.telefone.includes(soDigitos(busca) || "§"));
-  l.sort((a, b) => b.data.localeCompare(a.data));
-  const totalAberto = arred(todas.filter((x) => x.status === "pendente").reduce((s, x) => s + x.valor, 0));
-  return { totalAberto, ...paginar(l, pagina, 20) };
-}
-
-/** Baixar (recebeu do passageiro) ou abonar (perdoou). Devolve o débito da taxa na carteira do passageiro, se houve. */
-export function resolverPendencia(empresaId: string, id: string, acao: "baixar" | "abonar", por: string) {
-  const c = acharPropria(empresaId, id);
-  if (c.status !== "cancelada" || !(c.taxaCancelamento ?? 0)) throw new Error("Esta corrida não tem taxa pendente.");
-  const est = estadoPendencias(empresaId);
-  if ((est[c.id]?.status ?? "pendente") !== "pendente") throw new Error("Esta pendência já foi resolvida.");
-  const debito = `Taxa de cancelamento OS ${c.os}`;
-  const debitou = extrato(empresaId, "passageiro", c.passageiro.telefone, 1000).some((l) => l.corridaId === c.id && l.descricao === debito && l.valor < 0);
-  if (debitou) lancar(empresaId, "passageiro", c.passageiro.telefone, c.taxaCancelamento!, `${debito} ${acao === "baixar" ? "paga" : "abonada"}`, por, c.id);
-  const novo: EstadoPendencia = { status: acao === "baixar" ? "paga" : "abonada", em: agoraBr().toISOString(), por: por.slice(0, 120) };
-  gravarOperacao(empresaId, "pendencias.json", { ...est, [c.id]: novo });
-  return novo;
-}
+// Pagamentos pendentes (taxas de cancelamento, Pix no app e pagamento insuficiente): ver operacao/pendencias.ts.
 
 // ====================================================================== objetos perdidos
 

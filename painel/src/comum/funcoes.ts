@@ -41,13 +41,15 @@ export const FUNCOES: Funcao[] = [
   { id: "historico", grupo: "Corridas", nome: "Histórico", rota: "/historico", antigas: ["/corridas", "/raiox"] },
   { id: "ocorrencias", grupo: "Corridas", nome: "Retorno/Ocorrências", rota: "/ocorrencias" },
   { id: "programadas", grupo: "Corridas", nome: "Programadas", rota: "/programadas" },
-  { id: "pagamentos-pendentes", grupo: "Corridas", nome: "Pagamentos Pend.", rota: "/pagamentos-pendentes", antigas: ["/pendencias"] },
+  { id: "pagamentos-pendentes", grupo: "Corridas", nome: "Pagamentos pendentes", rota: "/pagamentos-pendentes", antigas: ["/pendencias"] },
+  { id: "taxas-cancelamento", grupo: "Corridas", nome: "Taxas de cancelamento", rota: "/taxas-cancelamento", novo: true },
   { id: "objetos", grupo: "Corridas", nome: "Objetos Perdidos", rota: "/objetos" },
   { id: "engajamento", grupo: "Corridas", nome: "Mapa de engajamento", rota: "/engajamento", novo: true },
 
   { id: "visao-geral", grupo: "Financeiro", secao: "Relatórios", nome: "Visão geral do financeiro", rota: "/visao-geral" },
   { id: "extrato-central", grupo: "Financeiro", secao: "Relatórios", nome: "Extrato da central", rota: "/extrato-central" },
   { id: "extrato-online", grupo: "Financeiro", secao: "Relatórios", nome: "Extrato de transações online", rota: "/extrato-online" },
+  { id: "transacao-pix", grupo: "Financeiro", secao: "Pix", nome: "Transação com Pix", rota: "/transacao-pix", novo: true },
   { id: "carteiras", grupo: "Financeiro", secao: "Transações", nome: "Carteiras", rota: "/carteiras" },
   { id: "extrato", grupo: "Financeiro", secao: "Transações", nome: "Extrato Geral", rota: "/extrato" },
   { id: "saques", grupo: "Financeiro", secao: "Transações", nome: "Saques", rota: "/saques" },
@@ -56,6 +58,7 @@ export const FUNCOES: Funcao[] = [
 
   { id: "conversas", grupo: "Comunicação", nome: "Conversas", rota: "/conversas" },
   { id: "notificacoes", grupo: "Comunicação", nome: "Notificações Push", rota: "/notificacoes" },
+  { id: "alertas-empresas", grupo: "Comunicação", nome: "Alertas para empresas", rota: "/alertas-empresas", novo: true },
 
   { id: "config-gerais", grupo: "Config", nome: "Gerais do App", rota: "/config-gerais", soAdmin: true },
   { id: "regras-credito", grupo: "Config", nome: "Regras de Crédito", rota: "/regras-credito", soAdmin: true },

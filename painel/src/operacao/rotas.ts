@@ -11,7 +11,8 @@
 //   POST /corridas/:id/reenviar        nova corrida igual (cancelada ou não atendida)
 //   POST /corridas/:id/cancelar        cancelar pela central, passageiro, motorista ou erro
 //   PUT  /corridas/:id                 editar a OS
-//   GET  /monitoramento, /mapa, /ocorrencias, /programadas, /pendencias, /objetos, /recuperacao, /passageiro, /motoristas
+//   GET  /pendencias (+ /exportar, POST registrar e mudar situação), /taxas-cancelamento (+ /exportar), /pix (+ /exportar, POST situação)
+//   GET  /monitoramento, /mapa, /ocorrencias, /programadas, /objetos, /recuperacao, /passageiro, /motoristas
 //   POST /solicitar                    nova solicitação (com paradas, agendamento, motorista e valor manual)
 
 import fs from "node:fs";
@@ -29,6 +30,9 @@ import { agoraBr } from "../servidor/util.ts";
 import "./ondas.ts"; // liga o registro das ofertas do despacho
 import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
 import * as S from "./servico.ts";
+import { periodo } from "../config/financeiro.ts";
+import { ABAS_TAXAS, csvPendencias, csvTaxas, listarPendencias, listarTaxas, mudarPendencia, registrarPendencia, type AcaoPendencia, type FiltroPendencias, type FiltroTaxas } from "./pendencias.ts";
+import { csvPix, listarPix, marcarPix, type FiltroPix } from "./pix.ts";
 
 export const rotasOperacao = Router();
 const hojeBr = () => agoraBr().toISOString().slice(0, 10);
@@ -188,16 +192,37 @@ rotasOperacao.put("/programadas/:id", central, ok(async (req, res) => {
   res.json({ corrida: { id: nova.id, os: nova.os } });
 }));
 
-const SIT: Array<S.SituacaoPendencia | "todos"> = ["pendente", "paga", "abonada", "todos"];
-rotasOperacao.get("/pendencias", ok((req, res) => {
-  const s = SIT.includes(q(req, "status") as S.SituacaoPendencia) ? (q(req, "status") as S.SituacaoPendencia | "todos") : "pendente";
-  res.json(S.pendencias(emp(req), s, q(req, "busca"), pag(req)));
-}));
+// Período dos filtros: "todos" (ou vazio) não filtra por data; senão usa os atalhos do financeiro (hoje, ultimos_30, personalizado...).
+const faixa = (req: Request): { inicio?: string; fim?: string } => {
+  const p = q(req, "periodo");
+  if (!p || p === "todos") return { inicio: dataOk(q(req, "inicio")) || undefined, fim: dataOk(q(req, "fim")) || undefined };
+  const r = periodo(p, q(req, "inicio"), q(req, "fim"));
+  return { inicio: r.inicio, fim: r.fim };
+};
+const filtroPendencias = (req: Request): FiltroPendencias => ({ ...faixa(req), tipo: q(req, "tipo"), situacao: q(req, "status") || q(req, "situacao"), busca: q(req, "busca", 80), motorista: q(req, "motorista", 80) });
+const baixarCsv = (res: Response, nome: string, csv: string) => {
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${nome}-${hojeBr()}.csv"`);
+  res.send(csv);
+};
+// Leitura para quem está logado; só o administrador muda situação ou registra (financeiro).
+rotasOperacao.get("/pendencias", ok((req, res) => res.json(listarPendencias(emp(req), filtroPendencias(req), pag(req)))));
+rotasOperacao.get("/pendencias/exportar", ok((req, res) => baixarCsv(res, "pendencias-de-pagamentos", csvPendencias(emp(req), filtroPendencias(req)))));
+rotasOperacao.post("/pendencias", exigirPapel("admin"), ok((req, res) => res.status(201).json({ pendencia: registrarPendencia(emp(req), (req.body ?? {}) as Record<string, unknown>, quem(req)) })));
 rotasOperacao.post("/pendencias/:id/:acao", exigirPapel("admin"), ok((req, res) => {
-  const acao = req.params.acao;
-  if (acao !== "baixar" && acao !== "abonar") throw new Error("Ação inválida.");
-  res.json({ pendencia: S.resolverPendencia(emp(req), req.params.id, acao, quem(req)) });
+  const acao = req.params.acao as AcaoPendencia;
+  if (!["processar", "repassar", "baixar", "abonar"].includes(acao)) throw new Error("Ação inválida.");
+  res.json({ pendencia: mudarPendencia(emp(req), req.params.id, acao, quem(req), { osColeta: String(req.body?.osColeta ?? ""), motivo: String(req.body?.motivo ?? "") }) });
 }));
+
+const filtroTaxas = (req: Request): FiltroTaxas => ({ ...faixa(req), aba: ABAS_TAXAS.find((a) => a === q(req, "aba")) ?? "todos", os: q(req, "os", 30), motorista: q(req, "motorista", 80), cliente: q(req, "cliente", 80) });
+rotasOperacao.get("/taxas-cancelamento", ok((req, res) => res.json(listarTaxas(emp(req), filtroTaxas(req), pag(req)))));
+rotasOperacao.get("/taxas-cancelamento/exportar", ok((req, res) => baixarCsv(res, "taxas-de-cancelamento", csvTaxas(emp(req), filtroTaxas(req)))));
+
+const filtroPix = (req: Request): FiltroPix => ({ ...faixa(req), os: q(req, "os", 30) || q(req, "busca", 30), motorista: q(req, "motorista", 80), situacao: q(req, "situacao") });
+rotasOperacao.get("/pix", ok((req, res) => res.json(listarPix(emp(req), filtroPix(req), pag(req)))));
+rotasOperacao.get("/pix/exportar", ok((req, res) => baixarCsv(res, "transacoes-pix", csvPix(emp(req), filtroPix(req)))));
+rotasOperacao.post("/pix/:id/situacao", exigirPapel("admin"), ok((req, res) => res.json({ pix: marcarPix(emp(req), req.params.id, String(req.body?.situacao ?? ""), String(req.body?.motivo ?? ""), quem(req)) })));
 
 rotasOperacao.get("/objetos", ok((req, res) => {
   const s = ["todos", "pendente", "resolvido"].includes(q(req, "status")) ? (q(req, "status") as "todos") : "todos";

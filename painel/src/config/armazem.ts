@@ -45,6 +45,8 @@ export function bancoConfig() {
       CREATE TABLE IF NOT EXISTS notificacoes_envios (
         empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, titulo TEXT NOT NULL, mensagem TEXT NOT NULL,
         segmento TEXT NOT NULL, destinatarios INTEGER NOT NULL, por TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (empresa, id));
+      CREATE TABLE IF NOT EXISTS central_notif_lidas (
+        empresa TEXT NOT NULL, usuario TEXT NOT NULL, chave TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (empresa, usuario, chave));
       CREATE INDEX IF NOT EXISTS notificacoes_envios_em ON notificacoes_envios (empresa, papel, em);
     `);
     criadas.add(arq);
