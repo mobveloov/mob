@@ -66,9 +66,11 @@ export function encerrarAlerta(empresaId: string, id: string, por: string): Aler
 export interface FiltroAlertas { empresa?: string; conteudo?: string; tipo?: string; status?: string }
 export function listarAlertas(empresaId: string, f: FiltroAlertas = {}) {
   const agora = agoraBr().toISOString(), b = normal(f.conteudo ?? "");
+  // Tipo e status aceitam mais de um valor separado por vírgula (caixas de marcar, como na Machine).
+  const tipos = (f.tipo ?? "").split(",").filter(Boolean), situacoes = (f.status ?? "").split(",").filter(Boolean);
   const itens = todos(empresaId)
     .filter((a) => (!f.empresa || f.empresa === "todos" ? true : f.empresa === "sem" ? !a.empresaAlvoId : a.empresaAlvoId === f.empresa)
-      && (!b || normal(a.conteudo).includes(b)) && (!f.tipo || a.tipo === f.tipo) && (!f.status || statusDoAlerta(a, agora) === f.status))
+      && (!b || normal(a.conteudo).includes(b)) && (!tipos.length || tipos.includes(a.tipo)) && (!situacoes.length || situacoes.includes(statusDoAlerta(a, agora))))
     .map((a) => ({ ...a, status: statusDoAlerta(a, agora), agendado: a.inicioEm > agora && !a.encerradoEm }))
     .sort((a, b) => b.inicioEm.localeCompare(a.inicioEm));
   return { tipos: TIPOS_ALERTA, unidades: UNIDADES_ALERTA, empresas: empresasDosAlertas(empresaId), itens };

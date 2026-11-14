@@ -1,6 +1,5 @@
 // Cadastro › Passageiros, Cupons, Empresas, Áreas, Desafios e Indicações (rotas da gestão).
 
-import { montarCsv } from "../config/financeiro-visao.ts";
 import type { Router } from "express";
 import { atualizar, criar, type Registro } from "../cadastros/armazem.ts";
 import { CUPONS_AUTOMATICOS, listarProprias, type CorridaPropria } from "../corridas/index.ts";

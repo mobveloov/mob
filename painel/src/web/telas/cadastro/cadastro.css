@@ -162,3 +162,27 @@
 .cg-auto { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 14px; font-size: 13px; }
 .cg-auto > strong { font-size: 15px; letter-spacing: .02em; }
 .cg-auto > span { color: var(--cg-suave); } .cg-auto > span strong { color: var(--cg-txt); }
+/* Áreas, Plantão e Desafios no formato da Machine */
+.cg-info-bloco { padding: 10px 14px; border-radius: 12px; background: var(--cg-cartao); border: 1px solid var(--cg-borda); font-size: 13px; }
+.cg-ordenar { background: none; border: 0; color: inherit; font: inherit; font-weight: 800; cursor: pointer; padding: 0; }
+.cg-cores { display: flex; gap: 4px; flex-wrap: wrap; }
+.cg-cor { border: 2px solid transparent; border-radius: 8px; padding: 3px 8px; color: #fff; font-size: 11px; cursor: pointer; text-shadow: 0 1px 2px #0008; }
+.cg-cor.ativa { border-color: var(--cg-txt, #fff); box-shadow: 0 0 0 2px #0006; }
+.cg-resumo-lista { color: var(--cg-suave); font-size: 12px; margin: 0 0 6px; min-height: 1em; }
+
+/* Desafios dos motoristas: cartões em duas colunas, como na Machine */
+.cg-botao.verde { background: #16a34a; color: #fff; border-color: #16a34a; }
+.cg-filtros-linha { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.cg-filtros-linha > * { flex: 1 1 170px; min-width: 0; }
+.cg-desafios-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cg-desafio { text-align: left; font: inherit; color: var(--cg-txt); background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 16px; padding: 14px; cursor: pointer; display: grid; gap: 12px; }
+.cg-desafio:hover { border-color: var(--cg-marca); }
+.cg-desafio-topo { display: flex; align-items: center; gap: 12px; }
+.cg-desafio-topo > div { flex: 1; min-width: 0; display: grid; }
+.cg-desafio-topo small { color: var(--cg-suave); }
+.cg-desafio-icone { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: #f59e0b22; color: #f59e0b; flex: 0 0 auto; }
+.cg-desafio-dados { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cg-desafio-dados div { display: grid; gap: 2px; }
+.cg-desafio-dados small { color: var(--cg-suave); font-size: 11px; }
+.cg-paginas { display: flex; gap: 6px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+@media (max-width: 860px) { .cg-desafios-grade { grid-template-columns: 1fr; } .cg-desafio-dados { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
