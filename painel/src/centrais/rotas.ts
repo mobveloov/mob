@@ -73,7 +73,7 @@ rotasCentrais.get("/extrato/:id/csv", ok((req, res) => {
 }));
 
 rotasCentrais.get("/planos", ok((req, res) => res.json(meusPlanos(emp(req), q(req, "central") || undefined))));
-rotasCentrais.put("/planos", ok((req, res) => { const p = escolherPlano(emp(req), req.body?.central, req.body?.plano); res.json({ plano: p, ...meusPlanos(emp(req), req.body?.central) }); }));
+rotasCentrais.put("/planos", ok((req, res) => { const p = escolherPlano(emp(req), req.body?.central, req.body?.plano); res.json({ ...meusPlanos(emp(req), req.body?.central), plano: p }); }));
 rotasCentrais.put("/servicos", ok((req, res) => { escolherServicos(emp(req), req.body?.central, req.body?.servicos); res.json(meusPlanos(emp(req), req.body?.central)); }));
 
 rotasCentrais.get("/demonstrativo", ok((req, res) => res.json(demonstrativo(emp(req), q(req, "central") || undefined, q(req, "competencia")))));

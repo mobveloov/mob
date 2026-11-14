@@ -13,6 +13,7 @@ import AlterarSenha from "./paginas/AlterarSenha";
 import { EmConstrucao } from "./componentes/ui";
 import { TELAS_ENTREGUES } from "./telas/registro";
 import { FaixaAlerta, Sino } from "./telas/demais/CentralNotificacoes";
+import { SeletorCentral } from "./telas/centrais/Seletor";
 import TelaCadastro from "./cadastros/TelaCadastro";
 import Financeiro from "./paginas/Financeiro";
 import Analise from "./paginas/Analise";
@@ -206,6 +207,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
           </nav>
         </div>
         <div className="barra-lado">
+          {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} />}
           <Sino />
           <button className="botao-tema" onClick={trocarTema} aria-label="Alternar Tema" title="Alternar Tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
           {usuarioMenu}
@@ -246,6 +248,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
           })}
           <div className="lateral-pref">
             <p>Preferências</p>
+            {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} classe="lateral" />}
             <NavLink to="/alterar-senha" className={({ isActive }) => `mobile-link ${isActive ? "ativo" : ""}`}><span><KeyRound size={16} /> Alterar Senha</span></NavLink>
             <button className="mobile-link" onClick={trocarTema}><span>{escuro ? <Sun size={16} /> : <Moon size={16} />} Alternar Tema</span></button>
           </div>
