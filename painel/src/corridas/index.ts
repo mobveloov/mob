@@ -4,8 +4,10 @@
 //
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
-import { aplicarDinamica } from "../config/dinamica.ts";
-import { extraDaCategoria } from "../config/categorias.ts";
+import { aplicarDinamica, type PedidoRecente } from "../config/dinamica.ts";
+import { percentualDaMatriz, type CanalDesconto, type FormaDesconto } from "../config/descontos-matriz.ts";
+import { extraDaCategoria, tarifaVigente } from "../config/categorias.ts";
+import { calcularTarifa } from "../config/tarifa-calculo.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -230,22 +232,54 @@ export function distanciaEstimada(a?: Ponto, b?: Ponto): number | null {
 const categorias = (empresaId: string) => listar(empresaId, cadastroPorId("categorias")!);
 const achar = (l: Registro[], campo: string, v: string) => l.find((r) => normal(String(r[campo] ?? "")) === normal(v));
 
-/** Preço pela tarifa da categoria. Sem tarifa cadastrada: valor null (o operador combina). */
-export function estimarPreco(empresaId: string, p: { categoria: string; distanciaKm?: number | null; minutos?: number | null; embarque?: Ponto }) {
-  const cat = achar(categorias(empresaId), "nome", p.categoria);
+/** Forma de pagamento escrita na corrida -> linha da matriz de descontos (null quando não reconhece). */
+export function formaDaMatriz(pagamento: string | undefined): FormaDesconto | null {
+  const t = normal(pagamento ?? "");
+  if (!t) return null;
+  if (t.includes("pix")) return "pix";
+  if (t.includes("dinheiro")) return "dinheiro";
+  if (t.includes("debito")) return "debito";
+  if (t.includes("app") || t.includes("online")) return "cartao_app";
+  if (t.includes("credito") || t.includes("cartao")) return "credito";
+  return null;
+}
+/** Canal da corrida -> coluna da matriz: pedidos pela central, bot e totem são "site"; os apps usam o app #1 a #4. */
+export const canalDaMatriz = (canal: Canal | undefined, app = 1): CanalDesconto => (canal === "app" ? (`app${Math.min(4, Math.max(1, Math.round(app)))}` as CanalDesconto) : "site");
+
+/** Pedidos recentes com coordenada do embarque: base das áreas automáticas da Dinâmica. */
+export function pedidosRecentes(empresaId: string): PedidoRecente[] {
+  const saida: PedidoRecente[] = [];
+  for (const c of listarProprias(empresaId)) {
+    const em = Date.parse(c.solicitadaEm);
+    if (c.embarque?.lat != null && c.embarque.lng != null && Number.isFinite(em)) saida.push({ lat: c.embarque.lat, lng: c.embarque.lng, em });
+  }
+  return saida;
+}
+
+/**
+ * Preço pela tarifa da categoria: a tarifa extra que vale neste dia e horário, ou a padrão (Config › Tarifas e categorias › Editar tarifa),
+ * e depois as tarifas dinâmicas. Sem tarifa cadastrada: valor null (o operador combina). "erro" vem quando o percurso passa do máximo da tarifa.
+ */
+export function estimarPreco(empresaId: string, p: { categoria: string; distanciaKm?: number | null; minutos?: number | null; embarque?: Ponto; destino?: Ponto; paradas?: number; minutosParado?: number; pagamento?: string; canal?: Canal; app?: number }) {
   const km = p.distanciaKm ?? null;
   const minutos = p.minutos ?? (km != null ? arred(km * 2.5, 0) : null);
-  if (!cat) return { valor: null, distanciaKm: km, minutos, categoria: null as string | null };
-  const n = (k: string) => (typeof cat[k] === "number" ? (cat[k] as number) : 0);
-  if (!n("bandeirada") && !n("valorKm") && !n("valorMinuto") && !n("valorMinimo")) return { valor: null, distanciaKm: km, minutos, categoria: String(cat.nome) };
-  let valor = n("bandeirada") + (km ?? 0) * n("valorKm") + (minutos ?? 0) * n("valorMinuto");
+  const vig = tarifaVigente(empresaId, p.categoria, agoraBr());
+  if (!vig) return { valor: null, distanciaKm: km, minutos, categoria: null as string | null, erro: null as string | null, tarifaExtra: null as string | null };
+  const cat = vig.registro;
+  const nome = String(cat.nome);
   const h = agoraBr().getUTCHours();
-  if ((h >= 23 || h < 6) && n("tarifaNoturna")) valor *= 1 + n("tarifaNoturna") / 100;
-  valor = Math.max(valor, n("valorMinimo"));
-  // Tarifas dinâmicas (Config › Tarifas Dinâmicas) ligadas à categoria: horário, área no mapa e alta demanda.
+  const noturno = (h >= 23 || h < 6) && typeof cat.tarifaNoturna === "number" ? cat.tarifaNoturna : 0;
+  const calc = calcularTarifa(vig.tarifa, { km, minutos, minutosParado: p.minutosParado, paradas: p.paradas, destinoTexto: p.destino?.texto, noturno });
+  const extra = vig.extra?.nome ?? null;
+  if (calc.valor == null) return { valor: null, distanciaKm: km, minutos, categoria: nome, erro: calc.erro ?? null, tarifaExtra: extra };
+  // Tarifas dinâmicas (Config › Tarifas Dinâmicas) ligadas à categoria: horário, área no mapa, alta demanda e áreas automáticas.
   const demanda = listarProprias(empresaId).filter((x) => x.status === "procurando" || x.status === "a_caminho" || x.status === "no_local" || x.status === "em_andamento").length;
-  valor = aplicarDinamica(empresaId, { categoria: String(cat.nome), valor: arred(valor), embarque: p.embarque, demanda }).valor;
-  return { valor: arred(valor), distanciaKm: km, minutos, categoria: String(cat.nome) };
+  const valor = aplicarDinamica(empresaId, { categoria: nome, valor: arred(calc.valor), embarque: p.embarque, demanda, pedidos: pedidosRecentes(empresaId) }).valor;
+  // Matriz de descontos por forma de pagamento (Config › Descontos): só quando se sabe a forma e o canal.
+  const forma = formaDaMatriz(p.pagamento);
+  const descontoPct = forma ? percentualDaMatriz(empresaId, forma, canalDaMatriz(p.canal, p.app)) : 0;
+  const final = descontoPct > 0 ? arred(valor * (1 - descontoPct / 100)) : arred(valor);
+  return { valor: final, valorCheio: arred(valor), descontoPct, distanciaKm: km, minutos, categoria: nome, erro: null as string | null, tarifaExtra: extra };
 }
 
 /** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). */
@@ -323,7 +357,8 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     } else if (doPassageiro.filter((c) => aindaAgendada(c)).length >= 3) throw new Error("No máximo 3 corridas agendadas por passageiro.");
 
     const km = n.distanciaKm ?? distanciaEstimada(n.embarque, n.destino);
-    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos, embarque: n.embarque });
+    const est = estimarPreco(empresaId, { categoria: n.categoria, distanciaKm: km, minutos, embarque: n.embarque, destino: n.destino, paradas: paradas.length, pagamento: n.pagamento, canal: n.canal });
+    if (est.erro) throw new Error(est.erro);
     let valorOferecido: number | undefined;
     if (n.valorOferecido != null) {
       const v = arred(Number(n.valorOferecido));
