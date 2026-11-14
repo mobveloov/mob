@@ -4,8 +4,8 @@
 import type { CorridaPainel } from "../comum/corrida.ts";
 import { agoraBr, arred, isoDia, normal, pct } from "./util.ts";
 
-export type Periodo = "hoje" | "ontem" | "semana" | "mes" | "mes_passado" | "ano_passado" | "personalizado";
-export const PERIODOS: Periodo[] = ["hoje", "ontem", "semana", "mes", "mes_passado", "ano_passado", "personalizado"];
+export type Periodo = "hoje" | "ontem" | "semana" | "semana_passada" | "mes" | "mes_passado" | "ano_passado" | "ultimo_7" | "ultimo_30" | "consolidado" | "personalizado";
+export const PERIODOS: Periodo[] = ["hoje", "ontem", "semana", "semana_passada", "mes", "mes_passado", "ano_passado", "ultimo_7", "ultimo_30", "consolidado", "personalizado"];
 
 const DIA = 86_400_000;
 const diaUtc = (s: string) => Date.parse(`${s}T00:00:00Z`);
@@ -19,6 +19,10 @@ export function datasDoPeriodo(p: Periodo, ini?: string, fim?: string, agora = a
   let inicio = hoje, final = hoje;
   if (p === "ontem") inicio = final = somar(hoje, -1);
   else if (p === "semana") inicio = somar(hoje, -((agora.getUTCDay() + 6) % 7)); // desde segunda-feira
+  else if (p === "semana_passada") { inicio = somar(hoje, -((agora.getUTCDay() + 6) % 7) - 7); final = somar(inicio, 6); }
+  else if (p === "ultimo_7") inicio = somar(hoje, -6);
+  else if (p === "ultimo_30") inicio = somar(hoje, -29);
+  else if (p === "consolidado") inicio = "2020-01-01";
   else if (p === "mes") inicio = isoDia(new Date(Date.UTC(a, m, 1)));
   else if (p === "mes_passado") { inicio = isoDia(new Date(Date.UTC(a, m - 1, 1))); final = isoDia(new Date(Date.UTC(a, m, 0))); }
   else if (p === "ano_passado") { inicio = `${a - 1}-01-01`; final = `${a - 1}-12-31`; }
@@ -40,6 +44,15 @@ const resumo = (lista: CorridaPainel[]) => {
   return { total: lista.length, fin, ganhos, ticket: fin.length ? arred(ganhos / fin.length) : 0, motoristas, porMotorista: motoristas ? arred(fin.length / motoristas) : 0 };
 };
 
+/** Origem das corridas finalizadas: sempre as quatro da Machine (mesmo com zero) mais as outras que aparecerem. */
+function origens(nomes: string[]) {
+  const trocados = nomes.map((n) => NOMES_ORIGEM[n] ?? n);
+  const total = trocados.length;
+  const m = new Map<string, number>(ORIGENS_FIXAS.map((n) => [n, 0]));
+  for (const n of trocados) m.set(n, (m.get(n) ?? 0) + 1);
+  return [...m.entries()].map(([nome, v]) => ({ nome, valor: v, pct: pct(v, total) })).sort((x, y) => y.valor - x.valor);
+}
+
 function contagem(nomes: string[], valores?: number[]) {
   const m = new Map<string, number>();
   nomes.forEach((n, i) => m.set(n, (m.get(n) ?? 0) + (valores ? valores[i] : 1)));
@@ -56,7 +69,7 @@ function quemCancelou(s: string): "motorista" | "passageiro" | "central" {
 }
 
 /** Série dos gráficos: por hora (um dia), por dia (até 62 dias) ou por mês. */
-function serie(lista: CorridaPainel[], inicio: string, fim: string, dias: number) {
+export function serie(lista: CorridaPainel[], inicio: string, fim: string, dias: number) {
   const modo = dias === 1 ? "hora" : dias <= 62 ? "dia" : "mes";
   const chaves: string[] = [];
   if (modo === "hora") for (let h = 0; h < 24; h++) chaves.push(String(h).padStart(2, "0"));
@@ -102,6 +115,33 @@ export const diaBrasilia = (iso: string) => {
   return Number.isNaN(t) ? "" : isoDia(new Date(t - 3 * 3600_000));
 };
 
+/** Texto de "Comparado com ...": Anteontem quando o período é Ontem, Ontem quando é Hoje; nos demais, as datas. */
+export function rotuloAnterior(p: Periodo, d: ReturnType<typeof datasDoPeriodo>, agora = agoraBr()) {
+  const hoje = isoDia(agora);
+  if (d.dias === 1 && d.inicio === hoje) return "Ontem";
+  if (d.dias === 1 && d.inicio === somar(hoje, -1)) return "Anteontem";
+  const br = (s: string) => s.split("-").reverse().join("/");
+  return d.antInicio === d.antFim ? br(d.antInicio) : `${br(d.antInicio)} a ${br(d.antFim)}`;
+}
+
+const NOMES_ORIGEM: Record<string, string> = { App: "Aplicativo", "": "Não informada" };
+const ORIGENS_FIXAS = ["Aplicativo", "Maçaneta", "Integração", "Site"];
+
+/** NPS e a divisão em detratores, neutros e promotores. Estrelas de 1 a 5: 5 promove, 4 é neutro, até 3 é detrator. */
+export function distribuicaoNps(notas: number[]) {
+  const n = notas.length;
+  if (!n) return { nps: null as number | null, respondentes: 0, detratores: 0, neutros: 0, promotores: 0 };
+  const dez = notas.some((x) => x > 5);
+  const prom = notas.filter((x) => (dez ? x >= 9 : x >= 5)).length, detr = notas.filter((x) => (dez ? x <= 6 : x <= 3)).length;
+  const p = (x: number) => Math.round((x / n) * 100);
+  return { nps: Math.round(((prom - detr) / n) * 100), respondentes: n, detratores: p(detr), neutros: p(n - prom - detr), promotores: p(prom) };
+}
+
+/** Métricas de avaliação: NPS de quem pede corrida (nota ao motorista) e de quem dirige (nota ao passageiro). */
+export function metricasNps(notasPassageiros: number[], notasMotoristas: number[]) {
+  return { passageiros: distribuicaoNps(notasPassageiros), motoristas: distribuicaoNps(notasMotoristas) };
+}
+
 export function calcularIndicadores(atual: CorridaPainel[], anterior: CorridaPainel[], p: ReturnType<typeof datasDoPeriodo>, passageiros: { atual: number; anterior: number }) {
   const a = resumo(atual), b = resumo(anterior);
   const can = atual.filter((c) => c.grupo === "cancelada");
@@ -111,15 +151,15 @@ export function calcularIndicadores(atual: CorridaPainel[], anterior: CorridaPai
   return {
     periodo: { inicio: p.inicio, fim: p.fim, anteriorInicio: p.antInicio, anteriorFim: p.antFim },
     corridas: {
-      total: a.total, finalizadas: a.fin.length, canceladas: can.length, naoAtendidas: atual.filter((c) => c.grupo === "nao_atendida").length,
+      anterior: b.total, total: a.total, finalizadas: a.fin.length, canceladas: can.length, naoAtendidas: atual.filter((c) => c.grupo === "nao_atendida").length,
       emAndamento: atual.filter((c) => c.grupo === "aberta").length, canceladasPor: porQuem, variacao: variacao(a.total, b.total),
     },
-    origens: contagem(a.fin.map((c) => c.canal || c.origemNome || "Não informada")),
-    ganhos: { total: a.ganhos, variacao: variacao(a.ganhos, b.ganhos), porPagamento: contagem(a.fin.map((c) => c.pagamento || "Não informado"), a.fin.map((c) => c.valor ?? 0)) },
-    ticketMedio: { valor: a.ticket, variacao: variacao(a.ticket, b.ticket) },
-    motoristasAtivos: { valor: a.motoristas, variacao: variacao(a.motoristas, b.motoristas) },
-    corridasPorMotorista: { valor: a.porMotorista, variacao: variacao(a.porMotorista, b.porMotorista) },
-    passageirosCadastrados: { valor: passageiros.atual, variacao: variacao(passageiros.atual, passageiros.anterior) },
+    origens: origens(a.fin.map((c) => c.canal || c.origemNome || "")),
+    ganhos: { anterior: b.ganhos, total: a.ganhos, variacao: variacao(a.ganhos, b.ganhos), porPagamento: contagem(a.fin.map((c) => c.pagamento || "Não informado"), a.fin.map((c) => c.valor ?? 0)) },
+    ticketMedio: { anterior: b.ticket, valor: a.ticket, variacao: variacao(a.ticket, b.ticket) },
+    motoristasAtivos: { anterior: b.motoristas, valor: a.motoristas, variacao: variacao(a.motoristas, b.motoristas) },
+    corridasPorMotorista: { anterior: b.porMotorista, valor: a.porMotorista, variacao: variacao(a.porMotorista, b.porMotorista) },
+    passageirosCadastrados: { anterior: passageiros.anterior, valor: passageiros.atual, variacao: variacao(passageiros.atual, passageiros.anterior) },
     nota: { media: notas.length ? arred(notas.reduce((x, y) => x + y, 0) / notas.length) : null, avaliacoes: notas.length, nps: nps(notas) },
     serie: serie(atual, p.inicio, p.fim, p.dias),
   };

@@ -17,7 +17,7 @@ import { CAMPOS, pendenciasDoMotor, type TipoMotor } from "./fontes/motor.ts";
 import { apagarCookie, criarCookie, errouLogin, exigirLogin, exigirPapel, podeTentar } from "./sessao.ts";
 import { rotasCadastros } from "../cadastros/rotas.ts";
 import { rotasCorridasProprias } from "../corridas/rotas.ts";
-import { encerrarSemMotorista } from "../corridas/index.ts";
+import { encerrarSemMotorista, listarProprias } from "../corridas/index.ts";
 import { rotasBot } from "../bot/rotas.ts";
 import { rotasTotem } from "../totem/rotas.ts";
 import { router as rotasCrm } from "../crm/rotas.ts";
@@ -28,7 +28,7 @@ import { rotasExtrasCentral } from "../apps/extras.ts";
 import { rotasGestao } from "../gestao/rotas.ts";
 import { rotasEngajamento } from "../engajamento/rotas.ts";
 import { iniciarApps } from "../apps/despacho.ts";
-import { calcularIndicadores, datasDoPeriodo, diaBrasilia, PERIODOS, type Periodo } from "./indicadores.ts";
+import { calcularIndicadores, datasDoPeriodo, diaBrasilia, metricasNps, PERIODOS, rotuloAnterior, serie as serieDeCorridas, type Periodo } from "./indicadores.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar as listarCadastro } from "../cadastros/armazem.ts";
 import { normal } from "./util.ts";
@@ -210,14 +210,33 @@ app.get("/api/indicadores", ok(async (req, res) => {
     buscarCorridas(empresaId, { inicio: p.antInicio, fim: p.antFim }),
   ]);
   const daCidade = <T,>(l: T[]) => (cidade ? l.filter((c) => normal((c as { cidade?: unknown }).cidade) === cidade) : l);
+  // Métricas de avaliação (NPS) e comparativos têm período próprio, como na Machine.
+  const outro = (chave: string, padrao: Periodo) => {
+    const per: Periodo = PERIODOS.includes(q[chave] as Periodo) ? (q[chave] as Periodo) : padrao;
+    return { per, datas: datasDoPeriodo(per, q[chave + "Inicio"], q[chave + "Fim"]) };
+  };
+  const metricas = async () => {
+    const { per, datas } = outro("nps", "consolidado");
+    const r = await buscarCorridas(empresaId, { inicio: datas.inicio, fim: datas.fim });
+    const notasP = daCidade(r.corridas).filter((c) => c.avaliacao != null).map((c) => c.avaliacao!);
+    const notasM = listarProprias(empresaId).filter((c) => c.avaliacaoPassageiro && (c.finalizadaEm ?? c.solicitadaEm ?? "").slice(0, 10) >= datas.inicio && (c.finalizadaEm ?? c.solicitadaEm ?? "").slice(0, 10) <= datas.fim).map((c) => c.avaliacaoPassageiro!.nota);
+    return { periodo: per, inicio: datas.inicio, fim: datas.fim, ...metricasNps(notasP, notasM) };
+  };
+  const comparativos = async () => {
+    const { per, datas } = outro("serie", "ultimo_7");
+    const r = await buscarCorridas(empresaId, { inicio: datas.inicio, fim: datas.fim });
+    return { periodo: per, inicio: datas.inicio, fim: datas.fim, serie: serieDeCorridas(daCidade(r.corridas), datas.inicio, datas.fim, datas.dias) };
+  };
   const cidades = [...new Set([...atual.corridas, ...anterior.corridas].map((c) => c.cidade.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
   // Passageiros cadastrados no período (cadastro de passageiros da empresa).
   const cad = cadastroPorId("clientes");
   const pax = cad ? daCidade(listarCadastro(empresaId, cad)).map((r) => diaBrasilia(String(r.criadoEm))) : [];
   const conta = (de: string, ate: string) => pax.filter((d) => d && d >= de && d <= ate).length;
   res.json({
-    avisos: atual.avisos, cidades,
+    avisos: atual.avisos, cidades, rotuloAnterior: rotuloAnterior(periodo, p),
     indicadores: calcularIndicadores(daCidade(atual.corridas), daCidade(anterior.corridas), p, { atual: conta(p.inicio, p.fim), anterior: conta(p.antInicio, p.antFim) }),
+    metricas: await metricas(),
+    comparativos: await comparativos(),
   });
 }));
 
