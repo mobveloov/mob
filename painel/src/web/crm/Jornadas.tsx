@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play, Plus, Save, Trash2 } from "lucide-react";
 import { Cartao, Gaveta, Titulo, useCarregar } from "../componentes/ui";
 import { crm, quando, type Jornada } from "./api";
-import { EditorRegras, useAdmin, useRetorno, Variaveis } from "./comum";
+import { EditorRegras, useGestor, useRetorno, Variaveis } from "./comum";
 
 const NOVA: Partial<Jornada> = { nome: "", ativa: false, gatilho: { tipo: "sem-corrida", dias: 15 }, publico: { tipo: "passageiro" }, texto: "Oi {primeiro_nome}! Faz {dias_sem_corrida} dias que você não pede uma corrida com a {empresa}. Estamos esperando você!", cupom: "" };
 const GATILHO: Record<string, string> = { "sem-corrida": "Sem corrida há", cancelou: "Cancelou a última corrida há até" };
@@ -12,7 +12,7 @@ export default function CrmJornadas() {
   const { dados, erro, recarregar } = useCarregar(() => crm.jornadas(), [], 15_000);
   const [editando, setEditando] = useState<Partial<Jornada> | null>(null);
   const { tentar, caixa } = useRetorno();
-  const admin = useAdmin();
+  const admin = useGestor();
   return (
     <>
       <Titulo titulo="Jornadas e gatilhos" sub="Mensagens automáticas: quem some ou cancela recebe uma vez (até voltar a pedir). Confere a cada hora.">

@@ -1,5 +1,6 @@
 // Peças comuns das telas do CRM: editor de regras (segmento) com contagem ao vivo e mensagens de retorno.
 
+import { podeCargo } from "../../comum/cargos.ts";
 import { useEffect, useState, type ReactNode } from "react";
 import { Users } from "lucide-react";
 import { useSessao } from "../App";
@@ -18,7 +19,8 @@ export function Selo({ estado }: { estado: string }) {
 }
 
 /** É admin (ou plataforma)? Operador não dispara nem configura o envio. */
-export const useAdmin = () => useSessao().sessao.usuario.papel !== "operador";
+export const useAdmin = () => podeCargo(useSessao().sessao.usuario.papel, "admin");
+export const useGestor = () => podeCargo(useSessao().sessao.usuario.papel, "gestor");
 
 /** Mensagem de retorno de uma ação (ok ou erro). */
 export function useRetorno() {

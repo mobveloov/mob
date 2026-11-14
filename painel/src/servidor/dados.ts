@@ -13,13 +13,14 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { ehCargo, type Cargo } from "../comum/cargos.ts";
 import { MARCA_PADRAO, sanearMarca, type Marca } from "../comum/marca.ts";
 import { gravarJson, lerJson } from "./jsoncache.ts";
 
 export type TipoIntegracao = "sistema-a" | "sistema-b" | "arquivo" | "exemplo";
 export interface Integracao { id: string; tipo: TipoIntegracao; nome: string; ativa: boolean }
 export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean }
-export type Papel = "plataforma" | "admin" | "operador";
+export type Papel = Cargo; // plataforma = ADMIN Mestre, admin = ADMIN, gestor, operador (src/comum/cargos.ts)
 export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string; telefone?: string }
 export interface Segredos { integracoes: Record<string, Record<string, string>>; ia: Record<string, string> }
 
@@ -140,6 +141,16 @@ export function criarUsuario(u: { email: string; nome: string; senha: string; em
   const novo: Usuario = { id: crypto.randomUUID(), email, nome: u.nome.trim().slice(0, 80) || email, hash: hashSenha(u.senha), empresaId: u.empresaId, papel: u.papel, criadoEm: new Date().toISOString() };
   gravar(arqUsuarios(), [...listarUsuarios(), novo], true);
   return novo;
+}
+
+/** Migração dos cargos: todo usuário fica com um cargo válido (o que não é reconhecido vira operador) e a plataforma sempre tem um ADMIN Mestre.
+ *  Os cargos antigos (plataforma, admin, operador) continuam valendo como estão: ninguém perde o acesso. Devolve quantos mudaram. */
+export function migrarCargos(): number {
+  const lista = listarUsuarios().map((u) => ({ ...u }));
+  let mudou = 0;
+  for (const u of lista) if (!ehCargo(u.papel)) { u.papel = "operador"; mudou++; }
+  if (mudou) gravar(arqUsuarios(), lista, true);
+  return mudou;
 }
 
 export function removerUsuario(id: string, empresaId: string) {

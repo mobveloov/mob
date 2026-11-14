@@ -9,13 +9,13 @@ import { rotasOutros } from "./outros.ts";
 
 export { regraDeCobrancaDoMotorista } from "./cobranca.ts";
 
-const PAPEIS: Papel[] = ["admin", "operador"];
+const PAPEIS: Papel[] = ["admin", "gestor", "operador"];
 
 export const rotasGestao = Router();
 rotasMotoristas(rotasGestao);
 rotasOutros(rotasGestao);
 
-// Equipe: os usuários do painel (cargos Administrador e Operador).
+// Equipe: os usuários do painel (cargos ADMIN, Gestor e Operador).
 const publico = ({ hash: _h, ...u }: ReturnType<typeof listarUsuarios>[number]) => u;
 rotasGestao.get("/equipe", ok((req, res) => {
   res.json({ equipe: listarUsuarios().filter((u) => u.empresaId === emp(req)).map(publico).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) });

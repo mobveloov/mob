@@ -1,7 +1,7 @@
 // Config › Descontos: matriz por forma de pagamento (site e app #1 a #4) e desconto máximo por empresa, como na Machine.
 
 import { useState } from "react";
-import { Aviso, Cab, Carregando, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Aviso, Cab, Carregando, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 const CANAIS: Array<[string, string]> = [["site", "Site"], ["app1", "App #1"], ["app2", "App #2"], ["app3", "App #3"], ["app4", "App #4"], ["maximo", "Máximo da empresa"]];
 const num = (v: string) => (v === "" ? 0 : Number(v.replace(/\./g, "").replace(",", ".")) || 0);
@@ -9,7 +9,7 @@ const txt = (n: number) => (n ? String(n).replace(".", ",") : "");
 const rotulo = (n: number) => (n > 0 ? `${String(n).replace(".", ",")}%` : "Nenhum");
 
 export function DescontosMatriz() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/descontos-matriz"), []);
   const [m, setM] = useState<any>(null), [lido, setLido] = useState<unknown>(null), [editando, setEditando] = useState(false);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setM(structuredClone(d.dados.matriz)); }

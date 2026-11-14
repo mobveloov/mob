@@ -1,12 +1,13 @@
 // Conversa com o servidor (/api). O painel não sabe de qual sistema veio cada corrida: só a etiqueta de origem.
 
 import type { CorridaPainel, Filtro, GrupoStatus } from "../comum/corrida.ts";
+import type { Cargo } from "../comum/cargos.ts";
 import type { Marca } from "../comum/marca.ts";
 
 export type { CorridaPainel, Filtro, GrupoStatus, Marca };
 
 export interface Sessao {
-  usuario: { id: string; nome: string; email: string; telefone?: string; papel: "plataforma" | "admin" | "operador" };
+  usuario: { id: string; nome: string; email: string; telefone?: string; papel: Cargo; cargo?: string };
   empresa: { id: string; nome: string };
   marca: Marca;
   empresas?: Array<{ id: string; nome: string }>;

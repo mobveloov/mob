@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { valorDinamica } from "./Dinamica";
 import { DetalhesTarifas, JanelaTarifa } from "./EditarTarifa";
-import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 const passos = [["basico", "Básico"], ["tarifas", "Tarifas & Negociação"], ["dinamica", "Dinâmica"], ["comissao", "Comissão"]] as const;
 type Passo = (typeof passos)[number][0];
@@ -23,7 +23,7 @@ const VAZIA = {
 };
 
 export function Categorias() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/categorias"), []);
   const [cidade, setCidade] = useState(""), [busca, setBusca] = useState("");
   const [edit, setEdit] = useState<any>(null);

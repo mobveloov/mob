@@ -3,6 +3,7 @@
 // Lista com filtros e contadores por situação, janela do motorista (Geral, Veículos, Financeiro, Documentos,
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
+import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request as Req, type Router } from "express";
 import { PAGAMENTOS_MACHINE, SITUACOES_MOTORISTA } from "../comum/cadastros.ts";
 import { atualizar, criar, remover, type Registro } from "../cadastros/armazem.ts";
@@ -236,7 +237,7 @@ export function rotasMotoristas(r: Router) {
   }));
 
   // Taxa, saldo mínimo, saque e regra de cobrança do motorista: só administrador (operador não grava, nem sem querer).
-  const ehAdmin = (req: Req) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+  const ehAdmin = (req: Req) => podeCargo(req.ctx!.usuario.papel, "admin");
   const semFinanceiro = (req: Req, d: Record<string, unknown>) => (ehAdmin(req) ? d : Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith("cobranca") && !CAMPOS_SENSIVEIS.includes(k))));
 
   /** Confere o CPF contra os outros motoristas da empresa (cada pessoa só aparece uma vez). */

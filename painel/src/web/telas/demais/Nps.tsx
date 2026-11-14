@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { baixar } from "../../api";
-import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, dataBr, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, dataBr, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 type Papel = "motorista" | "passageiro";
 const PapelAbas = ({ valor, onChange }: { valor: Papel; onChange: (p: Papel) => void }) => <Abas abas={[["motorista", "Motoristas"], ["passageiro", "Passageiros"]]} valor={valor} onChange={onChange} />;
@@ -11,7 +11,7 @@ const PapelAbas = ({ valor, onChange }: { valor: Papel; onChange: (p: Papel) => 
 // ------------------------------------------------------------------ Configuração NPS
 
 export function ConfigNps() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [papel, setPapel] = useState<Papel>("passageiro");
   const d = useCarregar(() => pedirConfig(`/nps/${papel}`), [papel]);
   const [c, setC] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
@@ -138,7 +138,7 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
 }
 
 export function Avaliacoes() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [papel, setPapel] = useState<Papel>("passageiro");
   const [aba, setAba] = useState<"avaliacoes" | "contestacoes" | "reclamacoes">("avaliacoes");
   const d = useCarregar(() => pedirConfig(`/nps/${papel}`), [papel]);

@@ -1,5 +1,6 @@
 // Rotas do painel para Financeiro, Comunicação, Config, Avaliações e Ajuda (montadas em /api/config, depois do login).
 
+import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request, type Response } from "express";
 import fs from "node:fs";
 import { resolverSaque } from "../apps/extras.ts";
@@ -38,6 +39,7 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
 const emp = (req: Request) => req.ctx!.empresaId;
 const quem = (req: Request) => req.ctx!.usuario.email;
 const admin = exigirPapel("admin");
+const gestor = exigirPapel("gestor");
 const q = (req: Request, k: string) => String(req.query[k] ?? "");
 const per = (req: Request) => periodo(q(req, "periodo"), q(req, "inicio"), q(req, "fim"));
 const papelCart = (v: string) => (v === "motorista" ? "motorista" : "passageiro") as "motorista" | "passageiro";
@@ -117,12 +119,12 @@ rotasConfig.delete("/notificacoes/agendar/:id", exigirPapel("admin", "operador")
 // ------------------------------------------------------------------ config: gerais do app
 
 rotasConfig.get("/gerais", ok((req, res) => res.json({ ...gerais(emp(req)), categoriasNomes: categoriasCompletas(emp(req)).map((c) => ({ id: c.id, nome: c.nome })) })));
-rotasConfig.put("/gerais", admin, ok((req, res) => res.json(salvarGerais(emp(req), req.body))));
-rotasConfig.post("/gerais/banners", admin, express.raw({ type: "image/*", limit: MAX_BANNER }), ok((req, res) => {
+rotasConfig.put("/gerais", gestor, ok((req, res) => res.json(salvarGerais(emp(req), req.body))));
+rotasConfig.post("/gerais/banners", gestor, express.raw({ type: "image/*", limit: MAX_BANNER }), ok((req, res) => {
   const bytes = req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array();
   res.json({ banner: adicionarBanner(emp(req), String(req.headers["content-type"] ?? ""), bytes, q(req, "link"), q(req, "tipo")) });
 }));
-rotasConfig.delete("/gerais/banners/:id", admin, ok((req, res) => { removerBanner(emp(req), req.params.id); res.json({ ok: true }); }));
+rotasConfig.delete("/gerais/banners/:id", gestor, ok((req, res) => { removerBanner(emp(req), req.params.id); res.json({ ok: true }); }));
 rotasConfig.get("/gerais/banners/:id", ok((req, res) => {
   const a = arquivoDoBanner(emp(req), req.params.id);
   if (!a) return res.status(404).json({ erro: "Banner não encontrado." });
@@ -136,20 +138,20 @@ rotasConfig.get("/apps", ok((req, res) => res.json(configDosApps(emp(req)))));
 // ------------------------------------------------------------------ config: crédito, categorias, dinâmicas, descontos
 
 rotasConfig.get("/credito", ok((req, res) => res.json({ ...credito(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
-rotasConfig.put("/credito", admin, ok((req, res) => res.json(salvarCredito(emp(req), req.body))));
-rotasConfig.post("/credito/regras", admin, ok((req, res) => res.json(salvarRegraComissao(emp(req), req.body))));
-rotasConfig.delete("/credito/regras/:id", admin, ok((req, res) => res.json(removerRegraComissao(emp(req), req.params.id))));
+rotasConfig.put("/credito", gestor, ok((req, res) => res.json(salvarCredito(emp(req), req.body))));
+rotasConfig.post("/credito/regras", gestor, ok((req, res) => res.json(salvarRegraComissao(emp(req), req.body))));
+rotasConfig.delete("/credito/regras/:id", gestor, ok((req, res) => res.json(removerRegraComissao(emp(req), req.params.id))));
 
 rotasConfig.get("/categorias", ok((req, res) => res.json({ categorias: categoriasCompletas(emp(req)), dinamicas: dinamicas(emp(req)), automacoes: automacoes(emp(req)), metodos: ROTULO_METODO, regras: credito(emp(req)).regras, icones: ICONES })));
-rotasConfig.post("/categorias", admin, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), null, req.body ?? {}, quem(req)) })));
-rotasConfig.put("/categorias/:id", admin, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
-rotasConfig.delete("/categorias/:id", admin, ok((req, res) => { removerCategoria(emp(req), req.params.id); res.json({ ok: true }); }));
+rotasConfig.post("/categorias", gestor, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), null, req.body ?? {}, quem(req)) })));
+rotasConfig.put("/categorias/:id", gestor, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
+rotasConfig.delete("/categorias/:id", gestor, ok((req, res) => { removerCategoria(emp(req), req.params.id); res.json({ ok: true }); }));
 
 // Editar tarifa (Machine): tarifa padrão e tarifas extras por dia e horário. Só o admin altera.
-rotasConfig.put("/categorias/:id/tarifa", admin, ok((req, res) => res.json({ categoria: salvarTarifaPadrao(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
-rotasConfig.post("/categorias/:id/tarifas-extras", admin, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: undefined }) })));
-rotasConfig.put("/categorias/:id/tarifas-extras/:extra", admin, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
-rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", admin, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
+rotasConfig.put("/categorias/:id/tarifa", gestor, ok((req, res) => res.json({ categoria: salvarTarifaPadrao(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
+rotasConfig.post("/categorias/:id/tarifas-extras", gestor, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: undefined }) })));
+rotasConfig.put("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
+rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
 
 /** Tudo da tela Tarifas dinâmicas: regras manuais (com a faixa da legenda), automações, áreas automáticas abertas agora e a prioridade. */
 const painelDinamicas = (empresaId: string) => ({
@@ -161,25 +163,25 @@ const painelDinamicas = (empresaId: string) => ({
   legenda: LEGENDA_DINAMICA,
 });
 rotasConfig.get("/dinamicas", ok((req, res) => res.json(painelDinamicas(emp(req)))));
-rotasConfig.post("/dinamicas", admin, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.post("/dinamicas/:id/ativa", admin, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.put("/dinamicas-prioridade", admin, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.post("/dinamicas-automacoes", admin, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.post("/dinamicas-automacoes/:id/ativa", admin, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.delete("/dinamicas-automacoes/:id", admin, ok((req, res) => { removerAutomacao(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.delete("/dinamicas/:id", admin, ok((req, res) => { removerDinamica(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas", gestor, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas/:id/ativa", gestor, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.put("/dinamicas-prioridade", gestor, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas-automacoes", gestor, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas-automacoes/:id/ativa", gestor, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.delete("/dinamicas-automacoes/:id", gestor, ok((req, res) => { removerAutomacao(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.delete("/dinamicas/:id", gestor, ok((req, res) => { removerDinamica(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
 
 rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
-rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
-rotasConfig.delete("/descontos/:id", admin, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
+rotasConfig.post("/descontos", gestor, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
+rotasConfig.delete("/descontos/:id", gestor, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
 // Matriz por forma de pagamento x site/app #1 a #4 e desconto máximo da empresa (convive com os descontos por campanha acima).
 rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)) })));
-rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
+rotasConfig.put("/descontos-matriz", gestor, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
 
 // ------------------------------------------------------------------ config: despacho, transbordos, integrações
 
 rotasConfig.get("/despacho", ok((req, res) => res.json(regrasDespacho(emp(req)))));
-rotasConfig.put("/despacho", admin, ok((req, res) => res.json(salvarDespacho(emp(req), req.body))));
+rotasConfig.put("/despacho", gestor, ok((req, res) => res.json(salvarDespacho(emp(req), req.body))));
 rotasConfig.get("/transbordos", ok((req, res) => {
   const hoje = agoraBr().toISOString().slice(0, 10);
   const p = periodo("personalizado", q(req, "inicio") || hoje.slice(0, 8) + "01", q(req, "fim") || hoje);
@@ -187,7 +189,7 @@ rotasConfig.get("/transbordos", ok((req, res) => {
 }));
 
 // Transações financeiras (formato da Machine): plano, quem recebe, taxa de cartão, Pix e dados bancários (estes só o admin vê e grava).
-const ehAdmin = (req: Request) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+const ehAdmin = (req: Request) => podeCargo(req.ctx!.usuario.papel, "admin");
 rotasConfig.get("/integracao-financeira", ok((req, res) => res.json(visaoIntegracao(emp(req), ehAdmin(req)))));
 rotasConfig.put("/integracao-financeira", admin, ok((req, res) => {
   if (req.body?.banco && typeof req.body.banco === "object") salvarDadosBancarios(emp(req), req.body.banco);
@@ -213,14 +215,14 @@ const filtroNps = (req: Request) => {
 /** Avaliações (NPS): nota, promotores, neutros, detratores e a lista paginada, com filtros de período, tipo, e-mail e telefone. */
 rotasConfig.get("/nps/:papel/avaliacoes", ok((req, res) => res.json({ ...avaliacoesNps(emp(req), papelNps(req.params.papel), filtroNps(req), Number(req.query.pagina) || 1), periodos: PERIODOS_NPS, tipos: TIPOS_NPS })));
 rotasConfig.get("/nps/:papel/exportar", ok((req, res) => res.json({ nome: `nps-${papelNps(req.params.papel)}-${agoraBr().toISOString().slice(0, 10)}.csv`, csv: csvAvaliacoes(emp(req), papelNps(req.params.papel), filtroNps(req)) })));
-rotasConfig.put("/nps/:papel", admin, ok((req, res) => res.json({ config: salvarConfigNps(emp(req), papelNps(req.params.papel), req.body) })));
-rotasConfig.post("/nps/:papel/resetar", admin, ok((req, res) => res.json({ removidas: resetarRecusas(emp(req), papelNps(req.params.papel)) })));
+rotasConfig.put("/nps/:papel", gestor, ok((req, res) => res.json({ config: salvarConfigNps(emp(req), papelNps(req.params.papel), req.body) })));
+rotasConfig.post("/nps/:papel/resetar", gestor, ok((req, res) => res.json({ removidas: resetarRecusas(emp(req), papelNps(req.params.papel)) })));
 
 rotasConfig.get("/termos", ok((req, res) => res.json(termos(emp(req)))));
-rotasConfig.put("/termos", admin, ok((req, res) => res.json(salvarTermos(emp(req), req.body ?? {}))));
+rotasConfig.put("/termos", gestor, ok((req, res) => res.json(salvarTermos(emp(req), req.body ?? {}))));
 
 rotasConfig.get("/ajuda", ok((req, res) => res.json(ajuda(emp(req)))));
-rotasConfig.put("/ajuda", admin, ok((req, res) => res.json(salvarAjuda(emp(req), req.body))));
+rotasConfig.put("/ajuda", gestor, ok((req, res) => res.json(salvarAjuda(emp(req), req.body))));
 
 // Agendamentos de notificação: confere a cada minuto (não roda nos testes).
 if (process.env.NODE_ENV !== "test") {

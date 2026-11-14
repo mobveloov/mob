@@ -1,5 +1,6 @@
 // Mapa de engajamento no formato da Machine: abas Motoristas, Passageiros e Histórico; filtros de situação e
 // categoria (motoristas); uma seção por indicador, com régua dos limites, três cartões e o menu Ações.
+import { podeCargo } from "../../../comum/cargos.ts";
 import { useEffect, useRef, useState } from "react";
 import { useSessao } from "../../App";
 import { Titulo } from "../../componentes/ui";
@@ -50,7 +51,7 @@ function Multi({ rotulo, itens, marcados, onAplicar }: { rotulo: string; itens: 
 
 export default function Engajamento() {
   const { sessao } = useSessao();
-  const admin = sessao.usuario.papel !== "operador";
+  const admin = podeCargo(sessao.usuario.papel, "admin");
   const [aba, setAba] = useState<Aba>("motoristas");
   const [abertas, setAbertas] = useState<string[]>([]);
   const [situacoes, setSituacoes] = useState<string[]>(["A"]);

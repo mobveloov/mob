@@ -1,10 +1,11 @@
+import { NOME_CARGO } from "../..//comum/cargos.ts";
 import { useState, type FormEvent } from "react";
 import { Eye, EyeOff, Lock, Mail, Phone, Save, ShieldCheck, User } from "lucide-react";
 import { api } from "../api";
 import { useSessao } from "../App";
 import { Titulo } from "../componentes/ui";
 
-const CARGO: Record<string, string> = { plataforma: "Plataforma", admin: "Gestor", operador: "Operador" };
+const CARGO: Record<string, string> = NOME_CARGO;
 
 /** Campo de senha com o olho para mostrar/ocultar. */
 function CampoSenha({ rotulo, valor, onChange, auto }: { rotulo: string; valor: string; onChange: (v: string) => void; auto: string }) {
