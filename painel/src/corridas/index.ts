@@ -4,6 +4,7 @@
 //
 // Usado por: painel (Solicitar corrida, Consultar corridas), bot de WhatsApp, totem e CRM.
 
+import { cobrancas, formaDaTaxa, somaCobrancas } from "../config/taxas.ts";
 import { aplicarDinamica, type PedidoRecente } from "../config/dinamica.ts";
 import { percentualDaMatriz, type CanalDesconto, type FormaDesconto } from "../config/descontos-matriz.ts";
 import { extraDaCategoria, tarifaVigente } from "../config/categorias.ts";
@@ -16,6 +17,7 @@ import path from "node:path";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { corridaVazia, type CorridaPainel, type GrupoStatus } from "../comum/corrida.ts";
 import { listar, mesclar, type Registro } from "../cadastros/armazem.ts";
+import { filial as acharFilial, filialDe } from "../filiais/filiais.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
 import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
@@ -60,6 +62,8 @@ export interface NovaCorridaPropria {
   semCadastro?: boolean;
   /** Número da OS no sistema de origem (quando a corrida veio de outro sistema ou central parceira). */
   osExterna?: string;
+  /** Filial de quem pediu na central (Cadastro › Filiais). Se não vier, vale a filial do motorista que atender. */
+  filialId?: string;
   /** Central que recebeu a chamada e central que atendeu a corrida (transbordo). Vazio: a própria central. */
   centralChamada?: string;
   centralCorrida?: string;
@@ -126,6 +130,8 @@ export interface CorridaPropria {
   /** Maçaneta (corrida de rua): "taximetro" cobra pela distância e pelo tempo reais; "destino" pela rota. */
   macaneta?: { modo: "taximetro" | "destino"; km: number; ultimaLat?: number; ultimaLng?: number; ultimaEm?: number };
   osExterna?: string;
+  /** Filial da corrida: a de quem pediu na central ou, depois, a do motorista (Cadastro › Filiais). */
+  filialId?: string;
   centralChamada?: string;
   centralCorrida?: string;
   empresaConveniada?: string;
@@ -293,14 +299,17 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
   const forma = formaDaMatriz(p.pagamento);
   const descontoPct = forma ? percentualDaMatriz(empresaId, forma, canalDaMatriz(p.canal, p.app)) : 0;
   const final = descontoPct > 0 ? arred(valor * (1 - descontoPct / 100)) : arred(valor);
-  return { valor: final, valorCheio: arred(valor), descontoPct, distanciaKm: km, minutos, categoria: nome, erro: null as string | null, tarifaExtra: extra };
+  // Taxa de serviço do passageiro (Config › Taxas da central): acrescida ao valor; o app mostra à parte.
+  const taxaServico = somaCobrancas(cobrancas(empresaId, "passageiro", { categoria: nome, valor: final, forma: formaDaTaxa(p.pagamento) }));
+  return { valor: final, valorCheio: arred(valor), descontoPct, taxaServico, distanciaKm: km, minutos, categoria: nome, erro: null as string | null, tarifaExtra: extra };
 }
 
 /** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). */
-export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string): number {
+export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string, automatico = false): number {
   if (!codigo || valor == null) return 0;
   const c = achar(listar(empresaId, cadastroPorId("cupons")!), "codigo", codigo);
   if (!c || c.ativo !== true) return 0;
+  if (c.automatico === true && !automatico) return 0; // automático só vale pela regra dele, não digitado
   const hoje = agoraBr().toISOString().slice(0, 10);
   if ((c.inicio && String(c.inicio) > hoje) || (c.fim && String(c.fim) < hoje)) return 0;
   const cats = String(c.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
@@ -309,6 +318,29 @@ export function descontoDoCupom(empresaId: string, codigo: string, valor: number
   let d = c.tipoDesconto === "Valor fixo" ? v : (valor * v) / 100;
   if (typeof c.valorMaximo === "number" && c.valorMaximo > 0) d = Math.min(d, c.valorMaximo);
   return arred(Math.min(d, valor));
+}
+
+/** Cupons automáticos da Machine: valem sozinhos, sem o passageiro digitar código. */
+export const CUPONS_AUTOMATICOS = [
+  { codigo: "PRIMEIRA CORRIDA", descricao: "Desconto na primeira corrida", limite: "Apenas na primeira corrida" },
+  { codigo: "DE VOLTA", descricao: "Desconto para cliente inativo", limite: "1 corrida por passageiro" },
+] as const;
+const DIAS_INATIVO = 30;
+
+/** Cupom automático que vale para este pedido (o primeiro que couber), com o desconto em reais. */
+export function cupomAutomatico(empresaId: string, anteriores: CorridaPropria[], valor: number | null, categoria: string): { codigo: string; desconto: number } | null {
+  if (valor == null) return null;
+  const usou = (codigo: string) => anteriores.some((c) => normal(c.cupom) === normal(codigo) && c.status !== "cancelada" && c.status !== "nao_atendida");
+  const finalizadas = anteriores.filter((c) => c.status === "finalizada");
+  const primeira = !finalizadas.length && !usou("PRIMEIRA CORRIDA");
+  const ultima = finalizadas.reduce((m, c) => ((c.finalizadaEm ?? c.solicitadaEm) > m ? (c.finalizadaEm ?? c.solicitadaEm) : m), "");
+  const inativo = !!ultima && Date.parse(agoraBr().toISOString()) - Date.parse(ultima) >= DIAS_INATIVO * 86_400_000 && !usou("DE VOLTA");
+  for (const [vale, codigo] of [[primeira, "PRIMEIRA CORRIDA"], [inativo, "DE VOLTA"]] as const) {
+    if (!vale) continue;
+    const d = descontoDoCupom(empresaId, codigo, valor, categoria, true);
+    if (d > 0) return { codigo, desconto: d };
+  }
+  return null;
 }
 
 // ------------------------------------------------------------------ ciclo da corrida
@@ -360,7 +392,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     }
     if (n.valorFinal?.modo === "prefixado" && !(Number(n.valorFinal.valor) > 0)) throw new Error("Informe o valor prefixado da corrida.");
     const cliente = listar(empresaId, cadastroPorId("clientes")!).find((c) => c.telefone === telefone);
-    if (cliente && (cliente.status === "Bloqueado" || cliente.status === "Suspenso")) throw new Error("Este passageiro está bloqueado.");
+    if (cliente && (["Bloqueado", "Suspenso", "Suspenso por nota", "Deletado"].includes(String(cliente.status)))) throw new Error("Este passageiro está bloqueado.");
     const bloqueio = motivoDeBloqueio(empresaId, n.embarque, agendadaPara ? new Date(agendadaPara) : undefined); // Cadastro › Áreas: área de risco/bloqueio
     if (bloqueio) throw new Error(bloqueio);
 
@@ -384,7 +416,12 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       if (est.valor != null && v > est.valor * 3) throw new Error("O valor oferecido está muito acima do preço estimado.");
       if (est.valor == null || v !== est.valor) valorOferecido = v;
     }
-    const desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria);
+    let desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria);
+    let codigoCupom = desconto ? String(n.cupom).toUpperCase() : "";
+    if (!desconto && !String(n.cupom ?? "").trim()) {
+      const auto = cupomAutomatico(empresaId, lista.filter((c) => c.passageiro.telefone === telefone), valorOferecido ?? est.valor, n.categoria);
+      if (auto) { desconto = auto.desconto; codigoCupom = auto.codigo; }
+    }
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);
     const corrida: CorridaPropria = {
@@ -395,7 +432,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       observacao: String(n.observacao ?? "").replace(/[<>]/g, "").slice(0, 500),
       motoristaId: null, motorista: "", telefoneMotorista: "",
       estimativa: { valor: est.valor, distanciaKm: est.distanciaKm, minutos: est.minutos },
-      valor: null, cupom: desconto ? String(n.cupom).toUpperCase() : "", desconto: desconto || null,
+      valor: null, cupom: codigoCupom, desconto: desconto || null,
       canceladaPor: "", motivoCancelamento: "", avaliacao: null,
       solicitadaEm: agora, iniciadaEm: null, finalizadaEm: null,
       historico: [{ em: agora, status: "procurando", por, ...(agendadaPara ? { nota: `Agendada para ${agendadaPara.slice(0, 16).replace("T", " ")}` } : {}) }],
@@ -404,6 +441,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(valorOferecido != null ? { valorOferecido } : {}),
       ...(n.opcionais?.length ? { opcionais: n.opcionais.slice(0, 8) } : {}),
       compartilhamento: crypto.randomBytes(12).toString("base64url"),
+      ...(n.filialId && acharFilial(empresaId, n.filialId) ? { filialId: n.filialId } : {}),
       ...(n.osExterna ? { osExterna: String(n.osExterna).replace(/[<>]/g, "").trim().slice(0, 40) } : {}),
       ...(n.centralChamada ? { centralChamada: String(n.centralChamada).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
       ...(n.centralCorrida ? { centralCorrida: String(n.centralCorrida).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
@@ -445,6 +483,7 @@ export function atribuirMotorista(empresaId: string, id: string, motoristaId: st
     if (!m) throw new Error("Motorista não encontrado.");
     if (m.status !== "Ativo") throw new Error("Este motorista não está ativo.");
     c.motoristaId = m.id; c.motorista = String(m.nome ?? ""); c.telefoneMotorista = String(m.telefone ?? "");
+    if (!c.filialId) { const fm = filialDe(empresaId, "motorista", m.id); if (fm) c.filialId = fm; }
     const agora = agoraBr().toISOString();
     c.atribuidaEm = agora;
     if (c.status === "procurando") c.status = "a_caminho";

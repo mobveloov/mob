@@ -2,7 +2,7 @@
 // Servidor: /api/gestao/desafios.
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trophy } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { Abas, Cabecalho, Campo, chamar, consulta, dataBr, dataHoraBr, dinheiro, Janela, Selo, useAviso, Vazio } from "./base";
 
@@ -13,33 +13,90 @@ const TOM: Record<string, "ok" | "info" | "ruim" | "neutro" | "alerta"> = { Ativ
 const TIPOS = ["Desafio de corridas", "Corridas pendentes aceitas", "Corridas maçaneta"];
 const ABAS = ["Todos", "Ativos", "Aguardando", "Cancelados", "Finalizados"] as const;
 
+const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+const diaMes = (iso: string) => `${iso.slice(8, 10)} ${MESES[Number(iso.slice(5, 7)) - 1] ?? ""}`;
+const PERIODOS: Array<[string, string]> = [["", "Período"], ["TD", "Hoje"], ["ON", "Ontem"], ["LW", "Semana passada"], ["LM", "Mês passado"], ["LS", "Últimos 7 dias"], ["LT", "Últimos 30 dias"], ["CT", "Personalizado"]];
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const somar = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+/** Intervalo (início e fim em AAAA-MM-DD) de cada atalho de período; vazio = sem filtro. */
+function intervalo(p: string, de: string, ate: string): [string, string] | null {
+  const hoje = new Date();
+  if (p === "TD") return [iso(hoje), iso(hoje)];
+  if (p === "ON") return [iso(somar(hoje, -1)), iso(somar(hoje, -1))];
+  if (p === "LS") return [iso(somar(hoje, -6)), iso(hoje)];
+  if (p === "LT") return [iso(somar(hoje, -29)), iso(hoje)];
+  if (p === "LW") { const ini = somar(hoje, -((hoje.getDay() + 6) % 7) - 7); return [iso(ini), iso(somar(ini, 6))]; }
+  if (p === "LM") { const ini = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1); return [iso(ini), iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0))]; }
+  if (p === "CT" && de) return [de, ate || de];
+  return null;
+}
+const POR_PAGINA = 10;
+
 export default function Desafios() {
+  const [publico, setPublico] = useState<"Motoristas" | "Clientes">("Motoristas");
   const [aba, setAba] = useState<string>("Todos");
   const [busca, setBusca] = useState("");
+  const [periodo, setPeriodo] = useState(""), [de, setDe] = useState(""), [ate, setAte] = useState("");
+  const [tipo, setTipo] = useState("");
+  const [pagina, setPagina] = useState(1);
   const l = useCarregar(() => chamar<{ desafios: Desafio[]; kpis: Record<string, number> }>("GET", `/desafios${consulta({ status: aba, busca })}`), [aba, busca], 60_000);
   const [novo, setNovo] = useState(false);
   const [aberto, setAberto] = useState<string | null>(null);
   const d = l.dados;
-  const k = d?.kpis ?? {};
+  const faixa = intervalo(periodo, de, ate);
+  const todos = [...(d?.desafios ?? [])].sort((x, y) => `${y.inicio}${y.horaInicio ?? ""}`.localeCompare(`${x.inicio}${x.horaInicio ?? ""}`)).filter((x) => (!tipo || x.tipo === tipo) && (!faixa || (x.inicio.slice(0, 10) <= faixa[1] && x.fim.slice(0, 10) >= faixa[0])));
+  const paginas = Math.max(1, Math.ceil(todos.length / POR_PAGINA));
+  const atual = Math.min(pagina, paginas);
+  const visiveis = todos.slice((atual - 1) * POR_PAGINA, atual * POR_PAGINA);
+  const semNenhum = !!d && !d.desafios.length && aba === "Todos" && !busca && !periodo && !tipo;
+  const mudar = (f: () => void) => { f(); setPagina(1); };
 
   return (
     <div className="cg-pagina-solta">
-      <Cabecalho titulo="Desafios dos motoristas"><button className="cg-botao primario" onClick={() => setNovo(true)}><Plus size={16} /> Novo desafio</button></Cabecalho>
-      <div className="cg-linha-tab">
-        <div style={{ flex: "3 1 380px" }}><Abas itens={ABAS.map((id) => ({ id, rotulo: id, n: id === "Todos" ? undefined : k[id.toLowerCase()] ?? 0 }))} valor={aba as "Todos"} onChange={setAba} /></div>
-        <input placeholder="Buscar" aria-label="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} />
-      </div>
-      {!d?.desafios.length ? <div className="cg-tabela-caixa"><Vazio titulo="Nenhum desafio." sub="Crie o primeiro em Novo desafio." /></div> : (
-        <div className="cg-cartoes">{d.desafios.map((x) => (
-          <div className="cg-cartao" key={x.id}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><h4>{x.nome}</h4><Selo tom={TOM[x.situacao] ?? "neutro"}>{x.situacao}</Selo></div>
-            <span className="cg-mono">{x.tipo} · {dataBr(x.inicio)} a {dataBr(x.fim)}</span>
-            <div className="cg-resumo-linha"><span>Meta</span><strong>{x.meta}</strong></div>
-            <div className="cg-resumo-linha"><span>Recompensa</span><strong>{dinheiro(x.premio)}</strong></div>
-            <div className="cg-resumo-linha"><span>Desafiados / participando / concluíram</span><strong>{x.desafiados} / {x.participando} / {x.concluidos}</strong></div>
-            <button className="cg-botao" onClick={() => setAberto(x.id)}>Abrir</button>
-          </div>))}
+      <Cabecalho titulo="Desafios">{publico === "Motoristas" && <button className="cg-botao verde" onClick={() => setNovo(true)}><Plus size={16} /> Novo desafio</button>}</Cabecalho>
+      <Abas itens={[{ id: "Motoristas" as const, rotulo: "Motoristas" }, { id: "Clientes" as const, rotulo: "Clientes" }]} valor={publico} onChange={setPublico} />
+      {publico === "Clientes" ? (
+        <div className="cg-tabela-caixa"><Vazio titulo="Desafios para clientes ainda não existem aqui." sub="Hoje só dá para lançar desafios para os motoristas." /></div>
+      ) : semNenhum ? (
+        <div className="cg-tabela-caixa" style={{ padding: 28, textAlign: "center" }}>
+          <h3 style={{ margin: "0 0 6px" }}>Comece a criar desafios agora mesmo</h3>
+          <p style={{ margin: "0 0 14px", color: "var(--cg-suave)" }}>Clique em "Novo desafio" abaixo para começar.</p>
+          <button className="cg-botao verde" onClick={() => setNovo(true)}><Plus size={16} /> Novo desafio</button>
         </div>
+      ) : (
+        <>
+          <div className="cg-filtros-linha">
+            <select aria-label="Período" value={periodo} onChange={(e) => mudar(() => setPeriodo(e.target.value))}>{PERIODOS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>
+            {periodo === "CT" && <><input type="date" aria-label="Data inicial" value={de} onChange={(e) => mudar(() => setDe(e.target.value))} /><input type="date" aria-label="Data final" value={ate} onChange={(e) => mudar(() => setAte(e.target.value))} /></>}
+            <select aria-label="Status" value={aba} onChange={(e) => mudar(() => setAba(e.target.value))}><option value="Todos">Status (todos)</option>{ABAS.slice(1).map((id) => <option key={id} value={id}>{id}</option>)}</select>
+            <select aria-label="Tipo do desafio" value={tipo} onChange={(e) => mudar(() => setTipo(e.target.value))}><option value="">Tipo do desafio</option>{TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+            <input placeholder="Buscar desafio" aria-label="Buscar desafio" value={busca} onChange={(e) => mudar(() => setBusca(e.target.value))} />
+          </div>
+          {!d ? <div className="cg-tabela-caixa"><Vazio titulo="Carregando..." /></div> : !todos.length ? <div className="cg-tabela-caixa"><Vazio titulo="Nenhum desafio encontrado." sub="Ajuste os filtros." /></div> : (
+            <div className="cg-desafios-grade">{visiveis.map((x) => (
+              <button type="button" className="cg-desafio" key={x.id} onClick={() => setAberto(x.id)}>
+                <div className="cg-desafio-topo">
+                  <span className="cg-desafio-icone"><Trophy size={20} /></span>
+                  <div><strong>{x.nome}</strong><small>{x.meta} corridas | {diaMes(x.inicio)} - {diaMes(x.fim)}</small></div>
+                  <Selo tom={TOM[x.situacao] ?? "neutro"}>{x.situacao}</Selo>
+                </div>
+                <div className="cg-desafio-dados">
+                  <div><small>Motoristas desafiados</small><strong>{x.desafiados}</strong></div>
+                  <div><small>Motoristas participando</small><strong>{x.participando}</strong></div>
+                  <div><small>Recompensa em créditos</small><strong>{dinheiro(x.premio)}</strong></div>
+                  <div><small>Gasto total atual</small><strong>{dinheiro(x.gastoAtual)}</strong></div>
+                </div>
+              </button>))}
+            </div>
+          )}
+          {paginas > 1 && (
+            <nav className="cg-paginas" aria-label="Páginas">
+              <button className="cg-botao" disabled={atual <= 1} onClick={() => setPagina(atual - 1)} aria-label="Página anterior">«</button>
+              {Array.from({ length: paginas }, (_, k) => k + 1).map((n) => <button key={n} className={`cg-botao ${n === atual ? "primario" : ""}`} onClick={() => setPagina(n)} aria-current={n === atual ? "page" : undefined}>{n}</button>)}
+              <button className="cg-botao" disabled={atual >= paginas} onClick={() => setPagina(atual + 1)} aria-label="Próxima página">»</button>
+            </nav>
+          )}
+        </>
       )}
       {novo && <Novo onFechar={() => setNovo(false)} onSalvo={() => l.recarregar()} />}
       {aberto && <Detalhes id={aberto} onFechar={() => setAberto(null)} onMudou={() => l.recarregar()} />}

@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, RefreshCw, Save, XCircle } from "lucide-react";
 import { Cartao, Kpi, useCarregar } from "../componentes/ui";
 import { crm, quandoReal, type Config, type ConfigEnvio } from "./api";
-import { Selo, useAdmin, useRetorno } from "./comum";
+import { Selo, useGestor, useRetorno } from "./comum";
 
 /** Envio: ritmo do WhatsApp (lote, pausa, limite), número da empresa e fila. */
 export default function Envio() {
   const cfg = useCarregar(() => crm.config(), []);
   const fila = useCarregar(() => crm.fila(), [], 5_000);
   const caixa = useCarregar(() => crm.simulado(), [], 5_000);
-  const admin = useAdmin();
+  const admin = useGestor();
   const r = useRetorno();
   const [c, setC] = useState<ConfigEnvio | null>(null);
   const [wa, setWa] = useState<Config["whatsapp"]>({ url: "", instancia: "", token: "" });

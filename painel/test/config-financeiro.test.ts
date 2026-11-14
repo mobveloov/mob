@@ -183,10 +183,10 @@ test("rotas: só admin salva; operador lê; outra empresa não enxerga", async (
 
 test("financeiro: ajuste de carteira, extrato, recargas e saques pelo painel", async () => {
   const m = criar(E, MOT, { nome: "Rita Rodas", telefone: "11980000010", status: "Ativo", cidade: "Jaboticabal - SP" }, "t");
-  const aj = await api(cookieAdm, "POST", `/carteiras/motorista/${m.id}/ajuste`, { acao: "adicionar", valor: 50, descricao: "Recarga de teste" });
+  const aj = await api(cookieAdm, "POST", `/carteiras/motorista/${m.id}/ajuste`, { acao: "adicionar", valor: 50, motivo: "Recarga de teste", chaveUnica: "cfg-recarga-0001" });
   assert.equal(aj.corpo.saldo, 50);
-  assert.equal((await api(cookieAdm, "POST", `/carteiras/motorista/${m.id}/ajuste`, { acao: "remover", valor: 500 })).status, 400, "não retira mais que o saldo");
-  assert.equal((await api(cookieOp, "POST", `/carteiras/motorista/${m.id}/ajuste`, { acao: "adicionar", valor: 1 })).status, 403);
+  assert.equal((await api(cookieAdm, "POST", `/carteiras/motorista/${m.id}/ajuste`, { acao: "remover", valor: 500, motivo: "Retirada grande", chaveUnica: "cfg-retira-0001" })).status, 400, "não retira mais que o saldo");
+  assert.equal((await api(cookieOp, "POST", `/carteiras/motorista/${m.id}/ajuste`, { acao: "adicionar", valor: 1, motivo: "Operador tentando", chaveUnica: "cfg-op-000001" })).status, 403);
   const lista = await api(cookieAdm, "GET", "/carteiras?papel=motorista&busca=rita");
   assert.equal(lista.corpo.itens[0].saldo, 50);
   assert.equal((await api(cookieAdm, "GET", "/carteiras?papel=motorista&busca=zzz")).corpo.itens.length, 0);

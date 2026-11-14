@@ -1,6 +1,7 @@
 // Histórico (Consultar corridas): filtros avançados, atalhos de tempo, atualização automática, janela da corrida.
 // Mantém os extras da central: planilha e análise com IA.
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, FileDown, Filter, HelpCircle, Loader2, Send, Sparkles, X } from "lucide-react";
 import { api, baixar, corridasCsv, type CorridaPainel, type Relatorio } from "../../api";
 import { useSessao } from "../../App";
@@ -8,8 +9,11 @@ import { RelatorioIa } from "../../componentes/RelatorioIa";
 import { Aviso, Paginacao, Selo, GRUPO_CLASSE, Janela, Vazio, dh, op, qs, reais, useDados, msgErro } from "./comum";
 import { JanelaCorrida, JanelaExterna } from "./JanelaCorrida";
 
+// Atalhos da Machine (15 minutos a 4 horas). "Hoje" é nosso, no fim, e é o padrão.
 const ATALHOS: Array<[string, string]> = [["15min", "15 minutos"], ["30min", "30 minutos"], ["1h", "1 hora"], ["2h", "2 horas"], ["3h", "3 horas"], ["4h", "4 horas"], ["hoje", "Hoje"]];
-const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "" };
+/** Ordem dos status no filtro da Machine. */
+const ORDEM_STATUS = ["distribuindo", "a_caminho", "nao_atendida", "cancelada", "cancelada_pax", "cancelada_mot", "andamento", "finalizada", "pendente", "espera"];
+const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "", filial: "" };
 type Filtros = typeof VAZIO;
 
 /** Dd/mm/aaaa -> aaaa-mm-dd (aceita também a data já no formato do campo de data). */
@@ -17,11 +21,13 @@ const dataIso = (s: string) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s.
 
 export default function Historico({ programadas = false }: { programadas?: boolean }) {
   const { marca } = useSessao();
-  const [rapido, setRapido] = useState("hoje");
-  const [f, setF] = useState<Filtros>(VAZIO);
-  const [rasc, setRasc] = useState<Filtros>(VAZIO);
+  const [rapido, setRapido] = useState(new URLSearchParams(window.location.search).get("motorista") ? "" : "hoje");
+  const [params] = useSearchParams();
+  const inicial: Filtros = { ...VAZIO, motorista: params.get("motorista") ?? "" };
+  const [f, setF] = useState<Filtros>(inicial);
+  const [rasc, setRasc] = useState<Filtros>(inicial);
   const [filtroAberto, setFiltroAberto] = useState(false);
-  const [auto, setAuto] = useState(false);
+  const [auto, setAuto] = useState(true);
   const [pagina, setPagina] = useState(1);
   const [aberta, setAberta] = useState<CorridaPainel | null>(null);
   const [legenda, setLegenda] = useState(false);
@@ -69,10 +75,10 @@ export default function Historico({ programadas = false }: { programadas?: boole
   return (
     <div className="oc">
       <div className="oc-topo">
-        <h1>{programadas ? "Corridas programadas" : "Corridas"} {dados && <small>{dados.total} no filtro</small>}</h1>
+        <h1>{programadas ? "Corridas programadas" : "Consultar corridas"} {dados && <small>{dados.total} no filtro</small>}</h1>
         <div className="oc-fila">
-          <button className="oc-btn" onClick={planilha} disabled={!dados?.total}><FileDown size={16} /> Exportar</button>
-          <button className="oc-btn pri" onClick={exportar} disabled={gerando || !dados?.total}>{gerando ? <Loader2 size={16} className="gira" /> : <Sparkles size={16} />} {gerando ? `${marca.assistente.nome} analisando...` : `Relatório ${marca.assistente.nome}`}</button>
+          <button className="oc-btn" onClick={planilha} disabled={!dados?.total}><FileDown size={16} /> Exportar relatório</button>
+          <button className="oc-btn pri" onClick={exportar} disabled={gerando || !dados?.total}>{gerando ? <Loader2 size={16} className="gira" /> : <Sparkles size={16} />} {gerando ? `${marca.assistente.nome} analisando...` : `Análise de ${marca.assistente.nome}`}</button>
         </div>
       </div>
 
@@ -85,8 +91,8 @@ export default function Historico({ programadas = false }: { programadas?: boole
 
       <div className="oc-card oc-fila" style={{ justifyContent: "space-between" }}>
         <div className="oc-fila">
-          <button className="oc-btn" onClick={() => { setRasc(f); setFiltroAberto(true); }}><Filter size={16} /> Filtros{nFiltros > 0 && <Selo tom="info">{nFiltros}</Selo>}</button>
-          <label className="oc-sw"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Auto-Update</label>
+          <button className="oc-btn" onClick={() => { setRasc(f); setFiltroAberto(true); }}><Filter size={16} /> Filtro{nFiltros > 0 && <Selo tom="info">{nFiltros}</Selo>}</button>
+          <label className="oc-sw"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> {auto ? "Atualizando automaticamente" : "Atualização automática pausada"}</label>
         </div>
         <div className="oc-fila">
           <span className="suave" style={{ fontWeight: 800 }}>Exibindo as últimas:</span>
@@ -110,21 +116,20 @@ export default function Historico({ programadas = false }: { programadas?: boole
 
       <div className="oc-card">
         {carregando && !dados && <Vazio><Loader2 size={16} className="gira" /> Carregando...</Vazio>}
-        {dados && !dados.total && <Vazio>Nenhuma corrida encontrada.<br />Tente ajustar os filtros.</Vazio>}
+        {dados && !dados.total && <Vazio>Nenhum resultado encontrado.</Vazio>}
         {!!dados?.total && <>
           <div className="oc-rola"><table>
-            <thead><tr><th>Alerta</th><th>Data/Hora</th><th>Nº OS</th><th>Partida</th><th>Passageiro</th><th>Motorista</th><th>Empresa</th><th>Status</th></tr></thead>
+            <thead><tr><th>Alerta</th><th>Nº OS</th><th>Partida</th><th>Passageiro</th><th>Motorista</th><th>Empresa</th><th>Status</th></tr></thead>
             <tbody>
               {dados.corridas.map((c: CorridaPainel & { alerta?: boolean; empresa?: string; osExterna?: string }) => (
                 <tr key={c.id} className="clic" onClick={() => setAberta(c)}>
                   <td>{c.alerta ? <AlertTriangle size={14} color="var(--oc-alerta)" aria-label="Com alerta" /> : ""}</td>
-                  <td>{dh(c.solicitadaEm)}</td>
-                  <td className="forte">{c.os}{c.osExterna && <><br /><small className="suave">ext. {c.osExterna}</small></>}</td>
+                  <td className="forte">{c.os}<br /><small className="suave">{rapido !== "hoje" || f.dataIni || f.dataFim ? dh(c.solicitadaEm) : c.solicitadaEm?.slice(11, 19)}</small>{c.osExterna && <><br /><small className="suave">ext. {c.osExterna}</small></>}</td>
                   <td><span className="corta">{c.embarque || "—"}</span></td>
                   <td>{c.passageiro || c.telefonePassageiro || "—"}</td>
                   <td>{c.motorista || "—"}</td>
                   <td>{c.empresa || "---"}</td>
-                  <td><Selo tom={GRUPO_CLASSE[c.grupo]}>{c.statusTexto}</Selo>{(c.valor ?? c.valorEstimado) != null && <small> {reais(c.valor ?? c.valorEstimado)}</small>}</td>
+                  <td><Selo tom={GRUPO_CLASSE[c.grupo]}>{c.statusTexto}</Selo></td>
                 </tr>
               ))}
             </tbody></table></div>
@@ -133,29 +138,27 @@ export default function Historico({ programadas = false }: { programadas?: boole
       </div>
 
       {filtroAberto && (
-        <Janela onFechar={() => setFiltroAberto(false)} titulo="Filtros Avançados" sub="Refine sua busca" tamanho="media"
-          rodape={<><button className="oc-btn" type="button" onClick={limpar}><X size={14} /> Limpar</button><button className="oc-btn pri" type="button" onClick={aplicar}>Aplicar Filtros</button></>}>
+        <Janela onFechar={() => setFiltroAberto(false)} titulo="Filtro de pesquisa" sub="Você pode filtrar um ou mais campos" tamanho="media"
+          rodape={<><button className="oc-btn" type="button" onClick={() => setFiltroAberto(false)}>Cancelar</button><button className="oc-btn" type="button" onClick={limpar}><X size={14} /> Limpar filtros</button><button className="oc-btn pri" type="button" onClick={aplicar}>Filtrar</button></>}>
           <form onSubmit={(e) => { e.preventDefault(); aplicar(); }} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <h3 className="suave" style={{ margin: 0 }}>Identificação</h3>
-            <div className="oc-grid2">{campo("os", "Número da OS", "Ex: 1234", "number")}{campo("osExterna", "Número externo da OS", "Ex: 5678")}</div>
+            <div className="oc-grid2">{campo("os", "Número da OS", "", "number")}{campo("osExterna", "Número externo da OS", "")}</div>
             <div className="oc-grid2">{lista("centralChamada", "Central chamada", op_?.centrais, "Selecione")}{lista("centralCorrida", "Central da corrida", op_?.centrais, "Selecione")}</div>
-            <h3 className="suave" style={{ margin: 0 }}>Empresa & Categoria</h3>
+            
             <div className="oc-grid2">{lista("empresa", "Empresa", op_?.empresas, "Selecione")}{lista("categoria", "Categoria", op_?.categorias, "Selecione")}</div>
-            <h3 className="suave" style={{ margin: 0 }}>Pessoas Envolvidas</h3>
-            <div className="oc-grid3">{campo("nomePax", "Nome do passageiro", "Nome completo...")}{campo("telPax", "Telefone do passageiro", "11 96123-4567")}{campo("cpfPax", "CPF do passageiro", "000.000.000-00")}</div>
-            {campo("endereco", "Endereço de partida", "Digite um trecho do endereço...")}
-            {campo("motorista", "Nome/VTR/Placa do motorista", "Nome ou placa do veículo...")}
-            <h3 className="suave" style={{ margin: 0 }}>Período</h3>
+            <div className="oc-grid3">{campo("nomePax", "Nome do passageiro", "")}{campo("telPax", "Telefone do passageiro", "+55")}{campo("cpfPax", "CPF do passageiro", "")}</div>
+            {campo("endereco", "Endereço de partida", "")}
+            {campo("motorista", "Nome/VTR/Placa do motorista", "")}
             <div className="oc-grid2">{campo("dataIni", "Data inicial", "", "date")}{campo("horaIni", "Hora inicial", "00:00", "time")}{campo("dataFim", "Data final", "", "date")}{campo("horaFim", "Hora final", "23:59", "time")}</div>
-            <h3 className="suave" style={{ margin: 0 }}>Operacional</h3>
             <div className="oc-grid2">
               {lista("pagamento", "Forma de pagamento", op_?.pagamentos, "Selecione")}
               <label className="oc-l">Status<select value={rasc.status} onChange={(e) => setRasc({ ...rasc, status: e.target.value })}><option value="">Selecione</option>
-                {Object.entries(dados?.status ?? {}).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}</select></label>
+                {Object.entries<string>(dados?.status ?? {}).sort((a, b) => ORDEM_STATUS.indexOf(a[0]) - ORDEM_STATUS.indexOf(b[0])).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}</select></label>
               {lista("urgencia", "Urgência", op_?.urgencias, "Selecione")}
               {lista("via", "Corrida via", op_?.vias, "Selecione")}
+              {(op_?.filiais?.length ?? 0) > 0 && lista("filial", "Filial", op_.filiais, "Todas")}
               {marca.mostrarOrigem && (op_?.fontes?.length ?? 0) > 1 && lista("fonte", "Fonte dos dados", op_.fontes, "Todas")}
             </div>
+            <h3 className="suave" style={{ margin: 0 }}>Outros filtros</h3>
             <label className="oc-sw"><input type="checkbox" checked={rasc.cashback === "1"} onChange={(e) => setRasc({ ...rasc, cashback: e.target.checked ? "1" : "" })} /> Corridas que geraram cashback</label>
           </form>
         </Janela>

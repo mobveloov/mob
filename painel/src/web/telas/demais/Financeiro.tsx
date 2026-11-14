@@ -1,6 +1,6 @@
 // Financeiro: Carteiras, Extrato Geral, Saques, Recargas e Relatórios & Stats.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, Filter, Search, Wallet } from "lucide-react";
 import Analise from "../../paginas/Analise";
 import { Abas, Aviso, Cab, Campo, Carregando, FiltroPeriodo, Modal, PERIODO_MES, dataBr, dataHoraBr, dinheiro, pedirConfig, queryPeriodo, textoPeriodo, useAdmin, useCarregar, useSalvar, type PeriodoSel } from "./comum";
@@ -82,16 +82,30 @@ function DetalheCarteira({ papel, chave, admin, onFechar, onMudou }: { papel: Pa
   );
 }
 
+const novaChave = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+
 function ModalAjuste({ tipo, onFechar, papel, chave, onFeito }: { tipo: null | "adicionar" | "remover"; onFechar: () => void; papel: Papel; chave: string; onFeito: () => void }) {
   const [valor, setValor] = useState(""), [desc, setDesc] = useState("");
+  // Uma chave nova a cada vez que a janela abre: o servidor lança uma vez só por chave (clique duplo e nova tentativa não repetem).
+  const [chaveUnica, setChaveUnica] = useState(() => novaChave());
+  const enviando = useRef(false);
   const { msg, salvando, salvar } = useSalvar();
+  const num = Number(valor.replace(",", "."));
   return (
-    <Modal aberto={!!tipo} onFechar={onFechar} titulo={tipo === "remover" ? "Retirar saldo" : "Adicionar saldo"} sub="O lançamento fica registrado no extrato com o seu usuário.">
-      <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); const r = await salvar(() => pedirConfig(`/carteiras/${papel}/${encodeURIComponent(chave)}/ajuste`, "POST", { acao: tipo, valor: Number(valor.replace(",", ".")), descricao: desc })); if (r) { setValor(""); setDesc(""); onFeito(); } }}>
+    <Modal aberto={!!tipo} onFechar={onFechar} titulo={tipo === "remover" ? "Retirar saldo" : "Adicionar saldo"} sub="O lançamento fica no extrato com o motivo, o seu usuário e a hora.">
+      <form className="dm-form" onSubmit={async (e) => {
+        e.preventDefault();
+        if (enviando.current) return;
+        enviando.current = true;
+        try {
+          const r = await salvar(() => pedirConfig(`/carteiras/${papel}/${encodeURIComponent(chave)}/ajuste`, "POST", { acao: tipo, valor: num, motivo: desc.trim(), chaveUnica }));
+          if (r) { setValor(""); setDesc(""); setChaveUnica(novaChave()); onFeito(); }
+        } finally { enviando.current = false; }
+      }}>
         <Campo rotulo="Valor (R$)"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" required /></Campo>
-        <Campo rotulo="Motivo (aparece no extrato)"><input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Ex.: Recarga manual" maxLength={120} /></Campo>
+        <Campo rotulo="Motivo (obrigatório, aparece no extrato)"><input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Ex.: Recarga recebida por Pix" minLength={5} maxLength={120} required /></Campo>
         <Aviso erro={msg?.erro} />
-        <div className="dm-rodape-modal"><button type="button" className="botao" onClick={onFechar}>Cancelar</button><button className="botao primario" disabled={salvando || !valor}>{tipo === "remover" ? "Retirar" : "Adicionar"}</button></div>
+        <div className="dm-rodape-modal"><button type="button" className="botao" onClick={onFechar}>Cancelar</button><button className="botao primario" disabled={salvando || !valor || desc.trim().length < 5}>{tipo === "remover" ? "Retirar" : "Adicionar"}</button></div>
       </form>
     </Modal>
   );

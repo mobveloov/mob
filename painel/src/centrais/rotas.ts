@@ -19,7 +19,7 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
 const emp = (req: Request) => req.ctx!.empresaId;
 const plataforma = (req: Request) => req.ctx!.usuario.papel === "plataforma";
 const q = (req: Request, k: string) => String(req.query[k] ?? "");
-const admin = exigirPapel("admin");
+const admin = exigirPapel("gestor"); // cobrança: Gestor e acima (como na Machine)
 const csv = (res: Response, nome: string, texto: string) => {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${nome}-${agoraBr().toISOString().slice(0, 10)}.csv"`);

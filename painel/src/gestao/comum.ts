@@ -1,6 +1,7 @@
 // Ajudas das rotas da gestão: tratamento de erro, empresa do login, permissão de escrita e leitura dos cadastros.
 
 import type { NextFunction, Request, Response } from "express";
+import { podeCargo } from "../comum/cargos.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar, type Registro } from "../cadastros/armazem.ts";
 import { banco } from "../servidor/banco.ts";
@@ -18,8 +19,13 @@ export const quem = (req: Request) => req.ctx!.usuario.email;
 
 /** Só administrador (e plataforma). */
 export function soAdmin(req: Request, res: Response, next: NextFunction) {
-  const p = req.ctx?.usuario.papel;
-  if (p === "plataforma" || p === "admin") return next();
+  if (podeCargo(req.ctx?.usuario.papel, "admin")) return next();
+  res.status(403).json({ erro: "Seu usuário só pode consultar esta parte." });
+}
+
+/** Gestor e acima (Gestor, ADMIN e ADMIN Mestre). */
+export function soGestor(req: Request, res: Response, next: NextFunction) {
+  if (podeCargo(req.ctx?.usuario.papel, "gestor")) return next();
   res.status(403).json({ erro: "Seu usuário só pode consultar esta parte." });
 }
 

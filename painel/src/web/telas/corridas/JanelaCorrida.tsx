@@ -12,10 +12,10 @@ export interface Detalhe {
 const STATUS_EDITAR: Array<[string, string]> = [["procurando", "Aguardando"], ["a_caminho", "A Caminho"], ["no_local", "Chegou"], ["em_andamento", "Em Viagem"], ["finalizada", "Finalizada"], ["cancelada", "Cancelada"], ["nao_atendida", "Não Atendida"]];
 const PAGAMENTOS_EDITAR = ["Dinheiro", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App"];
 
-export function JanelaCorrida({ id, onFechar, onMudou }: { id: string; onFechar: () => void; onMudou?: () => void }) {
+export function JanelaCorrida({ id, onFechar, onMudou, editarDireto }: { id: string; onFechar: () => void; onMudou?: () => void; editarDireto?: boolean }) {
   const { dados: d, erro, carregando, recarregar } = useDados<Detalhe>(() => op(`/corridas/${encodeURIComponent(id)}`), [id]);
   const [menu, setMenu] = useState(false);
-  const [sub, setSub] = useState<"" | "raiox" | "rastreio" | "editar" | "chat" | "cancelar" | "legenda" | "lances">("");
+  const [sub, setSub] = useState<"" | "raiox" | "rastreio" | "editar" | "chat" | "cancelar" | "legenda" | "lances">(editarDireto ? "editar" : "");
   const [msg, setMsg] = useState<{ t: string; erro?: boolean } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const mudou = () => { recarregar(); onMudou?.(); };

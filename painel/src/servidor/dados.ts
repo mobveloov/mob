@@ -13,13 +13,15 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { ehCargo, type Cargo } from "../comum/cargos.ts";
 import { MARCA_PADRAO, sanearMarca, type Marca } from "../comum/marca.ts";
 import { gravarJson, lerJson } from "./jsoncache.ts";
 
 export type TipoIntegracao = "sistema-a" | "sistema-b" | "arquivo" | "exemplo";
 export interface Integracao { id: string; tipo: TipoIntegracao; nome: string; ativa: boolean }
-export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean }
-export type Papel = "plataforma" | "admin" | "operador";
+/** ativa = false é empresa suspensa: ninguém dela entra no painel nem nos apps (só o ADMIN Mestre entra, para suporte). */
+export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean; suspensao?: { em: string; motivo: string; por: string } }
+export type Papel = Cargo; // plataforma = ADMIN Mestre, admin = ADMIN, gestor, operador (src/comum/cargos.ts)
 export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string; telefone?: string }
 export interface Segredos { integracoes: Record<string, Record<string, string>>; ia: Record<string, string> }
 
@@ -63,6 +65,18 @@ export function criarEmpresa(nome: string, marca?: Partial<Marca>): Empresa {
   return e;
 }
 
+/** Suspende ou reativa uma empresa (dono da plataforma). Nada é apagado. */
+export function definirAtiva(id: string, ativa: boolean, motivo = "", por = ""): Empresa {
+  const lista = listarEmpresas().map((e) => ({ ...e }));
+  const e = lista.find((x) => x.id === id);
+  if (!e) throw new Error("Empresa não encontrada.");
+  e.ativa = ativa;
+  if (ativa) delete e.suspensao;
+  else e.suspensao = { em: new Date().toISOString(), motivo: motivo.replace(/[<>]/g, "").trim().slice(0, 200), por: por.slice(0, 120) };
+  gravar(path.join(raiz(), "plataforma.json"), lista);
+  return e;
+}
+
 /** Empresa pelo domínio do pedido (domínio próprio ou subdomínio cadastrado na marca). */
 export function empresaDoDominio(host: string | undefined): Empresa | null {
   const h = String(host ?? "").toLowerCase().replace(/:\d+$/, "");
@@ -78,9 +92,27 @@ export const salvarMarca = (id: string, m: Marca) => gravar(path.join(pastaEmpre
 const TIPOS_IMAGEM: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico" };
 export const MAX_IMAGEM = 2 * 1024 * 1024;
 
+/** Confere a assinatura do arquivo (não basta o tipo declarado no envio). */
+function bytesDaImagemConferem(ext: string, b: Uint8Array): boolean {
+  const igual = (ini: number[], de = 0) => ini.every((v, i) => b[de + i] === v);
+  if (ext === "png") return igual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (ext === "jpg") return igual([0xff, 0xd8, 0xff]);
+  return igual([0x52, 0x49, 0x46, 0x46]) && igual([0x57, 0x45, 0x42, 0x50], 8);
+}
+
+/** Apaga um arquivo de imagem da empresa (só o nome simples; nunca sai da pasta de arquivos). */
+export function apagarImagem(id: string, nome: string) {
+  if (!/^[\w-]+\.(png|jpg|webp|svg|ico)$/.test(nome)) return;
+  fs.rmSync(path.join(pastaEmpresa(id), "arquivos", nome), { force: true });
+}
+
 /** Guarda uma imagem da marca. Devolve o nome do arquivo salvo. */
 export function salvarImagem(id: string, tipo: string, mime: string, bytes: Uint8Array): string {
   const ext = TIPOS_IMAGEM[mime];
+  if (tipo === "fotoEmpresa") {
+    if (!ext || !["png", "jpg", "webp"].includes(ext)) throw new Error("Envie a foto em PNG, JPG ou WEBP.");
+    if (!bytesDaImagemConferem(ext, bytes)) throw new Error("O arquivo não é uma imagem válida.");
+  }
   if (!ext) throw new Error("Envie PNG, JPG, WEBP, SVG ou ICO.");
   if (bytes.length > MAX_IMAGEM) throw new Error("Imagem grande demais (máximo 2 MB).");
   const pasta = path.join(pastaEmpresa(id), "arquivos");
@@ -140,6 +172,16 @@ export function criarUsuario(u: { email: string; nome: string; senha: string; em
   const novo: Usuario = { id: crypto.randomUUID(), email, nome: u.nome.trim().slice(0, 80) || email, hash: hashSenha(u.senha), empresaId: u.empresaId, papel: u.papel, criadoEm: new Date().toISOString() };
   gravar(arqUsuarios(), [...listarUsuarios(), novo], true);
   return novo;
+}
+
+/** Migração dos cargos: todo usuário fica com um cargo válido (o que não é reconhecido vira operador) e a plataforma sempre tem um ADMIN Mestre.
+ *  Os cargos antigos (plataforma, admin, operador) continuam valendo como estão: ninguém perde o acesso. Devolve quantos mudaram. */
+export function migrarCargos(): number {
+  const lista = listarUsuarios().map((u) => ({ ...u }));
+  let mudou = 0;
+  for (const u of lista) if (!ehCargo(u.papel)) { u.papel = "operador"; mudou++; }
+  if (mudou) gravar(arqUsuarios(), lista, true);
+  return mudou;
 }
 
 export function removerUsuario(id: string, empresaId: string) {

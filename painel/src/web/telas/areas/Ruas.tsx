@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
-import { Cabecalho, Campo, chamar as chamarBase, Interruptor, Janela, Selo, useAviso, Vazio } from "../cadastro/base";
+import { Cabecalho, Campo, chamar as chamarBase, Interruptor, Janela, Selo, useAviso } from "../cadastro/base";
 import MapaAreas, { type Ponto } from "../cadastro/MapaAreas";
 
 interface Regra { id: string; nomeExibicao: string; nomeNoMapa: string; poligono: Ponto[]; ativa: boolean }
@@ -18,13 +18,15 @@ export default function RuasTela() {
   return (
     <div className="cg-pagina-solta">
       {aviso}
-      <Cabecalho titulo="Ruas" sub="Regras de via"><button className="cg-botao primario" onClick={() => setEditando("nova")}><Plus size={16} /> Criar nova regra</button></Cabecalho>
-      <div className="cg-tabela-caixa" style={{ padding: 16, marginBottom: 14 }}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 15 }}>O que são regras de via?</h3>
-        <p style={{ margin: 0, color: "var(--cg-suave)", fontSize: 13 }}>Regras de via corrigem o nome de exibição de uma rua para a sua central, dentro do traçado desenhado no mapa — útil quando o nome retornado pelo mapa não é o mesmo usado pelos moradores da região. Vale nos endereços achados pela busca e pela localização enviada.</p>
-      </div>
+      <Cabecalho titulo="Ruas">{regras.length > 0 && <button className="cg-botao primario" onClick={() => setEditando("nova")}><Plus size={16} /> Criar nova regra</button>}</Cabecalho>
       {l.erro && <div className="cg-aviso erro">{l.erro}</div>}
-      {!regras.length ? <div className="cg-tabela-caixa"><Vazio titulo="Nenhuma regra de via criada." sub="Crie a primeira em Criar nova regra." /></div> : (
+      {!regras.length && !l.erro ? (
+        <div className="cg-tabela-caixa" style={{ padding: 24, textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
+          <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>O que são regras de via?</h3>
+          <p style={{ margin: "0 0 16px", color: "var(--cg-suave)", fontSize: 14 }}>Regras de via corrigem o nome de exibição de uma rua para a sua central, dentro do traçado desenhado no mapa — útil quando o nome retornado pelo mapa não é o mesmo usado pelos moradores da região.</p>
+          <button className="cg-botao primario" onClick={() => setEditando("nova")}>Criar nova regra</button>
+        </div>
+      ) : (
         <div className="cg-tabela-caixa"><div className="cg-rolagem"><table className="cg-tabela">
           <thead><tr><th>Nome de exibição</th><th>Nome no mapa</th><th className="centro">Pontos do traçado</th><th>Situação</th><th /></tr></thead>
           <tbody>{regras.map((r) => (

@@ -32,7 +32,7 @@ export default function Usuarios() {
             <label>Nome<input value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} required /></label>
             <label>E-mail<input type="email" value={novo.email} onChange={(e) => setNovo({ ...novo, email: e.target.value })} required /></label>
             <label>Senha inicial (mínimo 8)<input type="password" autoComplete="new-password" value={novo.senha} onChange={(e) => setNovo({ ...novo, senha: e.target.value })} required /></label>
-            <label>Acesso<select value={novo.papel} onChange={(e) => setNovo({ ...novo, papel: e.target.value })}><option value="operador">Operador (consulta e relatórios)</option><option value="admin">Administrador (também marca, integrações e usuários)</option></select></label>
+            <label>Acesso<select value={novo.papel} onChange={(e) => setNovo({ ...novo, papel: e.target.value })}><option value="operador">Operador (despacha e acompanha corridas)</option><option value="gestor">Gestor (cadastros, regras e marketing)</option><option value="admin">ADMIN (também financeiro, integrações e equipe)</option></select></label>
             <button className="botao primario"><Plus size={14} /> Criar</button>
           </form>
         </Cartao>

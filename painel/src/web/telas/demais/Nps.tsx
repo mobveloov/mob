@@ -1,17 +1,57 @@
 // Config › Configuração NPS e Avaliações (abas Avaliações, Contestações e Denúncias; passageiro e motorista).
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Download } from "lucide-react";
 import { baixar } from "../../api";
-import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, dataBr, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, dataBr, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
 type Papel = "motorista" | "passageiro";
-const PapelAbas = ({ valor, onChange }: { valor: Papel; onChange: (p: Papel) => void }) => <Abas abas={[["motorista", "Motoristas"], ["passageiro", "Passageiros"]]} valor={valor} onChange={onChange} />;
+const PapelAbas = ({ valor, onChange }: { valor: Papel; onChange: (p: Papel) => void }) => <Abas abas={[["passageiro", "Passageiros"], ["motorista", "Motoristas"]]} valor={valor} onChange={onChange} />;
 
 // ------------------------------------------------------------------ Configuração NPS
 
+/** "Configurações NPS" como na Machine: ativar ou desativar a pesquisa para passageiros e para motoristas. */
 export function ConfigNps() {
-  const admin = useAdmin();
+  const admin = useGestor();
+  const voltar = useNavigate();
+  const pas = useCarregar(() => pedirConfig("/nps/passageiro"), []);
+  const mot = useCarregar(() => pedirConfig("/nps/motorista"), []);
+  const [ativo, setAtivo] = useState<{ passageiro: boolean; motorista: boolean } | null>(null);
+  if (!ativo && pas.dados && mot.dados) setAtivo({ passageiro: !!pas.dados.config.ativo, motorista: !!mot.dados.config.ativo });
+  const { msg, salvando, salvar } = useSalvar();
+  const gravar = () => salvar(async () => {
+    if (!ativo) return;
+    for (const [papel, d] of [["passageiro", pas.dados], ["motorista", mot.dados]] as const) {
+      if (!!d.config.ativo !== ativo[papel]) await pedirConfig(`/nps/${papel}`, "PUT", { ...d.config, ativo: ativo[papel] });
+    }
+    pas.recarregar(); mot.recarregar();
+  }, "Configurações gravadas.");
+  const bloco = (papel: Papel, nome: string) => (
+    <section className="dm-cartao dm-secao" key={papel}>
+      <h3>NPS para {nome}</h3>
+      <h4>Ativar pesquisa de NPS para {nome}</h4>
+      <p className="sub">Buscar, através de pesquisa, um panorama sobre a <strong>fidelidade</strong> dos seus {nome} e quão satisfeitos estão com o que sua empresa oferece. <a href="https://pt.wikipedia.org/wiki/Net_Promoter_Score" target="_blank" rel="noreferrer">Saiba mais</a></p>
+      <div className="dm-radios">
+        <label><input type="radio" name={`nps-${papel}`} checked={!!ativo?.[papel]} disabled={!admin || !ativo} onChange={() => ativo && setAtivo({ ...ativo, [papel]: true })} /> Ativar</label>
+        <label><input type="radio" name={`nps-${papel}`} checked={!!ativo && !ativo[papel]} disabled={!admin || !ativo} onChange={() => ativo && setAtivo({ ...ativo, [papel]: false })} /> Desativar</label>
+      </div>
+    </section>
+  );
+  return (
+    <>
+      <Cab titulo="Configurações NPS" />
+      <Aviso erro={pas.erro ?? mot.erro ?? msg?.erro} ok={msg?.ok} />
+      {!ativo ? <Carregando /> : <>{bloco("passageiro", "passageiros")}{bloco("motorista", "motoristas")}</>}
+      <div className="dm-rodape-modal"><button className="botao" onClick={() => voltar(-1)}>Voltar</button>{admin && <button className="botao primario" disabled={salvando || !ativo} onClick={gravar}>Gravar</button>}</div>
+      <OpcoesNps />
+    </>
+  );
+}
+
+/** Opções a mais do nosso painel (pergunta, link da loja, etiquetas). A Machine não tem; ficam abaixo. */
+function OpcoesNps() {
+  const admin = useGestor();
   const [papel, setPapel] = useState<Papel>("passageiro");
   const d = useCarregar(() => pedirConfig(`/nps/${papel}`), [papel]);
   const [c, setC] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
@@ -21,7 +61,7 @@ export function ConfigNps() {
   const set = (k: string, v: unknown) => setC({ ...c, [k]: v });
   return (
     <>
-      <Cab titulo="Configuração NPS" sub="Quando e como o app pergunta a nota do aplicativo.">{admin && <button className="botao" onClick={() => confirm("Quem recusou avaliar voltará a ser perguntado. Continuar?") && salvar(async () => { await pedirConfig(`/nps/${papel}/resetar`, "POST", {}); d.recarregar(); }, "Recusas resetadas.")}>Resetar Recusas</button>}</Cab>
+      <Cab titulo="Avaliação do app na loja" sub="Quando e como o app pergunta a nota do aplicativo.">{admin && <button className="botao" onClick={() => confirm("Quem recusou avaliar voltará a ser perguntado. Continuar?") && salvar(async () => { await pedirConfig(`/nps/${papel}/resetar`, "POST", {}); d.recarregar(); }, "Recusas resetadas.")}>Resetar Recusas</button>}</Cab>
       <PapelAbas valor={papel} onChange={(p) => { setPapel(p); setC(null); setLido(null); }} />
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       {!c ? <Carregando /> : (
@@ -78,67 +118,81 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
   const dias: Array<[string, any[]]> = [];
   for (const i of x?.lista.itens ?? []) { const k = nomeDia(i.em); const g = dias.find(([n]) => n === k); if (g) g[1].push(i); else dias.push([k, [i]]); }
   const selo = (c: string) => (c === "Promotor" ? "ok" : c === "Neutro" ? "alerta" : "ruim");
+  const paginas = x?.lista.paginas ?? 1, atual = x?.lista.pagina ?? 1;
+  const setPeriodo = (periodo: string) => { const n = { ...f, periodo }; setF(n); setRasc(n); setPagina(1); };
+  const setTipo = (tipo: string) => { const n = { ...f, tipo }; setF(n); setRasc(n); setPagina(1); };
+  const filtrando = x ? `Período: ${diaBr(x.periodo.inicio)} até ${diaBr(x.periodo.fim)}${x.tipo !== "T" ? ` · ${TIPOS_NPS.find(([c]) => c === x.tipo)?.[1]}` : ""}${f.email ? ` · E-mail: ${f.email}` : ""}${f.telefone ? ` · Telefone: ${f.telefone}` : ""}` : "";
   return (
     <>
-      <h3 style={{ margin: "4px 0 10px" }}>Net Promoter Score</h3>
       <div className="dm-cartao dm-secao">
         <div className="dm-filtros">
-          <Campo rotulo="Período"><select value={rasc.periodo} onChange={(e) => setRasc({ ...rasc, periodo: e.target.value })}>{PERIODOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
-          {rasc.periodo === "CT" && <><Campo rotulo="De"><input type="date" value={rasc.inicio} onChange={(e) => setRasc({ ...rasc, inicio: e.target.value })} /></Campo><Campo rotulo="Até"><input type="date" value={rasc.fim} onChange={(e) => setRasc({ ...rasc, fim: e.target.value })} /></Campo></>}
-          <Campo rotulo="Tipo"><select value={rasc.tipo} onChange={(e) => setRasc({ ...rasc, tipo: e.target.value })}>{TIPOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
+          <Campo rotulo="Período"><select value={f.periodo} onChange={(e) => setPeriodo(e.target.value)}>{PERIODOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
+          {f.periodo === "CT" && <><Campo rotulo="De"><input type="date" value={rasc.inicio} onChange={(e) => setRasc({ ...rasc, inicio: e.target.value })} onBlur={() => setF({ ...f, inicio: rasc.inicio })} /></Campo><Campo rotulo="Até"><input type="date" value={rasc.fim} onChange={(e) => setRasc({ ...rasc, fim: e.target.value })} onBlur={() => setF({ ...f, fim: rasc.fim })} /></Campo></>}
+          <Campo rotulo="Tipo"><select value={f.tipo} onChange={(e) => setTipo(e.target.value)}>{TIPOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
           <button className="botao" type="button" onClick={() => setMais(!mais)} aria-expanded={mais}>Mais filtros</button>
-          <button className="botao primario" type="button" onClick={aplicar}>Filtrar</button>
-          <button className="botao" type="button" onClick={limpar}>Limpar filtros</button>
           <button className="botao" type="button" onClick={exportar} disabled={!x?.total}><Download size={16} aria-hidden /> Exportar</button>
         </div>
-        {mais && (
-          <div className="dm-filtros" style={{ marginTop: 10 }}>
-            <Campo rotulo="E-mail"><input value={rasc.email} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, email: e.target.value })} /></Campo>
-            <Campo rotulo="Telefone"><input value={rasc.telefone} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, telefone: e.target.value })} /></Campo>
-          </div>
-        )}
-        {x && <p className="sub" style={{ margin: "10px 0 0" }}>Filtrando por Período: {diaBr(x.periodo.inicio)} até {diaBr(x.periodo.fim)}{x.tipo !== "T" ? ` · ${TIPOS_NPS.find(([c]) => c === x.tipo)?.[1]}` : ""}</p>}
+        {x && <p className="sub" style={{ margin: "10px 0 0" }}>Filtrando por {filtrando} <button className="botao-tema" type="button" aria-label="Limpar filtros" onClick={limpar}>×</button></p>}
       </div>
+      {mais && (
+        <aside className="dm-cartao dm-secao" aria-label="Filtro de pesquisa">
+          <h3>Filtro de pesquisa</h3>
+          <p className="sub">Você pode filtrar um ou mais campos</p>
+          <div className="dm-filtros">
+            <Campo rotulo="Período"><select value={rasc.periodo} onChange={(e) => setRasc({ ...rasc, periodo: e.target.value })}>{PERIODOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
+            {rasc.periodo === "CT" && <><Campo rotulo="De"><input type="date" value={rasc.inicio} onChange={(e) => setRasc({ ...rasc, inicio: e.target.value })} /></Campo><Campo rotulo="Até"><input type="date" value={rasc.fim} onChange={(e) => setRasc({ ...rasc, fim: e.target.value })} /></Campo></>}
+            <Campo rotulo="Tipo"><select value={rasc.tipo} onChange={(e) => setRasc({ ...rasc, tipo: e.target.value })}>{TIPOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
+            <Campo rotulo="Email"><input value={rasc.email} minLength={2} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, email: e.target.value })} /></Campo>
+            <Campo rotulo="Telefone"><input value={rasc.telefone} minLength={2} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, telefone: e.target.value })} /></Campo>
+          </div>
+          <div className="dm-linha" style={{ marginTop: 10 }}>
+            <button className="botao primario" type="button" onClick={() => { aplicar(); setMais(false); }}>Filtrar</button>
+            <button className="botao" type="button" onClick={() => { limpar(); setMais(false); }}>Limpar filtros</button>
+            <button className="botao" type="button" onClick={() => { setRasc(f); setMais(false); }}>Cancelar</button>
+          </div>
+        </aside>
+      )}
       <Aviso erro={d.erro ?? erroEx} />
       {!x ? <Carregando /> : (
         <>
           <div className="dm-kpis">
-            <div className="dm-kpi destaque"><small>Nota NPS</small><strong>{x.nps ?? "—"}</strong><small>{x.media != null ? `Média ${x.media} de 5` : "Sem avaliações no período"}</small></div>
             <div className="dm-kpi"><small>Total avaliações</small><strong>{x.total}</strong></div>
             <div className="dm-kpi"><small>Promotores</small><strong>{x.promotores}</strong></div>
             <div className="dm-kpi"><small>Neutros</small><strong>{x.neutros}</strong></div>
             <div className="dm-kpi"><small>Detratores</small><strong>{x.detratores}</strong></div>
+            <div className="dm-kpi destaque"><small>Nota NPS</small><strong>{x.nps ?? "—"}</strong><small>{x.media != null ? `Média ${x.media} de 5` : "Sem avaliações no período"}</small></div>
             {resumo && <div className="dm-kpi"><small>Recusaram avaliar</small><strong>{resumo.recusaram}</strong></div>}
           </div>
           <div className="dm-cartao tabela-rola">
             {!dias.length ? <p className="vazio">Nenhuma avaliação neste filtro.</p> : dias.map(([dia, itens]) => (
               <div key={dia}>
                 <h4 style={{ margin: "12px 12px 4px" }}>{dia}</h4>
-                <table><thead><tr><th>Hora</th><th>{papel === "motorista" ? "Motorista" : "Passageiro"}</th><th>Telefone</th><th>Nota</th><th>Classificação</th></tr></thead><tbody>
-                  {itens.map((i, n) => <tr key={`${i.em}-${n}`}><td>{i.em.slice(11, 16)}</td><td className="forte">{i.nome}{i.comentario && <><br /><small className="sub">{i.comentario}</small></>}</td><td>{i.telefone || "—"}</td><td>{i.nota}</td><td><span className={`selo ${selo(i.classe)}`}>{i.classe}</span></td></tr>)}
+                <table><tbody>
+                  {itens.map((i, n) => <tr key={`${i.em}-${n}`}><td className="forte" style={{ fontSize: 20, width: 56, textAlign: "center" }}>{i.nota}</td><td style={{ width: 70 }}>{i.em.slice(11, 16)}</td><td className="forte">{i.nome}{i.comentario && <><br /><small className="sub">{i.comentario}</small></>}</td><td><span className={`selo ${selo(i.classe)}`}>{i.classe}</span></td></tr>)}
                 </tbody></table>
               </div>
             ))}
-            {x.lista.paginas > 1 && (
-              <div className="dm-linha" style={{ justifyContent: "space-between", padding: 12 }}>
-                <span className="sub">{x.lista.total} avaliações · página {x.lista.pagina} de {x.lista.paginas}</span>
-                <span className="dm-linha"><button className="botao" disabled={x.lista.pagina <= 1} onClick={() => setPagina(x.lista.pagina - 1)}>Anterior</button><button className="botao" disabled={x.lista.pagina >= x.lista.paginas} onClick={() => setPagina(x.lista.pagina + 1)}>Próxima</button></span>
-              </div>
+            {paginas > 1 && (
+              <nav className="dm-linha" style={{ justifyContent: "center", padding: 12 }} aria-label="Páginas">
+                <button className="botao" disabled={atual <= 1} onClick={() => setPagina(atual - 1)} aria-label="Página anterior">«</button>
+                {Array.from({ length: paginas }, (_, k) => k + 1).filter((n) => n === 1 || n === paginas || Math.abs(n - atual) <= 2).map((n) => <button key={n} className={`botao ${n === atual ? "primario" : ""}`} onClick={() => setPagina(n)} aria-current={n === atual ? "page" : undefined}>{n}</button>)}
+                <button className="botao" disabled={atual >= paginas} onClick={() => setPagina(atual + 1)} aria-label="Próxima página">»</button>
+              </nav>
             )}
           </div>
         </>
       )}
       <section className="dm-cartao dm-secao">
         <h3>O que é NPS?</h3>
-        <p>Net Promoter Score é uma métrica que tem como objetivo medir a satisfação e a lealdade dos clientes com a empresa. A nota NPS é a porcentagem de promotores menos a porcentagem de detratores.</p>
-        <p className="sub">Aqui as notas vão de 1 a 5: nota 5 é promotor, nota 4 é neutro e notas de 1 a 3 são detratores.</p>
+        <p>Net Promoter Score é uma métrica que tem como objetivo medir a satisfação e lealdade dos clientes com as empresas. <a href="https://pt.wikipedia.org/wiki/Net_Promoter_Score" target="_blank" rel="noreferrer">Saiba mais</a></p>
+        <p className="sub">No nosso painel as notas vão de 1 a 5: nota 5 é promotor, nota 4 é neutro e notas de 1 a 3 são detratores. A nota NPS é a porcentagem de promotores menos a de detratores.</p>
       </section>
     </>
   );
 }
 
 export function Avaliacoes() {
-  const admin = useAdmin();
+  const admin = useGestor();
   const [papel, setPapel] = useState<Papel>("passageiro");
   const [aba, setAba] = useState<"avaliacoes" | "contestacoes" | "reclamacoes">("avaliacoes");
   const d = useCarregar(() => pedirConfig(`/nps/${papel}`), [papel]);
@@ -149,9 +203,9 @@ export function Avaliacoes() {
   const filtradas = ocorr.filter((o) => { const t = `${o.tipo ?? ""} ${o.titulo ?? ""} ${o.assunto ?? ""}`.toLowerCase(); return aba === "contestacoes" ? /conte|taxa/.test(t) : /den|recl|abus/.test(t); });
   return (
     <>
-      <Cab titulo="Avaliação do App (NPS)" sub="Feedback nas Lojas">{admin && <button className="botao" onClick={() => confirm("Quem recusou avaliar voltará a ser perguntado. Continuar?") && salvar(async () => { await pedirConfig(`/nps/${papel}/resetar`, "POST", {}); d.recarregar(); }, "Recusas resetadas.")}>Resetar Recusas</button>}</Cab>
-      <Abas abas={[["avaliacoes", "Avaliações"], ["contestacoes", "Contestações"], ["reclamacoes", "Denúncias"]]} valor={aba} onChange={setAba} />
+      <Cab titulo="Net Promoter Score" sub="Feedback nas Lojas">{admin && <button className="botao" onClick={() => confirm("Quem recusou avaliar voltará a ser perguntado. Continuar?") && salvar(async () => { await pedirConfig(`/nps/${papel}/resetar`, "POST", {}); d.recarregar(); }, "Recusas resetadas.")}>Resetar Recusas</button>}</Cab>
       <PapelAbas valor={papel} onChange={setPapel} />
+      <Abas abas={[["avaliacoes", "Avaliações"], ["contestacoes", "Contestações"], ["reclamacoes", "Denúncias"]]} valor={aba} onChange={setAba} />
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       {aba === "avaliacoes" ? (
         <PainelNps papel={papel} resumo={x} />

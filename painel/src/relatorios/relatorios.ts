@@ -2,6 +2,7 @@
 // estatísticas (bairro, empresa, operador, forma de pagamento, % por motorista), corrida por motorista e km rodados.
 // Todos com período, paginação de 10 em 10 e CSV (com proteção contra injeção de fórmula). Sempre da central do login.
 
+import { corridaDaFilial, listarFiliais, pessoasDaFilial } from "../filiais/filiais.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar, type Registro } from "../cadastros/armazem.ts";
 import { CANAL_TEXTO, listarProprias, type CorridaPropria } from "../corridas/index.ts";
@@ -48,6 +49,8 @@ export function casaForma(pagamento: string, forma: string): boolean {
 export interface Filtros {
   inicio: string; fim: string; empresa?: string; pagamento?: string; pagamentos?: string[]; motorista?: string; viatura?: string; categoria?: string;
   taxa?: number; valorFixo?: number; valorPorCorrida?: number;
+  /** Só as corridas desta filial (Cadastro › Filiais). */
+  filial?: string;
 }
 export type TipoColuna = "texto" | "dinheiro" | "numero" | "pct" | "km";
 export interface Coluna { chave: string; rotulo: string; tipo: TipoColuna }
@@ -113,8 +116,10 @@ function corridasDo(empresaId: string, f: Filtros, status: string[] = ["finaliza
   const x = contexto(empresaId);
   const motorista = normal(f.motorista), viatura = normal(f.viatura), empresa = normal(f.empresa), categoria = normal(f.categoria);
   const formas = f.pagamentos?.length ? f.pagamentos : f.pagamento ? [f.pagamento] : [];
+  const daFilial = f.filial ? new Set(pessoasDaFilial(empresaId, f.filial, "motorista")) : null;
   const lista = listarProprias(empresaId).filter((c) => {
     if (!status.includes(c.status)) return false;
+    if (f.filial && !corridaDaFilial(c, f.filial, daFilial!)) return false;
     const d = diaDaCorrida(c);
     if (d < f.inicio || d > f.fim) return false;
     if (status.length === 1 && status[0] === "finalizada" && !(c.valor != null && c.valor >= 0)) return false;
@@ -250,11 +255,11 @@ function statOperador(empresaId: string, f: Filtros): Tabela {
     g.set(normal(nome), a);
   }
   const linhas = [...g.values()].sort((a, b) => ordemTexto(a.nome, b.nome)).map((a) => ({ operador: a.nome, finalizadas: a.fin, cancPass: a.pass, cancMotorista: a.mot, cancOpe: a.ope, naoAtend: a.nat, totais: a.fin + a.pass + a.mot + a.ope + a.nat }));
-  const t = (k: "finalizadas" | "cancPass" | "cancMotorista" | "cancOpe" | "naoAtend" | "totais") => linhas.reduce((s, l) => s + l[k], 0);
   return {
     colunas: [{ chave: "operador", rotulo: "Operador", tipo: "texto" }, { chave: "finalizadas", rotulo: "FINALIZADAS", tipo: "numero" }, { chave: "cancPass", rotulo: "CANC PASS", tipo: "numero" }, { chave: "cancMotorista", rotulo: "CANC MOTORISTA", tipo: "numero" },
       { chave: "cancOpe", rotulo: "CANC OPE", tipo: "numero" }, { chave: "naoAtend", rotulo: "N/ATEND", tipo: "numero" }, { chave: "totais", rotulo: "TOTAIS", tipo: "numero" }],
-    linhas, totais: { operador: "Total", finalizadas: t("finalizadas"), cancPass: t("cancPass"), cancMotorista: t("cancMotorista"), cancOpe: t("cancOpe"), naoAtend: t("naoAtend"), totais: t("totais") },
+    // a Machine não mostra linha de total nesta tela
+    linhas,
   };
 }
 
@@ -336,15 +341,28 @@ export function lerFiltros(b: Record<string, unknown>): Filtros {
   const lista = Array.isArray(b.pagamentos) ? b.pagamentos : typeof b.pagamentos === "string" && b.pagamentos ? b.pagamentos.split("|") : [];
   return {
     inicio, fim, empresa: limpar(b.empresa, 80), pagamento: limpar(b.pagamento, 40), pagamentos: lista.map((p) => limpar(p, 40)).filter(Boolean).slice(0, 15),
-    motorista: limpar(b.motorista, 80), viatura: limpar(b.viatura, 20), categoria: limpar(b.categoria, 60),
+    motorista: limpar(b.motorista, 80), viatura: limpar(b.viatura, 20), categoria: limpar(b.categoria, 60), filial: limpar(b.filial, 60),
     taxa: num(b.taxa), valorFixo: num(b.valorFixo), valorPorCorrida: num(b.valorPorCorrida),
   };
 }
 
-export function gerarRelatorio(empresaId: string, id: string, f: Filtros, pagina = 1) {
+/** Ordena as linhas pela coluna pedida (números como número, texto em português). Coluna desconhecida: mantém a ordem. */
+export function ordenarLinhas(t: Tabela, ordem?: string, dir?: string): Tabela {
+  const col = t.colunas.find((c) => c.chave === ordem);
+  if (!col) return t;
+  const sinal = dir === "desc" ? -1 : 1;
+  const linhas = [...t.linhas].sort((a, b) => {
+    const x = a[col.chave], y = b[col.chave];
+    const r = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""), "pt-BR", { numeric: true });
+    return r * sinal;
+  });
+  return { ...t, linhas };
+}
+
+export function gerarRelatorio(empresaId: string, id: string, f: Filtros, pagina = 1, ordem?: string, dir?: string) {
   const d = definicao(id);
   if (!d) throw new Error("Relatório não encontrado.");
-  const t = d.gerar(empresaId, f);
+  const t = ordenarLinhas(d.gerar(empresaId, f), ordem, dir);
   const total = t.linhas.length, paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const p = Math.min(paginas, Math.max(1, Math.floor(pagina) || 1));
   return { id: d.id, titulo: d.titulo, periodo: { inicio: f.inicio, fim: f.fim }, colunas: t.colunas, linhas: t.linhas.slice((p - 1) * POR_PAGINA, p * POR_PAGINA), totais: t.totais ?? null, total, pagina: p, paginas, porPagina: POR_PAGINA };
@@ -362,7 +380,7 @@ export function csvDoRelatorio(empresaId: string, id: string, f: Filtros): strin
 /** Listas para os filtros: empresas conveniadas, categorias e formas de pagamento. */
 export function opcoesDosFiltros(empresaId: string) {
   const cats = listar(empresaId, cadastroPorId("categorias")!).filter((c) => c.ativa !== false).map((c) => String(c.nome ?? "")).filter(Boolean);
-  return { empresas: nomesConveniadas(empresaId), categorias: cats, formas: FORMAS_PAGAMENTO };
+  return { empresas: nomesConveniadas(empresaId), categorias: cats, formas: FORMAS_PAGAMENTO, filiais: listarFiliais(empresaId).filter((f) => f.ativa).map((f) => ({ id: f.id, nome: f.nome })) };
 }
 
 // ------------------------------------------------------------------ modelos de relatório

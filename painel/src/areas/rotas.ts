@@ -25,7 +25,7 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
   }
 };
 const emp = (req: Request) => req.ctx!.empresaId;
-const admin = exigirPapel("admin");
+const gestor = exigirPapel("gestor");
 const central = exigirPapel("admin", "operador");
 const q = (req: Request, k: string) => String(req.query[k] ?? "").slice(0, 200);
 const id = (req: Request, k = "id") => String(req.params[k] ?? "").slice(0, 80);
@@ -45,9 +45,9 @@ rotasAreas.get("/motoristas/busca", ok((req, res) => res.json({ motoristas: busc
 
 // ------------------------------------------------------------------ ruas (regras de via)
 rotasAreas.get("/ruas", ok((req, res) => res.json({ regras: regrasDeVia(emp(req)) })));
-rotasAreas.post("/ruas", admin, ok((req, res) => res.json({ regra: criarRegra(emp(req), req.body ?? {}) })));
-rotasAreas.put("/ruas/:id", admin, ok((req, res) => res.json({ regra: atualizarRegra(emp(req), id(req), req.body ?? {}) })));
-rotasAreas.delete("/ruas/:id", admin, ok((req, res) => { removerRegra(emp(req), id(req)); res.json({ ok: true }); }));
+rotasAreas.post("/ruas", gestor, ok((req, res) => res.json({ regra: criarRegra(emp(req), req.body ?? {}) })));
+rotasAreas.put("/ruas/:id", gestor, ok((req, res) => res.json({ regra: atualizarRegra(emp(req), id(req), req.body ?? {}) })));
+rotasAreas.delete("/ruas/:id", gestor, ok((req, res) => { removerRegra(emp(req), id(req)); res.json({ ok: true }); }));
 
 // ------------------------------------------------------------------ funil de clientes
 const CANAIS = ["painel", "bot", "totem", "app", "macaneta"];

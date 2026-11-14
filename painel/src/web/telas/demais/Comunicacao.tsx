@@ -2,17 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, MessageSquare, Radio, Search, Send } from "lucide-react";
+import { CriarNotificacao } from "./CriarNotificacao";
 import { Abas, Aviso, Cab, Campo, Carregando, Modal, dataHoraBr, pedirConfig, useCarregar, useSalvar } from "./comum";
 
 // ------------------------------------------------------------------ Conversas
 
+const diaCurto = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(2, 4)}` : "");
+const ABAS_CHAT: Array<[string, string]> = [["motorista", "Motoristas"], ["empresa", "Empresas"], ["passageiro", "Passageiros"]];
+
+/** Chat (Machine): abas Motoristas e Empresas, Criar conversa, Mensagem Geral e as conversas com "Central: ...". Passageiros é nosso. */
 export function Conversas() {
   const [somLigado, setSom] = useState(() => { try { return localStorage.getItem("conversas-som") !== "0"; } catch { return true; } });
   const [menu, setMenu] = useState(false);
   const [busca, setBusca] = useState("");
-  const [soNaoLidas, setSoNaoLidas] = useState(false);
-  const [sel, setSel] = useState<{ papel: string; chave: string } | null>(null);
+  const [aba, setAba] = useState("motorista");
+  const [sel, setSel] = useState<{ papel: string; chave: string; nome?: string } | null>(null);
   const [transmissao, setTransmissao] = useState(false);
+  const [criar, setCriar] = useState(false);
+  // "x" da conversa: some da lista até chegar mensagem nova (só neste navegador).
+  const [fechadas, setFechadas] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem("conversas-fechadas") ?? "{}"); } catch { return {}; } });
+  const fechar = (c: any) => { const n = { ...fechadas, [`${c.papel}|${c.chave}`]: c.ultima }; setFechadas(n); try { localStorage.setItem("conversas-fechadas", JSON.stringify(n)); } catch { /* sem armazenamento */ } };
   const lista = useCarregar(() => pedirConfig("/conversas"), [], 8000);
   const ultimoTotal = useRef<number | null>(null);
   const todas: any[] = lista.dados?.conversas ?? [];
@@ -22,44 +31,62 @@ export function Conversas() {
     ultimoTotal.current = naoLidas;
   }, [naoLidas, somLigado]);
   const q = busca.trim().toLowerCase();
-  const filtradas = todas.filter((c) => (!soNaoLidas || c.naoLidas > 0) && (!q || `${c.nome} ${c.chave}`.toLowerCase().includes(q)));
+  const filtradas = todas.filter((c) => c.papel === aba && fechadas[`${c.papel}|${c.chave}`] !== c.ultima && (!q || `${c.nome} ${c.chave}`.toLowerCase().includes(q)));
   const lerTodas = async () => { await pedirConfig("/conversas/lidas", "POST", {}); lista.recarregar(); };
   const atual = todas.find((c) => c.papel === sel?.papel && c.chave === sel?.chave);
   return (
     <div className="dm-conversas">
       <aside className={`dm-esquerda ${sel ? "oculta-movel" : ""}`}>
         <div className="dm-esq-topo">
+          <div className="dm-pilulas" role="tablist">{ABAS_CHAT.map(([k, n]) => <button key={k} role="tab" aria-selected={aba === k} className={aba === k ? "ativo" : ""} onClick={() => setAba(k)}>{n}</button>)}</div>
           <div className="dm-linha dm-entre"><h2>Conversas</h2>
-            <div className="dm-dropdown"><button className="icone" aria-label="Configurações do chat" onClick={() => setMenu(!menu)}>⋮</button>
-              {menu && <div className="dm-dropdown-menu direita">
-                <button onClick={() => { const n = !somLigado; setSom(n); try { localStorage.setItem("conversas-som", n ? "1" : "0"); } catch { /* sem armazenamento */ } }}>{somLigado ? <Bell size={14} /> : <BellOff size={14} />} {somLigado ? "Sons Ativados" : "Sons Desativados"}</button>
-                <button onClick={() => { setMenu(false); void lerTodas(); }}>Marcar todas como lidas</button>
-              </div>}
-            </div>
+            <span className="dm-linha">
+              <button className="botao primario" onClick={() => setCriar(true)} disabled={aba === "empresa"}>Criar conversa</button>
+              <div className="dm-dropdown"><button className="icone" aria-label="Configurações do chat" onClick={() => setMenu(!menu)}>⋮</button>
+                {menu && <div className="dm-dropdown-menu direita">
+                  <button onClick={() => { const n = !somLigado; setSom(n); try { localStorage.setItem("conversas-som", n ? "1" : "0"); } catch { /* sem armazenamento */ } }}>{somLigado ? <Bell size={14} /> : <BellOff size={14} />} {somLigado ? "Sons Ativados" : "Sons Desativados"}</button>
+                  <button onClick={() => { setMenu(false); void lerTodas(); }}>Marcar todas como lidas</button>
+                </div>}
+              </div>
+            </span>
           </div>
-          <label className="dm-busca"><Search size={16} /><input placeholder="Buscar conversa..." value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversa" /></label>
-          <div className="dm-linha dm-entre">
-            <div className="dm-pilulas"><button className={!soNaoLidas ? "ativo" : ""} onClick={() => setSoNaoLidas(false)}>Todas</button><button className={soNaoLidas ? "ativo" : ""} onClick={() => setSoNaoLidas(true)}>Não lidas <b>{naoLidas}</b></button></div>
-            <button className="botao" onClick={lerTodas}>Ler todas</button>
-          </div>
-          <button className="botao primario" onClick={() => setTransmissao(true)}><Radio size={14} /> Transmissão Geral</button>
+          <label className="dm-busca"><Search size={16} /><input placeholder="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversa" /></label>
         </div>
         <div className="dm-esq-lista">
-          {lista.carregando && !lista.dados ? <Carregando /> : !filtradas.length ? <p className="vazio">Nenhuma conversa.</p> : filtradas.map((c) => (
-            <button key={`${c.papel}${c.chave}`} className={`dm-item ${sel?.chave === c.chave && sel?.papel === c.papel ? "ativo" : ""}`} onClick={() => setSel({ papel: c.papel, chave: c.chave })}>
-              <span className="dm-item-nome"><strong>{c.nome}</strong><small>{c.papel === "motorista" ? "Motorista" : "Passageiro"} · {c.ultimaDe === "central" ? "Você: " : ""}{c.ultimaTexto}</small></span>
-              <span className="dm-dir"><small>{dataHoraBr(c.ultima)}</small>{c.naoLidas > 0 && <b className="dm-contador">{c.naoLidas}</b>}</span>
-            </button>
+          {aba !== "empresa" && <button className="dm-item" onClick={() => setTransmissao(true)}><span className="dm-item-nome"><strong><Radio size={14} /> Mensagem Geral</strong></span></button>}
+          {lista.carregando && !lista.dados ? <Carregando /> : !filtradas.length ? <p className="vazio">{aba === "empresa" ? "Nenhuma conversa com empresas." : "Nenhuma conversa."}</p> : filtradas.map((c) => (
+            <div key={`${c.papel}${c.chave}`} className="dm-linha" style={{ alignItems: "stretch" }}>
+              <button className={`dm-item ${sel?.chave === c.chave && sel?.papel === c.papel ? "ativo" : ""}`} onClick={() => setSel({ papel: c.papel, chave: c.chave })}>
+                <span className="dm-item-nome"><strong>{c.nome}</strong><small>{c.ultimaDe === "central" ? "Central: " : ""}{c.ultimaTexto}</small></span>
+                <span className="dm-dir"><small>{diaCurto(c.ultima)}</small>{c.naoLidas > 0 && <b className="dm-contador">{c.naoLidas}</b>}</span>
+              </button>
+              <button className="icone" aria-label={`Fechar conversa com ${c.nome}`} onClick={() => fechar(c)}>×</button>
+            </div>
           ))}
         </div>
       </aside>
       <section className="dm-direita">
-        {sel ? <Chat key={`${sel.papel}${sel.chave}`} papel={sel.papel} chave={sel.chave} nome={atual?.nome ?? sel.chave} onFechar={() => setSel(null)} onMudou={lista.recarregar} /> : (
+        {sel ? <Chat key={`${sel.papel}${sel.chave}`} papel={sel.papel} chave={sel.chave} nome={atual?.nome ?? sel.nome ?? sel.chave} onFechar={() => setSel(null)} onMudou={lista.recarregar} /> : (
           <div className="dm-vazio-grande"><div className="dm-circulo"><MessageSquare size={44} /></div><h3>Selecione uma conversa</h3><p>Sua caixa de entrada está pronta.</p><small className="dm-chat-status">--</small></div>
         )}
       </section>
       <Transmissao aberto={transmissao} onFechar={() => setTransmissao(false)} />
+      <CriarConversa aberto={criar} papel={aba} onFechar={() => setCriar(false)} onEscolher={(p) => { setCriar(false); setSel(p); }} />
     </div>
+  );
+}
+
+function CriarConversa({ aberto, papel, onFechar, onEscolher }: { aberto: boolean; papel: string; onFechar: () => void; onEscolher: (p: { papel: string; chave: string; nome: string }) => void }) {
+  const [busca, setBusca] = useState("");
+  const pessoas = useCarregar(() => (aberto ? pedirConfig(`/notificacoes/pessoas?papel=${papel}&busca=${encodeURIComponent(busca)}`) : Promise.resolve({ pessoas: [] })), [aberto, papel, busca]);
+  return (
+    <Modal aberto={aberto} onFechar={onFechar} titulo="Criar conversa" sub={papel === "motorista" ? "Escolha o motorista." : "Escolha o passageiro."}>
+      <Campo rotulo="Buscar"><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome, e-mail ou telefone" aria-label="Buscar pessoa" /></Campo>
+      <ul className="dm-transacoes">
+        {(pessoas.dados?.pessoas ?? []).slice(0, 30).map((p: any) => <li key={p.chave}><button className="dm-item" onClick={() => onEscolher({ papel, chave: p.chave, nome: p.nome })}><span className="dm-item-nome"><strong>{p.nome}</strong><small>{p.telefone}</small></span></button></li>)}
+        {pessoas.dados && !pessoas.dados.pessoas.length && <li className="vazio">Ninguém encontrado.</li>}
+      </ul>
+    </Modal>
   );
 }
 
@@ -77,14 +104,14 @@ function Chat({ papel, chave, nome, onFechar, onMudou }: { papel: string; chave:
   };
   return (
     <div className="dm-chat">
-      <div className="dm-chat-topo"><button className="botao dm-voltar" onClick={onFechar}>←</button><div><h2>{nome}</h2><small>{papel === "motorista" ? "Motorista" : "Passageiro"}</small></div></div>
+      <div className="dm-chat-topo"><button className="botao dm-voltar" onClick={onFechar}>←</button><div><h2>{nome}</h2></div></div>
       <div className="dm-chat-msgs" aria-live="polite">
-        {!m.dados ? <Carregando /> : !lista.length ? <p className="vazio">Sua caixa de entrada está pronta.</p> : lista.map((x) => <div key={x.id} className={`dm-bolha ${x.de === "central" ? "minha" : ""}`}><p>{x.texto}</p><small>{dataHoraBr(x.em)}</small></div>)}
+        {!m.dados ? <Carregando /> : !lista.length ? <p className="vazio">Sua caixa de entrada está pronta.</p> : lista.map((x) => <div key={x.id} className={`dm-bolha ${x.de === "central" ? "minha" : ""}`}><small><b>{x.de === "central" ? "Central" : nome}</b></small><p>{x.texto}</p><small>{x.em.slice(11, 16)} {x.em.slice(8, 10)}/{x.em.slice(5, 7)}/{x.em.slice(0, 4)}</small></div>)}
         <div ref={fim} />
       </div>
       <Aviso erro={msg?.erro} />
       <form className="dm-chat-envio" onSubmit={(e) => { e.preventDefault(); void enviar(); }}>
-        <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Digite sua mensagem..." rows={1} maxLength={1000} aria-label="Mensagem" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void enviar(); } }} />
+        <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Mensagem" rows={1} maxLength={1000} aria-label="Mensagem" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void enviar(); } }} />
         <button className="botao primario" disabled={salvando || !texto.trim()} aria-label="Enviar"><Send size={16} /></button>
       </form>
     </div>
@@ -111,14 +138,79 @@ function Transmissao({ aberto, onFechar }: { aberto: boolean; onFechar: () => vo
 const DIAS = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 const SEG: Array<[string, string]> = [["todos", "Todos"], ["com_corridas", "Com Corridas"], ["sem_corridas", "Sem Corridas"], ["individual", "Individual"]];
 
+const DEST: Array<[string, string]> = [["", "Todos"], ["passageiro", "Clientes App"], ["motorista", "Motoristas"]];
+const VAZIO_N = { destinatario: "", dataIni: "", dataFim: "", titulo: "", mensagem: "" };
+const diaBr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/** Notificações app (Machine): lista com filtros e "Nova notificação" (disparo imediato ou agendado). */
 export function Notificacoes() {
+  const [criando, setCriando] = useState(false);
   const [aba, setAba] = useState<"imediato" | "agendamento">("imediato");
+  const [rasc, setRasc] = useState(VAZIO_N);
+  const [f, setF] = useState(VAZIO_N);
+  const [pagina, setPagina] = useState(1);
+  const [detalhe, setDetalhe] = useState<any>(null);
+  const [menu, setMenu] = useState<string | null>(null);
+  const qs = new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), pagina: String(pagina) }).toString();
+  const lista = useCarregar(() => pedirConfig(`/notificacoes/lista?${qs}`), [qs, criando]);
+  const x = lista.dados;
+  if (criando) {
+    return (
+      <>
+        <Cab titulo={aba === "imediato" ? "Nova notificação" : "Agendamento Inteligente"} sub={aba === "imediato" ? "Dispare mensagens PUSH para o celular de seus usuários na hora." : "Programe mensagens para rodarem sozinhas no piloto automático."}>
+          <button className="botao" onClick={() => setCriando(false)}>Voltar</button>
+          <Abas abas={[["imediato", "Disparo Imediato"], ["agendamento", "Agendar Notificações"]]} valor={aba} onChange={setAba} />
+        </Cab>
+        {aba === "imediato" ? <CriarNotificacao onVoltar={() => setCriando(false)} onEnviada={() => setCriando(false)} /> : <Formulario agendar />}
+      </>
+    );
+  }
+  const de = x ? (x.pagina - 1) * 10 + 1 : 0, ate = x ? de + x.itens.length - 1 : 0;
+  const paginas: number[] = x ? Array.from({ length: x.paginas }, (_, i) => i + 1).filter((p) => p === 1 || p === x.paginas || Math.abs(p - x.pagina) <= 2) : [];
+  const set = (k: keyof typeof VAZIO_N, v: string) => setRasc({ ...rasc, [k]: v });
   return (
     <>
-      <Cab titulo={aba === "imediato" ? "Central de Notificações" : "Agendamento Inteligente"} sub={aba === "imediato" ? "Dispare mensagens PUSH para o celular de seus usuários na hora." : "Programe mensagens para rodarem sozinhas no piloto automático."}>
-        <Abas abas={[["imediato", "Disparo Imediato"], ["agendamento", "Agendar Notificações"]]} valor={aba} onChange={setAba} />
+      <Cab titulo="Notificações app" sub={'São mensagens rápidas que aparecem na tela do celular, normalmente chamadas de "Notificação Push".'}>
+        <button className="botao primario" onClick={() => setCriando(true)}>Nova notificação</button>
       </Cab>
-      <Formulario agendar={aba === "agendamento"} />
+      <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setPagina(1); setF(rasc); }}>
+        <h3>Filtros</h3>
+        <Campo rotulo="Destinatário"><select value={rasc.destinatario} onChange={(e) => set("destinatario", e.target.value)}>{DEST.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></Campo>
+        <Campo rotulo="Data inicial"><input type="date" value={rasc.dataIni} onChange={(e) => set("dataIni", e.target.value)} /></Campo>
+        <Campo rotulo="Data final"><input type="date" value={rasc.dataFim} onChange={(e) => set("dataFim", e.target.value)} /></Campo>
+        <Campo rotulo="Título"><input value={rasc.titulo} maxLength={80} onChange={(e) => set("titulo", e.target.value)} /></Campo>
+        <Campo rotulo="Mensagem"><input value={rasc.mensagem} maxLength={200} onChange={(e) => set("mensagem", e.target.value)} /></Campo>
+        <button className="botao primario">Filtrar</button>
+        <button type="button" className="botao" onClick={() => { setRasc(VAZIO_N); setF(VAZIO_N); setPagina(1); }}>Limpar filtros</button>
+      </form>
+      <Aviso erro={lista.erro} />
+      <div className="dm-cartao tabela-rola">
+        {!x ? <Carregando /> : <>
+          <p><small>{x.total ? `Exibindo ${de}-${ate} de ${x.total} ${x.total === 1 ? "resultado" : "resultados"}.` : ""}</small></p>
+          <table>
+            <thead><tr><th>Data criação</th><th>Destinatário</th><th>Título</th><th>Mensagem</th><th>Status do envio</th><th>Data do envio</th><th /></tr></thead>
+            <tbody>
+              {!x.itens.length ? <tr><td colSpan={7} className="vazio">Nenhum resultado encontrado.</td></tr> : x.itens.map((n: any) => (
+                <tr key={n.id}>
+                  <td>{diaBr(n.criadoEm)}</td><td>{n.destinatario}</td><td>{n.titulo}</td><td>{n.mensagem}</td><td>{n.status}</td><td>{diaBr(n.enviadoEm)}</td>
+                  <td><div className="dm-dropdown"><button className="icone" aria-label={`Ações de ${n.titulo}`} onClick={() => setMenu(menu === n.id ? null : n.id)}>⋮</button>
+                    {menu === n.id && <div className="dm-dropdown-menu direita"><button onClick={() => { setMenu(null); setDetalhe(n); }}>Ver detalhes</button></div>}</div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {x.paginas > 1 && (
+            <div className="dm-cab-acoes" style={{ marginTop: 10 }} role="navigation" aria-label="Páginas">
+              <button className="botao" disabled={x.pagina <= 1} onClick={() => setPagina(x.pagina - 1)}>←</button>
+              {paginas.map((p) => <button key={p} className={`botao ${p === x.pagina ? "primario" : ""}`} onClick={() => setPagina(p)}>{p}</button>)}
+              <button className="botao" disabled={x.pagina >= x.paginas} onClick={() => setPagina(x.pagina + 1)}>→</button>
+            </div>
+          )}
+        </>}
+      </div>
+      <Modal aberto={!!detalhe} onFechar={() => setDetalhe(null)} titulo={detalhe?.titulo ?? ""} sub={detalhe ? `${detalhe.destinatario} · ${dataHoraBr(detalhe.em)}` : ""}>
+        {detalhe && <><p style={{ whiteSpace: "pre-wrap" }}>{detalhe.mensagem}</p><p><small>Segmento: {detalhe.segmento} · {detalhe.destinatarios} destinatário(s) · Enviada por {detalhe.por}</small></p></>}
+      </Modal>
     </>
   );
 }

@@ -1,6 +1,7 @@
 // Rotas dos cadastros: /api/cadastros/:cadastro (listar, criar, editar, excluir, importar).
 // A empresa vem sempre do usuário logado (req.ctx). Operador edita só os cadastros marcados com operadorEdita.
 
+import { podeCargo } from "../comum/cargos.ts";
 import { Router, type Request, type Response } from "express";
 import { cadastroPorId, CADASTROS, type Cadastro } from "../comum/cadastros.ts";
 import * as D from "../servidor/dados.ts";
@@ -22,8 +23,7 @@ function cad(req: Request): Cadastro {
   return c;
 }
 function podeEditar(req: Request, c: Cadastro) {
-  const p = ctx(req).usuario.papel;
-  if (p === "plataforma" || p === "admin" || c.operadorEdita) return;
+  if (podeCargo(ctx(req).usuario.papel, "gestor") || c.operadorEdita) return;
   throw new Error("Seu usuário só pode consultar este cadastro.");
 }
 const quem = (req: Request) => ctx(req).usuario.email;

@@ -7,6 +7,7 @@ import { listar } from "../cadastros/armazem.ts";
 import { normal } from "../servidor/util.ts";
 import { credito } from "./credito.ts";
 import { extraDaCategoria, registroDaCategoria } from "./categorias.ts";
+import { cobrancas, formaDaTaxa, somaCobrancas, temTaxaDoMotorista } from "./taxas.ts";
 
 export interface ResultadoComissao { valorBruto: number; taxaCentral: number; valorLiquido: number }
 
@@ -21,7 +22,7 @@ function taxaDe(tipo: string, valor: number, bruto: number): number {
 }
 
 /** Regra de cobrança própria do motorista, lida do cadastro (null = Padrão: vale a da categoria). */
-function regraDoMotorista(empresaId: string, motoristaId?: string) {
+export function regraDoMotorista(empresaId: string, motoristaId?: string) {
   if (!motoristaId) return null;
   const m = listar(empresaId, cadastroPorId("motoristas")!).find((x) => x.id === motoristaId);
   if (!m) return null;
@@ -32,13 +33,16 @@ function regraDoMotorista(empresaId: string, motoristaId?: string) {
 }
 
 /** Quanto a central fica da corrida e quanto sobra para o motorista. Nunca passa do valor bruto; centavos arredondados. */
-export function calcularComissao(empresaId: string, categoria: string, valorBruto: number, motoristaId?: string): ResultadoComissao {
+export function calcularComissao(empresaId: string, categoria: string, valorBruto: number, motoristaId?: string, pagamento?: string): ResultadoComissao {
   const bruto = Number.isFinite(valorBruto) && valorBruto > 0 ? cent(valorBruto) : 0;
   let taxa = 0;
   const mot = regraDoMotorista(empresaId, motoristaId);
   if (mot?.isento) taxa = 0;
   else if (mot) taxa = taxaDe(mot.tipo, mot.valor, bruto);
-  else {
+  else if (temTaxaDoMotorista(empresaId)) {
+    // Config › Taxas da central: as taxas do motorista substituem a comissão da categoria.
+    taxa = somaCobrancas(cobrancas(empresaId, "motorista", { categoria, valor: bruto, forma: formaDaTaxa(pagamento) }));
+  } else {
     const reg = registroDaCategoria(empresaId, categoria);
     const faixas = extraDaCategoria(empresaId, categoria).comissao;
     if (faixas.usaFaixas) {

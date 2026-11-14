@@ -1,9 +1,10 @@
 // Rotas do painel para Financeiro, Comunicação, Config, Avaliações e Ajuda (montadas em /api/config, depois do login).
 
+import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request, type Response } from "express";
 import fs from "node:fs";
 import { resolverSaque } from "../apps/extras.ts";
-import { lancar, saldo } from "../apps/extras.ts";
+import { ajustarCarteira } from "../apps/extras.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
@@ -15,18 +16,26 @@ import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
 import { pedidosRecentes } from "../corridas/index.ts";
-import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { removerTaxa, salvarTaxa, taxas } from "./taxas.ts";
+import { FORMAS_TAXA } from "../comum/taxas.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
 import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
-import { csvExtratoOnline, csvVisaoGeral, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
+import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoGeral, relatorioFaturamento, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
-import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, termos } from "./gerais.ts";
+import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
+import { personalizacao, salvarPersonalizacao } from "./personalizacao.ts";
+import { bandeira, salvarBandeira } from "./bandeira.ts";
+import { salvarTransbordo, transbordoDasParceiras } from "./transbordo.ts";
+import { areasDaEmpresa } from "../areas/areas.ts";
+import { cadastroPorId } from "../comum/cadastros.ts";
+import { listar } from "../cadastros/armazem.ts";
 
 export const rotasConfig = express.Router();
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
@@ -38,6 +47,7 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
 const emp = (req: Request) => req.ctx!.empresaId;
 const quem = (req: Request) => req.ctx!.usuario.email;
 const admin = exigirPapel("admin");
+const gestor = exigirPapel("gestor");
 const q = (req: Request, k: string) => String(req.query[k] ?? "");
 const per = (req: Request) => periodo(q(req, "periodo"), q(req, "inicio"), q(req, "fim"));
 const papelCart = (v: string) => (v === "motorista" ? "motorista" : "passageiro") as "motorista" | "passageiro";
@@ -47,13 +57,11 @@ const papelCart = (v: string) => (v === "motorista" ? "motorista" : "passageiro"
 rotasConfig.get("/carteiras", ok((req, res) => res.json(listaCarteiras(emp(req), papelCart(q(req, "papel")), q(req, "busca"), q(req, "situacao") || "todos"))));
 rotasConfig.get("/carteiras/:papel/:chave", ok((req, res) => res.json({ ...detalheCarteira(emp(req), papelCart(req.params.papel), req.params.chave, per(req)), periodo: per(req) })));
 rotasConfig.post("/carteiras/:papel/:chave/ajuste", admin, ok((req, res) => {
-  const papel = papelCart(req.params.papel);
+  // Crédito ou débito manual: motivo obrigatório e chave única por clique (clique duplo não lança duas vezes).
   const valor = Number(req.body?.valor);
-  if (!Number.isFinite(valor) || valor <= 0 || valor > 10_000) throw new Error("Valor inválido.");
-  const retirar = req.body?.acao === "remover";
-  if (retirar && saldo(emp(req), papel, req.params.chave) < valor) throw new Error("O saldo não cobre esta retirada.");
-  const l = lancar(emp(req), papel, req.params.chave, retirar ? -valor : valor, texto(req.body?.descricao, 120) || (retirar ? "Débito da central" : "Crédito da central"), quem(req));
-  res.json({ lancamento: l, saldo: saldo(emp(req), papel, req.params.chave) });
+  if (!Number.isFinite(valor) || valor <= 0) throw new Error("Valor inválido.");
+  const r = ajustarCarteira(emp(req), { papel: papelCart(req.params.papel), chave: req.params.chave, valor: req.body?.acao === "remover" ? -valor : valor, motivo: texto(req.body?.motivo ?? req.body?.descricao, 120), chaveUnica: String(req.body?.chaveUnica ?? ""), por: quem(req) });
+  res.status(r.repetido ? 200 : 201).json(r);
 }));
 rotasConfig.get("/extrato", ok((req, res) => res.json({ periodo: per(req), ...extratoGeral(emp(req), (["motorista", "passageiro"].includes(q(req, "aba")) ? q(req, "aba") : "geral") as "geral", per(req)) })));
 rotasConfig.get("/saques", ok((req, res) => res.json({ periodo: per(req), ...listaSaques(emp(req), per(req)) })));
@@ -70,6 +78,7 @@ const baixarCsv = (res: Response, nome: string, csv: string) => {
 rotasConfig.get("/visao-geral", ok((req, res) => res.json(visaoGeral(emp(req), per(req)))));
 rotasConfig.get("/visao-geral/csv", ok((req, res) => baixarCsv(res, "visao-geral-financeiro", csvVisaoGeral(emp(req), per(req)))));
 rotasConfig.get("/extrato-central", ok((req, res) => res.json(extratoDaCentral(emp(req), per(req)))));
+rotasConfig.get("/extrato-central/csv", ok((req, res) => baixarCsv(res, "extrato-da-central", csvExtratoCentral(emp(req), per(req)))));
 rotasConfig.post("/extrato-central/recargas", admin, ok((req, res) => res.status(201).json({ pedido: pedirRecargaCentral(emp(req), Number(req.body?.valor), texto(req.body?.observacao, 200), quem(req)) })));
 rotasConfig.post("/extrato-central/recargas/:id/:acao", admin, ok((req, res) => {
   if (!["confirmar", "cancelar"].includes(req.params.acao)) throw new Error("Ação inválida.");
@@ -78,6 +87,9 @@ rotasConfig.post("/extrato-central/recargas/:id/:acao", admin, ok((req, res) => 
 const filtroTransacoes = (req: Request) => ({ tipo: q(req, "tipo"), status: q(req, "status"), repasse: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "repasse")) ? q(req, "repasse") : "", busca: q(req, "busca").slice(0, 80) });
 rotasConfig.get("/transacoes-online", ok((req, res) => res.json(extratoOnline(emp(req), per(req), filtroTransacoes(req)))));
 rotasConfig.get("/transacoes-online/csv", ok((req, res) => baixarCsv(res, "extrato-transacoes-online", csvExtratoOnline(emp(req), per(req), filtroTransacoes(req)))));
+const filtroFaturamento = (req: Request) => ({ status: q(req, "status"), pagamento: q(req, "pagamento"), busca: q(req, "busca").slice(0, 40) });
+rotasConfig.get("/relatorio-faturamento", ok((req, res) => res.json(relatorioFaturamento(emp(req), per(req), filtroFaturamento(req), Number(q(req, "pagina")) || 1))));
+rotasConfig.get("/relatorio-faturamento/csv", ok((req, res) => baixarCsv(res, "relatorio-faturamento", csvRelatorioFaturamento(emp(req), per(req), filtroFaturamento(req)))));
 rotasConfig.post("/transacoes-online/:id/status", admin, ok((req, res) => res.json(marcarTransacao(emp(req), req.params.id, String(req.body?.status ?? ""), texto(req.body?.motivo, 200), quem(req)))));
 rotasConfig.get("/recargas", ok((req, res) => res.json({ periodo: per(req), ...listaRecargas(emp(req), papelCart(q(req, "aba") || "motorista"), per(req)) })));
 rotasConfig.get("/relatorios/producao", ok((req, res) => {
@@ -108,6 +120,7 @@ rotasConfig.post("/alertas/:id/encerrar", exigirPapel("admin", "operador"), ok((
 rotasConfig.get("/central-notificacoes", ok((req, res) => res.json(central(emp(req), quem(req), q(req, "somenteNaoLidas") === "1"))));
 rotasConfig.post("/central-notificacoes/lidas", ok((req, res) => res.json({ marcadas: marcarCentralLidas(emp(req), quem(req), req.body?.chaves, req.body?.todas === true), ...central(emp(req), quem(req), false) })));
 rotasConfig.get("/notificacoes", ok((req, res) => res.json({ historico: historicoNotificacoes(emp(req)), agendamentos: agendamentos(emp(req)) })));
+rotasConfig.get("/notificacoes/lista", ok((req, res) => res.json(listaNotificacoes(emp(req), { destinatario: q(req, "destinatario"), dataIni: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataIni")) ? q(req, "dataIni") : undefined, dataFim: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataFim")) ? q(req, "dataFim") : undefined, titulo: q(req, "titulo"), mensagem: q(req, "mensagem") }, Number(q(req, "pagina")) || 1))));
 rotasConfig.get("/notificacoes/pessoas", ok((req, res) => res.json({ pessoas: buscarPessoas(emp(req), papelCart(q(req, "papel")), q(req, "busca")) })));
 rotasConfig.post("/notificacoes", exigirPapel("admin", "operador"), ok(async (req, res) => res.json(await dispararNotificacao(emp(req), sanearPedido(req.body), quem(req)))));
 rotasConfig.post("/notificacoes/agendar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ agendamentos: criarAgendamento(emp(req), req.body) })));
@@ -117,12 +130,12 @@ rotasConfig.delete("/notificacoes/agendar/:id", exigirPapel("admin", "operador")
 // ------------------------------------------------------------------ config: gerais do app
 
 rotasConfig.get("/gerais", ok((req, res) => res.json({ ...gerais(emp(req)), categoriasNomes: categoriasCompletas(emp(req)).map((c) => ({ id: c.id, nome: c.nome })) })));
-rotasConfig.put("/gerais", admin, ok((req, res) => res.json(salvarGerais(emp(req), req.body))));
-rotasConfig.post("/gerais/banners", admin, express.raw({ type: "image/*", limit: MAX_BANNER }), ok((req, res) => {
+rotasConfig.put("/gerais", gestor, ok((req, res) => res.json(salvarGerais(emp(req), req.body))));
+rotasConfig.post("/gerais/banners", gestor, express.raw({ type: "image/*", limit: MAX_BANNER }), ok((req, res) => {
   const bytes = req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array();
   res.json({ banner: adicionarBanner(emp(req), String(req.headers["content-type"] ?? ""), bytes, q(req, "link"), q(req, "tipo")) });
 }));
-rotasConfig.delete("/gerais/banners/:id", admin, ok((req, res) => { removerBanner(emp(req), req.params.id); res.json({ ok: true }); }));
+rotasConfig.delete("/gerais/banners/:id", gestor, ok((req, res) => { removerBanner(emp(req), req.params.id); res.json({ ok: true }); }));
 rotasConfig.get("/gerais/banners/:id", ok((req, res) => {
   const a = arquivoDoBanner(emp(req), req.params.id);
   if (!a) return res.status(404).json({ erro: "Banner não encontrado." });
@@ -135,21 +148,25 @@ rotasConfig.get("/apps", ok((req, res) => res.json(configDosApps(emp(req)))));
 
 // ------------------------------------------------------------------ config: crédito, categorias, dinâmicas, descontos
 
+// Taxas da central (Taxa por corrida): leitura para quem está logado, gravação só do admin.
+rotasConfig.get("/taxas", ok((req, res) => res.json({ taxas: taxas(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome), pagamentos: FORMAS_TAXA })));
+rotasConfig.post("/taxas", admin, ok((req, res) => res.json({ taxas: salvarTaxa(emp(req), req.body, quem(req)) })));
+rotasConfig.delete("/taxas/:id", admin, ok((req, res) => res.json({ taxas: removerTaxa(emp(req), req.params.id) })));
 rotasConfig.get("/credito", ok((req, res) => res.json({ ...credito(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
-rotasConfig.put("/credito", admin, ok((req, res) => res.json(salvarCredito(emp(req), req.body))));
-rotasConfig.post("/credito/regras", admin, ok((req, res) => res.json(salvarRegraComissao(emp(req), req.body))));
-rotasConfig.delete("/credito/regras/:id", admin, ok((req, res) => res.json(removerRegraComissao(emp(req), req.params.id))));
+rotasConfig.put("/credito", gestor, ok((req, res) => res.json(salvarCredito(emp(req), req.body))));
+rotasConfig.post("/credito/regras", gestor, ok((req, res) => res.json(salvarRegraComissao(emp(req), req.body))));
+rotasConfig.delete("/credito/regras/:id", gestor, ok((req, res) => res.json(removerRegraComissao(emp(req), req.params.id))));
 
 rotasConfig.get("/categorias", ok((req, res) => res.json({ categorias: categoriasCompletas(emp(req)), dinamicas: dinamicas(emp(req)), automacoes: automacoes(emp(req)), metodos: ROTULO_METODO, regras: credito(emp(req)).regras, icones: ICONES })));
-rotasConfig.post("/categorias", admin, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), null, req.body ?? {}, quem(req)) })));
-rotasConfig.put("/categorias/:id", admin, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
-rotasConfig.delete("/categorias/:id", admin, ok((req, res) => { removerCategoria(emp(req), req.params.id); res.json({ ok: true }); }));
+rotasConfig.post("/categorias", gestor, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), null, req.body ?? {}, quem(req)) })));
+rotasConfig.put("/categorias/:id", gestor, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
+rotasConfig.delete("/categorias/:id", gestor, ok((req, res) => { removerCategoria(emp(req), req.params.id); res.json({ ok: true }); }));
 
 // Editar tarifa (Machine): tarifa padrão e tarifas extras por dia e horário. Só o admin altera.
-rotasConfig.put("/categorias/:id/tarifa", admin, ok((req, res) => res.json({ categoria: salvarTarifaPadrao(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
-rotasConfig.post("/categorias/:id/tarifas-extras", admin, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: undefined }) })));
-rotasConfig.put("/categorias/:id/tarifas-extras/:extra", admin, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
-rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", admin, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
+rotasConfig.put("/categorias/:id/tarifa", gestor, ok((req, res) => res.json({ categoria: salvarTarifaPadrao(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
+rotasConfig.post("/categorias/:id/tarifas-extras", gestor, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: undefined }) })));
+rotasConfig.put("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
+rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
 
 /** Tudo da tela Tarifas dinâmicas: regras manuais (com a faixa da legenda), automações, áreas automáticas abertas agora e a prioridade. */
 const painelDinamicas = (empresaId: string) => ({
@@ -161,25 +178,33 @@ const painelDinamicas = (empresaId: string) => ({
   legenda: LEGENDA_DINAMICA,
 });
 rotasConfig.get("/dinamicas", ok((req, res) => res.json(painelDinamicas(emp(req)))));
-rotasConfig.post("/dinamicas", admin, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.post("/dinamicas/:id/ativa", admin, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.put("/dinamicas-prioridade", admin, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.post("/dinamicas-automacoes", admin, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.post("/dinamicas-automacoes/:id/ativa", admin, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.delete("/dinamicas-automacoes/:id", admin, ok((req, res) => { removerAutomacao(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
-rotasConfig.delete("/dinamicas/:id", admin, ok((req, res) => { removerDinamica(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas", gestor, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas/:id/ativa", gestor, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.put("/dinamicas-prioridade", gestor, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas-automacoes", gestor, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.post("/dinamicas-automacoes/:id/ativa", gestor, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.delete("/dinamicas-automacoes/:id", gestor, ok((req, res) => { removerAutomacao(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.delete("/dinamicas/:id", gestor, ok((req, res) => { removerDinamica(emp(req), req.params.id); res.json(painelDinamicas(emp(req))); }));
 
 rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
-rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
-rotasConfig.delete("/descontos/:id", admin, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
+rotasConfig.post("/descontos", gestor, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
+rotasConfig.delete("/descontos/:id", gestor, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
 // Matriz por forma de pagamento x site/app #1 a #4 e desconto máximo da empresa (convive com os descontos por campanha acima).
-rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)) })));
-rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
+const dadosBandeira = (empresaId: string) => ({ ...bandeira(empresaId), areas: areasDaEmpresa(empresaId).filter((a) => !a.bloqueio?.ativo).map((a) => ({ id: a.id, nome: a.nome })) });
+rotasConfig.get("/bandeira", ok((req, res) => res.json(dadosBandeira(emp(req)))));
+rotasConfig.put("/bandeira", gestor, ok((req, res) => { salvarBandeira(emp(req), req.body, areasDaEmpresa(emp(req)).map((a) => a.id)); res.json(dadosBandeira(emp(req))); }));
+rotasConfig.get("/transbordo-bandeiras", ok((req, res) => res.json({ parceiras: transbordoDasParceiras(emp(req)) })));
+rotasConfig.put("/transbordo-bandeiras", gestor, ok((req, res) => res.json({ parceiras: salvarTransbordo(emp(req), req.body) })));
+rotasConfig.get("/personalizacao", ok((req, res) => res.json(personalizacao(emp(req)))));
+rotasConfig.put("/personalizacao", gestor, ok((req, res) => res.json(salvarPersonalizacao(emp(req), req.body))));
+const motoristasAtivos = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!).filter((m) => m.status === "Ativo").length;
+rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)), motoristasAtivos: motoristasAtivos(emp(req)) })));
+rotasConfig.put("/descontos-matriz", gestor, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body), motoristasAtivos: motoristasAtivos(emp(req)) })));
 
 // ------------------------------------------------------------------ config: despacho, transbordos, integrações
 
 rotasConfig.get("/despacho", ok((req, res) => res.json(regrasDespacho(emp(req)))));
-rotasConfig.put("/despacho", admin, ok((req, res) => res.json(salvarDespacho(emp(req), req.body))));
+rotasConfig.put("/despacho", gestor, ok((req, res) => res.json(salvarDespacho(emp(req), req.body))));
 rotasConfig.get("/transbordos", ok((req, res) => {
   const hoje = agoraBr().toISOString().slice(0, 10);
   const p = periodo("personalizado", q(req, "inicio") || hoje.slice(0, 8) + "01", q(req, "fim") || hoje);
@@ -187,7 +212,7 @@ rotasConfig.get("/transbordos", ok((req, res) => {
 }));
 
 // Transações financeiras (formato da Machine): plano, quem recebe, taxa de cartão, Pix e dados bancários (estes só o admin vê e grava).
-const ehAdmin = (req: Request) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+const ehAdmin = (req: Request) => podeCargo(req.ctx!.usuario.papel, "admin");
 rotasConfig.get("/integracao-financeira", ok((req, res) => res.json(visaoIntegracao(emp(req), ehAdmin(req)))));
 rotasConfig.put("/integracao-financeira", admin, ok((req, res) => {
   if (req.body?.banco && typeof req.body.banco === "object") salvarDadosBancarios(emp(req), req.body.banco);
@@ -213,14 +238,14 @@ const filtroNps = (req: Request) => {
 /** Avaliações (NPS): nota, promotores, neutros, detratores e a lista paginada, com filtros de período, tipo, e-mail e telefone. */
 rotasConfig.get("/nps/:papel/avaliacoes", ok((req, res) => res.json({ ...avaliacoesNps(emp(req), papelNps(req.params.papel), filtroNps(req), Number(req.query.pagina) || 1), periodos: PERIODOS_NPS, tipos: TIPOS_NPS })));
 rotasConfig.get("/nps/:papel/exportar", ok((req, res) => res.json({ nome: `nps-${papelNps(req.params.papel)}-${agoraBr().toISOString().slice(0, 10)}.csv`, csv: csvAvaliacoes(emp(req), papelNps(req.params.papel), filtroNps(req)) })));
-rotasConfig.put("/nps/:papel", admin, ok((req, res) => res.json({ config: salvarConfigNps(emp(req), papelNps(req.params.papel), req.body) })));
-rotasConfig.post("/nps/:papel/resetar", admin, ok((req, res) => res.json({ removidas: resetarRecusas(emp(req), papelNps(req.params.papel)) })));
+rotasConfig.put("/nps/:papel", gestor, ok((req, res) => res.json({ config: salvarConfigNps(emp(req), papelNps(req.params.papel), req.body) })));
+rotasConfig.post("/nps/:papel/resetar", gestor, ok((req, res) => res.json({ removidas: resetarRecusas(emp(req), papelNps(req.params.papel)) })));
 
-rotasConfig.get("/termos", ok((req, res) => res.json(termos(emp(req)))));
-rotasConfig.put("/termos", admin, ok((req, res) => res.json(salvarTermos(emp(req), req.body ?? {}))));
+rotasConfig.get("/termos", ok((req, res) => res.json({ ...termos(emp(req)), padraoPassageiro: TERMOS_PADRAO.passageiro })));
+rotasConfig.put("/termos", gestor, ok((req, res) => res.json({ ...salvarTermos(emp(req), req.body ?? {}), padraoPassageiro: TERMOS_PADRAO.passageiro })));
 
 rotasConfig.get("/ajuda", ok((req, res) => res.json(ajuda(emp(req)))));
-rotasConfig.put("/ajuda", admin, ok((req, res) => res.json(salvarAjuda(emp(req), req.body))));
+rotasConfig.put("/ajuda", gestor, ok((req, res) => res.json(salvarAjuda(emp(req), req.body))));
 
 // Agendamentos de notificação: confere a cada minuto (não roda nos testes).
 if (process.env.NODE_ENV !== "test") {

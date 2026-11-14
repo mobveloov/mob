@@ -1,3 +1,4 @@
+import { podeCargo } from "../../comum/cargos.ts";
 import { useEffect, useState } from "react";
 import { Link2, Plug, PlugZap, Save, Unplug } from "lucide-react";
 import { useSessao } from "../App";
@@ -12,7 +13,7 @@ const SITUACAO: Record<Conexao["situacao"], { texto: string; tom: string }> = {
 /** Conexão do número de WhatsApp da empresa (instância própria) e configuração do bot. */
 export function BotConexao() {
   const { sessao } = useSessao();
-  const admin = sessao.usuario.papel !== "operador";
+  const admin = podeCargo(sessao.usuario.papel, "admin");
   const cfg = useCarregar(() => apiBot.config(), []);
   const [form, setForm] = useState<Pick<ConfigBot, "ativo" | "provedor" | "instancia"> & { urlApi: string; token: string }>({ ativo: false, provedor: "simulado", instancia: "", urlApi: "", token: "" });
   const [proprio, setProprio] = useState(false);

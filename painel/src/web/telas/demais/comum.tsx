@@ -1,5 +1,6 @@
 // Peças comuns das telas de Financeiro, Comunicação, Config, Avaliações e Ajuda.
 
+import { podeCargo, type Cargo } from "../../../comum/cargos.ts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { dinheiro } from "../../api";
@@ -22,16 +23,20 @@ export async function pedirConfig<T = any>(url: string, metodo = "GET", corpo?: 
 
 /** Quem pode salvar (administrador). */
 let papelUsuario: Promise<string> | null = null;
-export function useAdmin() {
+function useCargoMinimo(minimo: Cargo) {
   const [admin, setAdmin] = useState(false);
   useEffect(() => {
     papelUsuario ??= fetch("/api/sessao", { credentials: "same-origin" }).then((r) => r.json()).then((s) => String(s?.usuario?.papel ?? "")).catch(() => "");
     let vivo = true;
-    papelUsuario.then((p) => { if (vivo) setAdmin(p === "admin" || p === "plataforma"); });
+    papelUsuario.then((p) => { if (vivo) setAdmin(podeCargo(p, minimo)); });
     return () => { vivo = false; };
   }, []);
   return admin;
 }
+/** ADMIN e acima (financeiro, integrações). */
+export const useAdmin = () => useCargoMinimo("admin");
+/** Gestor e acima (configurações e regras). */
+export const useGestor = () => useCargoMinimo("gestor");
 
 export function Cab({ titulo, sub, children }: { titulo: string; sub?: string; children?: ReactNode }) {
   return (
@@ -90,7 +95,10 @@ export const textoPeriodo = (p: PeriodoSel) => (p.chave === "personalizado" ? `$
 export const queryPeriodo = (p: PeriodoSel) => `periodo=${p.chave}${p.chave === "personalizado" ? `&inicio=${p.inicio}&fim=${p.fim}` : ""}`;
 
 /** Filtro de período em lista suspensa (Hoje, Ontem, ... Personalizado). */
-export function FiltroPeriodo({ valor, onChange, extras }: { valor: PeriodoSel; onChange: (p: PeriodoSel) => void; extras?: Array<[string, string]> }) {
+/** Atalhos de período na ordem da Machine (telas do Financeiro). */
+export const PERIODOS_MACHINE = ["hoje", "ontem", "semana_passada", "mes_passado", "ultimos_7", "ultimos_30"];
+
+export function FiltroPeriodo({ valor, onChange, extras, atalhos }: { valor: PeriodoSel; onChange: (p: PeriodoSel) => void; extras?: Array<[string, string]>; atalhos?: string[] }) {
   const [aberto, setAberto] = useState(false);
   const [de, setDe] = useState(""), [ate, setAte] = useState("");
   const [perso, setPerso] = useState(false);
@@ -100,7 +108,7 @@ export function FiltroPeriodo({ valor, onChange, extras }: { valor: PeriodoSel; 
     document.addEventListener("mousedown", fora);
     return () => document.removeEventListener("mousedown", fora);
   }, []);
-  const lista = [...(extras ?? []), ...PERIODOS];
+  const lista = [...(extras ?? []), ...(atalhos ? atalhos.map((c) => PERIODOS.find(([k]) => k === c)!).filter(Boolean) : PERIODOS)];
   return (
     <div className="dm-dropdown" ref={caixa}>
       <button type="button" className="botao" aria-haspopup="listbox" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{(lista.find(([c]) => c === valor.chave) ?? ["", textoPeriodo(valor)])[1]} ▾</button>

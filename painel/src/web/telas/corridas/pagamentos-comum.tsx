@@ -9,15 +9,20 @@ export { useAdmin };
 
 export interface PeriodoPag { periodo: string; inicio: string; fim: string }
 export const PERIODO_30: PeriodoPag = { periodo: "ultimos_30", inicio: "", fim: "" };
-const OPCOES: Array<[string, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["ultimos_7", "Últimos 7 dias"], ["ultimos_30", "Últimos 30 dias"], ["semana", "Esta semana"], ["semana_passada", "Semana passada"], ["mes", "Este mês"], ["mes_passado", "Mês passado"], ["todos", "Todo o período"], ["personalizado", "Personalizado"]];
+const OPCOES: Array<[string, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["ultimos_7", "Últimos 7 dias"], ["ultimos_14", "Últimos 14 dias"], ["ultimos_30", "Últimos 30 dias"], ["semana", "Esta semana"], ["semana_passada", "Semana passada"], ["mes", "Este mês"], ["mes_passado", "Mês passado"], ["todos", "Todo o período"], ["personalizado", "Personalizado"]];
+/** Atalhos de período como na Machine: Pix tem a lista longa; pendências e taxas, a curta. */
+export const PERIODOS_PIX = ["hoje", "ontem", "ultimos_7", "ultimos_14", "ultimos_30", "semana", "semana_passada", "mes", "mes_passado", "personalizado"];
+export const PERIODOS_CURTOS = ["hoje", "ontem", "semana_passada", "mes_passado", "ultimos_7", "ultimos_30", "personalizado"];
+export const PERIODO_HOJE: PeriodoPag = { periodo: "hoje", inicio: "", fim: "" };
+export const dataBrIso = (s?: string) => (s ? s.split("-").reverse().join("/") : "");
 
 /** Parâmetros de período para a URL (vazios quando é "todos" sem datas). */
 export const paramsPeriodo = (p: PeriodoPag) => ({ periodo: p.periodo, inicio: p.periodo === "personalizado" ? p.inicio : "", fim: p.periodo === "personalizado" ? p.fim : "" });
 
-export function SeletorPeriodo({ valor, onChange }: { valor: PeriodoPag; onChange: (p: PeriodoPag) => void }) {
+export function SeletorPeriodo({ valor, onChange, opcoes }: { valor: PeriodoPag; onChange: (p: PeriodoPag) => void; opcoes?: string[] }) {
   return (
     <span className="oc-fila" style={{ gap: 6 }}>
-      <select value={valor.periodo} onChange={(e) => onChange({ ...valor, periodo: e.target.value })} aria-label="Período">{OPCOES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
+      <select value={valor.periodo} onChange={(e) => onChange({ ...valor, periodo: e.target.value })} aria-label="Período">{(opcoes ? opcoes.map((k) => OPCOES.find(([c]) => c === k)!).filter(Boolean) : OPCOES).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
       {valor.periodo === "personalizado" && <>
         <input type="date" value={valor.inicio} onChange={(e) => onChange({ ...valor, inicio: e.target.value })} aria-label="Data de início" />
         <input type="date" value={valor.fim} onChange={(e) => onChange({ ...valor, fim: e.target.value })} aria-label="Data do final" />

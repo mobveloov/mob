@@ -1,5 +1,5 @@
-/* Telas do grupo Corridas: tema escuro próprio, sem depender do restante do painel. Tudo sob .oc. */
-.oc { --oc-fundo: #0b1121; --oc-card: #151e32; --oc-card2: #1e2d4a; --oc-borda: #2a3b55; --oc-txt: #e6ebf3; --oc-suave: #8fa0b8; --oc-pri: #4f8cff; --oc-ok: #34d399; --oc-ruim: #f87171; --oc-alerta: #fbbf24; --oc-info: #60a5fa; --oc-rox: #a78bfa;
+/* Telas do grupo Corridas: as cores --oc-* seguem o tema do painel (claro e escuro). Tudo sob .oc. */
+.oc { --oc-fundo: var(--fundo); --oc-card: var(--cartao); --oc-card2: var(--campo); --oc-borda: var(--borda); --oc-txt: var(--texto); --oc-suave: var(--suave); --oc-pri: var(--primaria-viva); --oc-ok: var(--ok); --oc-ruim: var(--ruim); --oc-alerta: var(--alerta); --oc-info: var(--info); --oc-rox: #a78bfa;
   color: var(--oc-txt); }
 .oc * { box-sizing: border-box; }
 .oc h1 { margin: 0; font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -19,7 +19,7 @@
 .oc .campo-endereco small { text-transform: none; color: var(--oc-ok); }
 .oc-btn { display: inline-flex; gap: 6px; align-items: center; justify-content: center; font: inherit; font-weight: 700; font-size: 13px; color: var(--oc-txt); background: var(--oc-card2); border: 1px solid var(--oc-borda); border-radius: 10px; padding: 8px 14px; cursor: pointer; min-height: 38px; text-decoration: none; }
 .oc-btn:hover { border-color: var(--oc-pri); }
-.oc-btn.pri { background: var(--oc-pri); border-color: var(--oc-pri); color: #fff; }
+.oc-btn.pri { background: var(--primaria); border-color: var(--primaria); color: var(--primaria-txt); }
 .oc-btn.ok { background: #059669; border-color: #059669; color: #fff; }
 .oc-btn.ruim { background: #b91c1c22; border-color: #b91c1c; color: var(--oc-ruim); }
 .oc-btn.peq { min-height: 30px; padding: 4px 10px; font-size: 12px; }
@@ -29,7 +29,7 @@
 .oc-sw input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .2s; }
 .oc-sw input:checked { background: var(--oc-pri); } .oc-sw input:checked::after { left: 19px; }
 .oc-chip { font: inherit; font-weight: 800; font-size: 12px; color: var(--oc-suave); background: var(--oc-fundo); border: 1px solid var(--oc-borda); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
-.oc-chip.on { background: var(--oc-pri); border-color: var(--oc-pri); color: #fff; }
+.oc-chip.on { background: var(--primaria); border-color: var(--primaria); color: var(--primaria-txt); }
 .oc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .oc-kpi { background: var(--oc-card); border: 1px solid var(--oc-borda); border-radius: 16px; padding: 14px 16px; }
 .oc-kpi span { display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--oc-suave); letter-spacing: .06em; }

@@ -16,7 +16,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { cancelarCorrida, criarCorridaPropria, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import * as D from "../servidor/dados.ts";
-import { exigirLogin, exigirPapel } from "../servidor/sessao.ts";
+import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as T from "./dados.ts";
 
 export const rotasTotem = express.Router();
@@ -200,7 +200,7 @@ rotasTotem.post(`${P}/corridas/:id/cancelar`, exigirChave, ok(async (req, res) =
 // ====================================================================== internas (com login)
 
 const interno = express.Router();
-interno.use(exigirLogin);
+interno.use(exigirLogin, exigirModulo("totem"));
 rotasTotem.use(interno);
 const admin = exigirPapel("admin");
 const emp = (req: Request) => req.ctx!.empresaId;

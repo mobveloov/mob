@@ -23,7 +23,7 @@ export function Integracoes() {
   return (
     <>
       <Cab titulo="Integrações" sub="Configure gateways de pagamento e métodos." />
-      <Abas abas={[["transacoes", "Transações financeiras"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
+      <Abas abas={[["transacoes", "Transações Financeiras"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
       {aba === "sistemas" ? <IntegracoesSistemas /> : aba === "transacoes" ? <TransacoesFinanceiras /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
         <>
           <Aviso erro={msg?.erro} ok={msg?.ok} />

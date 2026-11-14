@@ -177,7 +177,13 @@ export function arquivoDoBanner(empresaId: string, id: string): { caminho: strin
 
 // ------------------------------------------------------------------ termos (Jurídico, Termos de Uso App, Jurídico & Leis)
 
-export interface Termos { passageiro: string; motorista: string; privacidade: string; versao: number; atualizadoEm: string | null }
+/** Como cada público vê os termos: não mostrar, usar o texto padrão (só passageiro) ou o texto próprio da central. */
+export type ModoTermo = "nenhum" | "padrao" | "proprio";
+export interface Termos {
+  passageiro: string; motorista: string; privacidade: string; versao: number; atualizadoEm: string | null;
+  /** Termos para as empresas parceiras (texto próprio) e o modo de cada tela da Machine. */
+  empresa: string; modoPassageiro: ModoTermo; modoMotorista: ModoTermo; modoEmpresa: ModoTermo;
+}
 export const TERMOS_PADRAO: Termos = {
   passageiro: [
     "1. Aceite dos termos",
@@ -212,14 +218,22 @@ export const TERMOS_PADRAO: Termos = {
     "Você pode pedir acesso, correção ou exclusão dos seus dados pelo suporte.",
   ].join("\n"),
   versao: 1, atualizadoEm: null,
+  empresa: "", modoPassageiro: "padrao", modoMotorista: "proprio", modoEmpresa: "nenhum",
 };
 
 export const termos = (empresaId: string): Termos => ({ ...TERMOS_PADRAO, ...lerConfig<Partial<Termos>>(empresaId, "termos", {}) });
 export function salvarTermos(empresaId: string, entrada: Record<string, unknown>): Termos {
   const atual = termos(empresaId);
-  const t = (k: "passageiro" | "motorista" | "privacidade") => (typeof entrada[k] === "string" ? String(entrada[k]).replace(/<\/?script/gi, "").slice(0, 60_000) : atual[k]);
-  const novo: Termos = { passageiro: t("passageiro"), motorista: t("motorista"), privacidade: t("privacidade"), versao: atual.versao, atualizadoEm: atual.atualizadoEm };
-  const mudou = novo.passageiro !== atual.passageiro || novo.motorista !== atual.motorista || novo.privacidade !== atual.privacidade;
+  const t = (k: "passageiro" | "motorista" | "privacidade" | "empresa") => (typeof entrada[k] === "string" ? String(entrada[k]).replace(/<\/?script/gi, "").slice(0, 60_000) : atual[k]);
+  const modo = (k: "modoPassageiro" | "modoMotorista" | "modoEmpresa", permitidos: readonly ModoTermo[]): ModoTermo => (permitidos.includes(entrada[k] as ModoTermo) ? (entrada[k] as ModoTermo) : atual[k]);
+  const novo: Termos = {
+    passageiro: t("passageiro"), motorista: t("motorista"), privacidade: t("privacidade"), empresa: t("empresa"), versao: atual.versao, atualizadoEm: atual.atualizadoEm,
+    modoPassageiro: modo("modoPassageiro", ["nenhum", "padrao", "proprio"]), modoMotorista: modo("modoMotorista", ["nenhum", "proprio"]), modoEmpresa: modo("modoEmpresa", ["nenhum", "proprio"]),
+  };
+  if (novo.modoPassageiro === "proprio" && !novo.passageiro.trim()) throw new Error("Escreva ou envie os termos do aplicativo passageiro.");
+  if (novo.modoMotorista === "proprio" && !novo.motorista.trim()) throw new Error("Escreva ou envie os termos do aplicativo motorista.");
+  if (novo.modoEmpresa === "proprio" && !novo.empresa.trim()) throw new Error("Escreva ou envie os termos para as empresas parceiras.");
+  const mudou = novo.passageiro !== atual.passageiro || novo.motorista !== atual.motorista || novo.privacidade !== atual.privacidade || novo.empresa !== atual.empresa;
   if (mudou) { novo.versao = atual.versao + 1; novo.atualizadoEm = new Date().toISOString(); }
   gravarConfig(empresaId, "termos", novo);
   return novo;

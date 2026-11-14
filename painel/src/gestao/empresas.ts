@@ -8,7 +8,7 @@ import { atualizar, criar, type Registro } from "../cadastros/armazem.ts";
 import { listarProprias } from "../corridas/index.ts";
 import { empresa } from "../servidor/dados.ts";
 import { arred, celulaCsv, normal } from "../servidor/util.ts";
-import { cad, contem, digitos, emp, hojeBr, ok, paginar, quem, registros, soAdmin, texto } from "./comum.ts";
+import { cad, contem, digitos, emp, hojeBr, ok, paginar, quem, registros, soAdmin, soGestor, texto } from "./comum.ts";
 import { cepValido, cnpjValido, conferir, cpfValido, emailValido, soDigitos, telefoneValido, UFS } from "./validacao.ts";
 
 export const SITUACOES_EMPRESA = ["Ativa", "Suspensa", "Aguardando ativação", "Encerrada"];
@@ -133,7 +133,7 @@ export function rotasEmpresas(r: Router) {
     res.json({ empresa: x });
   }));
 
-  r.post("/empresas", soAdmin, ok((req, res) => {
+  r.post("/empresas", soGestor, ok((req, res) => {
     const e = emp(req);
     const dados = prepararEmpresa(e, entradaDe(req), null, true);
     dados.bandeira ||= empresa(e)?.nome ?? null;
@@ -141,7 +141,7 @@ export function rotasEmpresas(r: Router) {
     res.json({ empresa: criar(e, cad("conveniadas"), dados, quem(req)) });
   }));
 
-  r.put("/empresas/:id", soAdmin, ok((req, res) => {
+  r.put("/empresas/:id", soGestor, ok((req, res) => {
     const e = emp(req), anterior = registros(e, "conveniadas").find((c) => c.id === req.params.id);
     if (!anterior) throw new Error("Empresa não encontrada.");
     const dados = prepararEmpresa(e, entradaDe(req), anterior, false);
@@ -149,13 +149,13 @@ export function rotasEmpresas(r: Router) {
   }));
 
   /** Excluir = situação "Encerrada" (Deletado na Machine): o histórico de corridas e faturas continua. */
-  r.delete("/empresas/:id", soAdmin, ok((req, res) => {
+  r.delete("/empresas/:id", soGestor, ok((req, res) => {
     const e = emp(req), anterior = registros(e, "conveniadas").find((c) => c.id === req.params.id);
     if (!anterior) throw new Error("Empresa não encontrada.");
     res.json({ empresa: atualizar(e, cad("conveniadas"), anterior.id, { ...anterior, status: "Encerrada" }, quem(req)) });
   }));
 
-  r.post("/empresas/:id/funcionarios", soAdmin, ok((req, res) => {
+  r.post("/empresas/:id/funcionarios", soGestor, ok((req, res) => {
     const e = emp(req);
     const x = registros(e, "conveniadas").find((c) => c.id === req.params.id);
     if (!x) throw new Error("Empresa não encontrada.");
