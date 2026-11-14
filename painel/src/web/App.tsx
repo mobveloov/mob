@@ -95,7 +95,12 @@ export default function App() {
     return <Entrar marca={marca} logo={logo} primeiroAcesso={estado === "configurar"} onEntrou={carregar} />;
   }
 
-  const trocarTema = () => { const novo = !escuro; gravar("tema", novo ? "escuro" : "claro"); setEscuro(novo); aplicarMarca(marca, sessao.empresa.id, novo); };
+  const trocarTema = () => {
+    const novo = !escuro, raiz = document.documentElement;
+    raiz.classList.add("trocando-tema"); // sem animação na troca: evita o piscar
+    gravar("tema", novo ? "escuro" : "claro"); setEscuro(novo); aplicarMarca(marca, sessao.empresa.id, novo);
+    requestAnimationFrame(() => requestAnimationFrame(() => raiz.classList.remove("trocando-tema")));
+  };
   const trocarEmpresa = (id: string) => { escolherEmpresa(id); gravar("empresa", id); carregar(); };
 
   return (
@@ -158,7 +163,7 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
 
   const linkItem = (f: Funcao) => (
     <NavLink key={f.id} to={f.rota} end className={({ isActive }) => `dropdown-item ${isActive ? "ativo" : ""}`} onClick={() => setFechado(f.grupo)}>
-      <span>{rotuloFuncao(f, marca.assistente.nome)}</span>{f.novo && <span className="etiqueta-novo">NOVO</span>}
+      <span>{rotuloFuncao(f, marca.assistente.nome)}</span>
     </NavLink>
   );
 

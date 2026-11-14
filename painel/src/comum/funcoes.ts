@@ -15,7 +15,6 @@ export interface Funcao {
   /** Só administradores (e a plataforma) veem. */
   soAdmin?: boolean;
   /** Etiqueta "NOVO" no menu. */
-  novo?: boolean;
   /** Caminhos antigos que agora levam a esta tela. */
   antigas?: string[];
 }
@@ -35,8 +34,8 @@ export const FUNCOES: Funcao[] = [
   { id: "motoristas", grupo: "Cadastro", nome: "Motoristas", rota: "/motoristas" },
   { id: "punicoes", grupo: "Cadastro", nome: "Punições", rota: "/punicoes" },
   { id: "passageiros", grupo: "Cadastro", nome: "Clientes", rota: "/passageiros", antigas: ["/clientes"] },
-  { id: "ruas", grupo: "Cadastro", nome: "Ruas", rota: "/ruas", novo: true },
-  { id: "desafios", grupo: "Cadastro", nome: "Desafios", rota: "/desafios", novo: true },
+  { id: "ruas", grupo: "Cadastro", nome: "Ruas", rota: "/ruas" },
+  { id: "desafios", grupo: "Cadastro", nome: "Desafios", rota: "/desafios" },
   { id: "destravar", grupo: "Cadastro", secao: EXTRA, nome: "Destravar Motoristas", rota: "/destravar" },
   { id: "veiculos", grupo: "Cadastro", secao: EXTRA, nome: "Veículos", rota: "/veiculos" },
   { id: "equipe", grupo: "Cadastro", secao: EXTRA, nome: "Equipe", rota: "/equipe", soAdmin: true, antigas: ["/usuarios"] },
@@ -52,10 +51,10 @@ export const FUNCOES: Funcao[] = [
   { id: "alterar-os", grupo: "Corridas", nome: "Alteração de dados da OS", rota: "/alterar-os", soAdmin: true },
   { id: "entrega-voucher", grupo: "Corridas", nome: "Entrega de voucher", rota: "/entrega-voucher" },
   { id: "objetos", grupo: "Corridas", nome: "Objetos perdidos", rota: "/objetos" },
-  { id: "engajamento", grupo: "Corridas", nome: "Mapa de engajamento", rota: "/engajamento", novo: true },
-  { id: "recuperacao", grupo: "Corridas", secao: EXTRA, nome: "Recuperação de Vendas", rota: "/recuperacao", novo: true },
-  { id: "funil-clientes", grupo: "Corridas", secao: EXTRA, nome: "Funil de Clientes", rota: "/funil-clientes", novo: true },
-  { id: "mapa-bairros", grupo: "Corridas", secao: EXTRA, nome: "Mapa de Bairros e Demanda", rota: "/mapa-bairros", novo: true },
+  { id: "engajamento", grupo: "Corridas", nome: "Mapa de engajamento", rota: "/engajamento" },
+  { id: "recuperacao", grupo: "Corridas", secao: EXTRA, nome: "Recuperação de Vendas", rota: "/recuperacao" },
+  { id: "funil-clientes", grupo: "Corridas", secao: EXTRA, nome: "Funil de Clientes", rota: "/funil-clientes" },
+  { id: "mapa-bairros", grupo: "Corridas", secao: EXTRA, nome: "Mapa de Bairros e Demanda", rota: "/mapa-bairros" },
 
   { id: "transacao-pix", grupo: "Financeiro", secao: "Pix", nome: "Transações", rota: "/transacao-pix" },
   { id: "faturamento-empresa", grupo: "Financeiro", secao: "Contas a receber", nome: "Faturamento por empresa", rota: "/faturamento-empresa" },
@@ -105,7 +104,7 @@ export const FUNCOES: Funcao[] = [
   // Cobrança entre centrais (grupo nosso, fora da Machine).
   { id: "demonstrativo-mensal", grupo: "Cobrança", nome: "Demonstrativo Mensal", rota: "/demonstrativo-mensal", soAdmin: true },
   { id: "meus-planos", grupo: "Cobrança", nome: "Meus planos", rota: "/meus-planos", soAdmin: true },
-  { id: "controle-centrais", grupo: "Cobrança", nome: "Controle financeiro de centrais", rota: "/controle-centrais", soAdmin: true, novo: true },
+  { id: "controle-centrais", grupo: "Cobrança", nome: "Controle financeiro de centrais", rota: "/controle-centrais", soAdmin: true },
 
   // Telas próprias (não existem na Machine).
   { id: "crm-campanhas", grupo: "Mais", secao: "CRM", nome: "Campanhas", rota: "/crm/campanhas" },
