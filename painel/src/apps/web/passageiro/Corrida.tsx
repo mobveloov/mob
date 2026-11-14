@@ -179,7 +179,7 @@ const ETAPA: Record<string, string> = { a_caminho: "Motorista a caminho", no_loc
 export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou }: {
   corrida: Corrida; pos: Posicao | null; marca: MarcaApp; naoLidas: number; abrirChat: () => void; mudou: (c: Corrida) => void;
 }) {
-  const [escuro, setEscuro] = useState(() => matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  const [escuro, setEscuro] = useState(false); // mapa claro por padrão, como na referência; o botão do topo troca
   const [centralizar, setCentralizar] = useState(0);
   const [folga, setFolga] = useState(300);
   const [janela, setJanela] = useState<"" | "cancelar" | "rota" | "sos">("");
