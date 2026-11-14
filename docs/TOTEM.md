@@ -154,7 +154,7 @@ totem acompanha em até 5 segundos.
   destino o preço já sai pela distância).
 - Vínculo do aparelho (um aparelho por local) e senha para fechar o app.
 
-## O que veio do mobveloov (14/11/2026)
+## O que veio do sistema de referência (14/11/2026)
 
 A tela do totem agora segue a do sistema de referência (com endereço fixo de embarque):
 

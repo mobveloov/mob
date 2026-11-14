@@ -102,7 +102,7 @@ No `.env.example`: `WHATSAPP_EVOLUTION_URL=`, `WHATSAPP_EVOLUTION_TOKEN=`, `BOT_
 - Conversa entre passageiro e motorista pelo número do bot.
 - Mover conversas para o banco quando a fase 1.4 chegar (tabelas `bot_*` com `empresa_id`).
 
-## O que veio do mobveloov (14/11/2026)
+## O que veio do sistema de referência (14/11/2026)
 
 Tela **Bot de WhatsApp › Ajustes do bot** (só admin muda) e regras do bot de referência, sem a Machine (a corrida é nativa).
 
