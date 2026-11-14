@@ -11,6 +11,7 @@ const CNEFE = fs.mkdtempSync(path.join(os.tmpdir(), "painel-cnefe-"));
 process.env.DADOS_DIR = DADOS;
 process.env.CNEFE_DIR = CNEFE;
 delete process.env.OSRM_URL;
+process.env.OSRM_PUBLICO = "0"; process.env.NOMINATIM_PUBLICO = "0"; // testes sem internet
 
 // Cidade de teste 3599999 (SP) e uma de outro município que não pode aparecer.
 fs.mkdirSync(path.join(CNEFE, "_casas"));
