@@ -178,6 +178,9 @@ export function rotasMotoristas(r: Router) {
     res.json({ cidades: [...nomes].sort((a, b) => a.localeCompare(b, "pt-BR")), categorias: registros(emp(req), "categorias").map((c) => String(c.nome ?? "")).filter(Boolean) });
   }));
 
+  /** Exigências que o motorista pode aceitar (as mesmas do pedido de corrida). */
+  r.get("/exigencias", ok((req, res) => res.json({ exigencias: ajustes(emp(req)).opcionais })));
+
   r.get("/motoristas", ok((req, res) => res.json(listarMotoristas(emp(req), req.query as Record<string, unknown>))));
 
   /** Busca rápida (punições, veículos, restrições). */
