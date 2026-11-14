@@ -137,3 +137,13 @@ Prints do teste: motorista "a caminho" (1,5 km, "Siga até local de embarque") e
       com pedido de novo ao voltar para o app). Opção em Ajustes "Manter a tela ligada" (padrão ligado durante a
       corrida). Também garantir que o GPS e o tempo real continuem com a tela apagada ou o app em segundo plano
       (serviço em primeiro plano com notificação). Testar no aparelho.
+
+## Estado (14/11, tarde)
+- [x] Barra de cima em qualquer zoom, título legível, sem "NOVO".
+- [x] Taxas da central e carteira de crédito (mesclado no main).
+- [x] Cargos (ADMIN Mestre, ADMIN, Gestor, Operador), filiais e painel do dono/superadmin (mesclado).
+- [x] Menu lateral igual ao MobVeloov + foto da empresa (mesclado).
+- [x] Segurança do painel e da API (mesclado; docs/SEGURANCA.md).
+- [ ] CRM, Bot e Totem copiados do mobveloov: agente retomado depois do limite de 5h.
+- [ ] Depois: suíte completa, teste de telas no navegador, Docker, push, revisão final (Fable 5.2) e tabela "tela | igual à Machine? | diferença".
+- Suíte no main antes do CRM/Bot/Totem: 364 de 364 testes.
