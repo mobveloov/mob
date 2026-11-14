@@ -125,6 +125,26 @@ export function historicoNotificacoes(empresaId: string, limite = 50) {
   return bancoConfig().prepare("SELECT id, papel, titulo, mensagem, segmento, destinatarios, por, em FROM notificacoes_envios WHERE empresa = ? ORDER BY em DESC, rowid DESC LIMIT ?").all(empresaId, limite);
 }
 
+/** Lista da tela "Notificações app" (Machine): filtros por destinatário, datas, título e mensagem; 10 por página. */
+export interface FiltroListaNotif { destinatario?: string; dataIni?: string; dataFim?: string; titulo?: string; mensagem?: string }
+export function listaNotificacoes(empresaId: string, f: FiltroListaNotif, pagina: number) {
+  const w = ["empresa = ?"]; const a: Array<string | number> = [empresaId];
+  if (f.destinatario === "passageiro" || f.destinatario === "motorista") { w.push("papel = ?"); a.push(f.destinatario); }
+  if (f.dataIni) { w.push("substr(em, 1, 10) >= ?"); a.push(f.dataIni); }
+  if (f.dataFim) { w.push("substr(em, 1, 10) <= ?"); a.push(f.dataFim); }
+  const like = (campo: string, v?: string) => { if (v) { w.push(`${campo} LIKE ? ESCAPE '!'`); a.push(`%${v.replace(/[!%_]/g, "!$&")}%`); } };
+  like("titulo", f.titulo); like("mensagem", f.mensagem);
+  const onde = w.join(" AND ");
+  const total = (bancoConfig().prepare(`SELECT COUNT(*) AS n FROM notificacoes_envios WHERE ${onde}`).get(...a) as { n: number }).n;
+  const paginas = Math.max(1, Math.ceil(total / 10));
+  const p = Math.min(Math.max(1, Math.floor(pagina) || 1), paginas);
+  const linhas = bancoConfig().prepare(`SELECT id, papel, titulo, mensagem, segmento, destinatarios, por, em FROM notificacoes_envios WHERE ${onde} ORDER BY em DESC, rowid DESC LIMIT 10 OFFSET ?`).all(...a, (p - 1) * 10) as Array<{ id: string; papel: string; titulo: string; mensagem: string; segmento: string; destinatarios: number; por: string; em: string }>;
+  return {
+    total, pagina: p, paginas,
+    itens: linhas.map((l) => ({ ...l, destinatario: l.papel === "motorista" ? "Motorista" : "Cliente App", status: "Concluído", criadoEm: l.em, enviadoEm: l.em })),
+  };
+}
+
 // ---- agendamento (Piloto Automático)
 
 export interface Agendamento extends PedidoPush { id: string; regra: "unico" | "diario" | "semanal" | "mensal"; data: string; hora: string; diaSemana: number; diaMes: number; ativo: boolean; ultimoEnvio: string }
