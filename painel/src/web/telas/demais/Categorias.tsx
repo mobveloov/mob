@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { valorDinamica } from "./Dinamica";
+import { DetalhesTarifas, JanelaTarifa } from "./EditarTarifa";
 import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
 const passos = [["basico", "Básico"], ["tarifas", "Tarifas & Negociação"], ["dinamica", "Dinâmica"], ["comissao", "Comissão"]] as const;
@@ -26,6 +27,8 @@ export function Categorias() {
   const [cidade, setCidade] = useState(""), [busca, setBusca] = useState("");
   const [edit, setEdit] = useState<any>(null);
   const [reordenar, setReordenar] = useState(false);
+  const [abertas, setAbertas] = useState<string[]>([]);
+  const [tarifa, setTarifa] = useState<{ cat: any; extra: any } | null>(null);
   const arrastando = useRef<string | null>(null);
   const { msg, salvar } = useSalvar();
   const todas: any[] = d.dados?.categorias ?? [];
@@ -68,11 +71,16 @@ export function Categorias() {
                 <div><dt>Comissão</dt><dd>{c.comissaoTipo === "Percentual" ? `${String(c.comissaoValor).replace(".", ",")}%` : dinheiro(c.comissaoValor)}</dd></div>
               </dl>
               <div className="dm-linha"><small>Ordem {c.extra.ordem} · {c.extra.grupo}{c.extra.negociacao.ativo ? " · Negocia" : ""}</small>
+                <button className="botao" aria-expanded={abertas.includes(c.id)} onClick={() => setAbertas(abertas.includes(c.id) ? abertas.filter((x) => x !== c.id) : [...abertas, c.id])}>Tarifa {abertas.includes(c.id) ? "▴" : "▾"}</button>
                 {admin && <span className="dm-linha dm-fim"><button className="icone" aria-label={`Editar ${c.nome}`} onClick={() => setEdit(structuredClone(c))}><Pencil size={14} /></button><button className="icone" aria-label={`Remover ${c.nome}`} onClick={async () => { if (confirm(`Remover a categoria "${c.nome}"?`)) { await salvar(async () => { await pedirConfig(`/categorias/${c.id}`, "DELETE"); d.recarregar(); }, "Categoria removida."); } }}><Trash2 size={14} /></button></span>}</div>
+              {abertas.includes(c.id) && <DetalhesTarifas cat={c} admin={admin} onEditar={(e) => setTarifa({ cat: c, extra: e })} onExtra={() => setTarifa({ cat: c, extra: "nova" })}
+                onRemover={async (e) => { if (confirm(`Remover a tarifa extra "${e.nome}"?`)) await salvar(async () => { await pedirConfig(`/categorias/${c.id}/tarifas-extras/${e.id}`, "DELETE"); d.recarregar(); }, "Tarifa extra removida."); }}
+                onAtivar={(e, v) => salvar(async () => { await pedirConfig(`/categorias/${c.id}/tarifas-extras/${e.id}`, "PUT", { ...e, ativa: v }); d.recarregar(); }, v ? "Tarifa extra ligada." : "Tarifa extra desligada.")} />}
             </article>
           ))}
         </div>
       )}
+      {tarifa && <JanelaTarifa cat={tarifa.cat} extra={tarifa.extra} onFechar={() => setTarifa(null)} onSalvo={() => { setTarifa(null); d.recarregar(); }} />}
       {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
     </>
   );
@@ -134,18 +142,9 @@ function JanelaCategoria({ inicial, automacoes, dinamicas, regras, icones, onFec
             <Interruptor valor={ex.negociacao.ativo} onChange={(v) => sub("negociacao", "ativo", v)} rotulo="Habilitar negociação" descricao="Habilita a tela onde motorista e passageiro negociam a tarifa final." />
             {ex.negociacao.ativo && <div className="dm-duplo"><Campo rotulo="Desconto Máx. Passageiro (%)"><input type="number" min={0} max={100} value={ex.negociacao.descontoMaxPax} onChange={(e) => sub("negociacao", "descontoMaxPax", Number(e.target.value))} /></Campo><Campo rotulo="Acréscimo Máx. Motorista (%)"><input type="number" min={0} value={ex.negociacao.acrescimoMaxMot} onChange={(e) => sub("negociacao", "acrescimoMaxMot", Number(e.target.value))} /></Campo></div>}
             <h3>Estrutura de Preço</h3>
-            <fieldset><legend>Modo de Cobrança / KM</legend><p className="sub">Defina se o valor é único ou se muda de acordo com a distância.</p><div className="dm-radios"><label><input type="radio" name="modo" checked={ex.modoPrecoKm === "padrao"} onChange={() => setEx("modoPrecoKm", "padrao")} /> Padrão</label><label><input type="radio" name="modo" checked={ex.modoPrecoKm === "faixas"} onChange={() => setEx("modoPrecoKm", "faixas")} /> Faixas Avançadas</label></div></fieldset>
+            <p className="sub">Valores iniciais da tarifa. O método de cálculo (tabela de KM, bairro, hora parada) e as tarifas extras ficam em <strong>Tarifa › Editar tarifa</strong>, na lista de categorias.</p>
             <Campo rotulo="Taxa Base"><input inputMode="decimal" value={txt(c.taxaBase)} placeholder="0.00" onChange={(e) => set("taxaBase", num(e.target.value))} /></Campo>
-            {ex.modoPrecoKm === "padrao" ? (
               <div className="dm-grade3"><Campo rotulo="Preço KM (R$)"><input inputMode="decimal" value={txt(c.precoKm)} placeholder="0.00" onChange={(e) => set("precoKm", num(e.target.value))} /></Campo><Campo rotulo="Preço Min."><input inputMode="decimal" value={txt(c.precoMin)} placeholder="0.00" onChange={(e) => set("precoMin", num(e.target.value))} /></Campo><Campo rotulo="Tarifa Mínima"><input inputMode="decimal" value={txt(c.tarifaMinima)} placeholder="0.00" onChange={(e) => set("tarifaMinima", num(e.target.value))} /></Campo></div>
-            ) : (
-              <div><div className="dm-linha dm-entre"><h4>Tabela Escalonada (Fatiada)</h4><button type="button" className="botao" onClick={() => setEx("faixasKm", [...ex.faixasKm, { de: ex.faixasKm.at(-1)?.ate ?? 0, ate: (ex.faixasKm.at(-1)?.ate ?? 0) + 5, valor: 0 }])}>Adicionar Faixa</button></div>
-                {!ex.faixasKm.length ? <p className="sub">Nenhuma faixa configurada. Clique no botão acima.</p> : ex.faixasKm.map((f: any, i: number) => (
-                  <div key={i} className="dm-grade4"><Campo rotulo="De (KM)"><input type="number" value={f.de} onChange={(e) => setEx("faixasKm", ex.faixasKm.map((x: any, j: number) => (j === i ? { ...x, de: Number(e.target.value) } : x)))} /></Campo><Campo rotulo="Até (KM)"><input type="number" value={f.ate} onChange={(e) => setEx("faixasKm", ex.faixasKm.map((x: any, j: number) => (j === i ? { ...x, ate: Number(e.target.value) } : x)))} /></Campo><Campo rotulo="Valor / km"><input inputMode="decimal" value={txt(f.valor)} onChange={(e) => setEx("faixasKm", ex.faixasKm.map((x: any, j: number) => (j === i ? { ...x, valor: num(e.target.value) } : x)))} /></Campo><button type="button" className="icone" aria-label="Remover faixa" onClick={() => setEx("faixasKm", ex.faixasKm.filter((_: unknown, j: number) => j !== i))}><Trash2 size={14} /></button></div>
-                ))}
-                <p className="sub">Regra: O campo "Até" de uma linha deve ser igual ao "De" da próxima.</p>
-                <Campo rotulo="Tarifa Mínima"><input inputMode="decimal" value={txt(c.tarifaMinima)} placeholder="0.00" onChange={(e) => set("tarifaMinima", num(e.target.value))} /></Campo></div>
-            )}
             <h3>Taxas e Regras Extras</h3>
             <div className="dm-grade3">
               <Campo rotulo="Taxa Cancelamento"><input inputMode="decimal" value={txt(c.taxaCancelamento)} placeholder="0.00" onChange={(e) => set("taxaCancelamento", e.target.value === "" ? null : num(e.target.value))} /></Campo>
