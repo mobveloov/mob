@@ -56,7 +56,7 @@ const perto = () => ({ lat: CENTRO.lat + (Math.random() - 0.5) * 0.04, lng: CENT
 
 // ------------------------------------------------------------------ preparação (empresas, admin, cadastros)
 
-const senha = crypto.randomBytes(12).toString("base64url");
+const senha = process.env.CARGA_SENHA || crypto.randomBytes(12).toString("base64url");
 console.log(`Carga: ${N} corridas ao mesmo tempo em ${EMPRESAS} empresas, em ${BASE}${EXTRAS ? " (com bot, totem e CRM)" : ""}`);
 
 let r = await pedir("preparo", "POST", "/api/configurar", { corpo: { empresa: "Carga Um", nome: "Admin Carga", email: "admin@carga.test", senha } });
