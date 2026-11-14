@@ -235,6 +235,7 @@ export const CADASTROS: Cadastro[] = [
       { chave: "limiteUsos", rotulo: "Limite de usos", tipo: "numero" },
       { chave: "usoPorPassageiro", rotulo: "Usos por passageiro", tipo: "numero" },
       { chave: "categorias", rotulo: "Só nas categorias", tipo: "texto", dica: "Vazio = todas. Separe por vírgula." },
+      { chave: "automatico", rotulo: "Cupom automático", tipo: "booleano", dica: "PRIMEIRA CORRIDA e DE VOLTA valem sozinhos, sem o passageiro digitar o código." },
       { chave: "ativo", rotulo: "Ativo", tipo: "booleano" },
     ],
     colunas: ["codigo", "tipoDesconto", "valor", "inicio", "fim", "limiteUsos", "ativo"],

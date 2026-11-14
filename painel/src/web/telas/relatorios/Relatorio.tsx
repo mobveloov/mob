@@ -16,6 +16,11 @@ export const celula = (tipo: string, v: unknown) => {
   if (tipo === "numero") return Number(v).toLocaleString("pt-BR");
   return String(v);
 };
+// Botões do topo como na Machine: nem toda tela tem Exportar e Imprimir. Só o faturamento por empresa marca as datas com *.
+const BOTOES: Record<string, { exportar: boolean; imprimir: boolean }> = {
+  "faturamento-empresa": { exportar: true, imprimir: true }, "faturamento-centro-custo": { exportar: false, imprimir: true }, "faturamento-periodo": { exportar: true, imprimir: false },
+  "vouchers-motoristas": { exportar: true, imprimir: true }, "km-rodados": { exportar: true, imprimir: false },
+};
 const dataBrDia = (d: string) => d.split("-").reverse().join("/");
 
 export function useDefinicoes() {
@@ -66,13 +71,14 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
     <>
       <Cab titulo={def.titulo} sub={def.descricao}>
         {aoVoltar && <button className="botao" onClick={aoVoltar}>Voltar</button>}
-        <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => baixarCsvRel(`/relatorio/${id}/csv?${qs(aplicado)}`, `${id}.csv`), "CSV exportado.")}><Download size={14} /> Exportar CSV</button>
-        <button className="botao" onClick={() => window.print()}><Printer size={14} /> Imprimir</button>
+        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => baixarCsvRel(`/relatorio/${id}/csv?${qs(aplicado)}`, `${id}.csv`), "CSV exportado.")}><Download size={14} /> Exportar</button>}
+        {(BOTOES[id]?.imprimir ?? true) && <button className="botao" onClick={() => window.print()}><Printer size={14} /> Imprimir</button>}
       </Cab>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
+      <h3 className="dm-secao">Filtros</h3>
       <form className="dm-cartao dm-filtros" onSubmit={filtrar}>
-        <Campo rotulo="Data inicial *"><input type="date" required value={form.inicio ?? ""} onChange={(e) => setForm({ ...form, inicio: e.target.value })} /></Campo>
-        <Campo rotulo="Data final *"><input type="date" required value={form.fim ?? ""} onChange={(e) => setForm({ ...form, fim: e.target.value })} /></Campo>
+        <Campo rotulo={id === "faturamento-empresa" ? "Data inicial *" : "Data inicial"}><input type="date" required value={form.inicio ?? ""} onChange={(e) => setForm({ ...form, inicio: e.target.value })} /></Campo>
+        <Campo rotulo={id === "faturamento-empresa" ? "Data final *" : "Data final"}><input type="date" required value={form.fim ?? ""} onChange={(e) => setForm({ ...form, fim: e.target.value })} /></Campo>
         {(def.filtros as any[]).map((f) => {
           const rot = f.obrigatorio ? `${f.rotulo} *` : f.rotulo;
           if (f.tipo === "empresa") return <Campo key={f.chave} rotulo={rot}><select value={form[f.chave] ?? ""} onChange={(e) => setForm({ ...form, [f.chave]: e.target.value })}><option value="">Selecione</option>{opc?.empresas.map((n: string) => <option key={n}>{n}</option>)}</select></Campo>;
@@ -91,7 +97,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
         <button type="button" className="botao" onClick={limpar}>Limpar filtros</button>
       </form>
       <Aviso erro={d.erro} />
-      {obrigatorioFalta ? <p className="vazio">Escolha os filtros obrigatórios (*) e clique em Filtrar.</p> : !x ? <Carregando /> : (
+      {obrigatorioFalta ? <p className="vazio">Nenhum resultado encontrado.</p> : !x ? <Carregando /> : (
         <div className="dm-cartao tabela-rola">
           <p><small>Período: {dataBrDia(x.periodo.inicio)} a {dataBrDia(x.periodo.fim)}. {x.total ? `Exibindo ${de}-${ate} de ${x.total} resultados.` : ""}</small></p>
           <table>

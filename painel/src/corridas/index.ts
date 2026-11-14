@@ -297,10 +297,11 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
 }
 
 /** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). */
-export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string): number {
+export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string, automatico = false): number {
   if (!codigo || valor == null) return 0;
   const c = achar(listar(empresaId, cadastroPorId("cupons")!), "codigo", codigo);
   if (!c || c.ativo !== true) return 0;
+  if (c.automatico === true && !automatico) return 0; // automático só vale pela regra dele, não digitado
   const hoje = agoraBr().toISOString().slice(0, 10);
   if ((c.inicio && String(c.inicio) > hoje) || (c.fim && String(c.fim) < hoje)) return 0;
   const cats = String(c.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
@@ -309,6 +310,29 @@ export function descontoDoCupom(empresaId: string, codigo: string, valor: number
   let d = c.tipoDesconto === "Valor fixo" ? v : (valor * v) / 100;
   if (typeof c.valorMaximo === "number" && c.valorMaximo > 0) d = Math.min(d, c.valorMaximo);
   return arred(Math.min(d, valor));
+}
+
+/** Cupons automáticos da Machine: valem sozinhos, sem o passageiro digitar código. */
+export const CUPONS_AUTOMATICOS = [
+  { codigo: "PRIMEIRA CORRIDA", descricao: "Desconto na primeira corrida", limite: "Apenas na primeira corrida" },
+  { codigo: "DE VOLTA", descricao: "Desconto para cliente inativo", limite: "1 corrida por passageiro" },
+] as const;
+const DIAS_INATIVO = 30;
+
+/** Cupom automático que vale para este pedido (o primeiro que couber), com o desconto em reais. */
+export function cupomAutomatico(empresaId: string, anteriores: CorridaPropria[], valor: number | null, categoria: string): { codigo: string; desconto: number } | null {
+  if (valor == null) return null;
+  const usou = (codigo: string) => anteriores.some((c) => normal(c.cupom) === normal(codigo) && c.status !== "cancelada" && c.status !== "nao_atendida");
+  const finalizadas = anteriores.filter((c) => c.status === "finalizada");
+  const primeira = !finalizadas.length && !usou("PRIMEIRA CORRIDA");
+  const ultima = finalizadas.reduce((m, c) => ((c.finalizadaEm ?? c.solicitadaEm) > m ? (c.finalizadaEm ?? c.solicitadaEm) : m), "");
+  const inativo = !!ultima && Date.parse(agoraBr().toISOString()) - Date.parse(ultima) >= DIAS_INATIVO * 86_400_000 && !usou("DE VOLTA");
+  for (const [vale, codigo] of [[primeira, "PRIMEIRA CORRIDA"], [inativo, "DE VOLTA"]] as const) {
+    if (!vale) continue;
+    const d = descontoDoCupom(empresaId, codigo, valor, categoria, true);
+    if (d > 0) return { codigo, desconto: d };
+  }
+  return null;
 }
 
 // ------------------------------------------------------------------ ciclo da corrida
@@ -384,7 +408,12 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       if (est.valor != null && v > est.valor * 3) throw new Error("O valor oferecido está muito acima do preço estimado.");
       if (est.valor == null || v !== est.valor) valorOferecido = v;
     }
-    const desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria);
+    let desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria);
+    let codigoCupom = desconto ? String(n.cupom).toUpperCase() : "";
+    if (!desconto && !String(n.cupom ?? "").trim()) {
+      const auto = cupomAutomatico(empresaId, lista.filter((c) => c.passageiro.telefone === telefone), valorOferecido ?? est.valor, n.categoria);
+      if (auto) { desconto = auto.desconto; codigoCupom = auto.codigo; }
+    }
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);
     const corrida: CorridaPropria = {
@@ -395,7 +424,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       observacao: String(n.observacao ?? "").replace(/[<>]/g, "").slice(0, 500),
       motoristaId: null, motorista: "", telefoneMotorista: "",
       estimativa: { valor: est.valor, distanciaKm: est.distanciaKm, minutos: est.minutos },
-      valor: null, cupom: desconto ? String(n.cupom).toUpperCase() : "", desconto: desconto || null,
+      valor: null, cupom: codigoCupom, desconto: desconto || null,
       canceladaPor: "", motivoCancelamento: "", avaliacao: null,
       solicitadaEm: agora, iniciadaEm: null, finalizadaEm: null,
       historico: [{ em: agora, status: "procurando", por, ...(agendadaPara ? { nota: `Agendada para ${agendadaPara.slice(0, 16).replace("T", " ")}` } : {}) }],
