@@ -4,7 +4,7 @@
 // avaliar com etiquetas, histórico, agendadas e conta.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { api, avisoDoMarco, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
+import { api, avisoDoMarco, manterTelaLigada, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
 import { Clock, House, User, Wallet } from "lucide-react";
 import { Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 import { duracaoDaViagem, esperandoHorario, lerLugares, quandoAgendada, type Corrida, type Endereco, type Eu, type Lugares, type Ponto, type Rota } from "./apoio";
@@ -79,6 +79,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     if (!corrida?.motorista || !corrida.aberta) { setMensagens([]); return; }
     void api<{ mensagens: Mensagem[] }>(`/corridas/${corrida.id}/chat`).then((r) => setMensagens(r.mensagens)).catch(() => undefined);
   }, [corrida?.id, corrida?.aberta, !!corrida?.motorista]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { void manterTelaLigada(!!corrida && corrida.aberta); return () => { void manterTelaLigada(false); }; }, [!!corrida, corrida?.aberta]); // tela acesa enquanto acompanha a viagem
 
   useEffect(() => tempoReal((tipo, d) => {
     if (tipo === "corrida") {

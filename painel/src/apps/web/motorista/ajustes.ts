@@ -9,10 +9,10 @@ export type Tema = "sistema" | "claro" | "escuro";
 export type Navegador = "nativo" | "google" | "waze";
 export type Sons = "padrao" | "sirene" | "campainha";
 export interface Ajustes {
-  tema: Tema; navegador: Navegador; prioritarias: boolean; flutuante: boolean; vibrar: boolean; insistente: boolean; voz: boolean; sons: Sons; volume: boolean; esconderGanhos: boolean;
+  tema: Tema; navegador: Navegador; prioritarias: boolean; flutuante: boolean; vibrar: boolean; insistente: boolean; voz: boolean; sons: Sons; volume: boolean; esconderGanhos: boolean; manterTela: boolean;
 }
 
-const PADRAO: Ajustes = { tema: "sistema", navegador: "nativo", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "padrao", volume: true, esconderGanhos: false };
+const PADRAO: Ajustes = { tema: "sistema", navegador: "nativo", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "padrao", volume: true, esconderGanhos: false, manterTela: true };
 const CHAVE = "motorista-ajustes";
 
 function carregar(): Ajustes {

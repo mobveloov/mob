@@ -192,3 +192,32 @@ test("cadastro feito no app aparece nos cadastros do painel; o mesmo telefone, e
   assert.ok(reg, "o motorista criado no app está em Motoristas do painel");
   assert.notEqual(reg.status, "Ativo", "motorista novo fica aguardando aprovação da central");
 });
+
+test("motorista desiste com motivo: a corrida volta a procurar, vai para outro motorista e o painel mostra o motivo; quem desistiu não recebe de novo", async () => {
+  const cookie = await cookieDoPainel();
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Dani Desiste", telefone: "11900000021", status: "Ativo", veiculo: "Hatch", placa: "DAN1A23" }, "teste");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Edu Segundo", telefone: "11900000022", status: "Ativo", veiculo: "Sedã", placa: "EDU1A23" }, "teste");
+  const tokP = await entrar("passageiro", "11988883333");
+  const tokD = await entrar("motorista", "11900000021");
+  await chamar("POST", `${API}/online`, { lat: -23.5505, lng: -46.63 }, tokD); // o mais perto: recebe primeiro
+  const pedido = await chamar("POST", `${API}/corridas`, { embarque: EMBARQUE, destino: DESTINO, categoria: "Econômico", pagamento: "Pix", pedidoId: "ponta-d" }, tokP);
+  const id = pedido.corpo.corrida.id as string;
+  const esperarOferta = async (tok: string) => { let o = (await chamar("GET", `${API}/estado`, undefined, tok)).corpo.oferta; for (let i = 0; i < 12 && !o; i++) { await new Promise((r) => setTimeout(r, 300)); o = (await chamar("GET", `${API}/estado`, undefined, tok)).corpo.oferta; } return o; };
+  const of1 = await esperarOferta(tokD);
+  assert.ok(of1, "Dani recebe a oferta");
+  assert.equal((await chamar("POST", `${API}/ofertas/${of1.id}/aceitar`, {}, tokD)).status, 200);
+  // Os motivos vêm das configurações da empresa.
+  const motivos = (await chamar("GET", `${API}/motivos-cancelamento`, undefined, tokD)).corpo.motivos as string[];
+  assert.ok(motivos.length > 1);
+  // Edu entra online só agora; Dani desiste com motivo.
+  const tokE = await entrar("motorista", "11900000022");
+  await chamar("POST", `${API}/online`, { lat: -23.55, lng: -46.63 }, tokE); // no embarque: o mais perto de todos
+  const r = await chamar("POST", `${API}/corridas/${id}/cancelar`, { motivo: motivos[0] }, tokD);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const det = (await chamar("GET", `/api/corridas-proprias/${id}`, undefined, undefined, cookie)).corpo.corrida;
+  assert.ok(["procurando", "a_caminho"].includes(det.status), "voltou para procurar (ou já está com outro motorista)");
+  assert.ok(det.historico.some((h: any) => String(h.nota ?? "").includes(motivos[0])), "o painel mostra o motivo de quem desistiu");
+  const of2 = await esperarOferta(tokE);
+  assert.ok(of2 && of2.corrida.id === id, "Edu recebe a mesma corrida");
+  assert.equal((await chamar("GET", `${API}/estado`, undefined, tokD)).corpo.oferta, null, "quem desistiu não recebe a mesma de novo");
+});

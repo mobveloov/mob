@@ -398,8 +398,8 @@ export async function aceitar(empresaId: string, motoristaId: string, ofertaId: 
 }
 
 /** Motorista desiste antes de chegar: a corrida volta a procurar outro (e ele não recebe essa de novo logo). */
-export async function desistir(empresaId: string, motoristaId: string, corridaId: string) {
-  const c = await mudarStatus(empresaId, corridaId, "procurando", { nota: "Motorista desistiu pelo app" }, "app do motorista");
+export async function desistir(empresaId: string, motoristaId: string, corridaId: string, motivo = "") {
+  const c = await mudarStatus(empresaId, corridaId, "procurando", { nota: `Motorista desistiu pelo app${motivo ? `: ${motivo}` : ""}` }, "app do motorista");
   const e = estado(empresaId);
   const t = e.tentados.get(corridaId) ?? new Map<string, number>();
   t.set(motoristaId, Date.now());

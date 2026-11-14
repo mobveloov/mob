@@ -111,3 +111,17 @@ O motorista toca o som de aceite ao aceitar. Não baixei áudios de terceiros (l
 Despacho igual à Machine (modo geral, vários motoristas ao mesmo tempo, `oferta_encerrada` para os outros) e os testes de aceite
 simultâneo/cancelamento; ganho por km/minuto/hora na oferta; gravação das corridas (LGPD); segurança da API dos apps; importação
 das `casas` do mobveloov; testes em aparelho; ver `docs/PEDIDOS_DO_DONO_2026-11-14.md`.
+
+### 8. Navegação, folhas, cancelamento e tela ligada (14/11, noite)
+- **GPS do próprio app** (motorista): `GET /api/apps/<empresa>/navegacao` devolve a rota pelas ruas (OSRM) com a instrução de cada curva em português;
+  o app mostra "em 200 m, vire à direita na Rua X", avisa por voz a ~300 m e ~50 m, recalcula se sair da rota (mais de 60 m) e mostra o que falta.
+  Em Configurações › Navegador Padrão: "GPS do app (passo a passo)" (padrão), Google Maps ou Waze; a escolha fica salva.
+- **Passageiro**: motorista indo até ele em tempo real com a linha pelas ruas; em viagem, a rota até o destino. Botões de tema (claro/escuro) e de
+  atualizar localização no mapa (início, opções, procurando e acompanhar); etiquetas "Seu Local de Partida" e "Destino" não se sobrepõem mais aos pinos.
+  O botão de localização saiu do topo do "Acompanhar viagem".
+- **Painéis de baixo com 3 alturas** (recolhido, meio, aberto), por toque ou arrastando, lembrando a última (passageiro: `FolhaBaixo`; motorista: folha da corrida).
+- **Cancelar/desistir** no app do motorista com lista de motivos (a lista vem de Config › Gerais do App), aviso das regras e botão visível no topo da folha.
+  Desistir devolve a corrida a `procurando`, o painel mostra o motivo no histórico e quem desistiu não recebe a mesma de novo (teste ponta a ponta).
+- **Tela sempre acesa**: Wake Lock na web (refeito ao voltar ao app) e flag nativa no APK do motorista; opção "Manter a tela ligada" nos Ajustes (padrão ligado,
+  vale online ou em corrida); o passageiro mantém acesa enquanto acompanha. **Falta**: serviço em primeiro plano com notificação para GPS e tempo real com a tela
+  apagada ou o app em segundo plano (hoje o GPS do WebView pode parar em segundo plano).

@@ -492,3 +492,9 @@ html[data-tema="escuro"] { --m-bg: #0b0e14; --m-card: #161b26; --m-card2: #222a3
 .navegacao.nav-app.fora { background: #7a4b00; } .navegacao-texto .nav-instrucao { display: block; font-size: 1.15rem; font-weight: 800; line-height: 1.2; } .navegacao-texto .nav-dist { font-size: 1.6rem; font-weight: 800; display: block; }
 .navegacao-resto { font-size: .78rem; opacity: .85; }
 .mapa-tema-corrida { position: absolute; z-index: 25; right: 14px; top: 170px; }
+/* Folha da corrida em 3 alturas */
+.folha-corrida.n2 { max-height: 70vh; } .folha-corrida.n1 { max-height: 40vh; } .folha-corrida.n0 { max-height: none; overflow: hidden; }
+.folha-corrida.n0 > :not(.puxador-botao):not(.passageiro) { display: none; }
+.puxador-botao { touch-action: none; }
+.botao-m.perigo { background: var(--m-ruim); color: #fff; }
+.motivos-lista { display: flex; flex-direction: column; }

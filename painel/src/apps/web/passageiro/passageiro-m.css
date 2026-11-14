@@ -236,3 +236,5 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .etiqueta-etapa { padding: .35rem .9rem !important; font-size: .82rem !important; border-radius: 16px !important; }
 .acompanhar-baixo .folha { max-height: 52vh; }
 .inicio .mapa-controles { top: auto; bottom: 112px; }
+.folha-corpo.n1 { max-height: 30vh; overflow-y: auto; } .folha-corpo.n2 { max-height: 62vh; overflow-y: auto; } .folha.recolhida { padding-bottom: .6rem; }
+.topo-vazio { width: 44px; height: 44px; display: inline-block; }

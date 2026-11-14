@@ -323,7 +323,7 @@ r.post("/corridas/:id/cancelar", ok(async (req, res) => {
     if (!ANTES_DE_COMECAR.has(c.status)) throw new Error("Não dá para cancelar uma viagem em andamento. Fale com o motorista.");
     feita = await cancelarCorrida(empresaId, c.id, "Passageiro", motivo || "Cancelada pelo app", "app do passageiro");
   } else if (c.status === "a_caminho") {
-    feita = await P.desistir(empresaId, sessao.chave, c.id);
+    feita = await P.desistir(empresaId, sessao.chave, c.id, motivo);
   } else {
     feita = await cancelarCorrida(empresaId, c.id, "Motorista", motivo || "Cancelada pelo motorista", "app do motorista");
   }

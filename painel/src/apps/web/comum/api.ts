@@ -250,7 +250,7 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
 
 // ------------------------------------------------------------------ ícone flutuante (só no APK do motorista)
 
-interface PluginFlutuante { permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
+interface PluginFlutuante { manterTela?(o: { ligar: boolean }): Promise<void>; permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
 const FlutuanteNativo = registerPlugin<PluginFlutuante>("Flutuante");
 /** Bolinha por cima de outros apps quando o app é minimizado. Fora do APK do motorista, tudo isto não faz nada. */
 export const flutuante = {
@@ -260,6 +260,26 @@ export const flutuante = {
   mostrar: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.mostrar(); } catch { /* sem plugin */ } },
   esconder: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.esconder(); } catch { /* sem plugin */ } },
 };
+
+// ------------------------------------------------------------------ tela sempre acesa (online, em corrida, acompanhando a viagem)
+
+interface TravaDeTela { release(): Promise<void> }
+let trava: TravaDeTela | null = null;
+let querTelaLigada = false;
+async function pegarTrava() {
+  try {
+    const wl = (navigator as unknown as { wakeLock?: { request(t: "screen"): Promise<TravaDeTela> } }).wakeLock;
+    if (wl && !trava) { trava = await wl.request("screen"); (trava as unknown as EventTarget).addEventListener?.("release", () => { trava = null; }); }
+  } catch { /* o navegador não deixou (bateria fraca ou aba escondida) */ }
+}
+if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => { if (querTelaLigada && document.visibilityState === "visible") void pegarTrava(); });
+/** Mantém a tela acesa (ou deixa apagar). No APK do motorista também liga a flag nativa; na web usa o Wake Lock e pede de novo ao voltar para o app. */
+export async function manterTelaLigada(ligar: boolean) {
+  querTelaLigada = ligar;
+  if (ligar) await pegarTrava();
+  else { try { await trava?.release(); } catch { /* já liberada */ } trava = null; }
+  try { if (flutuante.disponivel()) await FlutuanteNativo.manterTela?.({ ligar }); } catch { /* sem plugin */ }
+}
 
 // ------------------------------------------------------------------ utilidades
 
