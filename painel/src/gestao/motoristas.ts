@@ -96,7 +96,7 @@ export function listarMotoristas(empresaId: string, q: Record<string, unknown>) 
   for (const a of Object.keys(ABAS_MOTORISTA)) contadores[a] = filtrados.filter((m) => m.aba === a).length;
   const aba = s("aba") || "todos";
   const daAba = filtrados.filter((m) => (aba === "todos" ? m.aba !== "lixeira" : m.aba === aba)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  const p = paginar(daAba, q.pagina);
+  const p = paginar(daAba, q.pagina, 10);
   return { motoristas: p.itens, paginacao: p.paginacao, contadores, ...(q.completo === true ? { todos: daAba } : {}) };
 }
 
