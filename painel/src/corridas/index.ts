@@ -360,7 +360,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     }
     if (n.valorFinal?.modo === "prefixado" && !(Number(n.valorFinal.valor) > 0)) throw new Error("Informe o valor prefixado da corrida.");
     const cliente = listar(empresaId, cadastroPorId("clientes")!).find((c) => c.telefone === telefone);
-    if (cliente && (cliente.status === "Bloqueado" || cliente.status === "Suspenso")) throw new Error("Este passageiro está bloqueado.");
+    if (cliente && (["Bloqueado", "Suspenso", "Suspenso por nota", "Deletado"].includes(String(cliente.status)))) throw new Error("Este passageiro está bloqueado.");
     const bloqueio = motivoDeBloqueio(empresaId, n.embarque, agendadaPara ? new Date(agendadaPara) : undefined); // Cadastro › Áreas: área de risco/bloqueio
     if (bloqueio) throw new Error(bloqueio);
 

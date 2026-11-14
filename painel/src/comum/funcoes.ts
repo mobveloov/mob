@@ -24,7 +24,7 @@ export const FUNCOES: Funcao[] = [
 
   { id: "motoristas", grupo: "Cadastro", secao: "Principal", nome: "Motoristas", rota: "/motoristas" },
   { id: "destravar", grupo: "Cadastro", secao: "Principal", nome: "Destravar Motoristas", rota: "/destravar" },
-  { id: "passageiros", grupo: "Cadastro", secao: "Principal", nome: "Passageiros", rota: "/passageiros", antigas: ["/clientes"] },
+  { id: "passageiros", grupo: "Cadastro", secao: "Principal", nome: "Clientes", rota: "/passageiros", antigas: ["/clientes"] },
   { id: "veiculos", grupo: "Cadastro", secao: "Principal", nome: "Veículos", rota: "/veiculos" },
   { id: "equipe", grupo: "Cadastro", secao: "Principal", nome: "Equipe", rota: "/equipe", soAdmin: true, antigas: ["/usuarios"] },
   { id: "cupons", grupo: "Cadastro", secao: "Gestão", nome: "Cupons", rota: "/cupons" },
