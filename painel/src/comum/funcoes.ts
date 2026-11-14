@@ -111,6 +111,7 @@ export const FUNCOES: Funcao[] = [
   { id: "apps", grupo: "Mais", secao: "Operação", nome: "Apps e SOS", rota: "/apps" },
   { id: "documentos", grupo: "Mais", secao: "Operação", nome: "Documentos dos motoristas", rota: "/documentos" },
   { id: "enderecos", grupo: "Mais", secao: "Configurações", nome: "Endereços", rota: "/enderecos" },
+  { id: "superadmin", grupo: "Mais", secao: "Plataforma", nome: "Painel do dono", rota: "/superadmin", minimo: "plataforma", novo: true },
   { id: "marca", grupo: "Mais", secao: "Configurações", nome: "Marca e aparência", rota: "/marca", minimo: "gestor" },
 
   // Menu do usuário (à direita).

@@ -6,7 +6,7 @@ import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request, type Response } from "express";
 import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
-import { exigirLogin, exigirPapel } from "../servidor/sessao.ts";
+import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
 import { encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
 import { caixaSimulada, soDigitos } from "./provedores.ts";
@@ -40,6 +40,7 @@ rotasBot.post("/webhook/:empresa/:segredo", express.json({ limit: "2mb" }), (req
 // ------------------------------------------------------------------ com login
 
 rotasBot.use(exigirLogin);
+rotasBot.use((req, res, next) => (req.path.startsWith("/webhook/") ? next() : exigirModulo("bot")(req, res, next)));
 const admin = exigirPapel("admin");
 const ctx = (req: Request) => req.ctx!;
 

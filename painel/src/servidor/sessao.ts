@@ -7,6 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import type { NextFunction, Request, Response } from "express";
 import { cargoMinimoDaRota, NIVEL, podeCargo } from "../comum/cargos.ts";
+import { moduloDaRota, type Modulo } from "../comum/modulos.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { empresa, listarUsuarios, raiz, type Papel, type Usuario } from "./dados.ts";
 
 const DURACAO_MS = 12 * 3600_000;
@@ -81,9 +83,17 @@ export const exigirPapel = (...papeis: Papel[]) => {
 /** Porteiro geral: cada caminho da API tem um cargo mínimo (REGRAS_API em src/comum/cargos.ts). Roda depois do login. */
 export function exigirCargoDaRota(req: Request, res: Response, next: NextFunction) {
   const minimo = cargoMinimoDaRota(req.method, req.path);
-  if (!minimo || podeCargo(req.ctx?.usuario.papel, minimo)) return next();
-  res.status(403).json({ erro: "Seu cargo não tem acesso a esta parte." });
+  if (minimo && !podeCargo(req.ctx?.usuario.papel, minimo)) return res.status(403).json({ erro: "Seu cargo não tem acesso a esta parte." });
+  const modulo = moduloDaRota(req.path);
+  if (modulo && req.ctx && !moduloLigado(req.ctx.empresaId, modulo)) return res.status(403).json({ erro: "Este recurso está desligado para a sua empresa." });
+  next();
 }
+
+/** Para rotas que têm o próprio login (bot e totem): recusa se o módulo estiver desligado para a empresa do usuário. */
+export const exigirModulo = (id: Modulo["id"]) => (req: Request, res: Response, next: NextFunction) => {
+  if (req.ctx && !moduloLigado(req.ctx.empresaId, id)) return res.status(403).json({ erro: "Este recurso está desligado para a sua empresa." });
+  next();
+};
 
 // Tentativas de login ERRADAS: no máximo 8 por 10 minutos para o mesmo IP e e-mail, e 30 para o mesmo e-mail.
 // Só o erro conta (antes, entrar certo também contava, e uma central atrás do mesmo IP se trancava).

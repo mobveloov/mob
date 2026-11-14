@@ -38,6 +38,8 @@ import { rotasRelatorios } from "../relatorios/rotas.ts";
 import { rotasAreas } from "../areas/rotas.ts";
 import { rotasCentrais } from "../centrais/rotas.ts";
 import { rotasFiliais } from "../filiais/rotas.ts";
+import { rotasSuperadmin } from "../superadmin/rotas.ts";
+import { recursosDesligados } from "../superadmin/recursos.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 // Cargos: garante um cargo válido para todo usuário (ninguém perde o acesso). Veja docs/CARGOS.md.
@@ -138,6 +140,8 @@ app.post("/api/entrar", ok((req, res) => {
   if (!podeTentar(req.ip ?? "", email)) return res.status(429).json({ erro: "Muitas tentativas. Espere alguns minutos." });
   const u = D.listarUsuarios().find((x) => x.email === email);
   if (!u || !D.senhaConfere(String(req.body?.senha ?? ""), u.hash)) { errouLogin(req.ip ?? "", email); return res.status(401).json({ erro: "E-mail ou senha errados." }); }
+  const e = D.empresa(u.empresaId);
+  if (u.papel !== "plataforma" && (!e || !e.ativa)) return res.status(403).json({ erro: "Esta empresa está suspensa. Fale com o suporte da plataforma." });
   criarCookie(res, req, u.id);
   res.json({ ok: true });
 }));
@@ -162,6 +166,7 @@ app.get("/api/sessao", ok((req, res) => {
     usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email, telefone: usuario.telefone ?? "", papel: usuario.papel, cargo: NOME_CARGO[usuario.papel] },
     empresa: D.empresa(empresaId), marca: D.marca(empresaId),
     empresas: usuario.papel === "plataforma" ? D.listarEmpresas() : undefined,
+    recursosDesligados: recursosDesligados(empresaId),
   });
 }));
 
@@ -474,6 +479,7 @@ app.use("/api/relatorios", rotasRelatorios);
 app.use("/api/areas", rotasAreas);
 app.use("/api/centrais", rotasCentrais);
 app.use("/api/filiais", rotasFiliais);
+app.use("/api/superadmin", rotasSuperadmin);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 

@@ -11,6 +11,8 @@ export interface Sessao {
   empresa: { id: string; nome: string };
   marca: Marca;
   empresas?: Array<{ id: string; nome: string }>;
+  /** Módulos que o dono da plataforma desligou para esta empresa (somem do menu). */
+  recursosDesligados?: string[];
 }
 
 export interface RespostaCorridas {

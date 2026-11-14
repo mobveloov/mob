@@ -19,7 +19,8 @@ import { gravarJson, lerJson } from "./jsoncache.ts";
 
 export type TipoIntegracao = "sistema-a" | "sistema-b" | "arquivo" | "exemplo";
 export interface Integracao { id: string; tipo: TipoIntegracao; nome: string; ativa: boolean }
-export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean }
+/** ativa = false é empresa suspensa: ninguém dela entra no painel nem nos apps (só o ADMIN Mestre entra, para suporte). */
+export interface Empresa { id: string; nome: string; criadaEm: string; ativa: boolean; suspensao?: { em: string; motivo: string; por: string } }
 export type Papel = Cargo; // plataforma = ADMIN Mestre, admin = ADMIN, gestor, operador (src/comum/cargos.ts)
 export interface Usuario { id: string; email: string; nome: string; hash: string; empresaId: string; papel: Papel; criadoEm: string; telefone?: string }
 export interface Segredos { integracoes: Record<string, Record<string, string>>; ia: Record<string, string> }
@@ -61,6 +62,18 @@ export function criarEmpresa(nome: string, marca?: Partial<Marca>): Empresa {
   gravar(path.join(raiz(), "plataforma.json"), [...listarEmpresas(), e]);
   salvarMarca(e.id, sanearMarca({ ...MARCA_PADRAO, produto: `Painel ${e.nome}`, nomeExibido: e.nome, ...marca }));
   salvarIntegracoes(e.id, [{ id: "exemplo", tipo: "exemplo", nome: "Dados de exemplo", ativa: true }]);
+  return e;
+}
+
+/** Suspende ou reativa uma empresa (dono da plataforma). Nada é apagado. */
+export function definirAtiva(id: string, ativa: boolean, motivo = "", por = ""): Empresa {
+  const lista = listarEmpresas().map((e) => ({ ...e }));
+  const e = lista.find((x) => x.id === id);
+  if (!e) throw new Error("Empresa não encontrada.");
+  e.ativa = ativa;
+  if (ativa) delete e.suspensao;
+  else e.suspensao = { em: new Date().toISOString(), motivo: motivo.replace(/[<>]/g, "").trim().slice(0, 200), por: por.slice(0, 120) };
+  gravar(path.join(raiz(), "plataforma.json"), lista);
   return e;
 }
 

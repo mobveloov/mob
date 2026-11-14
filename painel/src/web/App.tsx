@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ChevronDown, KeyRound, LogOut, Menu, Moon, Sun, X } from "lucide-react";
 import { NOME_CARGO, podeCargo } from "../comum/cargos.ts";
+import { moduloDaFuncao } from "../comum/modulos.ts";
 import { funcoesDoCargo, GRUPOS, type Funcao, type Grupo } from "../comum/funcoes.ts";
 import { MARCA_PADRAO, variaveisTema, type Marca } from "../comum/marca.ts";
 import { api, ErroApi, escolherEmpresa, urlImagem, type Sessao } from "./api";
@@ -148,7 +149,8 @@ function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { escuro: boolean; 
   const admin = podeCargo(sessao.usuario.papel, "gestor"); // seletor de centrais (cobrança)
   const logoArq = escuro ? marca.arquivos.logoEscuro || marca.arquivos.logoClaro : marca.arquivos.logoClaro || marca.arquivos.logoEscuro;
   const logo = logoArq ? <img src={urlImagem(sessao.empresa.id, logoArq)} alt={marca.produto} /> : <span className="logo-texto">{marca.produto}</span>;
-  const funcoes = funcoesDoCargo(sessao.usuario.papel);
+  const desligados = new Set(sessao.recursosDesligados ?? []);
+  const funcoes = funcoesDoCargo(sessao.usuario.papel).filter((f) => { const m = moduloDaFuncao(f.id); return !m || !desligados.has(m); });
   const grupos = GRUPOS.map((g) => ({ g, itens: funcoes.filter((f) => f.grupo === g) })).filter((x) => x.itens.length);
   const nomeUsuario = sessao.usuario.nome || sessao.usuario.email;
   const ativoGrupo = (itens: Funcao[]) => itens.some((f) => (f.rota === "/" ? local.pathname === "/" : local.pathname === f.rota || local.pathname.startsWith(`${f.rota}/`)));
