@@ -6,42 +6,54 @@ import { validarUrlExterna } from "../servidor/url.ts";
 import { CANCELAR, classificarComIa, ehCumprimento, limparEndereco, MENU, NAO, normalizar, opcao, pareceEndereco, pareceRua, SEM_DESTINO, SIM, type Classificador } from "./entender.ts";
 import { clienteDoTelefone, corridasDoBot } from "./corridas.ts";
 import { provedorEvolution, provedorSimulado, type ProvedorWhatsApp } from "./provedores.ts";
+import { provedorMeta, provedorZapi } from "./provedores-api.ts";
+import { textoDoAudio, type DepsAudio } from "./audio.ts";
 import { botSilencedFor, brPhoneVariants, parseBotCommand, parseBotCommandWithPhone, type BotCommand } from "./controle.ts";
 import { decideSkip } from "./destino.ts";
 import { customText, matchFaq, shouldSendGreetingImage } from "./textos-editaveis.ts";
 import { marcador, NOME_STATUS, PAGAMENTOS, T, type Marcador } from "./textos.ts";
-import type { CategoriaBot, ConfigBot, Conversa, CorridaBot, Local, Recebida } from "./tipos.ts";
+import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
 
 export interface Dependencias {
   provedor?: ProvedorWhatsApp;
   /** Entende frase livre. Padrão: IA da empresa (caso "classificacao"). */
   classificar?: Classificador;
+  /** Transcrição de áudio (testes trocam o fetch e as chaves). */
+  audio?: DepsAudio;
 }
 
 /**
- * Servidor de WhatsApp da empresa. Padrão: o servidor da plataforma (WHATSAPP_EVOLUTION_URL/_TOKEN no .env), com a
- * instância da empresa (bot-<empresa>, sem escolha): a empresa só lê o QR. Se a empresa cadastrou o próprio servidor
- * (URL e token nos segredos dela), usa esse, com a instância que ela escolheu.
+ * Servidor Evolution da conexão. Padrão: o servidor da plataforma (WHATSAPP_EVOLUTION_URL/_TOKEN no .env), com a
+ * instância da própria empresa (bot-<empresa>, sem escolha): a empresa só lê o QR. Se a empresa cadastrou o
+ * próprio servidor (URL e token nos segredos da conexão), usa esse, com a instância que ela escolheu.
+ * Cada conexão extra tem a instância dela (bot-<empresa>-<id> no servidor da plataforma).
  */
-export function servidorWhatsApp(empresaId: string) {
-  const s = A.segredosBot(empresaId);
-  if (s.urlApi && s.token) return { urlApi: s.urlApi, token: s.token, instancia: A.config(empresaId).instancia, daPlataforma: false };
+export function servidorWhatsApp(empresaId: string, conexaoId: string = ID_PRINCIPAL) {
+  const s = A.segredosBot(empresaId, conexaoId);
+  const cx = A.conexao(empresaId, conexaoId);
+  const instancia = cx?.instancia ?? A.instanciaPadrao(empresaId);
+  if (s.urlApi && s.token) return { urlApi: s.urlApi, token: s.token, instancia, daPlataforma: false };
   return {
     urlApi: (process.env.WHATSAPP_EVOLUTION_URL ?? "").trim(), token: (process.env.WHATSAPP_EVOLUTION_TOKEN ?? "").trim(),
-    instancia: A.instanciaPadrao(empresaId), daPlataforma: true,
+    instancia: conexaoId === ID_PRINCIPAL ? A.instanciaPadrao(empresaId) : `${A.instanciaPadrao(empresaId)}-${conexaoId}`, daPlataforma: true,
   };
 }
 
-/** Provedor de WhatsApp da empresa (o configurado em Bot de WhatsApp). */
-export function provedorDe(empresaId: string): ProvedorWhatsApp {
-  if (A.config(empresaId).provedor === "simulado") return provedorSimulado(empresaId);
-  const { urlApi, token, instancia, daPlataforma } = servidorWhatsApp(empresaId);
+/** Provedor de WhatsApp de uma conexão da empresa (a principal, se não disser qual). Cada empresa só enxerga as próprias. */
+export function provedorDe(empresaId: string, conexaoId: string = ID_PRINCIPAL): ProvedorWhatsApp {
+  const cx = A.conexao(empresaId, conexaoId) ?? A.conexao(empresaId)!;
+  const s = A.segredosBot(empresaId, cx.id);
   // Endereço salvo antes desta regra (ou mexido no arquivo): confere de novo antes de chamar.
-  if (!daPlataforma) {
-    try { validarUrlExterna(urlApi, "do servidor de WhatsApp"); }
-    catch { return provedorEvolution({ urlApi: "", token: "", instancia }); } // vira "não configurado"
+  const urlOk = (u: string) => { try { validarUrlExterna(u, "do servidor de WhatsApp"); return u; } catch { return ""; } };
+  switch (cx.provedor) {
+    case "simulado": return provedorSimulado(empresaId);
+    case "zapi": case "zpro": return provedorZapi({ urlApi: urlOk(s.urlApi ?? ""), token: s.token ?? "", clientToken: s.clientToken }, cx.provedor);
+    case "meta": return provedorMeta({ token: s.token ?? "", phoneId: s.phoneId ?? "", wabaId: s.wabaId });
+    default: {
+      const { urlApi, token, instancia, daPlataforma } = servidorWhatsApp(empresaId, cx.id);
+      return provedorEvolution({ urlApi: daPlataforma ? urlApi : urlOk(urlApi), token, instancia }); // sem endereço vira "não configurado"
+    }
   }
-  return provedorEvolution({ urlApi, token, instancia });
 }
 
 const agora = () => new Date().toISOString();
@@ -90,14 +102,33 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   if (c.vistas.includes(r.id)) return []; // o provedor mandou de novo a mesma mensagem
   c.vistas.push(r.id);
   if (c.nome === c.id && r.nome) c.nome = r.nome;
-  const texto = (r.texto ?? "").trim();
-  c.mensagens.push({ de: "passageiro", texto: texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
+  // As respostas saem pelo número (conexão) por onde o passageiro escreveu.
+  if (r.conexao && A.conexao(empresaId, r.conexao)) c.conexao = r.conexao;
+  const provedor = deps.provedor ?? provedorDe(empresaId, c.conexao);
+  let texto = (r.texto ?? "").trim();
+  let audioFalhou = false;
+  if (!texto && !r.local && r.audio) {
+    // Áudio: vira texto (quando há chave de transcrição) e segue como se tivesse sido digitado.
+    const dito = await textoDoAudio(empresaId, r.audio, provedor, deps.audio);
+    if (dito) texto = dito; else audioFalhou = true;
+    c.mensagens.push({ de: "passageiro", texto: dito ? `🎤 Áudio: "${dito.slice(0, 900)}"` : "🎤 Áudio (não deu para transcrever)", em: agora() });
+  } else {
+    c.mensagens.push({ de: "passageiro", texto: texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
+  }
   c.naoLidas++;
 
   // Bloqueado pela central ou com o bot pausado: o bot fica quieto (a conversa continua no painel para a equipe).
   if (botSilencedFor({ blocked: c.bloqueado, paused_until: c.pausadoAte ?? null })) {
     A.salvarConversa(empresaId, c);
     return [];
+  }
+  // Áudio que não deu para ouvir: pede para repetir ou escrever (com o operador na conversa, quem responde é ele).
+  if (audioFalhou) {
+    const aviso = c.etapa === "suporte" ? [] : [T.audioFalhou()];
+    for (const t of aviso) c.mensagens.push({ de: "bot", texto: t, em: agora() });
+    A.salvarConversa(empresaId, c);
+    await enviar(empresaId, provedor, c.id, aviso);
+    return aviso;
   }
 
   const respostas: string[] = [];
@@ -112,7 +143,6 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
     respostas.push(ctx.txt("ride_error", T.erroCriar()));
   }
   for (const t of respostas) c.mensagens.push({ de: "bot", texto: t, em: agora() });
-  const provedor = deps.provedor ?? provedorDe(empresaId);
   if (ctx.imagem) {
     c.mensagens.splice(c.mensagens.length - respostas.length, 0, { de: "bot", texto: `🖼️ ${ctx.imagem.url}${ctx.imagem.caption ? `\n${ctx.imagem.caption}` : ""}`, em: agora() });
   }
@@ -375,7 +405,7 @@ export function responderOperador(empresaId: string, conversaId: string, texto: 
     c.mensagens.push({ de: "operador", texto: t, em: agora(), autor: autor.slice(0, 60) });
     c.naoLidas = 0;
     A.salvarConversa(empresaId, c);
-    await (deps.provedor ?? provedorDe(empresaId)).enviarTexto(c.id, t);
+    await (deps.provedor ?? provedorDe(empresaId, c.conexao)).enviarTexto(c.id, t);
     return c;
   });
 }
@@ -391,7 +421,7 @@ export function encerrarAtendimento(empresaId: string, conversaId: string, deps:
     const t = customText(A.config(empresaId).textos, "support_thanks", T.fimAtendimento());
     c.mensagens.push({ de: "bot", texto: t, em: agora() });
     A.salvarConversa(empresaId, c);
-    await enviar(empresaId, deps.provedor ?? provedorDe(empresaId), c.id, [t]);
+    await enviar(empresaId, deps.provedor ?? provedorDe(empresaId, c.conexao), c.id, [t]);
     return c;
   });
 }

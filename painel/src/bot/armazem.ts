@@ -12,7 +12,7 @@ import * as D from "../servidor/dados.ts";
 import { normalizeBotControl } from "./controle.ts";
 import { normalizeBotTexts, normalizeFaq, normalizeGreeting } from "./textos-editaveis.ts";
 import { normalizeStatusMessages } from "./mensagens-status.ts";
-import { FLUXO_PADRAO, type ConfigBot, type Conversa, type FluxoBot } from "./tipos.ts";
+import { FLUXO_PADRAO, ID_PRINCIPAL, TIPOS_PROVEDOR, type ConexaoBot, type ConfigBot, type Conversa, type FluxoBot, type TipoProvedor } from "./tipos.ts";
 
 export const CHAVE_SEGREDOS = "bot-whatsapp";
 const MAX_MENSAGENS = 300;
@@ -37,7 +37,7 @@ function gravar(arq: string, valor: unknown) {
 export const instanciaPadrao = (empresaId: string) => `bot-${empresaId}`;
 
 export function configPadrao(empresaId: string): ConfigBot {
-  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId), ...avancadaPadrao() };
+  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId), conexoes: [], ...avancadaPadrao() };
 }
 
 const avancadaPadrao = () => ({
@@ -57,10 +57,77 @@ export function config(empresaId: string): ConfigBot {
   const p = configPadrao(empresaId);
   return {
     ativo: c.ativo ?? p.ativo,
-    provedor: c.provedor === "evolution" ? "evolution" : "simulado",
+    provedor: TIPOS_PROVEDOR.includes(c.provedor as TipoProvedor) ? (c.provedor as TipoProvedor) : "simulado",
     instancia: typeof c.instancia === "string" && c.instancia ? c.instancia : p.instancia,
+    conexoes: sanearConexoes(c.conexoes),
     ...sanearAvancada(c),
   };
+}
+
+// ------------------------------------------------------------------ várias conexões (números) por empresa
+
+export const MAX_CONEXOES = 10;
+const ID_CONEXAO = /^[a-z0-9][a-z0-9-]{1,23}$/;
+
+/** Confere a lista de conexões extras (a principal fica nos campos do topo da config). */
+export function sanearConexoes(lista: unknown): ConexaoBot[] {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set<string>([ID_PRINCIPAL]);
+  const out: ConexaoBot[] = [];
+  for (const x of lista as Array<Partial<ConexaoBot>>) {
+    const id = String(x?.id ?? "");
+    if (!ID_CONEXAO.test(id) || vistos.has(id)) continue;
+    vistos.add(id);
+    out.push({
+      id, nome: String(x.nome ?? "").trim().slice(0, 60) || id, ativa: x.ativa !== false,
+      provedor: TIPOS_PROVEDOR.includes(x.provedor as TipoProvedor) ? (x.provedor as TipoProvedor) : "simulado",
+      instancia: String(x.instancia ?? "").trim().slice(0, 40) || `bot-${id}`,
+      ...(x.phoneId ? { phoneId: String(x.phoneId).trim().slice(0, 40) } : {}),
+    });
+    if (out.length >= MAX_CONEXOES) break;
+  }
+  return out;
+}
+
+/** Todas as conexões da empresa, a principal primeiro. */
+export function conexoesDe(empresaId: string): ConexaoBot[] {
+  const c = config(empresaId);
+  return [{ id: ID_PRINCIPAL, nome: "Principal", ativa: true, provedor: c.provedor, instancia: c.instancia }, ...c.conexoes];
+}
+
+export function conexao(empresaId: string, id: string = ID_PRINCIPAL): ConexaoBot | null {
+  return conexoesDe(empresaId).find((x) => x.id === id) ?? null;
+}
+
+/** Cria ou muda uma conexão extra. O id é sorteado na criação. */
+export function salvarConexao(empresaId: string, dados: Partial<ConexaoBot> & { id?: string }): ConexaoBot {
+  const c = config(empresaId);
+  const lista = [...c.conexoes];
+  const i = dados.id ? lista.findIndex((x) => x.id === dados.id) : -1;
+  if (dados.id && i < 0) throw new Error("Conexão não encontrada.");
+  if (i < 0 && lista.length >= MAX_CONEXOES) throw new Error(`No máximo ${MAX_CONEXOES} conexões por empresa.`);
+  const id = i >= 0 ? lista[i].id : `n${crypto.randomBytes(4).toString("hex")}`;
+  const nova = sanearConexoes([{ ...(i >= 0 ? lista[i] : {}), ...dados, id }])[0];
+  if (!nova) throw new Error("Conexão inválida.");
+  if (instanciaEmUso(empresaId, nova.instancia, nova.id)) throw new Error("Já existe uma conexão com este nome de instância.");
+  if (i >= 0) lista[i] = nova; else lista.push(nova);
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, conexoes: lista });
+  return nova;
+}
+
+export function removerConexao(empresaId: string, id: string) {
+  if (id === ID_PRINCIPAL) throw new Error("A conexão principal não pode ser removida.");
+  const c = config(empresaId);
+  if (!c.conexoes.some((x) => x.id === id)) throw new Error("Conexão não encontrada.");
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, conexoes: c.conexoes.filter((x) => x.id !== id) });
+  const s = D.segredos(empresaId);
+  const { [`${CHAVE_SEGREDOS}-${id}`]: _fora, ...resto } = s.integracoes;
+  D.salvarSegredos(empresaId, { ...s, integracoes: resto });
+}
+
+/** Duas conexões da mesma empresa não podem usar a mesma instância. */
+function instanciaEmUso(empresaId: string, instancia: string, exceto: string) {
+  return conexoesDe(empresaId).some((x) => x.id !== exceto && x.instancia.toLowerCase() === instancia.toLowerCase());
 }
 
 /** Grava a config. Campos que não vierem ficam como estão (as configurações avançadas não somem ao mudar só a conexão). */
@@ -70,15 +137,18 @@ export function salvarConfig(empresaId: string, c: Pick<ConfigBot, "ativo" | "pr
 }
 
 /** Segredos do bot da empresa: urlApi e token (só se a empresa usa servidor próprio) e segredoWebhook. */
-export function segredosBot(empresaId: string): Record<string, string> {
-  return D.segredos(empresaId).integracoes[CHAVE_SEGREDOS] ?? {};
+const chaveDe = (conexaoId: string) => (conexaoId === ID_PRINCIPAL ? CHAVE_SEGREDOS : `${CHAVE_SEGREDOS}-${conexaoId}`);
+
+export function segredosBot(empresaId: string, conexaoId: string = ID_PRINCIPAL): Record<string, string> {
+  return D.segredos(empresaId).integracoes[chaveDe(conexaoId)] ?? {};
 }
 
-export function salvarSegredosBot(empresaId: string, novos: Record<string, string | undefined>) {
+export function salvarSegredosBot(empresaId: string, novos: Record<string, string | undefined>, conexaoId: string = ID_PRINCIPAL) {
   const s = D.segredos(empresaId);
-  const atual = { ...(s.integracoes[CHAVE_SEGREDOS] ?? {}) };
+  const chave = chaveDe(conexaoId);
+  const atual = { ...(s.integracoes[chave] ?? {}) };
   for (const [k, v] of Object.entries(novos)) if (v !== undefined) { if (v === "") delete atual[k]; else atual[k] = v; }
-  D.salvarSegredos(empresaId, { ...s, integracoes: { ...s.integracoes, [CHAVE_SEGREDOS]: atual } });
+  D.salvarSegredos(empresaId, { ...s, integracoes: { ...s.integracoes, [chave]: atual } });
 }
 
 /** Segredo da URL do webhook. Criado na primeira vez. */

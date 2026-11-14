@@ -42,6 +42,7 @@ export const T = {
   criando: () => "Um momento, estou chamando um motorista... 🚗",
   criada: (os: string, valor?: number) =>
     `Pedido feito! Número *${os}*.${valor ? ` Valor estimado: *${reais(valor)}*.` : ""}\nEstou procurando um motorista. Aviso aqui quando alguém aceitar.\nPara cancelar, envie *cancelar*.`,
+  audioFalhou: () => "Não consegui entender esse áudio agora. Pode enviar novamente ou escrever sua mensagem?",
   erroCriar: () => "Não consegui criar a corrida agora. 😕 Responda a forma de pagamento para tentar de novo, ou *menu* para recomeçar.",
   jaTemAberta: (motivo: string) => `${motivo} Para falar com um atendente, envie *menu* e escolha *2*.`,
   bloqueado: (m: Marcador) => `Não consigo pedir corrida por aqui para este número. Fale com o suporte da ${m.empresa}: envie *2*.`,

@@ -54,11 +54,23 @@ export interface Conversa {
   pausadoAte?: string;
   /** Última vez que a imagem de saudação foi enviada (no máximo uma a cada 12 h). */
   imagemEm?: string;
+  /** Conexão (número) por onde o passageiro escreveu; as respostas saem por ela. */
+  conexao?: string;
   criadaEm: string;
   atualizadaEm: string;
 }
 
-export type TipoProvedor = "evolution" | "simulado";
+export type TipoProvedor = "evolution" | "zapi" | "zpro" | "meta" | "simulado";
+export const TIPOS_PROVEDOR: TipoProvedor[] = ["evolution", "zapi", "zpro", "meta", "simulado"];
+
+/** Uma conexão de WhatsApp da empresa (número). A principal usa o provedor e a instância do topo da config. */
+export interface ConexaoBot {
+  id: string; nome: string; ativa: boolean;
+  provedor: TipoProvedor; instancia: string;
+  /** Meta: o phone number id (não é segredo). */
+  phoneId?: string;
+}
+export const ID_PRINCIPAL = "principal";
 
 /** Etapas do fluxo (todas ligadas por padrão). Mesmos nomes do sistema de referência. */
 export interface FluxoBot {
@@ -84,6 +96,8 @@ export interface ConfigBot {
   provedor: TipoProvedor;
   /** Nome da instância no provedor (única por empresa). No servidor da plataforma é sempre bot-<empresa>. */
   instancia: string;
+  /** Outros números da empresa (além do principal). Cada um com a própria instância e os próprios segredos. */
+  conexoes: ConexaoBot[];
 }
 
 /** Mensagem recebida do provedor, já traduzida. */
@@ -93,8 +107,19 @@ export interface Recebida {
   nome?: string;
   texto?: string;
   local?: Local;
+  /** Áudio recebido. Sem texto, o bot transcreve (quando há chave) e segue como se fosse digitado. */
+  audio?: AudioRecebido;
+  /** Conexão (número) por onde a mensagem chegou. */
+  conexao?: string;
   /** Mensagem digitada pela central no próprio WhatsApp do bot (comandos #bloquear, #pausar...). */
   daCentral?: boolean;
+}
+
+export interface AudioRecebido {
+  /** Endereço do arquivo (Z-API) ou id da mídia (Meta, Evolution). */
+  url?: string; id?: string; base64?: string; mimetype: string;
+  /** Texto já pronto (modo simulado / testes). */
+  transcricao?: string;
 }
 
 export type SituacaoConexao = "conectado" | "aguardando_qr" | "desconectado" | "nao_configurado" | "erro";
