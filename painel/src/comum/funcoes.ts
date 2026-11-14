@@ -85,6 +85,7 @@ export const FUNCOES: Funcao[] = [
   { id: "alertas-empresas", grupo: "Comunicação", nome: "Alertas para empresas", rota: "/alertas-empresas" },
 
   { id: "config-gerais", grupo: "Configurações", nome: "Gerais", rota: "/config-gerais", soAdmin: true },
+  { id: "taxas-central", grupo: "Configurações", nome: "Taxas da central", rota: "/taxas-central", soAdmin: true },
   { id: "personalizacao-app", grupo: "Configurações", nome: "Personalização app passageiro", rota: "/personalizacao-app", soAdmin: true },
   { id: "regras-despacho", grupo: "Configurações", nome: "Despacho", rota: "/regras-despacho", soAdmin: true, antigas: ["/despacho"] },
   { id: "transbordos", grupo: "Configurações", nome: "Transbordos", rota: "/transbordos", soAdmin: true },

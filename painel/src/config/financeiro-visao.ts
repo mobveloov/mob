@@ -79,7 +79,7 @@ const diaDoSaque = (s: SaqueLinha) => diaDe(s.resolvidoEm ?? s.em);
 function totaisDoPeriodo(empresaId: string, p: Per, saques: SaqueLinha[]) {
   const corridas = corridasFinalizadas(empresaId, p.inicio, p.fim);
   const faturamento = cent(corridas.reduce((s, c) => s + c.valor!, 0));
-  const ganhos = cent(corridas.filter((c) => c.motoristaId).reduce((s, c) => s + calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!).taxaCentral, 0));
+  const ganhos = cent(corridas.filter((c) => c.motoristaId).reduce((s, c) => s + calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!, c.pagamento).taxaCentral, 0));
   const pix = recargasPix(empresaId, p.inicio, p.fim);
   const recargas = cent(pix.reduce((s, x) => s + x.valor, 0));
   const app = corridas.filter((c) => ehPix(c.pagamento) || ehCartaoApp(c.pagamento));
@@ -167,7 +167,7 @@ function movimentosDaCentral(empresaId: string, ate: string): Movimento[] {
   for (const c of listarProprias(empresaId)) {
     const dia = diaDe(c.finalizadaEm ?? c.solicitadaEm);
     if (c.status !== "finalizada" || !c.valor || !c.motoristaId || !dia || dia > ate) continue;
-    const t = calcularComissao(empresaId, c.categoria, c.valor, c.motoristaId).taxaCentral;
+    const t = calcularComissao(empresaId, c.categoria, c.valor, c.motoristaId, c.pagamento).taxaCentral;
     if (t <= 0) continue;
     const g = porDia.get(dia) ?? { qtd: 0, valor: 0 };
     g.qtd++; g.valor += t; porDia.set(dia, g);

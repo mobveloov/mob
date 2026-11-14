@@ -102,3 +102,21 @@ Todos são agentes Sonnet 5.5, cada um no próprio worktree e ramo, sem mexer no
 | CRM, Bot e Totem (cópia exata do mobveloov) | crm-bot-totem | worktree-agent-a5eb39a3ed6da876e | em andamento |
 
 Revisão final e bug difícil: só com Fable 5.2, no fim, depois da mesclagem.
+
+## Navegação e mapa nos apps (pedido do dono, depois do teste no celular)
+
+Prints do teste: motorista "a caminho" (1,5 km, "Siga até local de embarque") e passageiro "Acompanhar viagem".
+- [ ] **Escolher o GPS** no app do motorista: Waze, Google Maps, outro instalado. E TAMBÉM o **GPS nativo do app**:
+      navegação passo a passo dentro do próprio app (rota pelas ruas, instrução "vire à direita em X metros",
+      recalcula se sair da rota, voz opcional), sem precisar abrir outro app. O motorista escolhe e a escolha fica salva.
+- [ ] **Passageiro vê a rota do motorista indo até ele**, em tempo real: linha da rota pelas ruas, carro andando,
+      tempo e distância atualizando. Depois do embarque, a rota até o destino.
+- [ ] **Botão de tema do mapa** (claro/escuro) dentro dos apps, no mapa, nos dois apps. Lembra a escolha.
+- [ ] **Botão "atualizar localização em tempo real"** (centralizar na minha posição e voltar a seguir), nos dois apps.
+- [ ] Corrigir no print do passageiro: sobreposição do rótulo "Destino"/"Seu Local de Partida" com os pinos, e a
+      etapa do aviso de status do topo ("Motorista a caminho") cobrindo o mapa.
+- [ ] **Painel de baixo que recolhe** nos dois apps (motorista e passageiro): a "folha" com as informações (motorista,
+      embarque, valor, OS etc.) tem a barrinha no topo, mas hoje, mesmo tocando nela, fica sempre expandida e não dá
+      para recolher. Tem que arrastar/tocar para recolher (mostra só o essencial: status e botão principal) e expandir
+      de novo, com 2 ou 3 alturas (recolhida, meio, aberta), liberando o mapa. O botão de localização não pode ficar
+      em cima da hora/barra de status.

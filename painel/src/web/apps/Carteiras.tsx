@@ -25,12 +25,15 @@ export default function Carteiras() {
   const d = useCarregar(() => pedir<{ saldos: SaldoLinha[]; saques: Saque[] }>("/api/apps-central/carteiras"), [], 20_000);
   const [msg, setMsg] = useState<{ texto: string; erro?: boolean } | null>(null);
   const [busca, setBusca] = useState("");
+  const [ocupado, setOcupado] = useState(false);
   const [aberta, setAberta] = useState<SaldoLinha | null>(null);
   const [novo, setNovo] = useState({ papel: "passageiro", chave: "", valor: "", descricao: "Recarga recebida por Pix" });
 
   const fazer = async (f: () => Promise<unknown>, ok: string) => {
+    if (ocupado) return;
+    setOcupado(true);
     setMsg(null);
-    try { await f(); setMsg({ texto: ok }); d.recarregar(); } catch (e) { setMsg({ texto: e instanceof Error ? e.message : String(e), erro: true }); }
+    try { await f(); setMsg({ texto: ok }); d.recarregar(); } catch (e) { setMsg({ texto: e instanceof Error ? e.message : String(e), erro: true }); } finally { setOcupado(false); }
   };
   const pendentes = (d.dados?.saques ?? []).filter((s) => s.situacao === "Pendente");
   const b = busca.trim().toLowerCase();
@@ -66,14 +69,14 @@ export default function Carteiras() {
         </Cartao>
         {admin && (
           <Cartao titulo="Lançar na carteira">
-            <form className="form" onSubmit={(e) => { e.preventDefault(); void fazer(() => pedir("/api/apps-central/carteiras/lancar", { ...novo, valor: Number(novo.valor.replace(/\./g, "").replace(",", ".")) }), "Lançamento feito."); }}>
+            <form className="form" onSubmit={(e) => { e.preventDefault(); void fazer(() => pedir("/api/apps-central/carteiras/lancar", { ...novo, motivo: novo.descricao, chaveUnica: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`, valor: Number(novo.valor.replace(/\./g, "").replace(",", ".")) }), "Lançamento feito."); }}>
               <label>De quem<select value={novo.papel} onChange={(e) => setNovo({ ...novo, papel: e.target.value })}><option value="passageiro">Passageiro (telefone)</option><option value="motorista">Motorista (escolha na lista)</option></select></label>
               {novo.papel === "passageiro"
                 ? <label>Telefone do passageiro<input value={novo.chave} inputMode="tel" placeholder="(00) 00000-0000" onChange={(e) => setNovo({ ...novo, chave: e.target.value })} required /></label>
                 : <label>Motorista<select value={novo.chave} onChange={(e) => setNovo({ ...novo, chave: e.target.value })} required><option value="">Escolha</option>{(d.dados?.saldos ?? []).filter((s) => s.papel === "motorista").map((s) => <option key={s.chave} value={s.chave}>{s.nome || s.chave}</option>)}</select><small>Aparecem os motoristas que já têm movimento. Os outros entram depois da primeira corrida pelo app.</small></label>}
               <label>Valor<input value={novo.valor} inputMode="decimal" placeholder="Ex.: 50 (crédito) ou -10 (débito)" onChange={(e) => setNovo({ ...novo, valor: e.target.value })} required /></label>
-              <label>Descrição<input value={novo.descricao} maxLength={120} onChange={(e) => setNovo({ ...novo, descricao: e.target.value })} /></label>
-              <div className="acoes"><button className="botao primario">Lançar</button></div>
+              <label>Motivo (obrigatório)<input value={novo.descricao} maxLength={120} minLength={5} required onChange={(e) => setNovo({ ...novo, descricao: e.target.value })} /></label>
+              <div className="acoes"><button className="botao primario" disabled={ocupado}>Lançar</button></div>
             </form>
           </Cartao>
         )}
