@@ -106,6 +106,10 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Docker refeito** com o main; `up.veloov.com` responde.
 - **Falta:** comparar mais telas lado a lado com a Machine (imagem), "Enviar mais de um carro" no despacho, desconto da empresa por forma de pagamento no preço, observação da empresa para o motorista no app, passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
 
+## Menu lateral e foto da empresa (branch worktree-agent-a4657717dc85a0595, 14/11/2026)
+- **Menu lateral** é o menu principal (como no painel de referência do dono): 240 px, recolhe para só ícones (preferência em `localStorage` `menuLateral`), 6 grupos coloridos (Operação laranja, Bot & Totem azul, Clientes verde, Gestão roxo, Configuração rosa, Ajuda lima), item ativo destacado, claro e escuro. Abaixo de 1024 px vira a gaveta do celular, com o mesmo menu. As abas do topo saíram: o topo tem só empresa, central, sino, tema e perfil.
+- Arranjo dos itens em `painel/src/comum/menu-lateral.ts` (ids e rotas continuam os de `funcoes.ts`; blocos recolhíveis Corridas, Frota, Financeiro, Cobrança e Regras e integrações). Tela em `painel/src/web/menu/MenuLateral.tsx`. Teste: `painel/test/menu-lateral.test.ts`.
+- **Foto da empresa:** Marca e aparência > Foto da empresa (enviar, trocar, remover). Servidor `painel/src/servidor/foto-empresa.ts` (`/api/empresa/foto`, só admin, PNG/JPG/WEBP até 2 MB, confere a assinatura do arquivo), guardada em `marca.arquivos.fotoEmpresa`. Aparece no menu lateral, no topo e na barra do celular. Teste: `painel/test/foto-empresa.test.ts`.
 ## Comparação tela a tela com a Machine (14/11/2026)
 
 Cada tela da Machine foi lida e comparada com a nossa, com banco de teste próprio. Detalhe completo (inclusive "o que ainda difere") em `docs/comparacao/GRUPO_A.md` a `GRUPO_E.md`. "quase" = igual com diferença pequena listada. Também: barra do topo igual nos temas claro e escuro (gaveta do celular segue o tema, cor de destaque legível no claro, troca sem piscar) e a etiqueta NOVO foi removida de todo lugar.

@@ -92,9 +92,27 @@ export const salvarMarca = (id: string, m: Marca) => gravar(path.join(pastaEmpre
 const TIPOS_IMAGEM: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico" };
 export const MAX_IMAGEM = 2 * 1024 * 1024;
 
+/** Confere a assinatura do arquivo (não basta o tipo declarado no envio). */
+function bytesDaImagemConferem(ext: string, b: Uint8Array): boolean {
+  const igual = (ini: number[], de = 0) => ini.every((v, i) => b[de + i] === v);
+  if (ext === "png") return igual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (ext === "jpg") return igual([0xff, 0xd8, 0xff]);
+  return igual([0x52, 0x49, 0x46, 0x46]) && igual([0x57, 0x45, 0x42, 0x50], 8);
+}
+
+/** Apaga um arquivo de imagem da empresa (só o nome simples; nunca sai da pasta de arquivos). */
+export function apagarImagem(id: string, nome: string) {
+  if (!/^[\w-]+\.(png|jpg|webp|svg|ico)$/.test(nome)) return;
+  fs.rmSync(path.join(pastaEmpresa(id), "arquivos", nome), { force: true });
+}
+
 /** Guarda uma imagem da marca. Devolve o nome do arquivo salvo. */
 export function salvarImagem(id: string, tipo: string, mime: string, bytes: Uint8Array): string {
   const ext = TIPOS_IMAGEM[mime];
+  if (tipo === "fotoEmpresa") {
+    if (!ext || !["png", "jpg", "webp"].includes(ext)) throw new Error("Envie a foto em PNG, JPG ou WEBP.");
+    if (!bytesDaImagemConferem(ext, bytes)) throw new Error("O arquivo não é uma imagem válida.");
+  }
   if (!ext) throw new Error("Envie PNG, JPG, WEBP, SVG ou ICO.");
   if (bytes.length > MAX_IMAGEM) throw new Error("Imagem grande demais (máximo 2 MB).");
   const pasta = path.join(pastaEmpresa(id), "arquivos");
