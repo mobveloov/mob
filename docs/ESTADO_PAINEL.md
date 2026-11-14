@@ -95,3 +95,7 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Também no main:** Pix, pendências, taxas de cancelamento, alertas e central de notificações; Relatórios e Vouchers; Tarifa (Editar tarifa) e Dinâmica; matriz de descontos já entra no preço da corrida. 203 testes passando.
 - **Em andamento (ramos machine-*):** cadmot (motorista e empresa), cadcat (categoria e nova solicitação), plarua (Plantão, Ruas, Áreas, Funil de Clientes, Mapa de Bairros), centr (telas de centrais).
 - **Depois:** comparar tela a tela com a Machine no navegador, carga de 500 corridas, Docker, up.veloov.com.
+
+## Página inicial e Mapa de engajamento iguais à Machine (branch machine-painel)
+- Comparação bloco a bloco em `docs/COMPARACAO_PAINEL_INICIAL.md`. Página inicial com períodos por bloco, NPS de passageiros e motoristas, engajamento e comparativos; Mapa de engajamento com os indicadores, faixas, régua, filtros e ações da Machine (sem mapa, como na Machine).
+- Testes: `painel/test/painel-inicial.test.ts` e `painel/test/engajamento.test.ts`.

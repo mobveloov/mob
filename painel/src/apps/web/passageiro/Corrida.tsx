@@ -179,7 +179,7 @@ const ETAPA: Record<string, string> = { a_caminho: "Motorista a caminho", no_loc
 export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou }: {
   corrida: Corrida; pos: Posicao | null; marca: MarcaApp; naoLidas: number; abrirChat: () => void; mudou: (c: Corrida) => void;
 }) {
-  const [escuro, setEscuro] = useState(() => matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  const [escuro, setEscuro] = useState(false); // mapa claro por padrão, como na referência; o botão do topo troca
   const [centralizar, setCentralizar] = useState(0);
   const [folga, setFolga] = useState(300);
   const [janela, setJanela] = useState<"" | "cancelar" | "rota" | "sos">("");
@@ -215,7 +215,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota(c)} carro={pos} escuro={escuro} centralizar={centralizar} folga={folga} linha={false} />
+      <Mapa pontos={pontosDaRota(c)} carro={pos} escuro={escuro} centralizar={centralizar} folga={folga} />
       <header className="topo-marca arredondado">
         <button className="icone-botao" aria-label={escuro ? "Mapa claro" : "Mapa escuro"} onClick={() => setEscuro(!escuro)}>{escuro ? <Sun size={24} /> : <Moon size={24} />}</button>
         <div className="topo-titulo"><strong>Acompanhar viagem</strong></div>
@@ -296,7 +296,7 @@ function EditarRota({ corrida: c, fechar, mudou }: { corrida: Corrida; fechar: (
     if (qual === "destino") setDestino({ texto }); else setParadas((l) => l.map((p, i) => (i === qual ? { texto } : p)));
     clearTimeout(tempo.current);
     if (texto.trim().length < 3) { setSugestoes([]); return; }
-    tempo.current = setTimeout(() => void api<{ enderecos: Endereco[] }>(`/enderecos?q=${encodeURIComponent(texto)}`).then((r) => setSugestoes(r.enderecos)).catch(() => setSugestoes([])), 350);
+    tempo.current = setTimeout(() => void api<{ enderecos: Endereco[] }>(`/enderecos?q=${encodeURIComponent(texto)}${c.embarque.lat != null ? `&lat=${c.embarque.lat}&lng=${c.embarque.lng}` : ""}`).then((r) => setSugestoes(r.enderecos)).catch(() => setSugestoes([])), 350);
   };
   const escolher = (s: Endereco) => {
     const p = { texto: s.texto, lat: s.lat, lng: s.lng };

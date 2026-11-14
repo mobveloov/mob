@@ -7,11 +7,12 @@ export const VERSAO = "2.0";
 
 export type Tema = "sistema" | "claro" | "escuro";
 export type Navegador = "google" | "waze";
+export type Sons = "padrao" | "sirene" | "campainha";
 export interface Ajustes {
-  tema: Tema; navegador: Navegador; prioritarias: boolean; vibrar: boolean; insistente: boolean; voz: boolean; volume: boolean; esconderGanhos: boolean;
+  tema: Tema; navegador: Navegador; prioritarias: boolean; flutuante: boolean; vibrar: boolean; insistente: boolean; voz: boolean; sons: Sons; volume: boolean; esconderGanhos: boolean;
 }
 
-const PADRAO: Ajustes = { tema: "sistema", navegador: "google", prioritarias: true, vibrar: true, insistente: true, voz: true, volume: true, esconderGanhos: false };
+const PADRAO: Ajustes = { tema: "sistema", navegador: "google", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "padrao", volume: true, esconderGanhos: false };
 const CHAVE = "motorista-ajustes";
 
 function carregar(): Ajustes {
@@ -46,6 +47,10 @@ if (typeof matchMedia !== "undefined") matchMedia("(prefers-color-scheme: dark)"
 
 export const NOMES_TEMA: Record<Tema, string> = { sistema: "Sistema", claro: "Claro", escuro: "Escuro" };
 export const NOMES_NAVEGADOR: Record<Navegador, string> = { google: "Google Maps", waze: "Waze" };
+export const NOMES_SONS: Record<Sons, string> = { padrao: "Padrão", sirene: "Sirene", campainha: "Campainha" };
+const TONS: Record<Sons, { f: [number, number]; onda: OscillatorType; passo: number }> = {
+  padrao: { f: [880, 660], onda: "sine", passo: 0.35 }, sirene: { f: [960, 720], onda: "square", passo: 0.5 }, campainha: { f: [1320, 990], onda: "triangle", passo: 0.25 },
+};
 
 /** Link para navegar até o ponto no navegador escolhido. */
 export function linkNavegar(p: Ponto) {
@@ -61,10 +66,11 @@ export function tocar(vezes = 3) {
   try {
     const ctx = new AudioContext();
     const alto = atual.volume ? 0.9 : 0.25;
+    const tom = TONS[atual.sons] ?? TONS.padrao;
     for (let i = 0; i < vezes; i++) {
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.frequency.value = i % 2 ? 660 : 880; o.connect(g); g.connect(ctx.destination);
-      const t = ctx.currentTime + i * 0.35;
+      o.type = tom.onda; o.frequency.value = tom.f[i % 2]; o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime + i * tom.passo;
       g.gain.setValueAtTime(alto, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
       o.start(t); o.stop(t + 0.3);
     }

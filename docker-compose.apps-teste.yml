@@ -27,9 +27,12 @@ services:
       # Teste: o código de login aparece no app e no log (sem WhatsApp configurado). NUNCA em produção.
       NODE_ENV: teste
       APPS_MOSTRAR_CODIGO: "1"
+      # Endereços do CNEFE (pasta com <UF>.tsv.gz). Sem a pasta, a busca cai no OpenStreetMap.
+      CNEFE_DIR: /cnefe
     volumes:
       - apps-teste-dados:/dados
       - apps-teste-banco:/banco
+      - ${CNEFE_PASTA:-./sem-cnefe}:/cnefe:ro
     restart: unless-stopped
 
   tunel:

@@ -80,7 +80,7 @@ export const api = {
   sessao: () => pedir<Sessao>("/api/sessao"),
   corridas: (f: Filtro) => pedir<RespostaCorridas>(`/api/corridas?${q(f)}`),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  indicadores: (periodo: string, cidade: string, inicio?: string, fim?: string) => pedir<{ avisos: string[]; cidades: string[]; indicadores: any }>(`/api/indicadores?${new URLSearchParams({ periodo, cidade, ...(inicio ? { inicio } : {}), ...(fim ? { fim } : {}) })}`),
+  indicadores: (p: { periodo: string; cidade: string; inicio?: string; fim?: string; nps?: string; npsInicio?: string; npsFim?: string; serie?: string; serieInicio?: string; serieFim?: string }) => pedir<{ avisos: string[]; cidades: string[]; rotuloAnterior: string; indicadores: any; metricas: any; comparativos: any }>(`/api/indicadores?${new URLSearchParams(Object.entries(p).filter(([, v]) => v) as [string, string][])}`),
   salvarConta: (d: { nome: string; email: string; telefone: string }) => pedir<{ ok: boolean; usuario: Sessao["usuario"] }>("/api/conta", json("PUT", d)),
   trocarSenha: (d: { atual: string; nova: string; confirmar: string }) => pedir<{ ok: boolean }>("/api/conta/senha", json("POST", d)),
   estatisticas: (f: Filtro) => pedir<{ avisos: string[]; stats: any }>(`/api/estatisticas?${q(f)}`),

@@ -209,6 +209,19 @@ rotasV2.get("/foto/:papel/:chave", ok((req, res) => {
 
 // ---------------------------------------------------------------- configurações que os apps leem
 
+/** Cupons ativos e dentro da validade, para a tela "Meus Cupons" do passageiro. */
+rotasV2.get("/cupons", so("passageiro"), ok((req, res) => {
+  const hoje = agoraBr().toISOString().slice(0, 10);
+  const lista = listar(ctx(req).empresaId, cadastroPorId("cupons")!)
+    .filter((c) => c.ativo === true && !(c.inicio && String(c.inicio) > hoje) && !(c.fim && String(c.fim) < hoje))
+    .map((c) => ({
+      codigo: String(c.codigo ?? ""), tipo: c.tipoDesconto === "Valor fixo" ? "valor" : "percentual", valor: Number(c.valor) || 0,
+      maximo: typeof c.valorMaximo === "number" && c.valorMaximo > 0 ? c.valorMaximo : null,
+      ate: c.fim ? String(c.fim) : null, categorias: String(c.categorias ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+    }))
+    .filter((c) => c.codigo);
+  res.json({ cupons: lista });
+}));
 rotasV2.get("/opcionais", ok((req, res) => res.json({ opcionais: ajustes(ctx(req).empresaId).opcionais })));
 rotasV2.get("/motivos-cancelamento", ok((req, res) => {
   const a = ajustes(ctx(req).empresaId);

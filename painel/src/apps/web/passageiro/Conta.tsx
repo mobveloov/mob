@@ -2,11 +2,14 @@
 // Também a lista de corridas agendadas.
 
 import { useEffect, useState, type ReactNode } from "react";
+import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
 import { api, reais, telefoneBonito } from "../comum/api";
 import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../comum/ui";
-import { compartilharTexto, dataCurta, quandoAgendada, type Eu, type Perfil } from "./apoio";
+import { compartilharTexto, dataCurta, prepararFoto, quandoAgendada, type Eu, type Perfil } from "./apoio";
+import { GENEROS } from "./Entrar";
+import { Avatar, Campo } from "./pecas";
 
-type Tela = "" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
+type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
 
 function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => void; children: ReactNode }) {
   return (
@@ -18,48 +21,152 @@ function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => vo
   );
 }
 
-export function Conta({ eu, marca, sair }: { eu: Eu; marca: MarcaApp; sair: () => void }) {
+export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: MarcaApp; sair: () => void; irPara: (a: "historico" | "carteira" | "agendadas") => void; mudouEu?: () => void }) {
   const [tela, setTela] = useState<Tela>("");
   const [perfil, setPerfil] = useState<Perfil | null>(null);
-  const [email, setEmail] = useState("");
-  const [erro, setErro] = useState("");
-  const [ok, setOk] = useState("");
+  const [saldo, setSaldo] = useState<number | null>(null);
   const temAjuda = !!(marca.suporte.email || marca.suporte.telefone);
-  const carregar = () => api<Perfil>("/perfil").then((p) => { setPerfil(p); setEmail(p.email ?? ""); }).catch((e) => setErro(mensagemDeErro(e)));
-  useEffect(() => { void carregar(); }, []);
+  const carregar = () => {
+    void api<Perfil>("/perfil").then(setPerfil).catch(() => undefined);
+    void api<{ saldo: number }>("/carteira").then((r) => setSaldo(r.saldo)).catch(() => undefined);
+  };
+  useEffect(() => { carregar(); }, []);
 
-  const voltar = () => { setTela(""); void carregar(); };
+  const voltar = () => { setTela(""); carregar(); };
+  if (tela === "perfil") return <EditarPerfil eu={eu} voltar={voltar} salvou={() => { mudouEu?.(); voltar(); }} />;
+  if (tela === "cupons") return <Voltar titulo="Meus Cupons" voltar={voltar}><Cupons /></Voltar>;
+  if (tela === "cartoes") return <Voltar titulo="Meus Cartões" voltar={voltar}><Cartoes /></Voltar>;
   if (tela === "favoritos") return <Voltar titulo="Motoristas favoritos e bloqueados" voltar={voltar}><Favoritos /></Voltar>;
   if (tela === "carteira") return <Voltar titulo="Carteira" voltar={voltar}><Carteira /></Voltar>;
   if (tela === "indique" && perfil) return <Voltar titulo="Indique e ganhe" voltar={voltar}><Indique perfil={perfil} marca={marca} mudou={setPerfil} /></Voltar>;
   if (tela === "avisos") return <Voltar titulo="Notificações" voltar={voltar}><Avisos /></Voltar>;
   if (tela === "ajuda") return <Voltar titulo="Ajuda" voltar={voltar}><Ajuda marca={marca} /></Voltar>;
 
-  const salvarEmail = async () => {
-    setErro(""); setOk("");
-    try { const p = await api<Perfil>("/perfil", { corpo: { email: email.trim() } }); setPerfil((a) => ({ ...a, ...p })); setOk("E-mail salvo."); } catch (e) { setErro(mensagemDeErro(e)); }
-  };
-
   return (
-    <div className="tela">
-      <h1>Conta</h1>
+    <div className="minha-conta">
+      <div className="conta-topo"><strong>Minha Conta</strong></div>
+      <div className="conta-perfil">
+        <span className="conta-foto"><Avatar foto={eu.foto} nome={eu.nome} tamanho={104} /></span>
+        <h2>{eu.nome.split(" ")[0] || "Sem nome"}</h2>
+        <small>{eu.telefone}</small>
+        <button className="botao-claro" onClick={() => setTela("perfil")}><Pencil size={16} /> Editar Perfil</button>
+      </div>
+      <section className="conta-carteira">
+        <div><Wallet size={26} /><strong>Carteira</strong><button onClick={() => irPara("carteira")}>Ver extrato ›</button></div>
+        <small>Saldo disponível</small>
+        <strong className="conta-saldo">{saldo != null ? reais(saldo) : "—"}</strong>
+      </section>
+      <h3 className="conta-secao">FINANCEIRO</h3>
+      <div className="conta-grupo">
+        <ItemConta icone={<CreditCard size={22} />} cor="azul" titulo="Meus Cartões" sub="Gerencie seus cartões" ir={() => setTela("cartoes")} />
+        <ItemConta icone={<Megaphone size={22} />} cor="laranja" titulo="Indique e Ganhe" sub="Convide amigos e ganhe bônus" ir={() => setTela("indique")} />
+        <ItemConta icone={<Tag size={22} />} cor="roxo" titulo="Meus Cupons" sub="Descontos exclusivos para você" ir={() => setTela("cupons")} />
+      </div>
+      <h3 className="conta-secao">MINHAS ATIVIDADES</h3>
+      <div className="conta-grupo">
+        <ItemConta icone={<History size={22} />} cor="azul" titulo="Histórico de Corridas" sub="Veja suas viagens anteriores" ir={() => irPara("historico")} />
+        <ItemConta icone={<CalendarDays size={22} />} cor="verde" titulo="Agendamentos" sub="Suas viagens agendadas" ir={() => irPara("agendadas")} />
+        <ItemConta icone={<Star size={22} />} cor="amarelo" titulo="Motoristas Favoritos" sub="Seus motoristas preferidos" ir={() => setTela("favoritos")} />
+        <ItemConta icone={<Bell size={22} />} cor="roxo" titulo="Notificações" sub="Avisos da central" ir={() => setTela("avisos")} />
+      </div>
+      <h3 className="conta-secao">CONTA</h3>
+      <div className="conta-grupo">
+        {temAjuda && <ItemConta icone={<Headphones size={22} />} cor="verde" titulo="Central de Ajuda" sub="Suporte e dúvidas frequentes" ir={() => setTela("ajuda")} />}
+        <ItemConta icone={<LogOut size={22} />} cor="vermelho" titulo="Sair da conta" sub="Encerrar sessão" ir={sair} />
+      </div>
+    </div>
+  );
+}
+
+function ItemConta({ icone, cor, titulo, sub, ir }: { icone: ReactNode; cor: string; titulo: string; sub?: string; ir: () => void }) {
+  return (
+    <button className="conta-item" onClick={ir}>
+      <span className={`conta-icone ${cor}`}>{icone}</span>
+      <span className="conta-texto"><strong>{titulo}</strong>{sub && <small>{sub}</small>}</span>
+      <ChevronRight size={18} className="conta-seta" />
+    </button>
+  );
+}
+
+interface CupomLista { codigo: string; tipo: "valor" | "percentual"; valor: number; maximo: number | null; ate: string | null; categorias: string[] }
+
+/** Meus Cupons: os cupons ativos da empresa; tocar copia o código para usar em "Clique para descontos". */
+function Cupons() {
+  const [lista, setLista] = useState<CupomLista[] | null>(null);
+  const [copiado, setCopiado] = useState("");
+  useEffect(() => { void api<{ cupons: CupomLista[] }>("/cupons").then((r) => setLista(r.cupons)).catch(() => setLista([])); }, []);
+  if (!lista) return <Carregando />;
+  if (!lista.length) return <div className="vazio"><strong>Nenhum cupom por aqui</strong><p>Quando houver descontos para você, eles aparecem nesta tela.</p></div>;
+  const copiar = (c: string) => { void navigator.clipboard?.writeText(c).catch(() => undefined); setCopiado(c); };
+  return <>{lista.map((c) => (
+    <Cartao key={c.codigo}>
+      <strong className="cupom-codigo">{c.codigo}</strong>
+      <span>{c.tipo === "valor" ? `${reais(c.valor)} de desconto` : `${c.valor}% de desconto${c.maximo ? ` (até ${reais(c.maximo)})` : ""}`}</span>
+      <small className="dica">{[c.categorias.length ? `Para ${c.categorias.join(", ")}` : "", c.ate ? `Válido até ${c.ate.split("-").reverse().join("/")}` : ""].filter(Boolean).join(" · ")}</small>
+      <button className="botao-claro" onClick={() => copiar(c.codigo)}>{copiado === c.codigo ? "Código copiado" : "Copiar código"}</button>
+    </Cartao>
+  ))}<p className="dica">Para usar, escolha "Clique para descontos" na hora de pedir e digite o código.</p></>;
+}
+
+/** Meus Cartões: hoje o app não guarda cartões; mostra as formas de pagamento que existem. */
+function Cartoes() {
+  return (
+    <>
       <Cartao>
-        <dl className="dados"><dt>Nome</dt><dd>{eu.nome}</dd><dt>Celular</dt><dd>{telefoneBonito(eu.telefone)}</dd></dl>
-        <form className="parada" onSubmit={(e) => { e.preventDefault(); void salvarEmail(); }}>
-          <label>E-mail<input type="email" inputMode="email" autoComplete="email" value={email} maxLength={120} placeholder="voce@exemplo.com" onChange={(e) => setEmail(e.target.value)} /></label>
-          <button className="botao secundario remover" disabled={!perfil || email.trim() === (perfil.email ?? "")}>Salvar</button>
-        </form>
-        <Aviso texto={ok} tipo="ok" />
+        <strong>Cartões salvos no app</strong>
+        <p className="dica" style={{ margin: 0 }}>Ainda não é possível salvar cartão no app. Você paga no dinheiro, no Pix, no cartão na maquininha do motorista ou com o saldo da carteira.</p>
+      </Cartao>
+    </>
+  );
+}
+
+/** Editar Perfil: foto, nome completo, e-mail, telefone (só leitura), gênero e troca de senha. */
+function EditarPerfil({ eu, voltar, salvou }: { eu: Eu; voltar: () => void; salvou: () => void }) {
+  const [nome, setNome] = useState(eu.nome);
+  const [email, setEmail] = useState(eu.email ?? "");
+  const [genero, setGenero] = useState(eu.genero ?? "");
+  const [foto, setFoto] = useState(eu.foto ?? null);
+  const [senha, setSenha] = useState(false);
+  const [atual, setAtual] = useState("");
+  const [nova, setNova] = useState("");
+  const [erro, setErro] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  useEffect(() => { void api<Perfil>("/perfil").then((p) => setEmail((e) => e || p.email || "")).catch(() => undefined); }, []);
+
+  const trocarFoto = async (f: File | undefined) => {
+    if (!f) return;
+    setErro("");
+    try { await api("/foto", { bruto: await prepararFoto(f) }); const r = await api<{ eu: Eu }>("/eu"); setFoto(r.eu.foto ?? null); } catch (e) { setErro(mensagemDeErro(e)); }
+  };
+  const salvar = async () => {
+    setErro(""); setOcupado(true);
+    try {
+      await api("/eu", { corpo: { nome: nome.trim(), ...(genero ? { genero } : {}) } });
+      await api("/perfil", { corpo: { email: email.trim() } });
+      if (senha && nova) await api("/conta/senha", { corpo: { atual, nova } });
+      salvou();
+    } catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
+  };
+  return (
+    <div className="tela-cheia clara editar-perfil">
+      <header className="topo-marca"><button className="icone-botao" onClick={voltar} aria-label="Voltar"><ArrowLeft size={22} /></button><strong>Editar Perfil</strong><span /></header>
+      <div className="conteudo">
+        <label className="perfil-foto"><Avatar foto={foto} nome={nome} tamanho={120} /><span className="foto-camera"><Camera size={18} /></span>
+          <input type="file" accept="image/*" hidden onChange={(e) => void trocarFoto(e.target.files?.[0])} /></label>
+        <Campo rotulo="Nome Completo" icone={<UserRound size={20} />}><input value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></Campo>
+        <Campo rotulo="E-mail" icone={<Mail size={20} />}><input type="email" inputMode="email" value={email} maxLength={120} onChange={(e) => setEmail(e.target.value)} /></Campo>
+        <Campo rotulo="Telefone" icone={<Phone size={20} />} travado><input value={eu.telefone} readOnly /></Campo>
+        <Campo rotulo="Gênero" icone={<Users size={20} />}>
+          <select value={genero} onChange={(e) => setGenero(e.target.value)}><option value="" disabled>Selecione</option>{GENEROS.map((g) => <option key={g}>{g}</option>)}</select>
+        </Campo>
+        <ItemConta icone={<Lock size={20} />} cor="azul" titulo="Alterar senha de acesso" ir={() => setSenha(!senha)} />
+        {senha && <>
+          <Campo rotulo="Senha atual" icone={<Lock size={20} />}><input type="password" autoComplete="current-password" value={atual} onChange={(e) => setAtual(e.target.value)} /></Campo>
+          <Campo rotulo="Nova senha (mínimo 6)" icone={<Lock size={20} />}><input type="password" autoComplete="new-password" value={nova} onChange={(e) => setNova(e.target.value)} /></Campo>
+        </>}
         <Aviso texto={erro} />
-      </Cartao>
-      <Cartao className="menu">
-        <button onClick={() => setTela("carteira")}>Carteira <small>saldo e extrato ›</small></button>
-        <button onClick={() => setTela("favoritos")}>Motoristas favoritos e bloqueados <small>›</small></button>
-        <button onClick={() => setTela("indique")} disabled={!perfil}>Indique e ganhe <small>›</small></button>
-        <button onClick={() => setTela("avisos")}>Notificações <small>›</small></button>
-        {temAjuda && <button onClick={() => setTela("ajuda")}>Ajuda <small>›</small></button>}
-      </Cartao>
-      <button className="botao secundario" onClick={sair}>Sair</button>
+        <button className="botao largo" disabled={ocupado || nome.trim().length < 2} onClick={() => void salvar()}>{ocupado ? "SALVANDO…" : "SALVAR ALTERAÇÕES"}</button>
+      </div>
     </div>
   );
 }
@@ -97,22 +204,29 @@ function Favoritos() {
   );
 }
 
+/** Aba Carteira: "Sua Carteira" com o cartão preto de saldo e o histórico de movimentações. */
+export function CarteiraTela() {
+  return <div className="tela tela-carteira"><h1 className="titulo-tela">Sua Carteira</h1><Carteira /></div>;
+}
+
 function Carteira() {
   const [dados, setDados] = useState<{ saldo: number; extrato: Array<{ valor: number; descricao: string; em: string }>; recarga: string } | null>(null);
   const [erro, setErro] = useState("");
+  const [recarga, setRecarga] = useState(false);
   useEffect(() => { void api<NonNullable<typeof dados>>("/carteira").then(setDados).catch((e) => setErro(mensagemDeErro(e))); }, []);
   if (!dados) return erro ? <Aviso texto={erro} /> : <Carregando />;
   return (
     <>
-      <Cartao className="centro">
-        <span className="dica">Seu saldo</span>
-        <span className="numero-grande">{reais(dados.saldo)}</span>
-        <p className="dica">Na hora de pedir, escolha “Saldo da carteira” para pagar com ele.</p>
-      </Cartao>
-      {dados.recarga && <Aviso texto={dados.recarga} tipo="info" />}
+      <section className="cartao-saldo">
+        <small>Saldo Disponível</small>
+        <strong>{reais(dados.saldo)}</strong>
+        <button className="botao-saldo" onClick={() => setRecarga(!recarga)}>+ Adicionar Saldo</button>
+        <p>Na hora de pedir, escolha “Saldo da carteira” para pagar com ele.</p>
+      </section>
+      {recarga && <Aviso texto={dados.recarga || "Para pôr saldo, fale com a central."} tipo="info" />}
+      <h2 className="secao-titulo">Histórico de Movimentações</h2>
       <Cartao>
-        <h2>Extrato</h2>
-        {!dados.extrato.length && <p className="dica">Nenhuma movimentação ainda.</p>}
+        {!dados.extrato.length && <div className="vazio"><strong>Sem movimentações</strong><p>Seu histórico de transações está limpo.</p></div>}
         <ul className="lista">{dados.extrato.map((x, i) => (
           <li key={i}>
             <span>{x.descricao}<br /><small className="dica">{dataCurta(x.em)}</small></span>
