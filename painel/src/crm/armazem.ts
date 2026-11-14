@@ -24,10 +24,10 @@ function pasta(empresaId: string) {
   if (!D.idValido(empresaId)) throw new Error("Empresa inválida.");
   return path.join(D.raiz(), "empresas", empresaId, "crm");
 }
-function ler<T>(empresaId: string, nome: string, padrao: T): T {
+export function ler<T>(empresaId: string, nome: string, padrao: T): T {
   try { return JSON.parse(fs.readFileSync(path.join(pasta(empresaId), nome), "utf8")) as T; } catch { return padrao; }
 }
-function gravar(empresaId: string, nome: string, valor: unknown) {
+export function gravar(empresaId: string, nome: string, valor: unknown) {
   const arq = path.join(pasta(empresaId), nome);
   fs.mkdirSync(path.dirname(arq), { recursive: true });
   const tmp = `${arq}.${process.pid}.tmp`;

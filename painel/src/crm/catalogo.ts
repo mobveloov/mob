@@ -88,3 +88,44 @@ export const MODELOS_TEMPLATE: ModeloTemplate[] = [
   t('chuva', 'Dia de chuva', 'strategic', 'Chovendo aí? ☔', 'Não se molhe: peça um carro e chegue sequinho.'),
 ];
 
+
+// ── Tipos de gatilho (aba Gatilhos) ──
+// Mesmos eventos do sistema de referência; sem a Machine: os eventos vêm das corridas e do cadastro do próprio painel.
+
+export interface InfoTipoGatilho {
+  value: string;
+  label: string;
+  group: "App do passageiro" | "Status da corrida" | "Tempo" | "Bot / WhatsApp" | "Legado";
+  description: string;
+  defaultDelaySeconds?: number;
+  transactional?: boolean;
+  source: "cadastro" | "status" | "tempo" | "bot" | "nenhum";
+}
+
+export const TIPOS_GATILHO: InfoTipoGatilho[] = [
+  { value: "new_passenger", label: "Cadastrou no app (novo passageiro)", group: "App do passageiro", source: "cadastro", description: "Boas-vindas logo após o cadastro do passageiro." },
+  { value: "simulated_no_request", label: "Simulou e não pediu (carrinho abandonado)", group: "App do passageiro", source: "cadastro", defaultDelaySeconds: 600, description: "Fez estimativa no app e não abriu corrida no prazo. Cancela sozinho se ele pedir antes." },
+  { value: "simulated_and_requested", label: "Simulou e pediu (quase-cliente)", group: "App do passageiro", source: "cadastro", description: "Abriu corrida até 1h depois de simular. Bom para reforçar confiança." },
+  { value: "simulated", label: "Simulou (toda estimativa)", group: "App do passageiro", source: "cadastro", description: "Cada estimativa feita no app. Use com intervalo por contato para não exagerar." },
+  { value: "ride_requested", label: "Abriu corrida (pedido feito)", group: "Status da corrida", source: "status", transactional: true, description: "Primeiro aviso de corrida procurando motorista, ou abertura no app." },
+  { value: "ride_accepted", label: "Aceita pelo condutor", group: "Status da corrida", source: "status", transactional: true, description: "O motorista aceitou e está a caminho." },
+  { value: "ride_driver_arrived", label: "Condutor chegou ao local", group: "Status da corrida", source: "status", transactional: true, description: "O motorista chegou ao embarque." },
+  { value: "ride_in_progress", label: "Em andamento", group: "Status da corrida", source: "status", transactional: true, description: "A corrida começou." },
+  { value: "ride_completed", label: "Finalizada", group: "Status da corrida", source: "status", transactional: true, description: "Corrida finalizada. Dispara uma única vez por corrida." },
+  { value: "ride_canceled", label: "Cancelada", group: "Status da corrida", source: "status", defaultDelaySeconds: 180, description: "Corrida cancelada. Não sai se ele pedir outra antes." },
+  { value: "ride_not_served", label: "Não atendida (sem condutor)", group: "Status da corrida", source: "status", defaultDelaySeconds: 30, description: "Nenhum motorista atendeu. Pedido de desculpas; não sai se outra corrida for aceita." },
+  { value: "inactive_passenger", label: "Passageiro inativo (X dias sem corrida)", group: "Tempo", source: "tempo", description: "Uma vez por período de inatividade, dentro da janela de envio." },
+  { value: "inactivity_recurring", label: "Inatividade recorrente (7/15/30 dias)", group: "Tempo", source: "tempo", description: "Mesmo motor do inativo; útil para criar uma régua com vários gatilhos." },
+  { value: "incomplete_signup", label: "Cadastrou e não fez a 1ª corrida", group: "Tempo", source: "tempo", description: "X horas depois do cadastro sem nenhuma corrida." },
+  { value: "birthday", label: "Aniversário do passageiro", group: "Tempo", source: "tempo", description: "No dia do aniversário (campo do cadastro), a partir da hora escolhida. 1x por ano." },
+  { value: "ride_canceled_no_car", label: "Motorista cancelou (corrida do bot)", group: "Bot / WhatsApp", source: "bot", description: "Corrida pedida pelo WhatsApp em que o motorista cancelou e o sistema busca outro." },
+  { value: "plan_expiring", label: "Plano vencendo (não usado)", group: "Legado", source: "nenhum", description: "Sem evento de origem. Mantido só para gatilhos antigos." },
+  { value: "custom", label: "Personalizado (não usado)", group: "Legado", source: "nenhum", description: "Sem evento de origem. Mantido só para gatilhos antigos." },
+];
+
+export const infoGatilho = (v: string) => TIPOS_GATILHO.find((t) => t.value === v);
+
+/** Origem do envio, como aparece em Notificações. */
+export const ROTULOS_ORIGEM: Record<string, string> = {
+  campaign: "Campanha", trigger: "Gatilho", journey: "Jornada", manual: "Manual", behavior: "Comportamental", automation: "Automação", regua: "Régua de reativação",
+};

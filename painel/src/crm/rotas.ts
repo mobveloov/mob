@@ -19,8 +19,12 @@ import { aplicarRegras, destinatarios, opcoes, publico, sanearRegras, selecionar
 import { VARIAVEIS, type Campanha, type Jornada, type Lista } from "./tipos.ts";
 import { caixaSimulada, provedorDaEmpresa } from "./whatsapp.ts";
 
+import automacao from "./rotas-automacao.ts";
+
 export const router = express.Router();
 export default router;
+// Gatilhos, Fila de Dispatches, Régua, Notificações e limites de envio ficam em rotas-automacao.ts.
+router.use(automacao);
 
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
   try { await fn(req, res); } catch (e) {

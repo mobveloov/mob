@@ -17,6 +17,7 @@ import path from "node:path";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { corridaVazia, type CorridaPainel, type GrupoStatus } from "../comum/corrida.ts";
 import { listar, mesclar, type Registro } from "../cadastros/armazem.ts";
+import { emitirEventoCrm, EVENTO_DO_STATUS } from "../crm/eventos.ts";
 import { filial as acharFilial, filialDe } from "../filiais/filiais.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
@@ -458,12 +459,25 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
     if (!n.semCadastro) mesclar(empresaId, cadastroPorId("clientes")!, [{ nome, telefone, status: "Ativo" }], por);
+    // Gatilhos do CRM: cadastro novo e pedido aberto.
+    if (!cliente && !n.semCadastro) emitirEventoCrm({ empresaId, tipo: "new_passenger", telefone, nome });
+    avisarCrm(empresaId, corrida);
     return corrida;
   });
 }
 
 /** Muda uma corrida com segurança (fila por empresa). Os apps usam para valor oferecido, rota editada, taxímetro etc. */
 export const alterarCorrida = (empresaId: string, id: string, fn: (c: CorridaPropria) => void): Promise<CorridaPropria> => alterar(empresaId, id, fn);
+
+/** Avisa os gatilhos do CRM que a corrida entrou neste status (pedido aberto, aceita, finalizada...). Nunca atrapalha a corrida. */
+function avisarCrm(empresaId: string, c: CorridaPropria) {
+  const tipo = EVENTO_DO_STATUS[c.status];
+  if (!tipo) return;
+  emitirEventoCrm({
+    empresaId, tipo, telefone: c.passageiro.telefone, nome: c.passageiro.nome,
+    vars: { os: c.os, valor: (c.valor ?? c.estimativa.valor) != null ? Number(c.valor ?? c.estimativa.valor).toFixed(2).replace(".", ",") : "", motorista: c.motorista ?? "" },
+  });
+}
 
 function alterar(empresaId: string, id: string, fn: (c: CorridaPropria) => void): Promise<CorridaPropria> {
   return emFila(empresaId, () => {
@@ -472,6 +486,7 @@ function alterar(empresaId: string, id: string, fn: (c: CorridaPropria) => void)
     const c = structuredClone(achada); // cópia: a lista da memória é só leitura
     fn(c);
     gravar(empresaId, [c]);
+    if (c.status !== achada.status) avisarCrm(empresaId, c);
     return c;
   });
 }

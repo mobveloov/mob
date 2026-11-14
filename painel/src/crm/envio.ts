@@ -9,6 +9,10 @@ import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
 import * as A from "./armazem.ts";
 import { conferirCupom } from "./cupons.ts";
+import { ligarEventos, processarAtrasados, rodarGatilhosDeTempo } from "./gatilhos.ts";
+import { voltaRegua } from "./regua.ts";
+import { dentroDaJanela, enviadosHoje, pausaGeral, tetoHoje } from "./limites.ts";
+import { registrar, type OrigemEnvio } from "./registro.ts";
 import { escolherVariacao, montarTexto } from "./mensagem.ts";
 import { aplicarRegras, destinatarios, publico, selecionar, telefoneWhatsApp } from "./publico.ts";
 import { reservar } from "./ritmo.ts";
@@ -159,7 +163,7 @@ export interface Opcoes {
   maxItens?: number;
 }
 
-export interface ResumoRodada { enviados: number; falhas: number; adiados: number; pausaAte: number | null; motivo: "vazia" | "pausa" | "limite" | "fim" }
+export interface ResumoRodada { enviados: number; falhas: number; adiados: number; pausaAte: number | null; motivo: "vazia" | "pausa" | "limite" | "fim" | "pausado" | "janela" | "teto" }
 
 const travas = new Map<string, Promise<ResumoRodada>>();
 
@@ -181,10 +185,14 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
   const provedor = o.provedor ?? provedorDaEmpresa(empresaId);
   const pausadas = new Set(A.campanhas(empresaId).filter((c) => c.estado === "pausada").map((c) => c.id));
   const r: ResumoRodada = { enviados: 0, falhas: 0, adiados: 0, pausaAte: null, motivo: "vazia" };
+  const real = provedor.nome === "evolution"; // o simulado não manda nada: horário e teto só valem para o WhatsApp de verdade
   for (let n = 0; n < maxItens; n++) {
     const t = agora();
     const item = A.proximaPendente(empresaId, t, pausadas);
     if (!item) { r.motivo = n ? "fim" : "vazia"; break; }
+    if (pausaGeral(empresaId).pausado) { r.motivo = "pausado"; break; }
+    if (real && !dentroDaJanela(empresaId)) { r.motivo = "janela"; break; }
+    if (real && enviadosHoje(empresaId, t) >= tetoHoje(empresaId, t)) { r.motivo = "teto"; break; }
     const res = reservar(cfg, A.ritmo(empresaId), t, o.sorteio);
     if (!res.ok) {
       if (res.motivo === "limite" && res.ate - t <= esperaMax) { await dormir(res.ate - t); n--; continue; }
@@ -199,6 +207,10 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
       if (envio.ok) { i.estado = "enviado"; i.enviadoEm = agora(); i.erro = ""; r.enviados++; }
       else if (envio.temporario && i.tentativas < MAX_TENTATIVAS) { i.proximaEm = agora() + ESPERA_ERRO_MS; i.erro = envio.erro; r.adiados++; }
       else { i.estado = "falha"; i.erro = envio.erro; i.enviadoEm = null; r.falhas++; }
+      if (i.estado === "enviado" || i.estado === "falha") {
+        const origem: OrigemEnvio = i.origem.tipo === "campanha" ? "campaign" : i.origem.tipo === "jornada" ? "journey" : "manual";
+        registrar(empresaId, { origem, origem_id: i.origem.id, estado: i.estado === "enviado" ? "sent" : "failed", telefone: i.telefone, nome: i.nome, previa: i.texto, erro: i.erro });
+      }
     });
     r.motivo = "fim";
   }
@@ -211,7 +223,9 @@ export async function enviarTeste(empresaId: string, telefone: string, texto: st
   const t = telefoneWhatsApp(telefone);
   if (!t) throw new Error("Telefone inválido. Use DDD + número.");
   if (!texto.trim()) throw new Error("Escreva a mensagem.");
-  return provedor.enviar(t, texto.trim());
+  const r = await provedor.enviar(t, texto.trim());
+  registrar(empresaId, { origem: "manual", estado: r.ok ? "sent" : "failed", telefone: t, nome: "Teste", previa: texto.trim(), erro: r.ok ? "" : r.erro });
+  return r;
 }
 
 export function resumoFila(empresaId: string, agora = Date.now()) {
@@ -244,11 +258,16 @@ export async function volta(empresaId: string) {
     try { await rodarJornada(empresaId, j); } catch (e) { console.error("[crm] jornada", empresaId, j.id, e instanceof Error ? e.message : e); }
   }
   await processarFila(empresaId);
+  // Gatilhos automáticos (fila com atraso e gatilhos por tempo) e régua de reativação.
+  try { await processarAtrasados(empresaId); } catch (e) { console.error("[crm] gatilhos", empresaId, e instanceof Error ? e.message : e); }
+  try { await rodarGatilhosDeTempo(empresaId); } catch (e) { console.error("[crm] gatilhos de tempo", empresaId, e instanceof Error ? e.message : e); }
+  try { await voltaRegua(empresaId); } catch (e) { console.error("[crm] régua", empresaId, e instanceof Error ? e.message : e); }
 }
 
 let relogio: NodeJS.Timeout | null = null;
 export function iniciarTrabalhador(intervaloMs = 15_000) {
   if (relogio) return;
+  ligarEventos();
   let ocupado = false;
   relogio = setInterval(async () => {
     if (ocupado) return;
