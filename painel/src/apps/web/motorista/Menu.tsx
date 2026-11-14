@@ -346,6 +346,7 @@ export function Configuracoes({ voltar }: Voltar) {
       <div className="config-divisor" />
       <div className="config-titulo">Áudio</div>
       <div className="config-grupo">
+        <Chave icone={Smartphone} ligado={a.manterTela} mudar={(v) => mudar({ manterTela: v })} titulo="Manter a tela ligada" texto="Evita que a tela apague enquanto você está online ou em corrida" />
         <Chave icone={Mic} ligado={a.voz} mudar={(v) => mudar({ voz: v })} titulo="Assistente de Voz (Co-piloto)" texto="Avisos por voz ao chegar perto do destino" />
         {linha(Music, "Pacote de Sons", undefined, NOMES_SONS[a.sons], () => setAbrir("sons"))}
         <Chave icone={Volume2} ligado={a.volume} mudar={(v) => mudar({ volume: v })} titulo="Volume Automático" texto="Ajustar volume da mídia ao tocar alarme" />

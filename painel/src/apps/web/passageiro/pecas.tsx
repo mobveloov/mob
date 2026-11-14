@@ -42,7 +42,14 @@ export function TituloGrande({ titulo, voltar }: { titulo: string; voltar?: () =
 export function FolhaBaixo({ children, resumo, aberta: inicial = true, fixa = false, className = "", aoMudarAltura }: {
   children?: ReactNode; resumo?: ReactNode; aberta?: boolean; fixa?: boolean; className?: string; aoMudarAltura?: (px: number) => void;
 }) {
-  const [aberta, setAberta] = useState(inicial);
+  // 3 alturas: 0 recolhida (só o resumo), 1 meio, 2 aberta. Toque na barrinha passa para a próxima; arrastar para cima sobe e para baixo desce.
+  // Lembra a última altura (por tipo de folha).
+  const chave = `folha-nivel-${className.split(" ")[0] || "padrao"}`;
+  const [nivel, setNivel] = useState<0 | 1 | 2>(() => {
+    if (fixa) return 2;
+    try { const n = Number(localStorage.getItem(chave)); if (n === 0 || n === 1 || n === 2) return n; } catch { /* sem armazenamento */ }
+    return inicial ? 2 : 0;
+  });
   const [arraste, setArraste] = useState(0);
   const inicio = useRef<number | null>(null);
   const caixa = useRef<HTMLDivElement>(null);
@@ -55,24 +62,24 @@ export function FolhaBaixo({ children, resumo, aberta: inicial = true, fixa = fa
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const ir = (n: number) => { if (fixa) return; const v = Math.max(0, Math.min(2, n)) as 0 | 1 | 2; setNivel(v); try { localStorage.setItem(chave, String(v)); } catch { /* sem armazenamento */ } };
   const soltar = () => {
     if (inicio.current == null) return;
-    if (!fixa && arraste > 50) setAberta(false);
-    else if (arraste < -30) setAberta(true);
+    if (arraste > 40) ir(nivel - 1); else if (arraste < -40) ir(nivel + 1); else if (Math.abs(arraste) < 6) ir(nivel === 2 ? 0 : nivel + 1);
     inicio.current = null; setArraste(0);
   };
   return (
-    <div ref={caixa} className={`folha ${aberta ? "aberta" : "recolhida"} ${className}`} style={arraste > 0 ? { transform: `translateY(${arraste}px)` } : undefined}>
-      <div className="puxador-area" role="button" tabIndex={0} aria-label={aberta ? "Recolher" : "Abrir"}
+    <div ref={caixa} className={`folha ${nivel === 2 ? "aberta" : nivel === 1 ? "meia" : "recolhida"} ${className}`}>
+      <div className="puxador-area" role="button" tabIndex={0} aria-label="Mudar a altura do painel" style={{ touchAction: "none" }}
         onPointerDown={(e) => { inicio.current = e.clientY; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
         onPointerMove={(e) => { if (inicio.current != null) setArraste(e.clientY - inicio.current); }}
-        onPointerUp={() => { if (Math.abs(arraste) < 6 && !fixa) setAberta((a) => !a); soltar(); }}
-        onPointerCancel={soltar}
-        onKeyDown={(e) => { if (e.key === "Enter" && !fixa) setAberta((a) => !a); }}>
+        onPointerUp={soltar}
+        onPointerCancel={() => { inicio.current = null; setArraste(0); }}
+        onKeyDown={(e) => { if (e.key === "Enter") ir(nivel === 2 ? 0 : nivel + 1); }}>
         <span className="puxador" />
       </div>
       {resumo}
-      {aberta && children}
+      {nivel > 0 && <div className={`folha-corpo n${nivel}`}>{children}</div>}
     </div>
   );
 }

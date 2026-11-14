@@ -18,8 +18,8 @@ import fs from "node:fs";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
-import { buscarEndereco, enderecoDoPonto, rota } from "../enderecos/index.ts";
-import { buscarFora, caminhoPelasRuas, pontoFora } from "../enderecos/externo.ts";
+import { buscarEndereco, casasPerto, enderecoDoPonto, rota } from "../enderecos/index.ts";
+import { buscarFora, caminhoPelasRuas, navegarPelasRuas, pontoFora } from "../enderecos/externo.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
@@ -201,12 +201,33 @@ r.get("/enderecos/ponto", ok(async (req, res) => {
   res.json({ endereco: enderecoDoPonto(ctx(req).empresaId, lat, lng) ?? await pontoFora(lat, lng) });
 }));
 
+// Número das casas em volta (base de endereços da empresa), para escrever no mapa quando o zoom é grande.
+r.get("/enderecos/casas", ok((req, res) => {
+  const lat = num(req.query.lat), lng = num(req.query.lng);
+  if (lat == null || lng == null) throw new Error("Posição inválida.");
+  res.json({ casas: casasPerto(ctx(req).empresaId, lat, lng, num(req.query.raio) ?? 120) });
+}));
+// Motoristas livres por perto (só tipo e posição), para o mapa de quem vai pedir.
+r.get("/motoristas-perto", so("passageiro"), ok((req, res) => {
+  const lat = num(req.query.lat), lng = num(req.query.lng);
+  if (lat == null || lng == null) throw new Error("Posição inválida.");
+  res.json({ motoristas: P.motoristasPerto(ctx(req).empresaId, lat, lng) });
+}));
+
 // Caminho pelas ruas para desenhar no mapa: ?pontos=lat,lng;lat,lng (de 2 a 6 pontos, na ordem).
 r.get("/rota", ok(async (req, res) => {
   const pts = String(req.query.pontos ?? "").split(";").slice(0, 6).map((p) => { const [a, b] = p.split(","); return { lat: Number(a), lng: Number(b) }; })
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   if (pts.length < 2) throw new Error("Informe pelo menos dois pontos.");
   res.json(await caminhoPelasRuas(pts));
+}));
+
+// Navegação passo a passo dentro do app: rota pelas ruas com a instrução de cada curva (?pontos=lat,lng;lat,lng).
+r.get("/navegacao", ok(async (req, res) => {
+  const pts = String(req.query.pontos ?? "").split(";").slice(0, 6).map((p) => { const [a, b] = p.split(","); return { lat: Number(a), lng: Number(b) }; })
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (pts.length < 2) throw new Error("Informe pelo menos dois pontos.");
+  res.json(await navegarPelasRuas(pts));
 }));
 
 r.get("/estimativa", ok(async (req, res) => {
@@ -302,7 +323,7 @@ r.post("/corridas/:id/cancelar", ok(async (req, res) => {
     if (!ANTES_DE_COMECAR.has(c.status)) throw new Error("Não dá para cancelar uma viagem em andamento. Fale com o motorista.");
     feita = await cancelarCorrida(empresaId, c.id, "Passageiro", motivo || "Cancelada pelo app", "app do passageiro");
   } else if (c.status === "a_caminho") {
-    feita = await P.desistir(empresaId, sessao.chave, c.id);
+    feita = await P.desistir(empresaId, sessao.chave, c.id, motivo);
   } else {
     feita = await cancelarCorrida(empresaId, c.id, "Motorista", motivo || "Cancelada pelo motorista", "app do motorista");
   }

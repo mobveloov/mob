@@ -61,3 +61,13 @@ test("nos testes, sem servidor configurado, a busca de fora não chama a interne
   assert.deepEqual(await buscarFora("Avenida Paulista 1000"), []);
   assert.equal(await pontoFora(-23.5, -46.6), null);
 });
+
+test("instruções de navegação em português a partir das manobras do OSRM", async () => {
+  const { textoDaManobra } = await import("../src/enderecos/externo.ts");
+  assert.equal(textoDaManobra("turn", "right", "Rua das Flores"), "Vire à direita na Rua das Flores");
+  assert.equal(textoDaManobra("turn", "slight left", ""), "Faça uma leve curva à esquerda");
+  assert.equal(textoDaManobra("turn", "uturn", ""), "Faça o retorno");
+  assert.equal(textoDaManobra("roundabout", "right", "Av. Brasil", 2), "Na rotatória, pegue a 2ª saída na Av. Brasil");
+  assert.equal(textoDaManobra("arrive", "", ""), "Você chegou ao destino");
+  assert.equal(textoDaManobra("new name", "straight", "Rua B"), "Siga em frente pela Rua B");
+});

@@ -360,6 +360,8 @@ rotasV2.post("/veiculos/:id/ativar", so("motorista"), ok((req, res) => res.json(
 rotasV2.post("/veiculos/:id/excluir", so("motorista"), ok((req, res) => res.json({ veiculos: excluirVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id", so("motorista"), ok((req, res) => res.json({ veiculos: salvarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}, req.params.id) })));
 
+rotasV2.get("/aceitacao", so("motorista"), ok((req, res) => res.json(P.taxaDeAceitacao(ctx(req).empresaId, ctx(req).sessao.chave))));
+
 /** Com ?periodo=mes|semana: ganhos completos da tela de histórico. Sem: o resumo simples (hoje, 7 e 30 dias). */
 rotasV2.get("/ganhos", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);

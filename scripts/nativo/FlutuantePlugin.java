@@ -3,6 +3,7 @@ package __PACOTE__;
 import android.content.Intent;
 import android.net.Uri;
 import android.provider.Settings;
+import android.view.WindowManager;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -16,6 +17,20 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  */
 @CapacitorPlugin(name = "Flutuante")
 public class FlutuantePlugin extends Plugin {
+
+    /** Mantém a tela ligada enquanto o app está aberto (online, em corrida). */
+    @PluginMethod
+    public void manterTela(final PluginCall call) {
+        final boolean ligar = Boolean.TRUE.equals(call.getBoolean("ligar", true));
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (ligar) getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                call.resolve();
+            }
+        });
+    }
 
     @PluginMethod
     public void permitido(PluginCall call) {

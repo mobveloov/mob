@@ -6,13 +6,13 @@ import type { Ponto } from "./tipos";
 export const VERSAO = "2.0";
 
 export type Tema = "sistema" | "claro" | "escuro";
-export type Navegador = "google" | "waze";
+export type Navegador = "nativo" | "google" | "waze";
 export type Sons = "padrao" | "sirene" | "campainha";
 export interface Ajustes {
-  tema: Tema; navegador: Navegador; prioritarias: boolean; flutuante: boolean; vibrar: boolean; insistente: boolean; voz: boolean; sons: Sons; volume: boolean; esconderGanhos: boolean;
+  tema: Tema; navegador: Navegador; prioritarias: boolean; flutuante: boolean; vibrar: boolean; insistente: boolean; voz: boolean; sons: Sons; volume: boolean; esconderGanhos: boolean; manterTela: boolean;
 }
 
-const PADRAO: Ajustes = { tema: "sistema", navegador: "google", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "padrao", volume: true, esconderGanhos: false };
+const PADRAO: Ajustes = { tema: "sistema", navegador: "nativo", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "padrao", volume: true, esconderGanhos: false, manterTela: true };
 const CHAVE = "motorista-ajustes";
 
 function carregar(): Ajustes {
@@ -46,7 +46,7 @@ export function aplicarTema() {
 if (typeof matchMedia !== "undefined") matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", aplicarTema);
 
 export const NOMES_TEMA: Record<Tema, string> = { sistema: "Sistema", claro: "Claro", escuro: "Escuro" };
-export const NOMES_NAVEGADOR: Record<Navegador, string> = { google: "Google Maps", waze: "Waze" };
+export const NOMES_NAVEGADOR: Record<Navegador, string> = { nativo: "GPS do app (passo a passo)", google: "Google Maps", waze: "Waze" };
 export const NOMES_SONS: Record<Sons, string> = { padrao: "Padrão", sirene: "Sirene", campainha: "Campainha" };
 const TONS: Record<Sons, { f: [number, number]; onda: OscillatorType; passo: number }> = {
   padrao: { f: [880, 660], onda: "sine", passo: 0.35 }, sirene: { f: [960, 720], onda: "square", passo: 0.5 }, campainha: { f: [1320, 990], onda: "triangle", passo: 0.25 },

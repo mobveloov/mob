@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LayoutGrid, LocateFixed, Power, SlidersHorizontal } from "lucide-react";
-import { api, ErroApi, flutuante, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
+import { api, ErroApi, flutuante, manterTelaLigada, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { ChatCorrida } from "./Conversa";
@@ -13,9 +13,10 @@ import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Mapa } from "./Mapa";
-import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, HistoricoGanhos, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
+import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
 import { BarraBaixo, Dialogo } from "./Pecas";
-import { Carteira, Desafios, Notificacoes, Preferencias } from "./Telas";
+import { Desafios, Notificacoes, Preferencias } from "./Telas";
+import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
 import { aplicarTema, useAjustes } from "./ajustes";
 import type { Corrida, Eu, Oferta } from "./tipos";
 
@@ -62,6 +63,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     setEu(e.eu); setCorrida(s.corrida); setOferta(s.oferta);
     if (onlineRef.current && !s.online) ultimoEnvio.current = 0; // servidor reiniciou: a próxima posição religa
   }, []);
+  useEffect(() => { void manterTelaLigada(ajustes.manterTela && (online || !!corrida)); return () => { void manterTelaLigada(false); }; }, [ajustes.manterTela, online, !!corrida]); // tela acesa online ou em corrida
   const carregarGanhos = useCallback(() => { void api<{ hoje: { valor: number } }>("/ganhos").then((g) => setHoje(g.hoje.valor)).catch(() => undefined); }, []);
   useEffect(() => { void carregar().catch(() => undefined); carregarGanhos(); }, [carregar, carregarGanhos]);
   useEffect(() => {
@@ -141,6 +143,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     try {
       if (contra) { await api(`/corridas/${oferta.corrida.id}/contraoferta`, { corpo: { valor } }); setOferta(null); setAviso("Contra-oferta enviada. Se o passageiro aceitar, a corrida vem para você."); return; }
       const r = await api<{ corrida: Corrida }>(`/ofertas/${oferta.id}/aceitar`, { corpo: {} });
+      tocarAlerta(1, "aceite");
       setCorrida(r.corrida.aberta ? r.corrida : null); setTerminada(null); setTela(""); setOferta(null);
     } catch (e) { setErroOferta(mensagemDeErro(e)); }
   };
@@ -167,7 +170,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const voltar = () => setTela("");
   const telas: Record<string, ReactNode> = {
     macaneta: <Macaneta voltar={voltar} posicao={posicao} aoAbrir={(c) => { setCorrida(c); setTela(""); }} />,
-    historico: <HistoricoGanhos voltar={voltar} />,
+    atividades: <Atividades voltar={voltar} eu={eu} irHistorico={() => setTela("historico")} irCarteira={() => setTela("carteira")} irAceitacao={() => setTela("aceitacao")} irDesafios={() => setTela("desafios")} />,
+    historico: <HistoricoDeGanhos voltar={() => setTela("atividades")} />,
+    aceitacao: <TaxaDeAceitacao voltar={() => setTela("atividades")} />,
     veiculos: <MeusVeiculos voltar={voltar} />,
     cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} irCarteira={() => setTela("carteira")} aoSairDaConta={() => { setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />,
     senha: <AlterarSenha voltar={voltar} />,
@@ -175,7 +180,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     diagnostico: <Diagnostico voltar={voltar} eu={eu} conectado={conectado} posicao={posicao} online={online} />,
     suporte: <Suporte voltar={voltar} marca={marca} />,
     fale: <FaleConosco voltar={voltar} marca={marca} />,
-    carteira: <Carteira voltar={() => setTela("cadastro")} />,
+    carteira: <CarteiraDoMotorista voltar={() => setTela("atividades")} />,
     preferencias: <Preferencias voltar={voltar} />,
     desafios: <Desafios voltar={voltar} marca={marca} />,
     notificacoes: <Notificacoes voltar={voltar} />,
@@ -204,7 +209,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         <button type="button" className="mapa-botao" aria-label="Menu" onClick={() => setMenu(true)}><LayoutGrid size={22} fill="currentColor" /></button>
         <span className="pilula-ganhos">
           <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
-          <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("historico")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
+          <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("atividades")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
         </span>
         <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>
       </div>

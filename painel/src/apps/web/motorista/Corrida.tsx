@@ -5,12 +5,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Ban, Banknote, ChevronRight, CircleAlert, Flag, LocateFixed, MessageCircle, Navigation, PackageSearch, Pencil, Phone, Plus, Search,
-  ShieldAlert, Star, Volume2, VolumeX, X,
+  ArrowUp, BadgeCheck, CornerUpLeft, CornerUpRight, Moon, ShieldAlert, Star, Sun, Undo2, Volume2, VolumeX, X,
 } from "lucide-react";
 import { api, reais, type Posicao } from "../comum/api";
 import { Estrelas, mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { falar, linkNavegar, useAjustes } from "./ajustes";
 import { Mapa, type PontoMapa } from "./Mapa";
+import { textoMetros, useNavegacao } from "./Navegacao";
 import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
 
@@ -45,8 +46,17 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   const [ocupado, setOcupado] = useState(false);
   const [parada, setParada] = useState(() => lerParada(c.id));
   const [folha, setFolha] = useState<"" | "rota" | "editar" | "perfil" | "finalizar" | "cancelar" | "sos">("");
-  const [recolhida, setRecolhida] = useState(false);
+  // Folha de baixo com 3 alturas: 0 recolhida (só o passageiro e o botão de deslizar), 1 meio, 2 aberta. Lembra a última.
+  const [nivel, setNivel] = useState<0 | 1 | 2>(() => { try { const n = Number(localStorage.getItem("folha-corrida-nivel")); return n === 0 || n === 1 || n === 2 ? n : 1; } catch { return 1; } });
+  const mudarNivel = (n: number) => { const v = Math.max(0, Math.min(2, n)) as 0 | 1 | 2; setNivel(v); try { localStorage.setItem("folha-corrida-nivel", String(v)); } catch { /* sem armazenamento */ } };
+  const arraste = useRef<number | null>(null);
   const [centro, setCentro] = useState(0);
+  const [temaMapa, setTemaMapa] = useState<"claro" | "escuro" | undefined>(() => { try { return (localStorage.getItem("tema-mapa-motorista") as "claro" | "escuro" | null) ?? undefined; } catch { return undefined; } });
+  const trocarTema = () => {
+    const atual = temaMapa ?? (document.documentElement.dataset.tema === "escuro" ? "escuro" : "claro");
+    const novo = atual === "escuro" ? "claro" : "escuro";
+    setTemaMapa(novo); try { localStorage.setItem("tema-mapa-motorista", novo); } catch { /* sem armazenamento */ }
+  };
   const avisado = useRef("");
   const paradas = c.paradas ?? [];
   const taximetro = ehTaximetro(c);
@@ -57,6 +67,10 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   const alvo: Ponto = !emViagem ? c.embarque : naParada ? paradas[parada] : c.destino ?? c.embarque;
   const nomeAlvo = !emViagem ? "LOCAL DE EMBARQUE" : naParada ? `PARADA ${parada + 1}` : c.destino ? "DESTINO" : "EMBARQUE";
   const longe = posicao && temPosicao(alvo) ? distanciaKm(posicao, alvo) : null;
+  // GPS do próprio app: instrução da próxima curva, rota pelas ruas, recálculo e voz.
+  const nativo = ajustes.navegador === "nativo";
+  const nav = useNavegacao(posicao, alvo, nativo, ajustes.voz);
+  const Seta = nav.passo?.modificador?.includes("left") ? CornerUpLeft : nav.passo?.modificador?.includes("right") ? CornerUpRight : nav.passo?.modificador === "uturn" ? Undo2 : nav.passo?.tipo === "arrive" ? Flag : ArrowUp;
 
   // Co-piloto de voz: avisa uma vez ao chegar perto do próximo ponto.
   useEffect(() => {
@@ -74,10 +88,13 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
     } catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
   };
   const passouParada = () => { const n = parada + 1; setParada(n); gravarParada(c.id, n); };
+  const [motivos, setMotivos] = useState<string[]>([]);
+  const [motivo, setMotivo] = useState("");
+  useEffect(() => { if (folha === "cancelar" && !motivos.length) void api<{ motivos: string[] }>("/motivos-cancelamento").then((r) => setMotivos(r.motivos)).catch(() => setMotivos(["Passageiro não apareceu", "Problema no veículo", "Outro motivo"])); }, [folha]); // eslint-disable-line react-hooks/exhaustive-deps
   const cancelar = async () => {
     const desistir = c.status === "a_caminho";
     try {
-      await api(`/corridas/${c.id}/cancelar`, { corpo: { motivo: "Cancelada pelo motorista" } });
+      await api(`/corridas/${c.id}/cancelar`, { corpo: { motivo: motivo || "Cancelada pelo motorista" } });
       gravarParada(c.id, null); mudou(null); avisar(desistir ? "Você desistiu da corrida." : "Corrida cancelada.");
     } catch (e) { setErro(mensagemDeErro(e)); }
     setFolha("");
@@ -100,8 +117,26 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
 
   return (
     <div className="em-corrida">
-      <Mapa pontos={pontos} caminho={viagem} ate={[posicao, alvo]} centralizar={centro} className="cheia" />
+      <Mapa pontos={pontos} caminho={viagem} ate={[posicao, alvo]} rotaNav={nativo ? nav.caminho : null} tema={temaMapa} centralizar={centro} className="cheia" />
 
+      {nativo ? (
+        <div className={`navegacao nav-app ${nav.fora ? "fora" : ""}`}>
+          <span className="navegacao-seta">{nav.carregando && !nav.disponivel ? <span className="girando" style={{ width: 22, height: 22, borderWidth: 2 }} /> : <Seta size={26} />}</span>
+          <div className="navegacao-texto">
+            {nav.passo ? <>
+              <span className="nav-dist">{nav.metros != null ? textoMetros(nav.metros) : "—"}</span>
+              <span className="nav-instrucao">{nav.fora ? "Recalculando a rota…" : nav.passo.texto}</span>
+              <small className="navegacao-resto">{nav.restamKm != null ? `${nav.restamKm.toFixed(1).replace(".", ",")} km · ${nav.restamMin} min até ${nomeAlvo.toLowerCase()}` : alvo.texto}</small>
+            </> : <>
+              <strong>{longe != null ? distanciaTexto(longe) : "—"}</strong>
+              <small>{nav.carregando ? "Calculando a rota…" : `Siga até ${nomeAlvo.toLowerCase()}: ${alvo.texto}`}</small>
+            </>}
+          </div>
+          <button type="button" className={`redondo ${ajustes.voz ? "" : "perigo"}`} aria-label={ajustes.voz ? "Silenciar a voz" : "Ligar a voz"} onClick={() => mudar({ voz: !ajustes.voz })}>
+            {ajustes.voz ? <Volume2 size={20} /> : <VolumeX size={20} />}
+          </button>
+        </div>
+      ) : (
       <div className="navegacao">
         <a className="navegacao-seta" href={linkNavegar(alvo)} target="_blank" rel="noreferrer" aria-label="Abrir navegação"><Navigation size={24} /></a>
         <a className="navegacao-texto" href={linkNavegar(alvo)} target="_blank" rel="noreferrer">
@@ -112,11 +147,16 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           {ajustes.voz ? <Volume2 size={20} /> : <VolumeX size={20} />}
         </button>
       </div>
+      )}
 
+      <button type="button" className="mapa-botao mapa-tema-corrida" aria-label="Trocar o tema do mapa" onClick={trocarTema}>{(temaMapa ?? (document.documentElement.dataset.tema === "escuro" ? "escuro" : "claro")) === "escuro" ? <Sun size={20} /> : <Moon size={20} />}</button>
       <button type="button" className="mapa-botao centralizar-corrida" aria-label="Centralizar o mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={20} /></button>
 
-      <div className={`folha-corrida ${recolhida ? "recolhida" : ""}`}>
-        <button type="button" className="puxador-botao" aria-label={recolhida ? "Abrir detalhes" : "Recolher detalhes"} onClick={() => setRecolhida(!recolhida)}><span className="puxador" /></button>
+      <div className={`folha-corrida n${nivel}`}>
+        <button type="button" className="puxador-botao" aria-label="Mudar a altura dos detalhes"
+          onPointerDown={(e) => { arraste.current = e.clientY; }}
+          onPointerUp={(e) => { const d = arraste.current == null ? 0 : e.clientY - arraste.current; arraste.current = null; if (d < -30) mudarNivel(nivel + 1); else if (d > 30) mudarNivel(nivel - 1); else mudarNivel(nivel === 2 ? 0 : nivel + 1); }}
+          onPointerCancel={() => { arraste.current = null; }}><span className="puxador" /></button>
         <div className="passageiro">
           <Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={58} selo={c.passageiro.nota != null ? <span className="avatar-nota"><Star size={10} fill="currentColor" /> {c.passageiro.nota.toFixed(1)}</span> : undefined} />
           <div className="passageiro-nome">
@@ -132,11 +172,12 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           <div className="local">
             <span className="local-icone"><Flag size={18} /></span>
             <div><small>{nomeAlvo}</small><strong>{alvo.texto}</strong></div>
-            <a className="quadrado marca" href={linkNavegar(alvo)} target="_blank" rel="noreferrer" aria-label="Navegar"><Navigation size={20} /></a>
+            {nativo ? <button type="button" className="quadrado marca" aria-label="Seguir no mapa" onClick={() => { setCentro((n) => n + 1); mudarNivel(0); }}><Navigation size={20} /></button> : <a className="quadrado marca" href={linkNavegar(alvo)} target="_blank" rel="noreferrer" aria-label="Navegar"><Navigation size={20} /></a>}
           </div>
           <div className="links-rota">
             <button type="button" className="link-m pequeno" onClick={() => setFolha("rota")}>VER ROTA COMPLETA <ChevronRight size={14} /></button>
             <button type="button" className="link-m pequeno aviso" onClick={() => setFolha("editar")}><Pencil size={13} /> EDITAR ROTA</button>
+            <button type="button" className="link-m pequeno perigo" onClick={() => setFolha("cancelar")}><Ban size={13} /> {c.status === "a_caminho" ? "DESISTIR" : "CANCELAR"}</button>
           </div>
         </div>
 
@@ -196,8 +237,14 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
       )}
       {folha === "finalizar" && <Finalizar corrida={c} taximetro={taximetro} valorSugerido={valor} ocupado={ocupado} erro={erro} fechar={() => setFolha("")} confirmar={(v) => void status("finalizada", v == null ? {} : { valor: v })} />}
       {folha === "cancelar" && (
-        <Dialogo icone={Ban} perigo titulo={c.status === "a_caminho" ? "Desistir da corrida?" : "Cancelar a corrida?"}
-          texto={c.status === "a_caminho" ? "A corrida volta para outro motorista." : "O passageiro será avisado."} cancelar={() => setFolha("")} confirmar={() => void cancelar()} rotulo={c.status === "a_caminho" ? "Desistir" : "Cancelar corrida"} rotuloCancelar="Voltar" />
+        <Folha titulo={c.status === "a_caminho" ? "Desistir da corrida" : "Cancelar a corrida"} fechar={() => { setFolha(""); setMotivo(""); }}>
+          <p className="dica">{c.status === "a_caminho" ? "A corrida volta a procurar outro motorista e você não recebe esta mesma de novo logo em seguida." : "O passageiro será avisado e a central registra o motivo."} Cancelamentos seguidos podem gerar punição, conforme as regras da central.</p>
+          <div className="motivos-lista" role="radiogroup" aria-label="Motivo">
+            {motivos.map((m) => <button key={m} type="button" role="radio" aria-checked={motivo === m} className={`opcao-folha ${motivo === m ? "ativa" : ""}`} onClick={() => setMotivo(m)}>{m}{motivo === m && <BadgeCheck size={20} />}</button>)}
+          </div>
+          <button type="button" className="botao-m perigo" disabled={!motivo || ocupado} onClick={() => void cancelar()}>{c.status === "a_caminho" ? "DESISTIR DA CORRIDA" : "CANCELAR CORRIDA"}</button>
+          <button type="button" className="link-m" onClick={() => { setFolha(""); setMotivo(""); }}>Voltar</button>
+        </Folha>
       )}
       {folha === "sos" && <Dialogo icone={ShieldAlert} perigo titulo="Pedir ajuda?" texto="A central recebe um alerta agora, com a sua posição. Se for grave, ligue 190." cancelar={() => setFolha("")} confirmar={() => void sos()} rotulo="Avisar a central" />}
     </div>

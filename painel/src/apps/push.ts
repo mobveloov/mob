@@ -72,7 +72,7 @@ async function tokenDeAcesso(conta: ContaServico): Promise<string> {
 
 // ------------------------------------------------------------------ envio
 
-export interface Aviso { titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" }
+export interface Aviso { titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" | "chegada" }
 
 /** Manda push para todos os aparelhos da pessoa. Nunca lança erro: push é um extra. Devolve quantos foram aceitos. */
 export async function avisar(empresaId: string, alvo: Alvo, aviso: Aviso): Promise<number> {

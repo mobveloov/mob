@@ -2,10 +2,11 @@
 // paradas, destino (com etiqueta), a linha da rota e o carro do motorista andando. No modo "escolher", o centro
 // do mapa é o ponto escolhido.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Posicao } from "../comum/api";
+import { api, posicaoAgora, type Posicao } from "../comum/api";
+import { LocateFixed, Moon, Sun } from "lucide-react";
 import { useRota } from "../comum/rota";
 
 export interface PontoMapa { lat: number; lng: number; tipo: "embarque" | "parada" | "destino"; rotulo: string; detalhe?: string }
@@ -23,25 +24,44 @@ function icone(p: PontoMapa, n: number, resumo?: { km: number; minutos: number }
   const selo = p.tipo === "destino" && resumo ? `<div class="pino-selo"><b>${Math.max(1, Math.round(resumo.minutos))}</b><small>min</small><b>${resumo.km.toFixed(1).replace(".", ",")}</b><small>km</small></div>` : "";
   return L.divIcon({ className: "", html: `<div class="pino pino-${p.tipo}"><span>${simbolo}</span>${selo}${etiqueta}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
 }
+const SVG_MOTO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 10a3.5 3.5 0 0 0-1.1.2l-1.2-2.4H18V6h-3v1.6l.9 1.8-2.7 2.6H10l-1.5-3H6v2h1.6l.5 1A3.5 3.5 0 1 0 9.7 14H13l3.5-3.4.6 1.2A3.5 3.5 0 1 0 19 10zM5.5 16a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm13.5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>`;
+export interface CarroPerto { lat: number; lng: number; tipo: "carro" | "moto"; categoria?: string }
+const iconePerto = (tipo: "carro" | "moto") => L.divIcon({ className: "", html: `<div class="pino-perto pino-perto-${tipo}" aria-label="${tipo === "moto" ? "Moto disponível" : "Carro disponível"}">${tipo === "moto" ? SVG_MOTO : SVG_CARRO.replace('width="20" height="20"', 'width="16" height="16"')}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+const iconeCasa = (n: number) => L.divIcon({ className: "", html: `<span class="casa-num">${n}</span>`, iconSize: [30, 16], iconAnchor: [15, 8] });
 const iconeCarro = L.divIcon({ className: "", html: `<div class="pino-carro" aria-label="Motorista">${SVG_CARRO}</div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
 const iconeEu = L.divIcon({ className: "", html: `<div class="pino-eu">${SVG_PESSOA}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
 
-export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, folga = 0, linha = true, aoMover, className = "" }: {
+const CHAVE_TEMA = "tema-mapa-passageiro";
+export function Mapa({ pontos = [], carro, alvoCarro, perto, eu: euProp, escuro = false, centralizar = 0, folga = 0, linha = true, aoMover, controles = false, className = "" }: {
+  /** Mostra os botões de tema do mapa (claro/escuro) e de atualizar a minha localização. */ controles?: boolean;
   pontos?: PontoMapa[]; carro?: Posicao | null; eu?: Posicao | null; escuro?: boolean;
+  /** Para onde o motorista (carro) está indo: desenha o caminho dele pelas ruas até lá, e atualiza enquanto ele anda. */ alvoCarro?: Posicao | null;
+  /** Mostra os carros e motos livres por perto desta posição (atualiza sozinho). */ perto?: Posicao | null;
   /** Mude o número para centralizar de novo. */ centralizar?: number;
   /** Espaço (px) coberto pela folha de baixo, para enquadrar acima dela. */ folga?: number;
   linha?: boolean; aoMover?: (centro: Posicao) => void; className?: string;
 }) {
   const caixa = useRef<HTMLDivElement>(null);
+  const [temaEscolhido, setTemaEscolhido] = useState<"claro" | "escuro" | null>(() => { try { return controles ? (localStorage.getItem(CHAVE_TEMA) as "claro" | "escuro" | null) : null; } catch { return null; } });
+  const [euLocal, setEuLocal] = useState<Posicao | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
+  const escuroFinal = temaEscolhido ? temaEscolhido === "escuro" : escuro;
+  const trocarTema = () => { const novo = escuroFinal ? "claro" : "escuro"; setTemaEscolhido(novo); try { localStorage.setItem(CHAVE_TEMA, novo); } catch { /* sem armazenamento */ } };
+  const atualizarLocal = async () => { setAtualizando(true); try { const p = await posicaoAgora(); setEuLocal(p); } catch { /* sem GPS */ } finally { setAtualizando(false); setCentralizarInterno((n) => n + 1); } };
+  const [centralizarInterno, setCentralizarInterno] = useState(0);
   const mapa = useRef<L.Map | null>(null);
   const camada = useRef<L.LayerGroup | null>(null);
   const marcaCarro = useRef<L.Marker | null>(null);
   const marcaEu = useRef<L.Marker | null>(null);
+  const camadaCasas = useRef<L.LayerGroup | null>(null);
+  const camadaPerto = useRef<L.LayerGroup | null>(null);
+  const camadaCarroRota = useRef<L.LayerGroup | null>(null);
+  const [carrosPerto, setCarrosPerto] = useState<CarroPerto[]>([]);
   const animacao = useRef(0);
   const mover = useRef(aoMover);
   mover.current = aoMover;
-  const dados = useRef({ pontos, carro, eu, folga });
-  dados.current = { pontos, carro, eu, folga };
+  const dados = useRef({ pontos, carro, eu: euProp, folga });
+  dados.current = { pontos, carro, eu: euLocal ?? euProp, folga };
 
   /** Enquadra tudo o que importa: pontos, carro e (sem pontos) minha posição. */
   const enquadrar = () => {
@@ -63,7 +83,23 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
     m.attributionControl.setPrefix(false);
     camada.current = L.layerGroup().addTo(m);
-    m.on("moveend", () => { const c = m.getCenter(); mover.current?.({ lat: c.lat, lng: c.lng }); });
+    camadaCasas.current = L.layerGroup().addTo(m);
+    camadaCarroRota.current = L.layerGroup().addTo(m);
+    camadaPerto.current = L.layerGroup().addTo(m);
+    let espera = 0;
+    const casas = async () => {
+      const g = camadaCasas.current;
+      if (!g) return;
+      if (m.getZoom() < 17) { g.clearLayers(); return; }
+      const c = m.getCenter(), raio = Math.min(250, Math.max(60, c.distanceTo(m.getBounds().getNorthEast()) * 0.8));
+      try {
+        const r = await api<{ casas: Array<{ numero: number; lat: number; lng: number }> }>(`/enderecos/casas?lat=${c.lat}&lng=${c.lng}&raio=${Math.round(raio)}`);
+        if (!mapa.current) return;
+        g.clearLayers();
+        for (const x of r.casas) L.marker([x.lat, x.lng], { icon: iconeCasa(x.numero), interactive: false, keyboard: false, zIndexOffset: -500 }).addTo(g);
+      } catch { /* sem a base de casas, o mapa fica sem os números */ }
+    };
+    m.on("moveend", () => { const c = m.getCenter(); mover.current?.({ lat: c.lat, lng: c.lng }); clearTimeout(espera); espera = window.setTimeout(() => void casas(), 350); });
     mapa.current = m;
     // O tamanho da caixa só fica certo depois de desenhar a tela.
     const t = setTimeout(() => { m.invalidateSize(); enquadrar(); }, 120);
@@ -76,12 +112,13 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
   useEffect(() => {
     const m = mapa.current;
     if (!m) return;
+    const eu = euLocal ?? euProp;
     if (!eu) { marcaEu.current?.remove(); marcaEu.current = null; return; }
     if (!marcaEu.current) {
       marcaEu.current = L.marker([eu.lat, eu.lng], { icon: iconeEu, keyboard: false, interactive: false }).addTo(m);
       if (!dados.current.pontos.length && !dados.current.carro) enquadrar();
     } else marcaEu.current.setLatLng([eu.lat, eu.lng]);
-  }, [eu?.lat, eu?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [euProp?.lat, euProp?.lng, euLocal?.lat, euLocal?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Caminho pelas ruas (OSRM, pelo servidor). Sem ele a linha não é desenhada: nunca em linha reta.
   const { linha: caminho, km: kmRota, minutos: minRota } = useRota(linha ? pontos : []);
@@ -102,8 +139,39 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     enquadrar();
   }, [chave, linha, caminho, kmRota, minRota]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { if (centralizar) enquadrar(); }, [centralizar]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (centralizar || centralizarInterno) enquadrar(); }, [centralizar, centralizarInterno]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setTimeout(enquadrar, 50); return () => clearTimeout(t); }, [folga]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Carros e motos livres por perto (na hora de pedir): consulta de tempo em tempo.
+  const perLat = perto?.lat, perLng = perto?.lng;
+  useEffect(() => {
+    if (perLat == null || perLng == null) { setCarrosPerto([]); return; }
+    let vivo = true;
+    const buscar = async () => {
+      try { const r = await api<{ motoristas: CarroPerto[] }>(`/motoristas-perto?lat=${perLat}&lng=${perLng}`); if (vivo) setCarrosPerto(r.motoristas); } catch { /* sem a lista, não mostra */ }
+    };
+    void buscar();
+    const t = setInterval(() => void buscar(), 8000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [perLat != null ? perLat.toFixed(3) : "", perLng != null ? perLng.toFixed(3) : ""]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const g = camadaPerto.current;
+    if (!g) return;
+    g.clearLayers();
+    for (const c of carrosPerto) L.marker([c.lat, c.lng], { icon: iconePerto(c.tipo), interactive: false, keyboard: false, title: c.categoria }).addTo(g);
+  }, [carrosPerto]);
+
+  // Caminho do motorista até o embarque (ou destino), pelas ruas; refaz enquanto ele anda.
+  const { linha: caminhoCarro } = useRota(carro && alvoCarro ? [carro, alvoCarro] : [], 12000, 4, true);
+  useEffect(() => {
+    const g = camadaCarroRota.current;
+    if (!g) return;
+    g.clearLayers();
+    if (!caminhoCarro || caminhoCarro.length < 2) return;
+    const cor = getComputedStyle(document.documentElement).getPropertyValue("--cor").trim() || "#1a73e8";
+    L.polyline(caminhoCarro, { color: "#111111", weight: 9, opacity: 0.85, lineJoin: "round" }).addTo(g);
+    L.polyline(caminhoCarro, { color: cor, weight: 5, opacity: 1, lineJoin: "round" }).addTo(g);
+  }, [caminhoCarro]);
 
   // Carro do motorista: anda suave até a posição nova.
   useEffect(() => {
@@ -127,5 +195,15 @@ export function Mapa({ pontos = [], carro, eu, escuro = false, centralizar = 0, 
     if (!m.getBounds().pad(-0.1).contains(destino)) enquadrar();
   }, [carro?.lat, carro?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div ref={caixa} className={`mapa-cheio ${escuro ? "mapa-escuro" : "mapa-claro"} ${className}`} role="application" aria-label="Mapa" />;
+  return (
+    <>
+      <div ref={caixa} className={`mapa-cheio ${escuroFinal ? "mapa-escuro" : "mapa-claro"} ${className}`} role="application" aria-label="Mapa" />
+      {controles && (
+        <div className="mapa-controles">
+          <button type="button" aria-label={escuroFinal ? "Mapa claro" : "Mapa escuro"} onClick={trocarTema}>{escuroFinal ? <Sun size={22} /> : <Moon size={22} />}</button>
+          <button type="button" aria-label="Atualizar minha localização" onClick={() => void atualizarLocal()} disabled={atualizando}>{atualizando ? <span className="girando" style={{ width: 18, height: 18, borderWidth: 2 }} /> : <LocateFixed size={22} />}</button>
+        </div>
+      )}
+    </>
+  );
 }
