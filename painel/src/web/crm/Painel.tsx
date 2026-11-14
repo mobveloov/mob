@@ -6,13 +6,8 @@ import {
 import { Cartao, Titulo, useCarregar } from "../componentes/ui";
 import { crm } from "./api";
 import { useAdmin, useRetorno } from "./comum";
-import Campanhas from "./Campanhas";
-import Descadastros from "./Descadastros";
-import Envio from "./Envio";
-import Jornadas from "./Jornadas";
-import Publico from "./Publico";
-import Templates from "./Templates";
-import Visao from "./Visao";
+import { ABAS } from "./abas";
+import { ABAS_EXTRAS } from "./abas-extras";
 
 type Aba = "dashboard" | "triggers" | "queue" | "journeys" | "regua" | "behavior_templates" | "campaigns" | "templates" | "logs" | "behavior_history" | "whatsapp" | "optout"
   | "passengers" | "drivers" | "behavior" | "contacts" | "segments" | "rfm" | "conversion" | "heatmap" | "rewards" | "cities" | "governance" | "audit";
@@ -58,6 +53,7 @@ export default function CrmPainel() {
   const ligado = emojis.dados?.ligado ?? false;
   const admin = useAdmin();
   const { tentar, caixa } = useRetorno();
+  const Tela = [...ABAS, ...ABAS_EXTRAS].find((x) => x.id === aba)?.componente;
   const alternar = () => tentar(() => crm.ligarEmojis(!ligado)).then(emojis.recarregar);
 
   return (
@@ -83,14 +79,8 @@ export default function CrmPainel() {
           </div>
         )}
       </div>
-      {aba === "dashboard" && <Visao />}
-      {aba === "journeys" && <Jornadas />}
-      {aba === "campaigns" && <Campanhas />}
-      {aba === "templates" && <Templates emojis={ligado} />}
-      {aba === "whatsapp" && <Envio />}
-      {aba === "optout" && <Descadastros />}
-      {(aba === "passengers" || aba === "drivers") && <Publico key={aba} tipoInicial={aba === "drivers" ? "motorista" : "passageiro"} />}
-      {AINDA_NAO[aba] && (
+      {Tela && <Tela emojis={ligado} />}
+      {!Tela && AINDA_NAO[aba] && (
         <Cartao titulo={AINDA_NAO[aba]}>
           <p className="vazio">Esta aba do CRM ainda está sendo portada para este painel. As demais já funcionam.</p>
         </Cartao>
