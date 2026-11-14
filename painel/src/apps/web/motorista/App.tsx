@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LayoutGrid, LocateFixed, Power, SlidersHorizontal } from "lucide-react";
-import { api, ErroApi, flutuante, manterTelaLigada, pararSons, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
+import { api, ErroApi, flutuante, manterTelaLigada, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { ChatCorrida } from "./Conversa";
@@ -64,6 +64,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     if (onlineRef.current && !s.online) ultimoEnvio.current = 0; // servidor reiniciou: a próxima posição religa
   }, []);
   useEffect(() => { void manterTelaLigada(ajustes.manterTela && (online || !!corrida)); return () => { void manterTelaLigada(false); }; }, [ajustes.manterTela, online, !!corrida]); // tela acesa online ou em corrida
+  useEffect(() => { void rastrearEmSegundoPlano(online); return () => { void rastrearEmSegundoPlano(false); }; }, [online]); // online: serviço em primeiro plano manda a posição com a tela apagada
   const carregarGanhos = useCallback(() => { void api<{ hoje: { valor: number } }>("/ganhos").then((g) => setHoje(g.hoje.valor)).catch(() => undefined); }, []);
   useEffect(() => { void carregar().catch(() => undefined); carregarGanhos(); }, [carregar, carregarGanhos]);
   useEffect(() => {

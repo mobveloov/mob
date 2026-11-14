@@ -250,7 +250,7 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
 
 // ------------------------------------------------------------------ ícone flutuante (só no APK do motorista)
 
-interface PluginFlutuante { manterTela?(o: { ligar: boolean }): Promise<void>; permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
+interface PluginFlutuante { rastrear?(o: { url: string; token: string }): Promise<void>; pararRastreio?(): Promise<void>; manterTela?(o: { ligar: boolean }): Promise<void>; permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
 const FlutuanteNativo = registerPlugin<PluginFlutuante>("Flutuante");
 /** Bolinha por cima de outros apps quando o app é minimizado. Fora do APK do motorista, tudo isto não faz nada. */
 export const flutuante = {
@@ -260,6 +260,15 @@ export const flutuante = {
   mostrar: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.mostrar(); } catch { /* sem plugin */ } },
   esconder: async () => { try { if (flutuante.disponivel()) await FlutuanteNativo.esconder(); } catch { /* sem plugin */ } },
 };
+
+/** Motorista online: serviço em primeiro plano (notificação fixa) que continua mandando a posição com a tela apagada. Só no APK. */
+export async function rastrearEmSegundoPlano(ligar: boolean) {
+  try {
+    if (!flutuante.disponivel()) return;
+    if (ligar && token()) await FlutuanteNativo.rastrear?.({ url: urlApi("/posicao"), token: token() ?? "" });
+    else await FlutuanteNativo.pararRastreio?.();
+  } catch { /* sem plugin */ }
+}
 
 // ------------------------------------------------------------------ tela sempre acesa (online, em corrida, acompanhando a viagem)
 

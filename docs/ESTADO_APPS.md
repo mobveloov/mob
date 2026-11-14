@@ -125,3 +125,31 @@ das `casas` do mobveloov; testes em aparelho; ver `docs/PEDIDOS_DO_DONO_2026-11-
 - **Tela sempre acesa**: Wake Lock na web (refeito ao voltar ao app) e flag nativa no APK do motorista; opção "Manter a tela ligada" nos Ajustes (padrão ligado,
   vale online ou em corrida); o passageiro mantém acesa enquanto acompanha. **Falta**: serviço em primeiro plano com notificação para GPS e tempo real com a tela
   apagada ou o app em segundo plano (hoje o GPS do WebView pode parar em segundo plano).
+
+### 9. Despacho da Machine, segurança e GPS em segundo plano (14/11, noite)
+Testes novos: `painel/test/apps-despacho.test.ts` (10) e `painel/test/apps-seguranca.test.ts` (4).
+
+| Caso | Resultado |
+|---|---|
+| Modo geral (primeiro a aceitar): 3 motoristas tocam juntos (limite 3, a 4ª não toca); um aceita e leva | passa |
+| Quem não aceitou: a chamada fecha na hora, `oferta_encerrada` com aviso "Corrida já aceita por outro motorista", o som para | passa |
+| Aceite simultâneo de dois motoristas | passa (um 200, o outro 400 "já aceita") |
+| Mais próximo: um motorista por vez; recusa passa ao seguinte | passa |
+| Fila virtual: quem está online há mais tempo recebe primeiro | passa |
+| Motorista aceita e desiste: volta a procurar, toca para outro, quem desistiu não recebe a mesma de novo | passa |
+| Passageiro cancela com chamadas tocando: todos os toques param | passa |
+| Ninguém aceita: respeita "máx. tentativas"; sem pendência vira não atendida | passa |
+| Tempo em pendência: espera sem chamar ninguém e avisa o passageiro | passa |
+| Fora do raio e categoria diferente não tocam | passa |
+| Aceitar próxima corrida (motorista em viagem perto do destino) só com a regra ligada | passa |
+| Toda rota privada dos apps recusa sem token e com token falso/enorme | passa |
+| Token de uma empresa não vale na outra; passageiro não usa rota do motorista e vice-versa | passa |
+| 5 códigos errados travam; entradas inválidas (objeto, texto, telefone enorme) dão erro 4xx sem derrubar o servidor | passa |
+| Nome com HTML (`<img onerror>`) não é guardado | passa |
+
+Campos do despacho que estavam mortos e agora valem: `limiteMotoristas`, `prioritarios`/`notificarGrupo` (modo geral), `maxTentativas`, `tempoPendencia`,
+`permitirProxima`/`distanciaProxima`. `secundarios` e `reserva` ainda não são usados separadamente (o nível do motorista já ordena a fila).
+Ganho por km, minuto e hora aparecem na chamada e na corrida do motorista.
+GPS com a tela apagada: serviço em primeiro plano nativo (`PosicaoService.java`, notificação "Você está online") manda a posição ao servidor a cada ~15 s com o motorista
+online. **Compila no APK, mas ainda não foi testado num aparelho.** Falta ainda: gravação das corridas (áudio e vídeo), importação das `casas` do mobveloov,
+cabeçalhos anti-clonagem do painel (arquivo `servidor/index.ts` é da sessão do painel).

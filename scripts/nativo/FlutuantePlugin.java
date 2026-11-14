@@ -32,6 +32,27 @@ public class FlutuantePlugin extends Plugin {
         });
     }
 
+    /** Liga o serviço em primeiro plano que manda a posição ao servidor com a tela apagada (url completa de /posicao e o token). */
+    @PluginMethod
+    public void rastrear(PluginCall call) {
+        Intent i = new Intent(getContext(), PosicaoService.class);
+        i.putExtra("url", call.getString("url", ""));
+        i.putExtra("token", call.getString("token", ""));
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) getContext().startForegroundService(i);
+            else getContext().startService(i);
+        } catch (Exception e) {
+            // o sistema não deixou: o app segue com a posição pela tela
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void pararRastreio(PluginCall call) {
+        getContext().stopService(new Intent(getContext(), PosicaoService.class));
+        call.resolve();
+    }
+
     @PluginMethod
     public void permitido(PluginCall call) {
         JSObject r = new JSObject();
