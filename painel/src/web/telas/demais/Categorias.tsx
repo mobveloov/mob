@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { valorDinamica } from "./Dinamica";
 import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
 const passos = [["basico", "Básico"], ["tarifas", "Tarifas & Negociação"], ["dinamica", "Dinâmica"], ["comissao", "Comissão"]] as const;
@@ -72,12 +73,12 @@ export function Categorias() {
           ))}
         </div>
       )}
-      {edit && <JanelaCategoria inicial={edit} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
+      {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
     </>
   );
 }
 
-function JanelaCategoria({ inicial, dinamicas, regras, icones, onFechar, onSalvo }: { inicial: any; dinamicas: any[]; regras: any[]; icones: string[]; onFechar: () => void; onSalvo: () => void }) {
+function JanelaCategoria({ inicial, automacoes, dinamicas, regras, icones, onFechar, onSalvo }: { inicial: any; automacoes: any[]; dinamicas: any[]; regras: any[]; icones: string[]; onFechar: () => void; onSalvo: () => void }) {
   const [c, setC] = useState<any>(inicial);
   const [passo, setPasso] = useState<Passo>("basico");
   const { msg, salvando, salvar } = useSalvar();
@@ -187,6 +188,7 @@ function JanelaCategoria({ inicial, dinamicas, regras, icones, onFechar, onSalvo
             <h3>Preço Dinâmico Multi-Fatores</h3>
             <p className="sub">Você pode misturar regras de horário, mapa geolocalizado e alta demanda simultaneamente. Se não houver regras listadas, crie-as no menu Tarifas Dinâmicas.</p>
             {grupoDin("horario", "Por Horário Fixo")}{grupoDin("mapa", "Por Polígono (Mapa)")}{grupoDin("demanda", "Alta Demanda Auto")}
+            <div><h4>Áreas automáticas (Automações)</h4>{!automacoes.length ? <p className="sub">Nenhuma automação criada. Crie em Tarifas dinâmicas › Automações.</p> : automacoes.map((a) => <label key={a.id} className="dm-check"><input type="checkbox" checked={ex.dinamicas.includes(a.id)} onChange={() => alternar("dinamicas", a.id)} /> {a.nome} <small>{valorDinamica(a)} · {a.minPedidos} pedidos em {a.janelaMin} min</small></label>)}</div>
           </>
         )}
         {passo === "comissao" && (

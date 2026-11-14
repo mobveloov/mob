@@ -183,3 +183,6 @@
 .dm-var { font-weight: 700; font-size: 13px; }
 .dm-dia { padding: 0; } .dm-dia .dm-transacoes { padding: 0 16px 8px; }
 .dm-dia-topo { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; width: 100%; background: none; border: 0; color: inherit; font: inherit; padding: 12px 16px; cursor: pointer; text-align: left; }
+.dm-legenda { display: flex; flex-wrap: wrap; gap: 12px; padding: 8px 4px 0; font-size: 13px; } .dm-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; } .dm-legenda small { opacity: .7; }
+.dm-guia { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; } .dm-guia p { flex: 1; margin: 0; }
+.dm-etiqueta { font-weight: 700; background: #fff; border: 1px solid #cbd5e1; }
