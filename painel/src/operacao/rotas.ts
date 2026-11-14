@@ -208,7 +208,7 @@ const baixarCsv = (res: Response, nome: string, csv: string) => {
   res.send(csv);
 };
 // Leitura para quem está logado; só o administrador muda situação ou registra (financeiro).
-rotasOperacao.get("/pendencias", ok((req, res) => res.json(listarPendencias(emp(req), filtroPendencias(req), pag(req)))));
+rotasOperacao.get("/pendencias", ok((req, res) => res.json({ ...listarPendencias(emp(req), filtroPendencias(req), pag(req)), periodo: faixa(req) })));
 rotasOperacao.get("/pendencias/exportar", ok((req, res) => baixarCsv(res, "pendencias-de-pagamentos", csvPendencias(emp(req), filtroPendencias(req)))));
 rotasOperacao.post("/pendencias", exigirPapel("admin"), ok((req, res) => res.status(201).json({ pendencia: registrarPendencia(emp(req), (req.body ?? {}) as Record<string, unknown>, quem(req)) })));
 rotasOperacao.post("/pendencias/:id/:acao", exigirPapel("admin"), ok((req, res) => {
@@ -218,7 +218,7 @@ rotasOperacao.post("/pendencias/:id/:acao", exigirPapel("admin"), ok((req, res) 
 }));
 
 const filtroTaxas = (req: Request): FiltroTaxas => ({ ...faixa(req), aba: ABAS_TAXAS.find((a) => a === q(req, "aba")) ?? "todos", os: q(req, "os", 30), motorista: q(req, "motorista", 80), cliente: q(req, "cliente", 80) });
-rotasOperacao.get("/taxas-cancelamento", ok((req, res) => res.json(listarTaxas(emp(req), filtroTaxas(req), pag(req)))));
+rotasOperacao.get("/taxas-cancelamento", ok((req, res) => res.json({ ...listarTaxas(emp(req), filtroTaxas(req), pag(req)), periodo: faixa(req) })));
 rotasOperacao.get("/taxas-cancelamento/exportar", ok((req, res) => baixarCsv(res, "taxas-de-cancelamento", csvTaxas(emp(req), filtroTaxas(req)))));
 
 const filtroPix = (req: Request): FiltroPix => ({ ...faixa(req), os: q(req, "os", 30) || q(req, "busca", 30), motorista: q(req, "motorista", 80), situacao: q(req, "situacao") });

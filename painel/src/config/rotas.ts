@@ -22,7 +22,7 @@ import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matr
 import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
-import { csvExtratoOnline, csvVisaoGeral, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
+import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoGeral, relatorioFaturamento, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
@@ -70,6 +70,7 @@ const baixarCsv = (res: Response, nome: string, csv: string) => {
 rotasConfig.get("/visao-geral", ok((req, res) => res.json(visaoGeral(emp(req), per(req)))));
 rotasConfig.get("/visao-geral/csv", ok((req, res) => baixarCsv(res, "visao-geral-financeiro", csvVisaoGeral(emp(req), per(req)))));
 rotasConfig.get("/extrato-central", ok((req, res) => res.json(extratoDaCentral(emp(req), per(req)))));
+rotasConfig.get("/extrato-central/csv", ok((req, res) => baixarCsv(res, "extrato-da-central", csvExtratoCentral(emp(req), per(req)))));
 rotasConfig.post("/extrato-central/recargas", admin, ok((req, res) => res.status(201).json({ pedido: pedirRecargaCentral(emp(req), Number(req.body?.valor), texto(req.body?.observacao, 200), quem(req)) })));
 rotasConfig.post("/extrato-central/recargas/:id/:acao", admin, ok((req, res) => {
   if (!["confirmar", "cancelar"].includes(req.params.acao)) throw new Error("Ação inválida.");
@@ -78,6 +79,9 @@ rotasConfig.post("/extrato-central/recargas/:id/:acao", admin, ok((req, res) => 
 const filtroTransacoes = (req: Request) => ({ tipo: q(req, "tipo"), status: q(req, "status"), repasse: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "repasse")) ? q(req, "repasse") : "", busca: q(req, "busca").slice(0, 80) });
 rotasConfig.get("/transacoes-online", ok((req, res) => res.json(extratoOnline(emp(req), per(req), filtroTransacoes(req)))));
 rotasConfig.get("/transacoes-online/csv", ok((req, res) => baixarCsv(res, "extrato-transacoes-online", csvExtratoOnline(emp(req), per(req), filtroTransacoes(req)))));
+const filtroFaturamento = (req: Request) => ({ status: q(req, "status"), pagamento: q(req, "pagamento"), busca: q(req, "busca").slice(0, 40) });
+rotasConfig.get("/relatorio-faturamento", ok((req, res) => res.json(relatorioFaturamento(emp(req), per(req), filtroFaturamento(req), Number(q(req, "pagina")) || 1))));
+rotasConfig.get("/relatorio-faturamento/csv", ok((req, res) => baixarCsv(res, "relatorio-faturamento", csvRelatorioFaturamento(emp(req), per(req), filtroFaturamento(req)))));
 rotasConfig.post("/transacoes-online/:id/status", admin, ok((req, res) => res.json(marcarTransacao(emp(req), req.params.id, String(req.body?.status ?? ""), texto(req.body?.motivo, 200), quem(req)))));
 rotasConfig.get("/recargas", ok((req, res) => res.json({ periodo: per(req), ...listaRecargas(emp(req), papelCart(q(req, "aba") || "motorista"), per(req)) })));
 rotasConfig.get("/relatorios/producao", ok((req, res) => {

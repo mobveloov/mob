@@ -21,6 +21,7 @@ export function periodo(chave: string, inicio = "", fim = ""): { inicio: string;
     case "hoje": return { inicio: hoje, fim: hoje, rotulo: "Hoje" };
     case "ontem": { const o = dia(somar(h, -1)); return { inicio: o, fim: o, rotulo: "Ontem" }; }
     case "ultimos_7": return { inicio: dia(somar(h, -6)), fim: hoje, rotulo: "Últimos 7 dias" };
+    case "ultimos_14": return { inicio: dia(somar(h, -13)), fim: hoje, rotulo: "Últimos 14 dias" };
     case "ultimos_30": return { inicio: dia(somar(h, -29)), fim: hoje, rotulo: "Últimos 30 dias" };
     case "semana": { const ini = somar(h, -((h.getUTCDay() + 6) % 7)); return { inicio: dia(ini), fim: hoje, rotulo: "Esta Semana" }; }
     case "semana_passada": { const seg = somar(h, -((h.getUTCDay() + 6) % 7) - 7); return { inicio: dia(seg), fim: dia(somar(seg, 6)), rotulo: "Semana Passada" }; }

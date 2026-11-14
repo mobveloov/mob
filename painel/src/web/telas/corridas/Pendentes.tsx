@@ -2,7 +2,7 @@
 // (Pendente, Processando, Resolvido, Abonado). Só o administrador muda a situação ou registra uma pendência.
 import { useEffect, useState } from "react";
 import { Aviso, Janela, Paginacao, Selo, Vazio, dh, fone, msgErro, op, qs, useDados } from "./comum";
-import { BotaoExportar, PERIODO_30, SeletorPeriodo, brl, paramsPeriodo, useAdmin, type PeriodoPag } from "./pagamentos-comum";
+import { BotaoExportar, PERIODOS_CURTOS, PERIODO_HOJE, SeletorPeriodo, brl, dataBrIso, paramsPeriodo, useAdmin, type PeriodoPag } from "./pagamentos-comum";
 import "./corridas.css";
 
 const TOM: Record<string, string> = { pendente: "alerta", processando: "info", resolvido: "ok", abonado: "ruim" };
@@ -14,7 +14,7 @@ export default function Pendentes() {
   const [tipo, setTipo] = useState("todos");
   const [status, setStatus] = useState("pendente");
   const [busca, setBusca] = useState(""), [b, setB] = useState("");
-  const [per, setPer] = useState<PeriodoPag>(PERIODO_30);
+  const [per, setPer] = useState<PeriodoPag>(PERIODO_HOJE);
   const [maisFiltros, setMais] = useState(false), [motorista, setMotorista] = useState("");
   const [pagina, setPagina] = useState(1);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
@@ -39,14 +39,14 @@ export default function Pendentes() {
       <div className="oc-abas">{[["todos", "Todos"], ...TIPOS.map((t) => [t, t])].map(([k, r]) => <button key={k} className={tipo === k ? "on" : ""} onClick={() => { setTipo(k); setPagina(1); }}>{r}</button>)}</div>
       <div className="oc-card oc-fila">
         <input style={{ maxWidth: 260 }} placeholder="Buscar passageiro, telefone ou OS" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar passageiro" />
-        <SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} />
+        <SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} opcoes={PERIODOS_CURTOS} />
         <button className="oc-btn" onClick={() => setMais(!maisFiltros)}>Mais filtros</button>
         {maisFiltros && <input style={{ maxWidth: 200 }} placeholder="Nome do motorista" value={motorista} onChange={(e) => { setMotorista(e.target.value); setPagina(1); }} aria-label="Motorista" />}
         <BotaoExportar caminho={`/pendencias/exportar${qs({ ...filtro, status })}`} nome="pendencias-de-pagamentos.csv" onErro={setErroAcao} />
         {admin && <button className="oc-btn pri" onClick={() => setNovo(true)}>Registrar pendência</button>}
-        <button className="oc-btn" onClick={() => { setTipo("todos"); setBusca(""); setB(""); setMotorista(""); setPer(PERIODO_30); setPagina(1); }}>Limpar filtro</button>
+        <button className="oc-btn" onClick={() => { setTipo("todos"); setBusca(""); setB(""); setMotorista(""); setPer(PERIODO_HOJE); setPagina(1); }}>Limpar filtro</button>
       </div>
-      {!!filtrando.length && <p className="suave" style={{ margin: "0 0 8px" }}>Filtrando por: {filtrando.join(" · ")}</p>}
+      <p className="suave" style={{ margin: "0 0 8px" }}>Filtrando por: {filtrando.length ? filtrando.join(" · ") : "Todos"}{dados?.periodo?.inicio ? ` · Período: ${dataBrIso(dados.periodo.inicio)} até ${dataBrIso(dados.periodo.fim)}` : ""}</p>
       <div className="oc-kpis">
         {(["pendente", "processando", "resolvido", "abonado"] as const).map((s) => (
           <button key={s} className={`oc-kpi ${TOM[s]}`} style={{ textAlign: "left", cursor: "pointer", outline: status === s ? "2px solid var(--oc-pri)" : "none" }} onClick={() => { setStatus(s); setPagina(1); }} aria-pressed={status === s}>

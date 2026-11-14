@@ -53,6 +53,7 @@ export const FUNCOES: Funcao[] = [
   { id: "entrega-voucher", grupo: "Corridas", nome: "Entrega de voucher", rota: "/entrega-voucher" },
 
   { id: "visao-geral", grupo: "Financeiro", secao: "Relatórios", nome: "Visão geral do financeiro", rota: "/visao-geral" },
+  { id: "relatorio-faturamento", grupo: "Financeiro", secao: "Relatórios", nome: "Faturamento", rota: "/relatorio-faturamento" },
   { id: "extrato-central", grupo: "Financeiro", secao: "Relatórios", nome: "Extrato da central", rota: "/extrato-central" },
   { id: "extrato-online", grupo: "Financeiro", secao: "Relatórios", nome: "Extrato de transações online", rota: "/extrato-online" },
   { id: "transacao-pix", grupo: "Financeiro", secao: "Pix", nome: "Transação com Pix", rota: "/transacao-pix", novo: true },

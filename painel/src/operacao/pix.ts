@@ -4,6 +4,8 @@
 // pode registrar à mão Estornada, Em disputa, Chargeback (ou confirmar Paga). A marcação fica em operacao/pix-marcas.json, por empresa,
 // e não mexe na carteira de ninguém. Pix estornado ou com chargeback gera uma pendência "Pix no app" (operacao/pendencias.ts).
 
+import { cadastroPorId } from "../comum/cadastros.ts";
+import { listar } from "../cadastros/armazem.ts";
 import { listarProprias } from "../corridas/index.ts";
 import { calcularComissao } from "../config/comissao.ts";
 import { montarCsv } from "../config/financeiro-visao.ts";
@@ -48,8 +50,11 @@ const diaDe = (s: string) => s.slice(0, 10);
 function filtrar(empresaId: string, f: FiltroPix) {
   const os = (f.os ?? "").trim(), mot = normal(f.motorista ?? "");
   const sit = SITUACOES_PIX.find((s) => s === f.situacao);
+  // "Nome/VTR do motorista": casa com o nome ou com a viatura (VTR) do cadastro.
+  const vtr = new Map<string, string>();
+  if (mot) for (const m of listar(empresaId, cadastroPorId("motoristas")!)) vtr.set(m.id, normal(String(m.viatura ?? "")));
   return pixDasCorridas(empresaId).filter((x) => (!f.inicio || diaDe(x.data) >= f.inicio) && (!f.fim || diaDe(x.data) <= f.fim)
-    && (!os || x.os.includes(os)) && (!mot || normal(x.motorista).includes(mot)) && (!sit || x.situacao === sit));
+    && (!os || x.os.includes(os)) && (!mot || normal(x.motorista).includes(mot) || (x.motoristaId != null && (vtr.get(x.motoristaId) ?? "") === mot)) && (!sit || x.situacao === sit));
 }
 
 export function listarPix(empresaId: string, f: FiltroPix, pagina: number) {

@@ -5,6 +5,7 @@ import "./demais.css";
 import { Carteiras, Extrato, Recargas, Relatorios, Saques } from "./Financeiro";
 import { ExtratoCentral, ExtratoOnline, VisaoGeral } from "./FinanceiroMachine";
 import { TransacaoPix } from "./Pix";
+import { RelatorioFaturamento } from "./RelatorioFaturamento";
 import { AlertasEmpresas } from "./Alertas";
 import { Conversas, Notificacoes } from "./Comunicacao";
 import { ConfigGerais } from "./ConfigGerais";
@@ -17,6 +18,7 @@ import { CentralAjuda, Juridico, TermosApp } from "./TermosAjuda";
 
 export const TELAS_DEMAIS: Record<string, JSX.Element> = {
   "visao-geral": <VisaoGeral />,
+  "relatorio-faturamento": <RelatorioFaturamento />,
   "extrato-central": <ExtratoCentral />,
   "extrato-online": <ExtratoOnline />,
   "transacao-pix": <TransacaoPix />,
