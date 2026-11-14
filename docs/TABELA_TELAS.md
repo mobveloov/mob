@@ -26,7 +26,7 @@ Referências: `docs/APPS_PRINTS_REFERENCIA.md` (P## = passageiro, M## = motorist
 
 ## Motorista
 
-Refeito por outra sessão (commit `6377ee0` e seguintes). Conferi lado a lado, no navegador com posição simulada em Pitangueiras, as telas marcadas "Conferido"; as demais foram refeitas mas eu não as vi (a sessão que as refez atingiu o limite de uso antes de escrever a tabela dela).
+Refeito por outra sessão (commit `6377ee0` e seguintes). Conferi lado a lado, no navegador com posição simulada em Pitangueiras, as telas marcadas "Conferido"; as demais precisam de uma corrida em andamento ou ainda não foram vistas.
 
 | Tela (referência) | Situação |
 |---|---|
@@ -36,12 +36,22 @@ Refeito por outra sessão (commit `6377ee0` e seguintes). Conferi lado a lado, n
 | Menu lateral (M30) | Conferido. Cartão do motorista, Operação, Conta e veículo, Suporte e sistema, Sair com versão |
 | Corridas Disp./Pend./Prog. (M14) | Conferido. Três abas e "Nenhuma corrida no momento…" |
 | Histórico de Viagens (M11) | Conferido. Mês, Ganhos do Mês, Viagens/Online/Em trânsito, Formas de Pagamento & Bônus |
-| Login/Senha (M02/M03) | Refeito, não conferido |
-| Cadastro em 5 passos (M24/M28/M22/M21/M20) | Refeito, não conferido |
+| Login (M02) | Conferido. Topo da marca com logo redonda, "PARCEIRO / MOTORISTA", cartão "Acesse sua conta", onda preta com "FAZER CADASTRO" |
+| Cadastro, passo 1 "Dados Pessoais 1/5" (M24) | Conferido. Cabeçalho da marca com contador 1/5 e campos preenchidos. Passos 2 a 5 (Foto, Endereço, Veículo, Documentos): não conferidos |
+| Meu Cadastro (M25) | Conferido. Cartões Dados Pessoais, Foto do Rosto, Endereço, Veículo, Documentos, com aviso do que falta |
+| Meus veículos (M26) | Conferido. Cartão do veículo com placa Mercosul, ATIVO, Aprovado, Editar e Excluir, botão + |
+| Preferências (M05/M06) | Conferido. Formas de pagamento, Categorias, Filtros e exigências, SALVAR PREFERÊNCIAS |
+| Notificações (M09) | Conferido. "Sem notificações" |
+| Maçaneta (M12) | Conferido. Taxímetro Livre / Com Destino, ponto de embarque por GPS, INICIAR CORRIDA NO TAXÍMETRO |
+| Fale Conosco (M13) | Conferido na estrutura. Sem contatos porque a UP ainda não cadastrou WhatsApp, telefone e site (dado, não tela) |
+| Configurações (M15/M16) | Conferido. Interface e tema, Alertas e notificações, Áudio, com ícone flutuante e vibrar |
+| Diagnóstico (M18) | Conferido. Os mesmos 7 itens, com situação |
+| Chat com suporte (M19) | Conferido. Cabeçalho Suporte Central, respostas rápidas e microfone |
+| Senha / Bem-vindo (M03) | Refeito, não conferido |
 | Chamada com valor líquido grande, bruto e taxa menores (cartaz) | Já existia e foi mantida; não reconferida |
-| Em corrida (P09/P04/P01) | Rota pelas ruas no mapa; layout não conferido |
-| Chat (P06), Maçaneta (M12) | Refeitos, não conferidos |
-| Meus veículos (M26), Meu Cadastro (M25), Preferências (M05/M06), Notificações (M09), Fale Conosco (M13), Configurações (M16/M15), Diagnóstico (M23/M18), Chat de suporte (M19) | Refeitos, não conferidos |
+| Em corrida (P09/P04/P01), chat da corrida (P06) | Rota pelas ruas no mapa; layout não conferido (precisa de uma corrida em andamento) |
+
+Diferença conhecida: o menu lateral da referência (M27) tem também "Termos de uso" e "Política de privacidade"; o nosso ainda não.
 
 ## Rota, mapa e endereços (pedidos do usuário)
 
