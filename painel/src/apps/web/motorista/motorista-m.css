@@ -113,13 +113,15 @@ body { background: var(--m-bg); color: var(--m-tx); }
 .entrar-cartao .botao-m { box-shadow: 0 8px 18px color-mix(in srgb, var(--cor) 38%, transparent); }
 .bem-vindo { margin: 0; font-size: 1.7rem; font-weight: 800; }
 .etiqueta-login { align-self: flex-start; display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .95rem; border-radius: 999px; border: 1px solid #eceff4; background: #f3f5f8; font-weight: 600; cursor: pointer; color: #101828; }
-.entrar-rodape { position: relative; margin-top: auto; background: #000; color: #fff; text-align: center; display: flex; flex-direction: column; gap: .8rem; align-items: center; justify-content: flex-end; padding: 3rem 1.4rem calc(1.4rem + env(safe-area-inset-bottom)); min-height: 190px; border-radius: 50% 50% 0 0 / 70px 70px 0 0; }
+.entrar-rodape { position: relative; margin-top: auto; background: #000; color: #fff; text-align: center; display: flex; flex-direction: column; gap: .8rem; align-items: center; justify-content: flex-end; padding: 2.6rem 1.4rem calc(1.4rem + env(safe-area-inset-bottom)); min-height: 170px; border-radius: 50% 50% 0 0 / 34px 34px 0 0; }
 .entrar-rodape p { margin: 0; color: #fff; font-size: .95rem; }
-.entrar-rodape .botao-contorno { width: auto; min-width: 210px; min-height: 46px; border: 1.5px solid var(--cor); color: #fff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; font-size: .85rem; background: transparent; border-radius: 999px; }
+.entrar-rodape .botao-contorno { width: auto; min-width: 210px; min-height: 46px; border: 1.5px solid var(--cor); color: #fff; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; font-size: .85rem; background: #1c1c1e; border-radius: 999px; }
+.entrar-cartao .botao-m:disabled { opacity: .8; }
+.entrar-cartao input::placeholder { font-weight: 700; color: #b3b9c4; }
 .entrar-rodape .botao-link { color: #9aa4b2; }
 .logo-circulo { display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; background: #000; color: var(--cor); font-weight: 800; border: 3px solid #fff; box-shadow: 0 8px 22px rgba(0,0,0,.18); }
 .logo-circulo img { width: 100%; height: 100%; object-fit: cover; }
-.entrar-m .link-m { color: var(--m-ac); }
+.entrar-m .link-m { color: var(--m-ac); font-size: .85rem; }
 .entrar-m .campo { color: #101828; } .entrar-m .campo-rotulo { color: #6b7488; font-size: .9rem; }
 .entrar-m input { color: #101828; }
 
