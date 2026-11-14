@@ -1,6 +1,7 @@
 // Rotas de endereços (/api/enderecos), com login. A empresa vem do usuário logado.
 import { Router, type Request, type Response } from "express";
 import { exigirPapel } from "../servidor/sessao.ts";
+import { importarCorrecoes } from "./correcoes.ts";
 import { buscarEndereco, buscarMunicipios, enderecoDoPonto, lerConfig, rota, salvarConfig, situacao } from "./index.ts";
 
 export const rotasEnderecos = Router();
@@ -14,6 +15,13 @@ rotasEnderecos.get("/municipios", ok((req, res) => res.json({ municipios: buscar
 rotasEnderecos.put("/config", exigirPapel("admin"), ok((req, res) => res.json(salvarConfig(emp(req), { municipios: req.body?.municipios ?? lerConfig(emp(req)).municipios }))));
 rotasEnderecos.get("/buscar", ok((req, res) => res.json(buscarEndereco(emp(req), String(req.query.q ?? "").slice(0, 200)))));
 rotasEnderecos.get("/ponto", ok((req, res) => res.json({ endereco: enderecoDoPonto(emp(req), Number(req.query.lat), Number(req.query.lng)) })));
+// Importa um arquivo de correções (casas que o CNEFE não tem). Vale para todas as empresas: só o dono da plataforma. Arquivos grandes: use o script "npm run importar-casas".
+rotasEnderecos.post("/correcoes", ok((req, res) => {
+  if (req.ctx!.usuario.papel !== "plataforma") { res.status(403).json({ erro: "Só o dono da plataforma importa correções de endereços." }); return; }
+  const conteudo = typeof req.body?.conteudo === "string" ? req.body.conteudo : "";
+  if (!conteudo.trim()) throw new Error("Envie o conteúdo do arquivo de correções.");
+  res.json(importarCorrecoes(conteudo));
+}));
 rotasEnderecos.get("/rota", ok(async (req, res) => {
   const n = (k: string) => Number(req.query[k]);
   if (![n("lat1"), n("lng1"), n("lat2"), n("lng2")].every(Number.isFinite)) throw new Error("Pontos inválidos.");

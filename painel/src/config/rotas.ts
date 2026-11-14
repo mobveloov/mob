@@ -16,6 +16,8 @@ import { categoriasCompletas, ICONES, removerCategoria, salvarCategoria } from "
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
+import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
+import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { ativarDinamica, dinamicas, removerDinamica, salvarDinamica } from "./dinamica.ts";
 import { csvExtratoOnline, csvVisaoGeral, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
@@ -149,6 +151,9 @@ rotasConfig.delete("/dinamicas/:id", admin, ok((req, res) => res.json({ regras: 
 rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
 rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
 rotasConfig.delete("/descontos/:id", admin, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
+// Matriz por forma de pagamento x site/app #1 a #4 e desconto máximo da empresa (convive com os descontos por campanha acima).
+rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)) })));
+rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
 
 // ------------------------------------------------------------------ config: despacho, transbordos, integrações
 
@@ -160,6 +165,15 @@ rotasConfig.get("/transbordos", ok((req, res) => {
   res.json({ periodo: p, permitir: regrasDespacho(emp(req)).permitirTransbordo, itens: transbordos(emp(req), p.inicio, p.fim, q(req, "cidade")) });
 }));
 
+// Transações financeiras (formato da Machine): plano, quem recebe, taxa de cartão, Pix e dados bancários (estes só o admin vê e grava).
+const ehAdmin = (req: Request) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+rotasConfig.get("/integracao-financeira", ok((req, res) => res.json(visaoIntegracao(emp(req), ehAdmin(req)))));
+rotasConfig.put("/integracao-financeira", admin, ok((req, res) => {
+  if (req.body?.banco && typeof req.body.banco === "object") salvarDadosBancarios(emp(req), req.body.banco);
+  salvarIntegracaoFinanceira(emp(req), req.body);
+  res.json(visaoIntegracao(emp(req), true));
+}));
+rotasConfig.post("/integracao-financeira/atualizar-cadastro", admin, ok((req, res) => { atualizarCadastro(emp(req), quem(req)); res.json(visaoIntegracao(emp(req), true)); }));
 rotasConfig.get("/pagamentos", ok((req, res) => res.json({ ...pagamentos(emp(req)), credenciais: credenciaisMp(emp(req)), campos: CAMPOS_MP })));
 rotasConfig.put("/pagamentos", admin, ok((req, res) => {
   if (req.body?.credenciais && typeof req.body.credenciais === "object") salvarCredenciaisMp(emp(req), req.body.credenciais as Record<string, unknown>);
