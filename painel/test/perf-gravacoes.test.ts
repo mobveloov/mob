@@ -185,3 +185,27 @@ test("perfis dos apps: filtros do despacho e consulta acompanham o que foi salvo
   assert.equal(X.ehFavorito(um, "11933330001", "mot-1"), true, "ficou no banco");
   assert.equal(X.pessoa(um, "passageiro", "11933330001").codigo, p.codigo);
 });
+
+test("banco: gravações do mesmo ciclo dividem uma confirmação, chegam ao disco, e transacao desfaz só o que falhou", async () => {
+  const B = await import("../src/servidor/banco.ts");
+  const { DatabaseSync } = await import("node:sqlite");
+  const db = B.banco();
+  db.prepare("INSERT INTO migracoes (empresa, nome, em, itens) VALUES (?, ?, ?, ?)").run(um, "lote-a", "agora", 1);
+  assert.throws(() => B.transacao(() => {
+    db.prepare("INSERT INTO migracoes (empresa, nome, em, itens) VALUES (?, ?, ?, ?)").run(um, "lote-b", "agora", 1);
+    throw new Error("falhou");
+  }), /falhou/);
+  B.transacao(() => B.transacao(() => { db.prepare("INSERT INTO migracoes (empresa, nome, em, itens) VALUES (?, ?, ?, ?)").run(um, "lote-c", "agora", 1); }));
+  await new Promise((r) => setImmediate(r)); // fim do ciclo: confirma
+  await new Promise((r) => setImmediate(r));
+  const outra = new DatabaseSync(process.env.BANCO_ARQUIVO!, { readOnly: true }); // outra conexão só enxerga o que foi confirmado
+  try {
+    const nomes = (outra.prepare("SELECT nome FROM migracoes WHERE nome LIKE 'lote-%' ORDER BY nome").all() as Array<{ nome: string }>).map((r) => r.nome);
+    assert.deepEqual(nomes, ["lote-a", "lote-c"]);
+  } finally { outra.close(); }
+  // confirmar() à mão também vale (usado antes de renomear os JSON antigos).
+  B.banco().prepare("INSERT INTO migracoes (empresa, nome, em, itens) VALUES (?, ?, ?, ?)").run(um, "lote-d", "agora", 1);
+  B.confirmar();
+  const outra2 = new DatabaseSync(process.env.BANCO_ARQUIVO!, { readOnly: true });
+  try { assert.ok(outra2.prepare("SELECT 1 FROM migracoes WHERE nome = 'lote-d'").get()); } finally { outra2.close(); }
+});
