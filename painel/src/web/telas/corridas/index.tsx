@@ -11,6 +11,7 @@ import Pendentes from "./Pendentes";
 import Programadas from "./Programadas";
 import Recuperacao from "./Recuperacao";
 import Solicitar from "./Solicitar";
+import Taxas from "./Taxas";
 
 export const TELAS_CORRIDAS: Record<string, JSX.Element> = {
   solicitar: <Solicitar />,
@@ -21,5 +22,6 @@ export const TELAS_CORRIDAS: Record<string, JSX.Element> = {
   ocorrencias: <Ocorrencias />,
   programadas: <Programadas />,
   "pagamentos-pendentes": <Pendentes />,
+  "taxas-cancelamento": <Taxas />,
   objetos: <Objetos />,
 };

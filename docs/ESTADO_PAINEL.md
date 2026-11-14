@@ -30,8 +30,15 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Recarregar saldo** só registra o pedido e o valor (sem gateway); o admin confirma ou cancela. Chargeback e estorno são marcações do admin, sem mexer na carteira. Leitura segue aberta a quem está logado e escrita só do admin, como o resto do financeiro.
 - Teste: `painel/test/financeiro-machine.test.ts`.
 
+## Pix, pendências, taxas, alertas e sino no formato da Machine (branch machine-pixalr)
+- **Transação com Pix** (Financeiro › Pix): uma linha por corrida paga com Pix; situação Paga, Estornada, Processando, Em disputa ou Chargeback. Sem gateway: nasce da corrida e o admin registra à mão (`operacao/pix.ts`, `/api/operacao/pix`).
+- **Pagamentos pendentes** (Gestão de pendências): tipos Pagamento insuficiente (registro manual do admin), Taxa de cancelamento e Pix no app (nasce de Pix estornado ou com chargeback); situações Pendente, Processando, Resolvido, Abonado (`operacao/pendencias.ts`). Baixar ou abonar taxa devolve o valor realmente debitado (corrigido).
+- **Taxas de cancelamento** (Corridas): abas Taxas, Pendentes, Repassados, Resolvidos, Abonados; Repassado aparece como Processando na gestão de pendências.
+- **Alertas para empresas** (Comunicação): listar com filtros e criar (tipo, início, duração); admin e operador criam e encerram; ativos aparecem como faixa no topo (`config/alertas.ts`).
+- **Central de notificações** (sino): avisos montados do que está pendente, leitura por pessoa, "Somente não lidas" (`config/central-notificacoes.ts`).
+- Exportar CSV com proteção de fórmula em Pix, pendências e taxas. Só admin muda situação. Teste: `painel/test/pix-pendencias.test.ts`.
+
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
-- **Abonar ou baixar pendência** devolve o valor editado, não o debitado (`operacao/servico.ts`).
 - **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
 - **Saldo mínimo** existe em duas configurações (Regras de Crédito e gestão do motorista); só a da gestão vale no despacho.
 - **Operador** ainda mexe em punições e veículos; nos cadastros genéricos isso é só de admin (`gestao/motoristas.ts`).
