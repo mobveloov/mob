@@ -8,6 +8,7 @@
 // Este módulo só lê o armazém da gestão (não importa o despacho nem as corridas), para poder ser usado por ambos.
 
 import { lerG } from "../gestao/armazem.ts";
+import { bandeira } from "../config/bandeira.ts";
 import { agoraBr } from "../servidor/util.ts";
 
 export type Ponto = [number, number];
@@ -80,6 +81,12 @@ export function fotoDeAreas(empresaId: string) {
 /** Mensagem para quem tenta pedir corrida dentro de uma área de bloqueio (null = pode pedir). */
 export function motivoDeBloqueio(empresaId: string, ponto: { lat?: number | null; lng?: number | null } | undefined, quando?: Date): string | null {
   if (!ponto) return null;
+  // Config › Gerais › Despacho: área de operação controlada (pedido fora dela é recusado).
+  const controlada = bandeira(empresaId).areaControlada;
+  if (controlada && ponto.lat != null && ponto.lng != null) {
+    const a = areasDaEmpresa(empresaId).find((x) => x.id === controlada);
+    if (a && a.poligono?.length >= 3 && !dentroDe(ponto.lat, ponto.lng, a.poligono)) return `Não atendemos este local: ele fica fora da área de operação (${a.nome}).`;
+  }
   const a = fotoDeAreas(empresaId).bloqueando(ponto.lat, ponto.lng, quando);
   return a ? `Não atendemos este local no momento (área de bloqueio: ${a.nome}).` : null;
 }

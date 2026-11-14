@@ -4,26 +4,63 @@ import { useState } from "react";
 import { Play, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { Abas, Aviso, Cab, Campo, Carregando, Modal, dataHoraBr, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
-// ------------------------------------------------------------------ Termos de Uso App (edição)
+// ------------------------------------------------------------------ Termos de Uso (edição, no formato da Machine)
+
+type AbaTermo = "passageiro" | "motorista" | "empresa" | "privacidade";
+const TERMOS: Record<"passageiro" | "motorista" | "empresa", { aba: string; modo: string; texto: string; app: string; opcoes: Array<[string, string]> }> = {
+  passageiro: { aba: "Aplicativo passageiro", modo: "modoPassageiro", texto: "passageiro", app: "do app passageiro", opcoes: [["nenhum", "Não mostrar Termos de Uso no aplicativo passageiro"], ["padrao", "Usar o termo de uso padrão"], ["proprio", "Enviar Termos de Uso"]] },
+  motorista: { aba: "Aplicativo motorista", modo: "modoMotorista", texto: "motorista", app: "do app motorista", opcoes: [["nenhum", "Não mostrar Termos de Uso no aplicativo motorista"], ["proprio", "Enviar Termos de Uso"]] },
+  empresa: { aba: "Empresa parceira", modo: "modoEmpresa", texto: "empresa", app: "para as empresas parceiras", opcoes: [["nenhum", "Não mostrar Termos de Uso para as empresas parceiras"], ["proprio", "Enviar Termos de Uso"]] },
+};
 
 export function TermosApp() {
   const admin = useAdmin();
-  const [aba, setAba] = useState<"passageiro" | "motorista" | "privacidade">("passageiro");
+  const [aba, setAba] = useState<AbaTermo>("passageiro");
   const d = useCarregar(() => pedirConfig("/termos"), []);
   const [t, setT] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setT(structuredClone(d.dados)); }
   const { msg, salvando, salvar } = useSalvar();
   if (!t) return <>{d.erro ? <Aviso erro={d.erro} /> : <Carregando />}</>;
+  const abas: Array<[AbaTermo, string]> = [["passageiro", "Aplicativo passageiro"], ["motorista", "Aplicativo motorista"], ["empresa", "Empresa parceira"], ["privacidade", "Política de privacidade"]];
+  const gravar = () => salvar(async () => { setT(await pedirConfig("/termos", "PUT", t)); }, "Mudanças salvas.");
+  const lerArquivo = (f: File | undefined, campo: string) => {
+    if (!f) return;
+    if (f.size > 200_000 || !/\.(txt|md|html?)$/i.test(f.name)) { alert("Envie um arquivo de texto (.txt, .md ou .html) de até 200 KB."); return; }
+    const l = new FileReader();
+    l.onload = () => setT((x: any) => ({ ...x, [campo]: String(l.result).replace(/<\/?script/gi, "") }));
+    l.readAsText(f);
+  };
+  const info = aba === "privacidade" ? null : TERMOS[aba];
+  const modo: string = info ? t[info.modo] : "proprio";
+  const campoTexto = info ? info.texto : "privacidade";
+  const mostrar = !info ? t.privacidade : modo === "padrao" ? t.padraoPassageiro : modo === "proprio" ? t[campoTexto] : "";
   return (
     <>
-      <Cab titulo="Termos de Uso do App" sub={`Versão ${t.versao}${t.atualizadoEm ? ` · atualizado em ${dataHoraBr(t.atualizadoEm)}` : ""}. Quem usa o app aceita a versão vigente.`}>
-        {admin && <button className="botao primario" disabled={salvando} onClick={() => salvar(async () => { setT(await pedirConfig("/termos", "PUT", t)); }, "Termos publicados.")}>Publicar</button>}
-      </Cab>
-      <Abas abas={[["passageiro", "Termos do Passageiro"], ["motorista", "Termos do Motorista"], ["privacidade", "Política de Privacidade"]]} valor={aba} onChange={setAba} />
+      <Cab titulo="Termos de uso" sub={`Versão ${t.versao}${t.atualizadoEm ? ` · atualizado em ${dataHoraBr(t.atualizadoEm)}` : ""}.`} />
+      <Abas abas={abas} valor={aba} onChange={setAba} />
       <Aviso erro={msg?.erro} ok={msg?.ok} />
-      <Campo rotulo={aba === "passageiro" ? "Termos de Uso do Passageiro" : aba === "motorista" ? "Termos de Uso do Motorista" : "Política de Privacidade (LGPD)"} dica={`${t[aba].length} caracteres. Cada linha em branco separa os itens; títulos numerados ("1. Título") ficam em destaque.`}>
-        <textarea className="dm-termo" rows={22} value={t[aba]} disabled={!admin} onChange={(e) => setT({ ...t, [aba]: e.target.value })} />
-      </Campo>
+      <section className="dm-cartao">
+        {info && (
+          <>
+            <h3>Configuração de Termos de Uso</h3>
+            <p className="sub">{aba === "passageiro" ? "Defina se deseja usar o texto padrão para os termos de uso do app passageiro ou se prefere personalizar o seu termo." : aba === "motorista" ? "Defina se deseja usar o texto padrão para os termos de uso do app motorista ou se prefere personalizar o seu termo." : "Defina se deseja mostrar os Termos de Uso para as empresas parceiras."}</p>
+            <div className="dm-radios dm-radios-col">{info.opcoes.map(([v, n]) => <label key={v}><input type="radio" name={`modo-${aba}`} disabled={!admin} checked={modo === v} onChange={() => setT({ ...t, [info.modo]: v })} /> {n}</label>)}</div>
+          </>
+        )}
+        {(modo !== "nenhum" || !info) && (
+          <>
+            <h3>Seus Termos de Uso</h3>
+            {modo === "padrao" ? <div className="dm-documento">{mostrar.split("\n").map((l: string, i: number) => (/^\d+\.\s/.test(l) ? <h3 key={i}>{l}</h3> : l.trim() ? <p key={i}>{l}</p> : null))}</div> : (
+              <>
+                {admin && info && <label className="botao">Enviar arquivo de texto<input type="file" hidden accept=".txt,.md,.html,.htm,text/plain" onChange={(e) => lerArquivo(e.target.files?.[0], campoTexto)} /></label>}
+                <textarea className="dm-termo" rows={20} aria-label="Texto dos termos" value={mostrar} disabled={!admin} onChange={(e) => setT({ ...t, [campoTexto]: e.target.value })} />
+                <small>{mostrar.length} caracteres. Cada linha em branco separa os itens; títulos começam com número (1. Aceite).</small>
+              </>
+            )}
+          </>
+        )}
+      </section>
+      {admin ? <div className="dm-salvar"><button className="botao" onClick={() => setT(structuredClone(d.dados))}>Voltar</button><button className="botao primario" disabled={salvando} onClick={gravar}>Salvar mudanças</button></div> : <p className="sub">Só o administrador altera os termos.</p>}
     </>
   );
 }

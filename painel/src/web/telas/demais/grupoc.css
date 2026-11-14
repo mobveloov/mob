@@ -20,3 +20,4 @@
 .pe-busca { background: #f3f4f6; border-radius: 8px; padding: 8px; color: #6b7280; } .pe-anuncio { border: 1px dashed var(--pe-cor); text-align: center; color: var(--pe-cor); }
 .pe-rodape { margin-top: auto; display: flex; justify-content: space-around; border-top: 1px solid #e5e7eb; padding-top: 6px; color: var(--pe-cor); }
 .pe-form input[type="color"] { width: 56px; height: 34px; padding: 2px; flex: none; }
+.dm-sep { margin: 22px 0 10px; font-size: 16px; color: var(--suave); }

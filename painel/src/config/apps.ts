@@ -33,7 +33,7 @@ export function configDosApps(empresaId: string) {
       valorExtraPassageiro: c.extra.valorExtraPassageiro, segurancaMulheres: c.extra.segurancaMulheres, solicitacoes: c.extra.solicitacoes,
     })),
     pagamentos: p,
-    termos: { versao: t.versao, atualizadoEm: t.atualizadoEm },
+    termos: { versao: t.versao, atualizadoEm: t.atualizadoEm, modoPassageiro: t.modoPassageiro, modoMotorista: t.modoMotorista, modoEmpresa: t.modoEmpresa },
     personalizacao: personalizacao(empresaId),
   };
 }

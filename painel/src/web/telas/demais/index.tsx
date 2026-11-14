@@ -10,7 +10,9 @@ import { AlertasEmpresas } from "./Alertas";
 import { Conversas, Notificacoes } from "./Comunicacao";
 import { ConfigGerais } from "./ConfigGerais";
 import { Categorias } from "./Categorias";
-import { Descontos, RegrasCredito, RegrasDespacho, Transbordos } from "./ConfigRegras";
+import { Descontos, RegrasCredito } from "./ConfigRegras";
+import { DespachoResumo } from "../grupoc/DespachoResumo";
+import { TransbordosParceiras } from "../grupoc/TransbordosParceiras";
 import { TarifasDinamicas } from "./Dinamica";
 import { Integracoes } from "./Integracoes";
 import { Avaliacoes, ConfigNps } from "./Nps";
@@ -34,8 +36,8 @@ export const TELAS_DEMAIS: Record<string, JSX.Element> = {
   categorias: <Categorias />,
   "tarifas-dinamicas": <TarifasDinamicas />,
   descontos: <Descontos />,
-  "regras-despacho": <RegrasDespacho />,
-  transbordos: <Transbordos />,
+  "regras-despacho": <DespachoResumo />,
+  transbordos: <TransbordosParceiras />,
   integracoes: <Integracoes />,
   "config-nps": <ConfigNps />,
   "termos-app": <TermosApp />,
