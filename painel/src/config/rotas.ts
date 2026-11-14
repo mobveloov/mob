@@ -8,7 +8,7 @@ import { exigirPapel } from "../servidor/sessao.ts";
 import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
 import { configDosApps } from "./apps.ts";
-import { configNps, resetarRecusas, resumoNps, salvarConfigNps, type PapelNps } from "./avaliacoes.ts";
+import { avaliacoesNps, csvAvaliacoes, PERIODOS_NPS, TIPOS_NPS, configNps, resetarRecusas, resumoNps, salvarConfigNps, type PapelNps } from "./avaliacoes.ts";
 import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
@@ -16,6 +16,8 @@ import { pedidosRecentes } from "../corridas/index.ts";
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
 import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
+import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
+import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
 import { csvExtratoOnline, csvVisaoGeral, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
@@ -160,6 +162,9 @@ rotasConfig.delete("/dinamicas/:id", admin, ok((req, res) => { removerDinamica(e
 rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => c.nome) })));
 rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
 rotasConfig.delete("/descontos/:id", admin, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
+// Matriz por forma de pagamento x site/app #1 a #4 e desconto máximo da empresa (convive com os descontos por campanha acima).
+rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)) })));
+rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
 
 // ------------------------------------------------------------------ config: despacho, transbordos, integrações
 
@@ -171,6 +176,15 @@ rotasConfig.get("/transbordos", ok((req, res) => {
   res.json({ periodo: p, permitir: regrasDespacho(emp(req)).permitirTransbordo, itens: transbordos(emp(req), p.inicio, p.fim, q(req, "cidade")) });
 }));
 
+// Transações financeiras (formato da Machine): plano, quem recebe, taxa de cartão, Pix e dados bancários (estes só o admin vê e grava).
+const ehAdmin = (req: Request) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+rotasConfig.get("/integracao-financeira", ok((req, res) => res.json(visaoIntegracao(emp(req), ehAdmin(req)))));
+rotasConfig.put("/integracao-financeira", admin, ok((req, res) => {
+  if (req.body?.banco && typeof req.body.banco === "object") salvarDadosBancarios(emp(req), req.body.banco);
+  salvarIntegracaoFinanceira(emp(req), req.body);
+  res.json(visaoIntegracao(emp(req), true));
+}));
+rotasConfig.post("/integracao-financeira/atualizar-cadastro", admin, ok((req, res) => { atualizarCadastro(emp(req), quem(req)); res.json(visaoIntegracao(emp(req), true)); }));
 rotasConfig.get("/pagamentos", ok((req, res) => res.json({ ...pagamentos(emp(req)), credenciais: credenciaisMp(emp(req)), campos: CAMPOS_MP })));
 rotasConfig.put("/pagamentos", admin, ok((req, res) => {
   if (req.body?.credenciais && typeof req.body.credenciais === "object") salvarCredenciaisMp(emp(req), req.body.credenciais as Record<string, unknown>);
@@ -182,6 +196,13 @@ rotasConfig.put("/pagamentos", admin, ok((req, res) => {
 
 const papelNps = (v: string): PapelNps => (v === "motorista" ? "motorista" : "passageiro");
 rotasConfig.get("/nps/:papel", ok((req, res) => res.json({ config: configNps(emp(req), papelNps(req.params.papel)), resumo: resumoNps(emp(req), papelNps(req.params.papel)) })));
+const filtroNps = (req: Request) => {
+  const v = (k: string, max = 80) => String(req.query[k] ?? "").trim().slice(0, max);
+  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20) };
+};
+/** Avaliações (NPS): nota, promotores, neutros, detratores e a lista paginada, com filtros de período, tipo, e-mail e telefone. */
+rotasConfig.get("/nps/:papel/avaliacoes", ok((req, res) => res.json({ ...avaliacoesNps(emp(req), papelNps(req.params.papel), filtroNps(req), Number(req.query.pagina) || 1), periodos: PERIODOS_NPS, tipos: TIPOS_NPS })));
+rotasConfig.get("/nps/:papel/exportar", ok((req, res) => res.json({ nome: `nps-${papelNps(req.params.papel)}-${agoraBr().toISOString().slice(0, 10)}.csv`, csv: csvAvaliacoes(emp(req), papelNps(req.params.papel), filtroNps(req)) })));
 rotasConfig.put("/nps/:papel", admin, ok((req, res) => res.json({ config: salvarConfigNps(emp(req), papelNps(req.params.papel), req.body) })));
 rotasConfig.post("/nps/:papel/resetar", admin, ok((req, res) => res.json({ removidas: resetarRecusas(emp(req), papelNps(req.params.papel)) })));
 

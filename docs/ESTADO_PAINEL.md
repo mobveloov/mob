@@ -41,6 +41,7 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Fila virtual** ordena pela hora em que o motorista ficou online, não por "livre desde".
 - **Notificação agendada** pode sair duas vezes; **disparo para todos** segura o pedido por minutos.
 - **Financeiro** soma só os 2.000 lançamentos mais recentes do período (`config/financeiro.ts`).
+- **Consultar corridas e NPS** (branch machine-corrnps): a consulta roda direto no banco (`operacao/consulta.ts`, só a página pedida) quando não há sistema nem planilha ativos (os dados de exemplo não entram nessa lista; escolha a fonte "exemplo" para vê-los). Com outra fonte conectada volta o caminho antigo (junta na memória) e os filtros novos valem só para as corridas próprias. Nº externo, central de chamada e da corrida só aparecem em corridas criadas com esses campos. NPS: notas de 1 a 5 (5 promotor, 4 neutro, até 3 detrator).
 - **Planilhas** (Empresas, Recuperação, Histórico): injeção de fórmula em células que começam com `=`, `+`, `-` ou `@`.
 - **Desempenho** com milhares de corridas: relatórios, desafios, indicações e o Monitoramento.
 - **Clique duplo** em "Confirmar" de crédito do motorista lança duas vezes.

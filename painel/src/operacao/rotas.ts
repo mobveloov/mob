@@ -1,7 +1,8 @@
 // Rotas da operação de corridas da central (/api/operacao): grupo Corridas do painel.
 // Registrar DEPOIS do app.use("/api", exigirLogin) do index.ts. A empresa vem SEMPRE do login (req.ctx).
 //
-//   GET  /historico                    histórico com filtros avançados (paginado; ?todas=1 para a planilha)
+//   GET  /historico                    histórico com filtros avançados (paginado no banco; ?todas=1 devolve a lista das outras fontes)
+//   GET  /historico/exportar           planilha CSV do filtro (com proteção contra fórmula)
 //   GET  /corridas/:id                 detalhe (repasses, financeiro, datas)
 //   GET  /corridas/:id/raiox           auditoria: ondas de envio, timeline técnica, motoristas da região
 //   GET  /corridas/:id/rastreio        rastreio (posição do motorista e link de compartilhar)
@@ -18,6 +19,11 @@ import { Router, type Request, type Response } from "express";
 import { arquivoDoAudio } from "../apps/chat.ts";
 import { aposCancelar } from "../apps/extras.ts";
 import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
+import { cadastroPorId } from "../comum/cadastros.ts";
+import { listar } from "../cadastros/armazem.ts";
+import { alertas } from "../apps/despacho.ts";
+import * as D from "../servidor/dados.ts";
+import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr } from "../servidor/util.ts";
 import "./ondas.ts"; // liga o registro das ofertas do despacho
@@ -25,6 +31,7 @@ import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
 import * as S from "./servico.ts";
 
 export const rotasOperacao = Router();
+const hojeBr = () => agoraBr().toISOString().slice(0, 10);
 
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
   try { await fn(req, res); } catch (e) {
@@ -48,23 +55,58 @@ const ponto = (v: unknown) => {
 
 // ------------------------------------------------------------------ histórico
 
+/** Filtros da consulta (os mesmos para a tela, a planilha e a análise com IA). */
+const filtrosHistorico = (req: Request): S.FiltroHistorico => ({
+  rapido: S.RAPIDOS[q(req, "rapido")] ? q(req, "rapido") : undefined, os: q(req, "os", 30), osExterna: q(req, "osExterna", 40),
+  centralChamada: q(req, "centralChamada", 60), centralCorrida: q(req, "centralCorrida", 60), empresa: q(req, "empresa", 80),
+  cidade: q(req, "cidade"), categoria: q(req, "categoria"),
+  endereco: q(req, "endereco"), nomePax: q(req, "nomePax"), cpfPax: q(req, "cpfPax", 20), telPax: q(req, "telPax", 20), motorista: q(req, "motorista"),
+  dataIni: dataOk(q(req, "dataIni")), dataFim: dataOk(q(req, "dataFim")), horaIni: horaOk(q(req, "horaIni")), horaFim: horaOk(q(req, "horaFim")),
+  pagamento: q(req, "pagamento"), origem: q(req, "origem"), status: q(req, "status"), fonte: q(req, "fonte", 60),
+  urgencia: q(req, "urgencia", 2), via: q(req, "via", 10), cashback: q(req, "cashback", 2) === "1",
+});
+const nomeDaCentral = (req: Request) => D.empresa(emp(req))?.nome ?? "";
+/** Só as corridas próprias do painel (sem sistema conectado nem planilha ativos; os dados de exemplo não contam): a consulta roda
+ *  direto no banco, só com a página pedida. Com outra fonte conectada, a lista junta tudo na memória (caminho antigo). */
+const soProprias = (req: Request, f: S.FiltroHistorico) => f.fonte === "propria" || (!f.fonte && !D.integracoes(emp(req)).some((i) => i.ativa && i.tipo !== "exemplo"));
+const OPCOES_FIXAS = (req: Request) => ({
+  pagamentos: PAGAMENTOS_LISTA, urgencias: Object.entries(URGENCIAS).map(([id, nome]) => ({ id, nome })), vias: Object.entries(VIAS).map(([id, nome]) => ({ id, nome })),
+  centrais: [nomeDaCentral(req)].filter(Boolean),
+  empresas: listar(emp(req), cadastroPorId("conveniadas")!).map((e) => String(e.nome ?? "")).filter(Boolean).sort(),
+});
+
 rotasOperacao.get("/historico", ok(async (req, res) => {
-  const f: S.FiltroHistorico = {
-    rapido: S.RAPIDOS[q(req, "rapido")] ? q(req, "rapido") : undefined, os: q(req, "os", 30), cidade: q(req, "cidade"), categoria: q(req, "categoria"),
-    endereco: q(req, "endereco"), nomePax: q(req, "nomePax"), cpfPax: q(req, "cpfPax", 20), telPax: q(req, "telPax", 20), motorista: q(req, "motorista"),
-    dataIni: dataOk(q(req, "dataIni")), dataFim: dataOk(q(req, "dataFim")), horaIni: horaOk(q(req, "horaIni")), horaFim: horaOk(q(req, "horaFim")),
-    pagamento: q(req, "pagamento"), origem: q(req, "origem"), status: q(req, "status"), fonte: q(req, "fonte", 60),
-  };
+  const f = filtrosHistorico(req);
+  const base = S.filtroBase(f);
+  const porPagina = 30;
+  if (soProprias(req, f) && req.query.todas !== "1") {
+    const r = consultarProprias(emp(req), f, pag(req), porPagina, nomeDaCentral(req));
+    const empresas = empresasPorTelefone(emp(req));
+    const comAlerta = new Set(alertas(emp(req)).filter((a) => !a.resolvido).map((a) => `propria:${a.corridaId}`));
+    return res.json({
+      avisos: [], stats: r.stats, filtroBase: base, pagina: r.pagina, paginas: r.paginas, total: r.total, status: S.STATUS_FILTRO,
+      corridas: r.itens.map((c) => ({ ...paraLinha(c, empresas), alerta: comAlerta.has(`propria:${c.id}`) })),
+      opcoes: { ...S.opcoesRapidas(emp(req)), ...OPCOES_FIXAS(req) },
+    });
+  }
   const r = await S.historico(emp(req), f);
   if (req.query.todas === "1") return res.json({ corridas: r.corridas.slice(0, 5000), filtroBase: r.filtroBase });
-  const porPagina = 30;
   const paginas = Math.max(1, Math.ceil(r.corridas.length / porPagina));
   const pagina = Math.min(Math.max(1, pag(req)), paginas);
   const itens = r.corridas.slice((pagina - 1) * porPagina, pagina * porPagina);
+  const empresas = empresasPorTelefone(emp(req));
   res.json({
-    avisos: r.avisos, stats: r.stats, opcoes: r.opcoes, filtroBase: r.filtroBase, pagina, paginas, total: r.corridas.length,
-    corridas: itens.map((c) => ({ ...c, alerta: r.alerta(c) })), status: S.STATUS_FILTRO,
+    avisos: [...r.avisos, ...(f.osExterna || f.centralChamada || f.centralCorrida || f.empresa || f.urgencia || f.via || f.cashback ? ["Os filtros de nº externo, central, empresa, urgência, via e cashback valem só para as corridas próprias."] : [])],
+    stats: r.stats, opcoes: { ...r.opcoes, ...OPCOES_FIXAS(req) }, filtroBase: r.filtroBase, pagina, paginas, total: r.corridas.length,
+    corridas: itens.map((c) => ({ ...c, osExterna: "", empresa: empresas.get(c.telefonePassageiro.replace(/\D/g, "")) ?? "", alerta: r.alerta(c) })), status: S.STATUS_FILTRO,
   });
+}));
+
+/** Exportar: planilha CSV de tudo o que o filtro mostra (com proteção contra fórmula). */
+rotasOperacao.get("/historico/exportar", ok((req, res) => {
+  const f = filtrosHistorico(req);
+  if (!soProprias(req, f)) throw new Error("A planilha completa vale para as corridas próprias. Escolha a fonte \"Próprias\" no filtro.");
+  res.json({ nome: `corridas-${hojeBr()}.csv`, csv: csvDeCorridas(emp(req), f, nomeDaCentral(req)) });
 }));
 
 // ------------------------------------------------------------------ uma corrida
@@ -190,6 +232,7 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
     destino: b.destino ? ponto(b.destino) : undefined, paradas: Array.isArray(b.paradas) ? b.paradas.map(ponto) : [],
     categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
     cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
+    osExterna: b.osExterna ? String(b.osExterna) : undefined,
   }, quem(req));
   const avisos: string[] = [];
   const valor = num(b.valor);

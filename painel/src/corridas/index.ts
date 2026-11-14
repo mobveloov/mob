@@ -56,6 +56,11 @@ export interface NovaCorridaPropria {
   opcionais?: string[];
   /** Corrida de rua do motorista (Maçaneta): não cria o passageiro no cadastro de clientes. */
   semCadastro?: boolean;
+  /** Número da OS no sistema de origem (quando a corrida veio de outro sistema ou central parceira). */
+  osExterna?: string;
+  /** Central que recebeu a chamada e central que atendeu a corrida (transbordo). Vazio: a própria central. */
+  centralChamada?: string;
+  centralCorrida?: string;
 }
 
 export interface CorridaPropria {
@@ -104,6 +109,9 @@ export interface CorridaPropria {
   etiquetas?: string[];
   /** Maçaneta (corrida de rua): "taximetro" cobra pela distância e pelo tempo reais; "destino" pela rota. */
   macaneta?: { modo: "taximetro" | "destino"; km: number; ultimaLat?: number; ultimaLng?: number; ultimaEm?: number };
+  osExterna?: string;
+  centralChamada?: string;
+  centralCorrida?: string;
 }
 
 /** Hora de referência da corrida: a agendada (se houver) ou a do pedido. */
@@ -131,15 +139,20 @@ function congelar<T>(v: T): T {
   return v;
 }
 
-export function listarProprias(empresaId: string): CorridaPropria[] {
+/** Garante que o corridas.json antigo já entrou no banco (uma vez só). As consultas direto no banco chamam isto antes. */
+export function prepararProprias(empresaId: string) {
   const arq = arquivo(empresaId); // valida o id da empresa
-  const m = memoria.get(empresaId);
-  if (m && m.arquivoBanco === arquivoDoBanco()) return m.lista as CorridaPropria[];
   migrarUmaVez(empresaId, "corridas_proprias", arq, (conteudo) => {
     const l = Array.isArray(conteudo) ? (conteudo as CorridaPropria[]).filter((c) => c && typeof c.id === "string") : [];
     for (const c of l) gravarLinha(empresaId, c);
     return l.length;
   });
+}
+
+export function listarProprias(empresaId: string): CorridaPropria[] {
+  const m = memoria.get(empresaId);
+  if (m && m.arquivoBanco === arquivoDoBanco()) { arquivo(empresaId); return m.lista as CorridaPropria[]; }
+  prepararProprias(empresaId);
   const lista = banco().prepare("SELECT dados FROM corridas_proprias WHERE empresa = ? ORDER BY os_num, id").all(empresaId)
     .map((r) => congelar(JSON.parse(String((r as { dados: string }).dados)) as CorridaPropria));
   memoria.set(empresaId, { arquivoBanco: arquivoDoBanco(), lista: Object.freeze(lista) });
@@ -321,6 +334,9 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(valorOferecido != null ? { valorOferecido } : {}),
       ...(n.opcionais?.length ? { opcionais: n.opcionais.slice(0, 8) } : {}),
       compartilhamento: crypto.randomBytes(12).toString("base64url"),
+      ...(n.osExterna ? { osExterna: String(n.osExterna).replace(/[<>]/g, "").trim().slice(0, 40) } : {}),
+      ...(n.centralChamada ? { centralChamada: String(n.centralChamada).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
+      ...(n.centralCorrida ? { centralCorrida: String(n.centralCorrida).replace(/[<>]/g, "").trim().slice(0, 60) } : {}),
     };
     gravar(empresaId, [corrida]);
     // O passageiro entra (ou é atualizado) no cadastro de clientes.
@@ -532,7 +548,7 @@ export function encerrarSemMotorista(empresaId: string, minutos = 20) {
 
 // ------------------------------------------------------------------ para as telas e a análise
 
-const CANAL_TEXTO: Record<Canal, string> = { painel: "Central", bot: "WhatsApp", totem: "Totem", app: "App", macaneta: "Maçaneta" };
+export const CANAL_TEXTO: Record<Canal, string> = { painel: "Central", bot: "WhatsApp", totem: "Totem", app: "App", macaneta: "Maçaneta" };
 
 export function corridaPropriaParaPainel(c: CorridaPropria, origemNome = "Próprias"): CorridaPainel {
   return {
