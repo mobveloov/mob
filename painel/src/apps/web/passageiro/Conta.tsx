@@ -2,14 +2,14 @@
 // Também a lista de corridas agendadas.
 
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
+import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
 import { api, reais, telefoneBonito } from "../comum/api";
 import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { compartilharTexto, dataCurta, prepararFoto, quandoAgendada, type Eu, type Perfil } from "./apoio";
 import { GENEROS } from "./Entrar";
 import { Avatar, Campo } from "./pecas";
 
-type Tela = "" | "perfil" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
+type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
 
 function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => void; children: ReactNode }) {
   return (
@@ -34,6 +34,8 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
 
   const voltar = () => { setTela(""); carregar(); };
   if (tela === "perfil") return <EditarPerfil eu={eu} voltar={voltar} salvou={() => { mudouEu?.(); voltar(); }} />;
+  if (tela === "cupons") return <Voltar titulo="Meus Cupons" voltar={voltar}><Cupons /></Voltar>;
+  if (tela === "cartoes") return <Voltar titulo="Meus Cartões" voltar={voltar}><Cartoes /></Voltar>;
   if (tela === "favoritos") return <Voltar titulo="Motoristas favoritos e bloqueados" voltar={voltar}><Favoritos /></Voltar>;
   if (tela === "carteira") return <Voltar titulo="Carteira" voltar={voltar}><Carteira /></Voltar>;
   if (tela === "indique" && perfil) return <Voltar titulo="Indique e ganhe" voltar={voltar}><Indique perfil={perfil} marca={marca} mudou={setPerfil} /></Voltar>;
@@ -56,7 +58,9 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
       </section>
       <h3 className="conta-secao">FINANCEIRO</h3>
       <div className="conta-grupo">
+        <ItemConta icone={<CreditCard size={22} />} cor="azul" titulo="Meus Cartões" sub="Gerencie seus cartões" ir={() => setTela("cartoes")} />
         <ItemConta icone={<Megaphone size={22} />} cor="laranja" titulo="Indique e Ganhe" sub="Convide amigos e ganhe bônus" ir={() => setTela("indique")} />
+        <ItemConta icone={<Tag size={22} />} cor="roxo" titulo="Meus Cupons" sub="Descontos exclusivos para você" ir={() => setTela("cupons")} />
       </div>
       <h3 className="conta-secao">MINHAS ATIVIDADES</h3>
       <div className="conta-grupo">
@@ -81,6 +85,38 @@ function ItemConta({ icone, cor, titulo, sub, ir }: { icone: ReactNode; cor: str
       <span className="conta-texto"><strong>{titulo}</strong>{sub && <small>{sub}</small>}</span>
       <ChevronRight size={18} className="conta-seta" />
     </button>
+  );
+}
+
+interface CupomLista { codigo: string; tipo: "valor" | "percentual"; valor: number; maximo: number | null; ate: string | null; categorias: string[] }
+
+/** Meus Cupons: os cupons ativos da empresa; tocar copia o código para usar em "Clique para descontos". */
+function Cupons() {
+  const [lista, setLista] = useState<CupomLista[] | null>(null);
+  const [copiado, setCopiado] = useState("");
+  useEffect(() => { void api<{ cupons: CupomLista[] }>("/cupons").then((r) => setLista(r.cupons)).catch(() => setLista([])); }, []);
+  if (!lista) return <Carregando />;
+  if (!lista.length) return <div className="vazio"><strong>Nenhum cupom por aqui</strong><p>Quando houver descontos para você, eles aparecem nesta tela.</p></div>;
+  const copiar = (c: string) => { void navigator.clipboard?.writeText(c).catch(() => undefined); setCopiado(c); };
+  return <>{lista.map((c) => (
+    <Cartao key={c.codigo}>
+      <strong className="cupom-codigo">{c.codigo}</strong>
+      <span>{c.tipo === "valor" ? `${reais(c.valor)} de desconto` : `${c.valor}% de desconto${c.maximo ? ` (até ${reais(c.maximo)})` : ""}`}</span>
+      <small className="dica">{[c.categorias.length ? `Para ${c.categorias.join(", ")}` : "", c.ate ? `Válido até ${c.ate.split("-").reverse().join("/")}` : ""].filter(Boolean).join(" · ")}</small>
+      <button className="botao-claro" onClick={() => copiar(c.codigo)}>{copiado === c.codigo ? "Código copiado" : "Copiar código"}</button>
+    </Cartao>
+  ))}<p className="dica">Para usar, escolha "Clique para descontos" na hora de pedir e digite o código.</p></>;
+}
+
+/** Meus Cartões: hoje o app não guarda cartões; mostra as formas de pagamento que existem. */
+function Cartoes() {
+  return (
+    <>
+      <Cartao>
+        <strong>Cartões salvos no app</strong>
+        <p className="dica" style={{ margin: 0 }}>Ainda não é possível salvar cartão no app. Você paga no dinheiro, no Pix, no cartão na maquininha do motorista ou com o saldo da carteira.</p>
+      </Cartao>
+    </>
   );
 }
 

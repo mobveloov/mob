@@ -145,6 +145,7 @@ function Historico({ irAgendadas }: { irAgendadas: () => void }) {
   const [aberta, setAberta] = useState<Corrida | null>(null);
   const [darNota, setDarNota] = useState(false);
   const [filtro, setFiltro] = useState<"todas" | "finalizadas" | "canceladas" | "andamento">("todas");
+  const [dataFiltro, setDataFiltro] = useState("");
   const carregar = useCallback(() => api<{ corridas: Corrida[] }>(`/corridas?filtro=${filtro}`).then((r) => setLista(r.corridas)).catch(() => setLista([])), [filtro]);
   useEffect(() => { void carregar(); }, [carregar]);
   if (!lista) return <Carregando />;
@@ -181,9 +182,9 @@ function Historico({ irAgendadas }: { irAgendadas: () => void }) {
   return (
     <div className="tela">
       <h1 className="titulo-tela">Suas Viagens</h1>
-      <div className="pilulas">{filtros.map(([id, nome]) => <button key={id} className={filtro === id ? "ativa" : ""} onClick={() => { setLista(null); setFiltro(id); }}>{nome}</button>)}<button onClick={irAgendadas}>Agendadas</button></div>
+      <div className="pilulas">{filtros.map(([id, nome]) => <button key={id} className={filtro === id ? "ativa" : ""} onClick={() => { setLista(null); setFiltro(id); }}>{nome}</button>)}<button onClick={irAgendadas}>Agendadas</button><label className={`pilula-data ${dataFiltro ? "ativa" : ""}`}>Filtrar Data<input type="date" value={dataFiltro} onChange={(e) => setDataFiltro(e.target.value)} /></label>{dataFiltro && <button onClick={() => setDataFiltro("")}>Limpar data</button>}</div>
       {!lista.length && <div className="vazio"><span className="vazio-icone"><Clock size={34} /></span><strong>Nenhuma viagem por aqui</strong><p>Quando você realizar corridas, elas aparecerão organizadas aqui.</p></div>}
-      <ul className="lista">{lista.map((c) => (
+      <ul className="lista">{lista.filter((c) => !dataFiltro || (c.agendadaPara ?? c.solicitadaEm).slice(0, 10) === dataFiltro).map((c) => (
         <li key={c.id} className="clicavel" role="button" tabIndex={0} onClick={() => setAberta(c)} onKeyDown={(e) => { if (e.key === "Enter") setAberta(c); }}>
           <span><strong>{c.agendadaPara ? quandoAgendada(c.agendadaPara) : hora(c.solicitadaEm)}</strong><br /><small className="dica">OS {c.os} · {c.destino?.texto ?? c.embarque.texto}</small></span>
           <span className="direita">{esperandoHorario(c) ? "Agendada" : c.statusTexto}<br /><strong>{c.valor != null ? reais(c.valor) : c.taxaCancelamento ? `taxa ${reais(c.taxaCancelamento)}` : ""}</strong>{c.avaliacao ? ` · ${c.avaliacao}★` : ""}</span>
