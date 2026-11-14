@@ -16,11 +16,12 @@ import { saldo, saldos } from "../apps/extras.ts";
 import { hashSenha } from "../servidor/dados.ts";
 import { arred, normal } from "../servidor/util.ts";
 import { gravarG, lerG } from "./armazem.ts";
+import { limparBloqueio, limparCor, limparPrioridade, type Bloqueio } from "../areas/areas.ts";
 
 // ====================================================================== áreas (cidades e perímetros)
 
 export type Ponto = [number, number];
-export interface Area { id: string; nome: string; fuso: string; poligono: Ponto[]; criadoEm: string }
+export interface Area { id: string; nome: string; fuso: string; poligono: Ponto[]; criadoEm: string; prioridade?: number; cor?: string; bloqueio?: Bloqueio }
 export const FUSOS: Record<string, string> = {
   "America/Sao_Paulo": "Brasília (UTC-3)", "America/Cuiaba": "Cuiabá (UTC-4)", "America/Manaus": "Manaus (UTC-4)",
   "America/Rio_Branco": "Acre (UTC-5)", "America/Noronha": "F. Noronha (UTC-2)",
@@ -37,21 +38,26 @@ function limparPoligono(v: unknown): Ponto[] {
   return pts;
 }
 
-export function salvarArea(empresaId: string, entrada: { id?: string; nome?: unknown; fuso?: unknown; poligono?: unknown }): Area {
+export function salvarArea(empresaId: string, entrada: { id?: string; nome?: unknown; fuso?: unknown; poligono?: unknown; prioridade?: unknown; cor?: unknown; bloqueio?: unknown }): Area {
   const nome = String(entrada.nome ?? "").replace(/[<>]/g, "").trim().slice(0, 80);
   if (nome.length < 2) throw new Error("Informe o nome da cidade.");
   const fuso = FUSOS[String(entrada.fuso)] ? String(entrada.fuso) : "America/Sao_Paulo";
   const poligono = limparPoligono(entrada.poligono);
   const l = areas(empresaId);
   if (l.some((a) => a.id !== entrada.id && normal(a.nome) === normal(nome))) throw new Error("Já existe uma área com este nome.");
+  const extras = {
+    ...(entrada.prioridade !== undefined ? { prioridade: limparPrioridade(entrada.prioridade) } : {}),
+    ...(entrada.cor !== undefined ? { cor: limparCor(entrada.cor) } : {}),
+    ...(entrada.bloqueio !== undefined ? { bloqueio: limparBloqueio(entrada.bloqueio, poligono) } : {}),
+  };
   if (entrada.id) {
     const a = l.find((x) => x.id === entrada.id);
     if (!a) throw new Error("Área não encontrada.");
-    Object.assign(a, { nome, fuso, poligono });
+    Object.assign(a, { nome, fuso, poligono, ...extras });
     gravarG(empresaId, "areas", l);
     return a;
   }
-  const a: Area = { id: crypto.randomUUID(), nome, fuso, poligono, criadoEm: new Date().toISOString() };
+  const a: Area = { id: crypto.randomUUID(), nome, fuso, poligono, criadoEm: new Date().toISOString(), prioridade: 1, ...extras };
   gravarG(empresaId, "areas", [...l, a]);
   return a;
 }

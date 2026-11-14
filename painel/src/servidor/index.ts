@@ -34,6 +34,7 @@ import { listar as listarCadastro } from "../cadastros/armazem.ts";
 import { normal } from "./util.ts";
 import { rotasConfig } from "../config/rotas.ts";
 import { rotasRelatorios } from "../relatorios/rotas.ts";
+import { rotasAreas } from "../areas/rotas.ts";
 
 if (fs.existsSync(".env")) process.loadEnvFile(".env");
 
@@ -445,6 +446,7 @@ app.use("/api/gestao", rotasGestao);
 app.use("/api/engajamento", rotasEngajamento);
 app.use("/api/config", rotasConfig);
 app.use("/api/relatorios", rotasRelatorios);
+app.use("/api/areas", rotasAreas);
 
 app.use("/api", (_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));
 

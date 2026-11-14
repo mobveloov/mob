@@ -6,6 +6,7 @@
 
 import { aplicarDinamica } from "../config/dinamica.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
+import { motivoDeBloqueio } from "../areas/areas.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -286,6 +287,8 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     if (cats.length && (!cat || cat.ativa === false)) throw new Error("Categoria inválida ou desligada.");
     const cliente = listar(empresaId, cadastroPorId("clientes")!).find((c) => c.telefone === telefone);
     if (cliente && (cliente.status === "Bloqueado" || cliente.status === "Suspenso")) throw new Error("Este passageiro está bloqueado.");
+    const bloqueio = motivoDeBloqueio(empresaId, n.embarque, agendadaPara ? new Date(agendadaPara) : undefined); // Cadastro › Áreas: área de risco/bloqueio
+    if (bloqueio) throw new Error(bloqueio);
 
     const lista = listarProprias(empresaId);
     // Mesmo passageiro com corrida em aberto: não cria outra (proteção contra toque duplo).
