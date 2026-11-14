@@ -146,3 +146,31 @@ test("passageiro vê os carros livres por perto (sem dados pessoais) e a rota de
   assert.equal(c.status, 200);
   assert.deepEqual(c.corpo.casas, []);
 });
+
+test("motorista: cada corrida do histórico traz valor, comissão da central, líquido e OS; totais de hoje e da semana; taxa de aceitação", async () => {
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Gil Ganhos", telefone: "11900000010", status: "Ativo", veiculo: "Sedã cinza", placa: "GIL1A23" }, "teste");
+  const tokP = await entrar("passageiro", "11988882222");
+  const tokM = await entrar("motorista", "11900000010");
+  await chamar("POST", `${API}/online`, { lat: -23.552, lng: -46.63 }, tokM);
+  const pedido = await chamar("POST", `${API}/corridas`, { embarque: EMBARQUE, destino: DESTINO, categoria: "Econômico", pagamento: "Dinheiro", pedidoId: "ponta-g" }, tokP);
+  const id = pedido.corpo.corrida.id as string;
+  let oferta = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta;
+  for (let i = 0; i < 10 && !oferta; i++) { await new Promise((r) => setTimeout(r, 300)); oferta = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta; }
+  assert.ok(oferta, "a oferta chega ao motorista");
+  assert.equal((await chamar("POST", `${API}/ofertas/${oferta.id}/aceitar`, {}, tokM)).status, 200);
+  for (const s of ["no_local", "em_andamento", "finalizada"]) await chamar("POST", `${API}/corridas/${id}/status`, { status: s }, tokM);
+  const g = (await chamar("GET", `${API}/ganhos?periodo=semana`, undefined, tokM)).corpo;
+  const c = g.lista.find((x: any) => x.id === id);
+  assert.ok(c, "a corrida finalizada está no histórico do motorista");
+  assert.equal(c.os, pedido.corpo.corrida.os);
+  assert.ok(c.valorBruto > 0);
+  assert.equal(c.taxaCentral, Math.round(c.valorBruto * 10) / 100, "comissão de 10% da categoria");
+  assert.equal(Math.round((c.valorBruto - c.taxaCentral) * 100), Math.round(c.valorLiquido * 100));
+  assert.equal(g.hoje.liquido >= c.valorLiquido, true);
+  assert.equal(g.semanaAtual.corridas >= 1, true);
+  assert.ok(Math.abs(g.totalLiquido - g.lista.reduce((s: number, x: any) => s + x.valorLiquido, 0)) < 0.01);
+  const resumo = (await chamar("GET", `${API}/ganhos`, undefined, tokM)).corpo;
+  assert.equal(resumo.hoje.liquido >= c.valorLiquido, true);
+  const acc = (await chamar("GET", `${API}/aceitacao`, undefined, tokM)).corpo;
+  assert.ok(acc.aceitas >= 1 && acc.porcentagem > 0);
+});

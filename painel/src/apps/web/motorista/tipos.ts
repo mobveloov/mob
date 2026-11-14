@@ -36,7 +36,7 @@ export interface CorridasAbertas { disponiveis: CorridaAberta[]; pendentes: Corr
 
 export interface Eu {
   nome: string; telefone: string; veiculo: string; placa: string; categorias: string; validadeCnh: string | null; validadeLicenciamento: string | null;
-  foto?: string | null; email?: string; genero?: string; situacao?: string; aprovado?: boolean; pendencias?: string[];
+  foto?: string | null; email?: string; genero?: string; situacao?: string; aprovado?: boolean; pendencias?: string[]; nota?: number | null;
 }
 
 export interface Veiculo { id: string; modelo: string; placa: string; cor: string; ano: string | number; cnh?: string; validadeCnh?: string; ativo: boolean; situacao?: string }

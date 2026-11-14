@@ -13,9 +13,10 @@ import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Mapa } from "./Mapa";
-import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, HistoricoGanhos, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
+import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
 import { BarraBaixo, Dialogo } from "./Pecas";
-import { Carteira, Desafios, Notificacoes, Preferencias } from "./Telas";
+import { Desafios, Notificacoes, Preferencias } from "./Telas";
+import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
 import { aplicarTema, useAjustes } from "./ajustes";
 import type { Corrida, Eu, Oferta } from "./tipos";
 
@@ -167,7 +168,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const voltar = () => setTela("");
   const telas: Record<string, ReactNode> = {
     macaneta: <Macaneta voltar={voltar} posicao={posicao} aoAbrir={(c) => { setCorrida(c); setTela(""); }} />,
-    historico: <HistoricoGanhos voltar={voltar} />,
+    atividades: <Atividades voltar={voltar} eu={eu} irHistorico={() => setTela("historico")} irCarteira={() => setTela("carteira")} irAceitacao={() => setTela("aceitacao")} irDesafios={() => setTela("desafios")} />,
+    historico: <HistoricoDeGanhos voltar={() => setTela("atividades")} />,
+    aceitacao: <TaxaDeAceitacao voltar={() => setTela("atividades")} />,
     veiculos: <MeusVeiculos voltar={voltar} />,
     cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} irCarteira={() => setTela("carteira")} aoSairDaConta={() => { setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />,
     senha: <AlterarSenha voltar={voltar} />,
@@ -175,7 +178,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     diagnostico: <Diagnostico voltar={voltar} eu={eu} conectado={conectado} posicao={posicao} online={online} />,
     suporte: <Suporte voltar={voltar} marca={marca} />,
     fale: <FaleConosco voltar={voltar} marca={marca} />,
-    carteira: <Carteira voltar={() => setTela("cadastro")} />,
+    carteira: <CarteiraDoMotorista voltar={() => setTela("atividades")} />,
     preferencias: <Preferencias voltar={voltar} />,
     desafios: <Desafios voltar={voltar} marca={marca} />,
     notificacoes: <Notificacoes voltar={voltar} />,
@@ -204,7 +207,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         <button type="button" className="mapa-botao" aria-label="Menu" onClick={() => setMenu(true)}><LayoutGrid size={22} fill="currentColor" /></button>
         <span className="pilula-ganhos">
           <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
-          <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("historico")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
+          <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("atividades")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
         </span>
         <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>
       </div>
