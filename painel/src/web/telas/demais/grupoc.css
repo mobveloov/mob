@@ -1,0 +1,23 @@
+/* Tarifas, categorias, descontos, termos e afins no formato da Machine (grupo C). */
+.dm-opcao { padding: 8px 0; border-bottom: 1px solid var(--borda); } .dm-opcao h4 { margin: 0 0 2px; }
+.dm-opcao-chave { display: flex; align-items: center; gap: 10px; margin-top: 4px; } .dm-opcao-chave .dm-interruptor-linha { margin: 0; }
+.dm-radios-col { flex-direction: column; align-items: flex-start; } .dm-radios-col label { display: flex; gap: 8px; align-items: flex-start; }
+
+/* Personalização do app do passageiro */
+.pe-grade { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .pe-grade { grid-template-columns: 1fr; } }
+.pe-recursos { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.pe-recursos li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--borda); border-radius: 10px; padding: 8px 10px; background: var(--fundo); } .pe-recursos li > div { flex: 1; } .pe-recursos li.oculto { opacity: .7; }
+.pe-num { width: 18px; text-align: center; font-weight: 700; color: var(--suave); }
+.pe-previa { position: sticky; top: 70px; } .pe-previa h3 { margin: 0 0 8px; }
+.pe-celular { width: 260px; height: 480px; margin: 0 auto; border: 6px solid #1f2937; border-radius: 28px; overflow: hidden; background: #fff; color: #111827; }
+.pe-tela { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 10px; font-size: 12px; }
+.pe-tela.marcante { background: #fff; } .pe-tela.marcante .pe-topo { background: var(--pe-cor); color: #fff; margin: -10px -10px 0; padding: 12px 10px; }
+.pe-tela.flutuante { background: #dbeafe; } .pe-tela.neutro { background: #fff; }
+.pe-topo { display: flex; justify-content: space-between; align-items: center; } .pe-marca { display: flex; align-items: center; gap: 6px; } .pe-marca img { max-height: 24px; max-width: 110px; }
+.pe-mapa { flex: 1; min-height: 80px; border-radius: 12px; background: repeating-linear-gradient(45deg, #bfdbfe, #bfdbfe 8px, #dbeafe 8px, #dbeafe 16px); display: grid; place-items: center; color: #1e3a8a; }
+.pe-bloco { background: #fff; border-radius: 12px; padding: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15); display: flex; flex-direction: column; gap: 4px; } .pe-bloco p { margin: 0; font-weight: 700; } .pe-bloco small { color: #6b7280; }
+.pe-busca { background: #f3f4f6; border-radius: 8px; padding: 8px; color: #6b7280; } .pe-anuncio { border: 1px dashed var(--pe-cor); text-align: center; color: var(--pe-cor); }
+.pe-rodape { margin-top: auto; display: flex; justify-content: space-around; border-top: 1px solid #e5e7eb; padding-top: 6px; color: var(--pe-cor); }
+.pe-form input[type="color"] { width: 56px; height: 34px; padding: 2px; flex: none; }
+.dm-sep { margin: 22px 0 10px; font-size: 16px; color: var(--suave); }

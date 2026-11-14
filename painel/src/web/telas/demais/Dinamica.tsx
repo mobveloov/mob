@@ -16,7 +16,7 @@ const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sáb
 type TipoDin = "mapa" | "horario" | "demanda";
 
 type Aba = "automaticas" | "manuais" | "sem_area";
-const ABAS: Array<[Aba, string]> = [["manuais", "Manuais"], ["automaticas", "Automáticas"], ["sem_area", "Sem área"]];
+const ABAS: Array<[Aba, string]> = [["automaticas", "Automáticas"], ["manuais", "Manuais"], ["sem_area", "Sem área"]];
 const COR_NIVEL: Record<number, string> = { 1: "#f59e0b", 2: "#f97316", 3: "#dc2626" };
 
 /** "+R$ 5,00", "1,3x" ou "+20%": o mesmo texto que a Machine mostra na etiqueta da área. */
@@ -50,7 +50,7 @@ export function TarifasDinamicas() {
         {admin && <button className="botao primario" onClick={() => nova(aba === "sem_area" ? "horario" : "mapa")}><Plus size={14} /> Nova regra</button>}
       </Cab>
       <div className="dm-abas" role="tablist">{ABAS.map(([k, n]) => <button key={k} role="tab" aria-selected={aba === k} className={aba === k ? "ativo" : ""} onClick={() => setAba(k)}>{n}</button>)}</div>
-      {guia && <div className="dm-cartao dm-guia"><strong>Navegue entre as dinâmicas</strong><p>Cada dinâmica tem suas configurações próprias. Use as abas para configurá-las e visualizá-las em tempo real. Em Automações, o painel abre áreas sozinho onde há muitos pedidos.</p><button className="botao" onClick={() => setGuia(false)}>Entendi</button></div>}
+      {guia && <div className="dm-cartao dm-guia"><strong>Navegue entre as dinâmicas</strong><p>Cada dinâmica tem suas configurações próprias. Use esse menu para configurá-las e visualizá-las em tempo real.</p><button className="botao" onClick={() => setGuia(false)}>Entendi</button></div>}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-dinamicas">
         <div className="dm-cartao dm-mapa-principal">
@@ -62,7 +62,7 @@ export function TarifasDinamicas() {
           <h2>{ABAS.find(([k]) => k === aba)![1]}</h2>
           {!dados ? <Carregando /> : aba === "automaticas" ? (
             <>
-              <p className="sub"><span className="selo alerta">Beta</span> A dinâmica automática está em fase experimental. As áreas abaixo existem agora, pelos pedidos dos últimos minutos.</p>
+              <p className="sub"><span className="selo alerta">Beta</span> A dinâmica automática está em fase experimental e pode evoluir com seus feedbacks. As áreas abaixo existem agora, pelos pedidos dos últimos minutos.</p>
               {!automaticas.length ? <p className="vazio">Nenhuma área automática aberta agora.</p> : <ul className="dm-transacoes">{automaticas.map((a) => <li key={a.id}><span><strong>{a.nome}</strong><small>{valorDinamica(a)} · {a.pedidos} pedidos recentes</small></span></li>)}</ul>}
               <p className="sub">{(dados.automacoes ?? []).length} automação(ões) cadastrada(s).</p>
             </>

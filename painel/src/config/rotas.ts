@@ -24,9 +24,15 @@ import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
 import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoGeral, relatorioFaturamento, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
-import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, termos } from "./gerais.ts";
+import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
+import { personalizacao, salvarPersonalizacao } from "./personalizacao.ts";
+import { bandeira, salvarBandeira } from "./bandeira.ts";
+import { salvarTransbordo, transbordoDasParceiras } from "./transbordo.ts";
+import { areasDaEmpresa } from "../areas/areas.ts";
+import { cadastroPorId } from "../comum/cadastros.ts";
+import { listar } from "../cadastros/armazem.ts";
 
 export const rotasConfig = express.Router();
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
@@ -177,8 +183,16 @@ rotasConfig.get("/descontos", ok((req, res) => res.json({ descontos: descontos(e
 rotasConfig.post("/descontos", admin, ok((req, res) => res.json({ descontos: salvarDesconto(emp(req), req.body) })));
 rotasConfig.delete("/descontos/:id", admin, ok((req, res) => res.json({ descontos: removerDesconto(emp(req), req.params.id) })));
 // Matriz por forma de pagamento x site/app #1 a #4 e desconto máximo da empresa (convive com os descontos por campanha acima).
-rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)) })));
-rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body) })));
+const dadosBandeira = (empresaId: string) => ({ ...bandeira(empresaId), areas: areasDaEmpresa(empresaId).filter((a) => !a.bloqueio?.ativo).map((a) => ({ id: a.id, nome: a.nome })) });
+rotasConfig.get("/bandeira", ok((req, res) => res.json(dadosBandeira(emp(req)))));
+rotasConfig.put("/bandeira", admin, ok((req, res) => { salvarBandeira(emp(req), req.body, areasDaEmpresa(emp(req)).map((a) => a.id)); res.json(dadosBandeira(emp(req))); }));
+rotasConfig.get("/transbordo-bandeiras", ok((req, res) => res.json({ parceiras: transbordoDasParceiras(emp(req)) })));
+rotasConfig.put("/transbordo-bandeiras", admin, ok((req, res) => res.json({ parceiras: salvarTransbordo(emp(req), req.body) })));
+rotasConfig.get("/personalizacao", ok((req, res) => res.json(personalizacao(emp(req)))));
+rotasConfig.put("/personalizacao", admin, ok((req, res) => res.json(salvarPersonalizacao(emp(req), req.body))));
+const motoristasAtivos = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!).filter((m) => m.status === "Ativo").length;
+rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)), motoristasAtivos: motoristasAtivos(emp(req)) })));
+rotasConfig.put("/descontos-matriz", admin, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body), motoristasAtivos: motoristasAtivos(emp(req)) })));
 
 // ------------------------------------------------------------------ config: despacho, transbordos, integrações
 
@@ -220,8 +234,8 @@ rotasConfig.get("/nps/:papel/exportar", ok((req, res) => res.json({ nome: `nps-$
 rotasConfig.put("/nps/:papel", admin, ok((req, res) => res.json({ config: salvarConfigNps(emp(req), papelNps(req.params.papel), req.body) })));
 rotasConfig.post("/nps/:papel/resetar", admin, ok((req, res) => res.json({ removidas: resetarRecusas(emp(req), papelNps(req.params.papel)) })));
 
-rotasConfig.get("/termos", ok((req, res) => res.json(termos(emp(req)))));
-rotasConfig.put("/termos", admin, ok((req, res) => res.json(salvarTermos(emp(req), req.body ?? {}))));
+rotasConfig.get("/termos", ok((req, res) => res.json({ ...termos(emp(req)), padraoPassageiro: TERMOS_PADRAO.passageiro })));
+rotasConfig.put("/termos", admin, ok((req, res) => res.json({ ...salvarTermos(emp(req), req.body ?? {}), padraoPassageiro: TERMOS_PADRAO.passageiro })));
 
 rotasConfig.get("/ajuda", ok((req, res) => res.json(ajuda(emp(req)))));
 rotasConfig.put("/ajuda", admin, ok((req, res) => res.json(salvarAjuda(emp(req), req.body))));
