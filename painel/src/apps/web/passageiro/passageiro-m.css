@@ -226,3 +226,13 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .pino-perto-moto { background: #111; color: var(--cor, #ffc400); border-color: var(--cor, #ffc400); }
 .casa-num { display: block; min-width: 22px; padding: 1px 4px; text-align: center; font: 700 11px/14px system-ui, sans-serif; color: #333; background: rgba(255,255,255,.88); border: 1px solid rgba(0,0,0,.25); border-radius: 4px; white-space: nowrap; pointer-events: none; }
 .detalhe-valor { display: flex; flex-direction: column; align-items: center; padding: 6px 0 10px; } .detalhe-valor small { color: #777; } .detalhe-valor strong { font-size: 30px; }
+
+/* Botões do mapa (tema e localização) e correção das etiquetas dos pinos que se sobrepunham. */
+.mapa-controles { position: absolute; z-index: 18; right: 12px; top: 128px; display: flex; flex-direction: column; gap: 10px; }
+.mapa-controles button { width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: #111; display: grid; place-items: center; box-shadow: 0 3px 10px rgba(0,0,0,.3); cursor: pointer; }
+.pino-embarque .pino-etiqueta { left: 50%; right: auto; top: 38px; transform: translateX(-50%); max-width: 150px; }
+.pino-destino .pino-etiqueta { left: 50%; right: auto; top: auto; bottom: 38px; transform: translateX(-50%); max-width: 150px; }
+.pino-etiqueta b { max-width: 140px; }
+.etiqueta-etapa { padding: .35rem .9rem !important; font-size: .82rem !important; border-radius: 16px !important; }
+.acompanhar-baixo .folha { max-height: 52vh; }
+.inicio .mapa-controles { top: auto; bottom: 112px; }

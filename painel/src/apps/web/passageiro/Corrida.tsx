@@ -80,7 +80,7 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota(c)} perto={temCoord(c.embarque) ? c.embarque as Posicao : null} folga={360} />
+      <Mapa pontos={pontosDaRota(c)} perto={temCoord(c.embarque) ? c.embarque as Posicao : null} controles folga={360} />
       <div className="topo-flutuante">
         <button className="pilula-branca vermelho" onClick={() => setCancelar(true)}>Cancelar</button>
       </div>

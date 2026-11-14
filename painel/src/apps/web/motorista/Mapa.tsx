@@ -35,8 +35,10 @@ function icone(p: PontoMapa) {
  * pontos: o que marcar. caminho: a viagem em ordem. ate: linha de você até o próximo ponto.
  * centralizar: mude o número para voltar a seguir você (botão de centralizar fora do mapa).
  */
-export function Mapa({ pontos, caminho = [], ate, centralizar = 0, className = "" }: {
+export function Mapa({ pontos, caminho = [], ate, rotaNav, tema, centralizar = 0, className = "" }: {
   pontos: PontoMapa[]; caminho?: Talvez[]; ate?: [Talvez, Talvez]; centralizar?: number; className?: string;
+  /** Rota do GPS do app (passo a passo): desenha esta linha no lugar da linha até o próximo ponto e acompanha você de perto. */ rotaNav?: Array<[number, number]> | null;
+  /** Força o mapa claro ou escuro (botão do mapa); sem isso, segue o tema do app. */ tema?: "claro" | "escuro";
 }) {
   const caixa = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
@@ -62,7 +64,8 @@ export function Mapa({ pontos, caminho = [], ate, centralizar = 0, className = "
 
   // Caminhos pelas ruas: a viagem inteira e o trecho de você até o próximo ponto (este se atualiza, no máximo a cada 12 s).
   const ruaViagem = useCaminho(caminho);
-  const ruaAte = useCaminho(ate ?? [], 12000, 4);
+  const ruaAteReal = useCaminho(rotaNav ? [] : ate ?? [], 12000, 4);
+  const ruaAte = rotaNav ?? ruaAteReal;
 
   useEffect(() => {
     const m = mapa.current, g = camada.current;
@@ -84,8 +87,9 @@ export function Mapa({ pontos, caminho = [], ate, centralizar = 0, className = "
       ultimaChave.current = chave;
       if (validos.length === 1) m.setView([validos[0].lat, validos[0].lng], 16);
       else m.fitBounds(L.latLngBounds(validos.map((p) => [p.lat, p.lng] as [number, number])), { padding: [60, 60], maxZoom: 17 });
-    } else if (eu && (!fixos.length || !m.getBounds().pad(-0.15).contains([eu.lat, eu.lng]))) m.panTo([eu.lat, eu.lng]);
+    } else if (eu && rotaNav) m.setView([eu.lat, eu.lng], Math.max(m.getZoom(), 17), { animate: true });
+    else if (eu && (!fixos.length || !m.getBounds().pad(-0.15).contains([eu.lat, eu.lng]))) m.panTo([eu.lat, eu.lng]);
   });
 
-  return <div ref={caixa} className={`mapa-m ${className}`} role="region" aria-label="Mapa" />;
+  return <div ref={caixa} className={`mapa-m ${tema ? `tema-${tema}` : ""} ${className}`} role="region" aria-label="Mapa" />;
 }

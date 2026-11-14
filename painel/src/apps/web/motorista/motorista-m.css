@@ -194,6 +194,8 @@ body { background: var(--m-bg); color: var(--m-tx); }
 .mapa-m { width: 100%; height: 100%; min-height: 220px; background: #e8efe9; position: relative; z-index: 0; isolation: isolate; }
 .mapa-m.cheia { position: absolute; inset: 0; height: 100%; border-radius: 0; }
 html[data-tema="escuro"] .mapa-m { background: #1f242c; }
+.mapa-m.tema-claro .leaflet-tile-pane { filter: none !important; } .mapa-m.tema-claro { background: #e8eaed; }
+.mapa-m.tema-escuro { background: #1f242c; } .mapa-m.tema-escuro .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) grayscale(.55) brightness(.95) contrast(.92) !important; }
 html[data-tema="escuro"] .mapa-m .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) grayscale(.55) brightness(.95) contrast(.92); }
 .pino-eu { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #111; border: 3px solid var(--cor); box-shadow: 0 2px 6px rgba(0,0,0,.5); }
 .mapa-botao { position: absolute; z-index: 20; width: 48px; height: 48px; border-radius: 16px; border: 0; background: #07090c; color: #fff; display: grid; place-items: center; box-shadow: 0 4px 12px rgba(0,0,0,.4); cursor: pointer; padding: 0; text-decoration: none; }
@@ -485,3 +487,8 @@ html:not([data-tema="escuro"]) .menu-lateral > div { background: #fff; }
 .extrato-item { display: flex; gap: 1rem; padding: 1rem 0; border-top: 1px solid var(--m-line); } .extrato-item .seta { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--m-card2); } .extrato-item div small, .extrato-item div strong, .extrato-item div span { display: block; } .extrato-item strong { font-size: 1.4rem; font-weight: 500; } .extrato-item span { font-weight: 700; font-size: 1.1rem; }
 .pergunta button { display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 1rem 0; background: none; border: 0; color: var(--m-tx); font-size: 1.1rem; font-weight: 600; cursor: pointer; text-align: left; } .pergunta p { margin: 0 0 .8rem; }
 html[data-tema="escuro"] { --m-bg: #0b0e14; --m-card: #161b26; --m-card2: #222a38; --m-line: #262f3d; --m-topo: #1a202c; --m-azul: #1c7ed6; }
+/* GPS do app: faixa com a próxima curva */
+.navegacao.nav-app { background: #0f5132; color: #fff; align-items: center; } .navegacao.nav-app .navegacao-seta { background: rgba(255,255,255,.18); color: #fff; }
+.navegacao.nav-app.fora { background: #7a4b00; } .navegacao-texto .nav-instrucao { display: block; font-size: 1.15rem; font-weight: 800; line-height: 1.2; } .navegacao-texto .nav-dist { font-size: 1.6rem; font-weight: 800; display: block; }
+.navegacao-resto { font-size: .78rem; opacity: .85; }
+.mapa-tema-corrida { position: absolute; z-index: 25; right: 14px; top: 170px; }

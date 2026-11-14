@@ -19,7 +19,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
 import { buscarEndereco, casasPerto, enderecoDoPonto, rota } from "../enderecos/index.ts";
-import { buscarFora, caminhoPelasRuas, pontoFora } from "../enderecos/externo.ts";
+import { buscarFora, caminhoPelasRuas, navegarPelasRuas, pontoFora } from "../enderecos/externo.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
@@ -220,6 +220,14 @@ r.get("/rota", ok(async (req, res) => {
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   if (pts.length < 2) throw new Error("Informe pelo menos dois pontos.");
   res.json(await caminhoPelasRuas(pts));
+}));
+
+// Navegação passo a passo dentro do app: rota pelas ruas com a instrução de cada curva (?pontos=lat,lng;lat,lng).
+r.get("/navegacao", ok(async (req, res) => {
+  const pts = String(req.query.pontos ?? "").split(";").slice(0, 6).map((p) => { const [a, b] = p.split(","); return { lat: Number(a), lng: Number(b) }; })
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (pts.length < 2) throw new Error("Informe pelo menos dois pontos.");
+  res.json(await navegarPelasRuas(pts));
 }));
 
 r.get("/estimativa", ok(async (req, res) => {

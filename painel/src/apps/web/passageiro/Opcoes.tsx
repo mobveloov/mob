@@ -96,7 +96,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
 
   return (
     <div className="tela-mapa">
-      <Mapa pontos={pontosDaRota({ embarque: rota.partida, paradas: rota.paradas, destino: rota.destino })} perto={temCoord(rota.partida) ? rota.partida as Posicao : null} folga={folga} />
+      <Mapa pontos={pontosDaRota({ embarque: rota.partida, paradas: rota.paradas, destino: rota.destino })} perto={temCoord(rota.partida) ? rota.partida as Posicao : null} controles folga={folga} />
       <div className="topo-flutuante">
         <button className="redondo-branco" onClick={voltar} aria-label="Voltar"><ArrowLeft size={22} /></button>
         <div className="segmento" role="tablist">
