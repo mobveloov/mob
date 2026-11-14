@@ -17,7 +17,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   {
     id: "operacao", nome: "Operação", cor: "laranja", blocos: [
       { ids: ["painel", "conversas"] },
-      { titulo: "Corridas", ids: ["solicitar", "monitoramento", "mapa", "historico", "programadas", "ocorrencias", "recuperacao", "pagamentos-pendentes", "taxas-cancelamento", "objetos", "entrega-voucher"] },
+      { titulo: "Corridas", ids: ["solicitar", "monitoramento", "mapa", "historico", "programadas", "ocorrencias", "recuperacao", "pagamentos-pendentes", "taxas-cancelamento", "objetos", "entrega-voucher", "alterar-os"] },
       { titulo: "Frota", ids: ["motoristas", "destravar", "veiculos", "plantao", "areas", "ruas", "punicoes", "desafios", "documentos"] },
     ],
   },
@@ -34,14 +34,14 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   {
     id: "gestao", nome: "Gestão", cor: "roxo", blocos: [
       { ids: ["analise"] },
-      { titulo: "Financeiro", ids: ["visao-geral", "extrato-central", "extrato-online", "transacao-pix", "indice-relatorios", "faturamento-empresa", "faturamento-centro-custo", "faturamento-periodo", "vouchers-motoristas", "os-motorista", "os-empresa", "os-bairro", "os-pagamento", "os-operador", "os-percentual-motorista", "km-rodados", "carteiras", "extrato", "saques", "recargas", "relatorios"] },
+      { titulo: "Financeiro", ids: ["visao-geral", "extrato-central", "extrato-online", "relatorio-faturamento", "transacao-pix", "indice-relatorios", "faturamento-empresa", "faturamento-centro-custo", "faturamento-periodo", "vouchers-motoristas", "os-motorista", "os-empresa", "os-bairro", "os-pagamento", "os-operador", "os-percentual-motorista", "km-rodados", "carteiras", "extrato", "saques", "recargas", "relatorios"] },
       { titulo: "Cobrança", ids: ["demonstrativo-mensal", "meus-planos", "controle-centrais"] },
     ],
   },
   {
     id: "configuracao", nome: "Configuração", cor: "rosa", blocos: [
       { ids: ["marca", "equipe", "alterar-senha"] },
-      { titulo: "Regras e integrações", ids: ["config-gerais", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app"] },
+      { titulo: "Regras e integrações", ids: ["config-gerais", "personalizacao-app", "taxas-central", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app"] },
     ],
   },
   {

@@ -106,6 +106,20 @@ test("estatísticas: bairro, empresa, forma de pagamento, motorista e operador",
   const o = await api(cAdm, "GET", `/relatorio/os-operador?${q()}`);
   const linha = o.corpo.linhas.find((l: any) => l.operador === "Op Rel");
   assert.equal(linha.finalizadas, 4); assert.equal(linha.cancPass, 1); assert.equal(linha.totais, 5);
+  assert.equal(o.corpo.totais, null, "a Machine não mostra total em Estatísticas por operador");
+});
+
+test("estatísticas: ordenar pela coluna (crescente e decrescente), números como número", async () => {
+  const cresc = await api(cAdm, "GET", `/relatorio/os-bairro?${q("&ordem=partidas&dir=asc")}`);
+  const desc = await api(cAdm, "GET", `/relatorio/os-bairro?${q("&ordem=partidas&dir=desc")}`);
+  const n = (r: any) => r.corpo.linhas.map((l: any) => l.partidas);
+  assert.deepEqual(n(cresc), [...n(cresc)].sort((a, b) => a - b));
+  assert.deepEqual(n(desc), [...n(desc)].sort((a, b) => b - a));
+  const nome = await api(cAdm, "GET", `/relatorio/os-bairro?${q("&ordem=bairro&dir=asc")}`);
+  const nomes = nome.corpo.linhas.map((l: any) => l.bairro);
+  assert.deepEqual(nomes, [...nomes].sort((a: string, b: string) => a.localeCompare(b, "pt-BR", { numeric: true })));
+  const invalida = await api(cAdm, "GET", `/relatorio/os-bairro?${q("&ordem=xx")}`);
+  assert.equal(invalida.status, 200);
 });
 
 test("corrida por motorista e km rodados", async () => {

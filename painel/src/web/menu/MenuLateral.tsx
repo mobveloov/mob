@@ -81,7 +81,6 @@ function Grupo({ g, recolhido, abertos, setAbertos, pathname, assistente, aoEsco
         className={`ml-item ${ativa(f, pathname) ? "ativo" : ""}`}>
         <Ic size={17} className="ml-icone" />
         <span className="ml-texto">{nome}</span>
-        {f.novo && <span className="ml-novo">NOVO</span>}
       </NavLink>
     );
   };

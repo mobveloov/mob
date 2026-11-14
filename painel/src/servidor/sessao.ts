@@ -74,9 +74,14 @@ export const exigirPapel = (...papeis: Papel[]) => (req: Request, res: Response,
   res.status(403).json({ erro: "Seu usuário não tem acesso a esta parte." });
 };
 
-// Tentativas de login ERRADAS: no máximo 8 por 10 minutos para o mesmo IP e e-mail, e 30 para o mesmo e-mail.
-// Só o erro conta (antes, entrar certo também contava, e uma central atrás do mesmo IP se trancava).
+// Tentativas de login ERRADAS (força bruta), todas numa janela de 10 minutos:
+//   - 8 para o mesmo IP + e-mail;
+//   - 30 para o mesmo e-mail (venha de onde vier: ataque distribuído contra uma conta);
+//   - 60 para o mesmo IP, com e-mails diferentes (testar uma senha em várias contas).
+// Passou do limite, o bloqueio é temporário: some sozinho quando as tentativas velhas saem da janela. Enquanto estiver
+// bloqueado, nem a senha certa entra. Só o erro conta (entrar certo não conta, e uma central atrás do mesmo IP não se tranca).
 const JANELA_LOGIN = 600_000;
+export const LIMITES_LOGIN = { ipEmail: 8, email: 30, ip: 60 } as const;
 const erros = new Map<string, number[]>();
 let limpezaLogin = 0;
 const recentes = (chave: string, agora: number) => (erros.get(chave) ?? []).filter((t) => agora - t < JANELA_LOGIN);
@@ -85,12 +90,17 @@ function limparErros(agora: number) {
   limpezaLogin = agora;
   for (const [k, l] of erros) if (!l.some((t) => agora - t < JANELA_LOGIN)) erros.delete(k);
 }
+const chavesLogin = (ip: string, email: string) => [`${ip}|${email}`, ...(email ? [`*|${email}`] : []), `${ip}|*`];
 export function podeTentar(ip: string, email = ""): boolean {
   const agora = Date.now();
   limparErros(agora);
-  return recentes(`${ip}|${email}`, agora).length < 8 && (!email || recentes(`*|${email}`, agora).length < 30);
+  return recentes(`${ip}|${email}`, agora).length < LIMITES_LOGIN.ipEmail
+    && (!email || recentes(`*|${email}`, agora).length < LIMITES_LOGIN.email)
+    && recentes(`${ip}|*`, agora).length < LIMITES_LOGIN.ip;
 }
 export function errouLogin(ip: string, email = "") {
   const agora = Date.now();
-  for (const k of [`${ip}|${email}`, ...(email ? [`*|${email}`] : [])]) erros.set(k, [...recentes(k, agora), agora]);
+  for (const k of chavesLogin(ip, email)) erros.set(k, [...recentes(k, agora), agora]);
 }
+/** Só para os testes: zera os contadores. */
+export const zerarTentativasDeLogin = () => erros.clear();

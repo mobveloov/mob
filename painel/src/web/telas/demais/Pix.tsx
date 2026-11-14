@@ -2,14 +2,14 @@
 // Sem operadora de Pix: a situação nasce da corrida e o administrador registra à mão estorno, disputa ou chargeback.
 import { useEffect, useState } from "react";
 import { Aviso as AvisoOp, Janela, Paginacao, Selo, Vazio, dh, msgErro, op, qs, useDados } from "../corridas/comum";
-import { BotaoExportar, PERIODO_30, SeletorPeriodo, brl, paramsPeriodo, useAdmin, type PeriodoPag } from "../corridas/pagamentos-comum";
+import { BotaoExportar, PERIODOS_PIX, PERIODO_HOJE, SeletorPeriodo, brl, paramsPeriodo, useAdmin, type PeriodoPag } from "../corridas/pagamentos-comum";
 import { Cab } from "./comum";
 
 const TOM: Record<string, string> = { Paga: "ok", Estornada: "ruim", Processando: "info", "Em disputa": "alerta", Chargeback: "ruim" };
 
 export function TransacaoPix() {
   const admin = useAdmin();
-  const [per, setPer] = useState<PeriodoPag>(PERIODO_30);
+  const [per, setPer] = useState<PeriodoPag>(PERIODO_HOJE);
   const [os, setOs] = useState(""), [motorista, setMotorista] = useState(""), [situacao, setSituacao] = useState("");
   const [f, setF] = useState({ os: "", motorista: "", situacao: "" });
   const [pagina, setPagina] = useState(1);
@@ -25,10 +25,10 @@ export function TransacaoPix() {
       </Cab>
       <div className="dm-cartao dm-filtros">
         <label>Buscar por OS<input value={os} onChange={(e) => setOs(e.target.value)} placeholder="Nº da OS" /></label>
-        <label>Período<SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} /></label>
-        <label>Nome do motorista<input value={motorista} onChange={(e) => setMotorista(e.target.value)} /></label>
-        <label>Situação do pagamento<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="">Todas</option>{(dados?.situacoes ?? []).map((s: string) => <option key={s}>{s}</option>)}</select></label>
-        <button className="botao" onClick={() => { setOs(""); setMotorista(""); setSituacao(""); setPer(PERIODO_30); setPagina(1); }}>Limpar filtro</button>
+        <label>Período<SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} opcoes={PERIODOS_PIX} /></label>
+        <label>Nome/VTR do motorista<input value={motorista} onChange={(e) => setMotorista(e.target.value)} /></label>
+        <label>Situação do Pagamento<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="">Todas</option>{(dados?.situacoes ?? []).map((s: string) => <option key={s}>{s}</option>)}</select></label>
+        <button className="botao" onClick={() => { setOs(""); setMotorista(""); setSituacao(""); setPer(PERIODO_HOJE); setPagina(1); }}>Limpar filtro</button>
       </div>
       <div className="dm-kpis">
         <div className="dm-kpi"><small>Total pago por Pix</small><strong>{brl(dados?.totalPago ?? 0)}</strong></div>

@@ -1,0 +1,22 @@
+/* Estatísticas no formato da Machine: filtros à esquerda (1/4) e tabela à direita (3/4). */
+.est-layout { display: grid; grid-template-columns: minmax(220px, 1fr) 3fr; gap: 14px; align-items: start; }
+.est-filtros { display: flex; flex-direction: column; gap: 10px; }
+.est-filtros h3 { margin: 0; text-align: center; }
+.est-filtros input { width: 100%; }
+.est-resumo { color: var(--suave); font-size: 13px; margin-bottom: 8px; min-height: 1em; }
+.est-ordem { background: none; border: 0; padding: 0; font: inherit; font-weight: inherit; color: inherit; cursor: pointer; text-align: inherit; }
+.est-ordem:hover { text-decoration: underline; }
+.est-tabela th.num, .est-tabela td.num { text-align: right; }
+.est-paginas { margin-top: 10px; }
+.index-relatorios { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 10px; }
+.index-relatorios a { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px solid var(--borda, rgba(128,128,128,.3)); border-radius: 10px; text-decoration: none; color: inherit; }
+.index-relatorios a:hover { border-color: var(--cor, #00a9e2); }
+.index-relatorios .numero { font-weight: 600; color: var(--suave); min-width: 1.2em; }
+.index-relatorios h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.modelo-nome { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.modelo-menu { position: relative; display: inline-block; }
+.modelo-menu ul { position: absolute; right: 0; top: 100%; z-index: 5; margin: 2px 0 0; padding: 4px; list-style: none; min-width: 140px; background: var(--fundo-cartao, #fff); border: 1px solid var(--borda, rgba(128,128,128,.3)); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+.modelo-menu li button { width: 100%; text-align: left; background: none; border: 0; padding: 7px 10px; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
+.modelo-menu li button:hover { background: rgba(128,128,128,.15); }
+@media (max-width: 760px) { .est-layout { grid-template-columns: 1fr; } }
+@media print { .est-filtros, .est-paginas { display: none; } .est-layout { display: block; } }

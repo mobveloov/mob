@@ -135,6 +135,7 @@ export function JanelaTarifa({ cat, extra, onFechar, onSalvo }: { cat: any; extr
 
         <h3>Extras da tarifa</h3>
         <p className="sub">Valores adicionais que podem ser aplicados em situações específicas.</p>
+        <p className="sub">Cobrança adicional para paradas intermediárias.</p>
         {campoValor("Valor por parada adicional", "paradaAdicional", "Define o valor fixo cobrado por paradas no meio do trajeto.")}
         <Interruptor valor={t.bonusDeslocamento.ativo} onChange={(v) => bonus("ativo", v)} rotulo="Bônus de deslocamento" descricao="Valor pago pela central para compensar longos deslocamentos até o passageiro." />
         {t.bonusDeslocamento.ativo && (

@@ -163,7 +163,7 @@ test("carteira: crédito da central, pagar com saldo, taxa de cancelamento e saq
   assert.match(sem.corpo.erro, /Saldo insuficiente/);
   // (a passageira já pagou uma taxa de cancelamento no teste das paradas)
   const inicial = (await chamar("GET", `/api/apps/${E}/carteira`, undefined, tp)).corpo.saldo;
-  const cr = await chamar("POST", "/api/apps-central/carteiras/lancar", { papel: "passageiro", chave: "(11) 92000-0001", valor: 50, descricao: "Recarga Pix recebida" }, undefined, { cookie: ck });
+  const cr = await chamar("POST", "/api/apps-central/carteiras/lancar", { papel: "passageiro", chave: "(11) 92000-0001", valor: 50, motivo: "Recarga Pix recebida", chaveUnica: "recarga-pix-teste-1" }, undefined, { cookie: ck });
   assert.equal(cr.corpo.saldo, Math.round((inicial + 50) * 100) / 100);
   await chamar("POST", `/api/apps/${E}/offline`, {}, tl);
   const id = await corridaAte(tp, tm, perto.id, "finalizada", { pagamento: "Saldo da carteira" });

@@ -1,16 +1,16 @@
 // Financeiro no formato da Machine: Visão geral do financeiro, Extrato da central e Extrato de transações online.
 // Os números vêm de /api/config (visao-geral, extrato-central, transacoes-online), sempre da empresa escolhida.
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Download, Info } from "lucide-react";
-import { Aviso, Campo, Carregando, FiltroPeriodo, Modal, PERIODO_MES, dataBr, dataHoraBr, dinheiro, pedirConfig, queryPeriodo, textoPeriodo, useAdmin, useCarregar, useSalvar, type PeriodoSel } from "./comum";
+import { useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, Download, Filter, Info, Search } from "lucide-react";
+import { Aviso, Campo, Carregando, FiltroPeriodo, Modal, PERIODO_MES, PERIODOS_MACHINE, dataBr, dataHoraBr, dinheiro, pedirConfig, queryPeriodo, textoPeriodo, useAdmin, useCarregar, useSalvar, type PeriodoSel } from "./comum";
 
 const ULTIMOS_7: PeriodoSel = { chave: "ultimos_7", inicio: "", fim: "" };
 const diaCurto = (d: string) => d.slice(8, 10) + "/" + d.slice(5, 7);
 const dataExtenso = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
 
 /** Baixa um CSV do servidor (a proteção contra fórmula é feita lá). */
-async function baixarCsv(url: string, nome: string) {
+export async function baixarCsv(url: string, nome: string) {
   let emp = "";
   try { emp = localStorage.getItem("empresa") ?? ""; } catch { /* sem armazenamento */ }
   const r = await fetch(`/api/config${url}`, { credentials: "same-origin", headers: emp ? { "X-Empresa": emp } : {} });
@@ -27,12 +27,13 @@ function Variacao({ v }: { v: number | null | undefined }) {
   return <span className={`dm-var ${v < 0 ? "txt-ruim" : v > 0 ? "txt-ok" : ""}`} title="Comparado ao período anterior de mesmo tamanho">{v > 0 ? "+" : ""}{v.toFixed(2).replace(".", ",")}%</span>;
 }
 
-function Indicador({ titulo, dica, valor, variacao, rodape }: { titulo: string; dica: string; valor: number | undefined; variacao?: number | null; rodape?: string }) {
+function Indicador({ titulo, dica, valor, variacao, rodape, acao }: { titulo: string; dica: string; valor: number | undefined; variacao?: number | null; rodape?: string; acao?: ReactNode }) {
   return (
     <div className="dm-kpi">
       <small>{titulo} <span title={dica} aria-label={dica}><Info size={13} /></span></small>
       <strong>{valor == null ? "—" : dinheiro(valor)}</strong>
       <span><Variacao v={valor == null ? undefined : variacao} /> {rodape && <small>{rodape}</small>}</span>
+      {acao}
     </div>
   );
 }
@@ -90,35 +91,34 @@ export function VisaoGeral() {
       <div className="dm-cab">
         <div><h1>Visão geral do financeiro</h1><p>Período: {textoPeriodo(per)}{x ? ` (${dataBr(x.periodo.inicio)} a ${dataBr(x.periodo.fim)})` : ""}</p></div>
         <div className="dm-cab-acoes">
-          <FiltroPeriodo valor={per} onChange={setPer} />
+          <FiltroPeriodo valor={per} onChange={setPer} atalhos={PERIODOS_MACHINE} />
           <button className="botao" onClick={() => salvar(() => baixarCsv(`/visao-geral/csv?${queryPeriodo(per)}`, "visao-geral-financeiro.csv"), "Relatório exportado.")}><Download size={14} /> Exportar relatório</button>
         </div>
       </div>
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-kpis">
-        <Indicador titulo="Faturamento total em corridas" dica="Valor total das corridas finalizadas no período selecionado." valor={x?.faturamento.valor} variacao={x?.faturamento.variacao} rodape={x ? `${x.faturamento.corridas} corridas` : undefined} />
-        <Indicador titulo="Ganhos líquidos em corridas" dica="Ganho da central com as taxas (comissões) cobradas nas corridas finalizadas." valor={x?.ganhosLiquidos.valor} variacao={x?.ganhosLiquidos.variacao} />
+        <Indicador titulo="Faturamento total em corridas" dica="Valor total das corridas no período selecionado." valor={x?.faturamento.valor} variacao={x?.faturamento.variacao} rodape={x ? `${x.faturamento.corridas} corridas` : undefined} />
+        <Indicador titulo="Ganhos líquidos em corridas" dica="Representa o ganho da central com taxas cobradas pelas corridas (comissões)." valor={x?.ganhosLiquidos.valor} variacao={x?.ganhosLiquidos.variacao} />
       </div>
       <h3 className="dm-secao">Recebimentos e fluxo de caixa</h3>
       <div className="dm-kpis">
-        <Indicador titulo="Total de valores recebidos" dica="Recargas por Pix (motoristas e passageiros) mais corridas pagas dentro do aplicativo, já recebidas pela central." valor={x?.totalRecebido.valor} variacao={x?.totalRecebido.variacao} />
+        <Indicador titulo="Total de valores recebidos" dica="Total de valores já recebidos pela central em conceito de recargas e corridas." valor={x?.totalRecebido.valor} variacao={x?.totalRecebido.variacao} />
       </div>
       <div className="dm-graficos">
         <div className="dm-cartao">
-          <div className="dm-linha dm-entre"><h3>Recargas Pix (Motoristas + Passageiros)</h3><button className="botao" onClick={() => setDetalhe("recargas")}>Ver detalhes <ChevronRight size={14} /></button></div>
+          <div className="dm-linha dm-entre"><h3>Recargas Pix (Motoristas + Passageiros) <span title="Volume de recargas realizadas via Pix, diferenciando motoristas e passageiros." aria-label="Volume de recargas realizadas via Pix, diferenciando motoristas e passageiros."><Info size={13} /></span></h3><button className="botao" onClick={() => setDetalhe("recargas")}>Ver detalhes <ChevronRight size={14} /></button></div>
           <p className="dm-sub">Volume de recargas feitas por Pix, separando motoristas e passageiros. Total: <strong>{x ? dinheiro(x.recargasPix.total) : "—"}</strong></p>
           {!x ? <Carregando /> : <Grafico tipo="barras" dados={x.recargasPix.serie} series={[{ chave: "motoristas", nome: "Motoristas", cor: COR_A }, { chave: "passageiros", nome: "Passageiros", cor: COR_B }]} vazio="Nenhuma recarga Pix no período." />}
         </div>
         <div className="dm-cartao">
-          <div className="dm-linha dm-entre"><h3>Corridas pagas no App (Cartão x Pix)</h3><button className="botao" onClick={() => setDetalhe("corridas")}>Ver detalhes <ChevronRight size={14} /></button></div>
+          <div className="dm-linha dm-entre"><h3>Corridas pagas no App (Cartão x Pix) <span title="Valores de corridas pagas dentro do aplicativo, separados entre pagamentos via Pix e Cartão." aria-label="Valores de corridas pagas dentro do aplicativo, separados entre pagamentos via Pix e Cartão."><Info size={13} /></span></h3><button className="botao" onClick={() => setDetalhe("corridas")}>Ver detalhes <ChevronRight size={14} /></button></div>
           <p className="dm-sub">Corridas pagas dentro do aplicativo. Total: <strong>{x ? dinheiro(x.corridasApp.total) : "—"}</strong> em {x?.corridasApp.qtd ?? 0} corridas</p>
           {!x ? <Carregando /> : <Grafico tipo="barras" dados={x.corridasApp.serie} series={[{ chave: "cartao", nome: "Cartão", cor: COR_A }, { chave: "pix", nome: "Pix", cor: COR_B }]} vazio="Nenhuma corrida paga no app no período." />}
         </div>
       </div>
       <h3 className="dm-secao">Saques</h3>
       <div className="dm-kpis">
-        <Indicador titulo="Saques dos motoristas" dica="Total sacado pelos motoristas (saques pagos) no período selecionado." valor={x?.saques.total} variacao={x?.saques.variacao} rodape={x ? `${x.saques.qtd} saques` : undefined} />
-        <Indicador titulo="Total do próximo repasse" dica="Valor previsto para o próximo pagamento: saques pedidos que ainda aguardam a central." valor={x?.proximoRepasse} />
+        <Indicador titulo="Saques dos motoristas" dica="Total de valores sacados pelos motoristas dentro do período selecionado." valor={x?.saques.total} variacao={x?.saques.variacao} rodape={x ? `${x.saques.qtd} saques` : undefined} />
       </div>
       <div className="dm-graficos">
         <div className="dm-cartao">
@@ -126,10 +126,13 @@ export function VisaoGeral() {
           {!x ? <Carregando /> : <Grafico tipo="barras" dados={x.saques.serie} series={[{ chave: "valor", nome: "Saques pagos", cor: COR_C }]} vazio="Nenhum saque pago no período." />}
         </div>
         <div className="dm-cartao">
-          <h3>Tendência de saques</h3>
+          <h3>Tendência de saques <span title="Evolução dos saques realizados pelos motoristas ao longo do tempo." aria-label="Evolução dos saques realizados pelos motoristas ao longo do tempo."><Info size={13} /></span></h3>
           <p className="dm-sub">Evolução (acumulada) dos saques pagos ao longo do período.</p>
           {!x ? <Carregando /> : <Grafico tipo="linha" dados={x.saques.serie} series={[{ chave: "acumulado", nome: "Acumulado", cor: COR_C }]} vazio="Sem saques para mostrar a tendência." />}
         </div>
+      </div>
+      <div className="dm-kpis">
+        <Indicador titulo="Total do próximo repasse" dica="Valor previsto para o seu próximo pagamento. Desconsidera pagamentos na data de hoje." valor={x?.proximoRepasse} />
       </div>
       <Modal aberto={!!detalhe} onFechar={() => setDetalhe(null)} titulo={detalhe === "recargas" ? "Recargas Pix por dia" : detalhe === "corridas" ? "Corridas pagas no app por dia" : ""} larga>
         {x && detalhe && (
@@ -155,8 +158,17 @@ function limitesDoMes(ym: string): PeriodoSel {
   return { chave: "personalizado", inicio: `${ym}-01`, fim };
 }
 
+function useNomeCentral() {
+  const d = useCarregar(() => fetch("/api/sessao", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null), []);
+  return String(d.dados?.empresa?.nome ?? "");
+}
+const mesExtenso = (ym: string) => new Date(`${ym}-15T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC", month: "long", year: "numeric" });
+
 export function ExtratoCentral() {
   const admin = useAdmin();
+  const nomeCentral = useNomeCentral();
+  const { msg, salvar } = useSalvar();
+  const [acoes, setAcoes] = useState(false);
   const [modo, setModo] = useState<Modo>("mensal");
   const [mes, setMes] = useState(mesAtual());
   const [perPeriodo, setPerPeriodo] = useState<PeriodoSel>(ULTIMOS_7);
@@ -177,10 +189,10 @@ export function ExtratoCentral() {
   return (
     <>
       <div className="dm-cab">
-        <div><h1>Extrato da central</h1><p>Entradas e saídas do caixa da central, dia a dia.</p></div>
+        <div><h1>Extrato da central</h1><p>{nomeCentral || "Entradas e saídas do caixa da central, dia a dia."}</p></div>
         <div className="dm-cab-acoes">{admin && <button className="botao primario" onClick={() => setRecarregar(true)}>Recarregar saldo</button>}</div>
       </div>
-      <Aviso erro={d.erro} />
+      <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-kpis">
         <div className="dm-kpi destaque"><small>Saldo atual</small><strong>{x ? dinheiro(x.saldoAtual) : "—"}</strong><small>Comissões e recargas menos saques pagos</small></div>
         <div className="dm-kpi"><small>Recargas de saldo aguardando</small><strong>{x ? dinheiro(x.aguardando) : "—"}</strong><button className="botao" onClick={() => setPedidos(true)}>Ver detalhes <ChevronRight size={14} /></button></div>
@@ -188,9 +200,13 @@ export function ExtratoCentral() {
       <div className="dm-cartao dm-filtros">
         <div className="dm-pilulas" role="tablist">{([["mensal", "Mensal"], ["periodo", "Por período"], ["hoje", "Hoje"]] as Array<[Modo, string]>).map(([m, n]) => <button key={m} role="tab" aria-selected={modo === m} className={modo === m ? "ativo" : ""} onClick={() => setModo(m)}>{n}</button>)}</div>
         {modo === "mensal" && <input type="month" value={mes} max={mesAtual()} onChange={(e) => e.target.value && setMes(e.target.value)} aria-label="Mês" />}
-        {modo === "periodo" && <FiltroPeriodo valor={perPeriodo} onChange={setPerPeriodo} />}
+        {modo === "periodo" && <FiltroPeriodo valor={perPeriodo} onChange={setPerPeriodo} atalhos={PERIODOS_MACHINE} />}
+        <div className="dm-dropdown">
+          <button type="button" className="botao" aria-haspopup="menu" aria-expanded={acoes} onClick={() => setAcoes(!acoes)}>Mais ações ▾</button>
+          {acoes && <div className="dm-dropdown-menu" role="menu"><button role="menuitem" onClick={() => { setAcoes(false); void salvar(() => baixarCsv(`/extrato-central/csv?${queryPeriodo(per)}`, "extrato-da-central.csv"), "CSV exportado."); }}>Exportar CSV</button></div>}
+        </div>
         <select value={mostrar} onChange={(e) => setMostrar(e.target.value as typeof mostrar)} aria-label="Mostrar"><option value="todos">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select>
-        <select value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)} aria-label="Ordenar por"><option value="recentes">Dias mais recentes</option><option value="antigos">Dias mais antigos</option><option value="maior">Maior valor</option></select>
+        <label className="dm-inline">Ordenar por <select value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)} aria-label="Ordenar por"><option value="recentes">Dias mais recentes</option><option value="antigos">Dias mais antigos</option><option value="maior">Maior valor</option></select></label>
         <button className="botao" onClick={() => setFechados(fechados === "todos" ? new Set() : "todos")}>{fechados === "todos" ? "Expandir tudo" : "Colapsar tudo"}</button>
       </div>
       <div className="dm-kpis">
@@ -199,7 +215,7 @@ export function ExtratoCentral() {
         <div className="dm-kpi"><small>Total de saídas</small><strong className="txt-ruim">{x ? dinheiro(x.totalSaidas) : "—"}</strong></div>
         <div className="dm-kpi"><small>Saldo final do período</small><strong>{x ? dinheiro(x.saldoFinal) : "—"}</strong></div>
       </div>
-      <h3 className="dm-secao">Movimentações ({textoPeriodo(per)})</h3>
+      <h3 className="dm-secao">Movimentações ({modo === "hoje" ? dataExtenso(new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10)) : modo === "mensal" ? mesExtenso(mes) : textoPeriodo(per)})</h3>
       {!x ? <Carregando /> : !dias.length ? <div className="dm-cartao"><p className="vazio">Nenhuma movimentação encontrada para os filtros selecionados.</p></div> : dias.map((dia: any) => (
         <div className="dm-cartao dm-dia" key={dia.dia}>
           <button className="dm-dia-topo" onClick={() => alternar(dia.dia)} aria-expanded={aberto(dia.dia)}>
@@ -262,7 +278,8 @@ const PADRAO_FILTRO = { tipo: "todos", status: "todos", repasse: "", busca: "" }
 
 export function ExtratoOnline() {
   const admin = useAdmin();
-  const [per, setPer] = useState<PeriodoSel>(ULTIMOS_7);
+  const [per, setPer] = useState<PeriodoSel>({ chave: "hoje", inicio: "", fim: "" });
+  const [maisFiltros, setMais] = useState(false), [repasses, setRepasses] = useState(false);
   const [f, setF] = useState(PADRAO_FILTRO), [aplicado, setAplicado] = useState(PADRAO_FILTRO);
   const [marcar, setMarcar] = useState<any>(null);
   const qs = `${queryPeriodo(per)}&tipo=${encodeURIComponent(aplicado.tipo)}&status=${encodeURIComponent(aplicado.status)}&repasse=${aplicado.repasse}&busca=${encodeURIComponent(aplicado.busca)}`;
@@ -274,29 +291,30 @@ export function ExtratoOnline() {
       <div className="dm-cab">
         <div><h1>Extrato de transações online</h1><p>Período: {textoPeriodo(per)}</p></div>
         <div className="dm-cab-acoes">
-          <FiltroPeriodo valor={per} onChange={setPer} />
+          <button className="botao" aria-expanded={maisFiltros} onClick={() => setMais(!maisFiltros)}><Filter size={14} /> Mais filtros</button>
+          <FiltroPeriodo valor={per} onChange={setPer} atalhos={PERIODOS_MACHINE} />
           <button className="botao" onClick={() => salvar(() => baixarCsv(`/transacoes-online/csv?${qs}`, "extrato-transacoes-online.csv"), "CSV exportado.")}><Download size={14} /> Exportar CSV</button>
         </div>
       </div>
-      <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setAplicado(f); }}>
+      {maisFiltros && <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setAplicado(f); }}>
         <label>Tipo de transação<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}><option value="todos">Todos</option>{(x?.tipos ?? []).map((t: string) => <option key={t}>{t}</option>)}</select></label>
         <label>Status<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="todos">Todos</option>{(x?.status ?? []).map((t: string) => <option key={t}>{t}</option>)}</select></label>
         <label>Data de repasse<input type="date" value={f.repasse} onChange={(e) => setF({ ...f, repasse: e.target.value })} /></label>
-        <label>ID da transação<input value={f.busca} onChange={(e) => setF({ ...f, busca: e.target.value })} placeholder="ID, OS ou nome" /></label>
         <button className="botao primario">Filtrar</button>
-        <button type="button" className="botao" onClick={() => { setF(PADRAO_FILTRO); setAplicado(PADRAO_FILTRO); }}>Limpar filtros</button>
-      </form>
+        <button type="button" className="botao" onClick={() => { setF({ ...PADRAO_FILTRO, busca: f.busca }); setAplicado({ ...PADRAO_FILTRO, busca: aplicado.busca }); }}>Limpar filtros</button>
+      </form>}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-kpis">
         <Indicador titulo="Total de valores em corridas e recargas" dica="Soma dos valores pagos em corridas e recargas no período (sem chargeback, estorno ou cancelamento)." valor={x?.totalCorridasRecargas} />
-        <Indicador titulo="Repasses de hoje" dica="Soma dos pagamentos e repasses pagos cuja data de repasse é hoje." valor={x?.repassesHoje} />
+        <Indicador titulo="Repasses de hoje" dica="Soma dos pagamentos e repasses pagos cuja data de repasse é hoje." valor={x?.repassesHoje} rodape={undefined} acao={<button className="botao" onClick={() => setRepasses(true)}>Ver detalhes <ChevronRight size={14} /></button>} />
         <Indicador titulo="Repasses agendados" dica="Soma de todas as transações com status Pendente (saques e recargas aguardando a central)." valor={x?.repassesAgendados} />
       </div>
       <div className="dm-cartao tabela-rola">
+        <div className="dm-busca"><Search size={14} aria-hidden /><input type="search" value={f.busca} onChange={(e) => { setF({ ...f, busca: e.target.value }); setAplicado({ ...aplicado, busca: e.target.value }); }} placeholder="Buscar por ID da transação" aria-label="Buscar por ID da transação" /></div>
         <table>
-          <thead><tr><th>Data e hora</th><th>Data de repasse</th><th>ID da transação</th><th>Tipo de transação</th><th>Forma de pagamento</th><th>Repasse</th><th>Status</th><th>Valor líquido</th>{admin && <th />}</tr></thead>
+          <thead><tr><th>Data e Hora</th><th>Data de repasse</th><th>ID da transação</th><th>Tipo de transação</th><th>Forma de pagamento</th><th>Repasse</th><th>Status</th><th>Valor líquido</th>{admin && <th />}</tr></thead>
           <tbody>
-            {!x ? <tr><td colSpan={9}><Carregando /></td></tr> : !x.itens.length ? <tr><td colSpan={9} className="vazio">Nenhuma transação encontrada para os filtros selecionados.</td></tr> : x.itens.map((i: any) => (
+            {!x ? <tr><td colSpan={9}><Carregando /></td></tr> : !x.itens.length ? <tr><td colSpan={9} className="vazio"><strong>Nenhuma transação encontrada para os filtros selecionados</strong><br />Quando houver lançamentos de transações, eles aparecerão aqui.</td></tr> : x.itens.map((i: any) => (
               <tr key={`${i.tipo}${i.id}`}>
                 <td>{dataHoraBr(i.em)}</td><td>{i.dataRepasse ? dataBr(i.dataRepasse) : "—"}</td>
                 <td title={i.id}><code>{i.codigo}</code><small className="bloco">{i.pessoa}{i.detalhe ? ` · ${i.detalhe}` : ""}</small></td>
@@ -310,6 +328,14 @@ export function ExtratoOnline() {
         </table>
         {x && x.total > x.itens.length && <p className="vazio">Mostrando {x.itens.length} de {x.total}. Refine os filtros ou exporte o CSV.</p>}
       </div>
+      <Modal aberto={repasses} onFechar={() => setRepasses(false)} titulo="Repasses de hoje" sub="Pagamentos e repasses pagos com data de repasse de hoje." larga>
+        {(() => {
+          const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+          const l = (x?.itens ?? []).filter((i: any) => i.status === "Pago" && i.dataRepasse === hoje && ["Pagamento", "Repasse"].includes(i.tipo));
+          return !l.length ? <p className="vazio">Nenhum repasse com data de hoje.</p> : <div className="tabela-rola"><table><thead><tr><th>ID da transação</th><th>Tipo de transação</th><th>Forma de pagamento</th><th>Valor líquido</th></tr></thead>
+            <tbody>{l.map((i: any) => <tr key={`${i.tipo}${i.id}`}><td><code>{i.codigo}</code></td><td>{i.tipo}</td><td>{i.forma}</td><td className="num">{dinheiro(i.valor)}</td></tr>)}</tbody></table></div>;
+        })()}
+      </Modal>
       <ModalMarcar item={marcar} onFechar={() => setMarcar(null)} onFeito={() => { setMarcar(null); d.recarregar(); }} />
     </>
   );

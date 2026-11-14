@@ -21,6 +21,7 @@ export function periodo(chave: string, inicio = "", fim = ""): { inicio: string;
     case "hoje": return { inicio: hoje, fim: hoje, rotulo: "Hoje" };
     case "ontem": { const o = dia(somar(h, -1)); return { inicio: o, fim: o, rotulo: "Ontem" }; }
     case "ultimos_7": return { inicio: dia(somar(h, -6)), fim: hoje, rotulo: "Últimos 7 dias" };
+    case "ultimos_14": return { inicio: dia(somar(h, -13)), fim: hoje, rotulo: "Últimos 14 dias" };
     case "ultimos_30": return { inicio: dia(somar(h, -29)), fim: hoje, rotulo: "Últimos 30 dias" };
     case "semana": { const ini = somar(h, -((h.getUTCDay() + 6) % 7)); return { inicio: dia(ini), fim: hoje, rotulo: "Esta Semana" }; }
     case "semana_passada": { const seg = somar(h, -((h.getUTCDay() + 6) % 7) - 7); return { inicio: dia(seg), fim: dia(somar(seg, 6)), rotulo: "Semana Passada" }; }
@@ -93,7 +94,7 @@ export function detalheCarteira(empresaId: string, papel: PapelCarteira, chave: 
 
 function comissoesDoPeriodo(empresaId: string, de: string, ate: string) {
   return listarProprias(empresaId).filter((c) => c.status === "finalizada" && c.valor && c.motoristaId && (c.finalizadaEm ?? c.solicitadaEm).slice(0, 10) >= de && (c.finalizadaEm ?? c.solicitadaEm).slice(0, 10) <= ate)
-    .map((c) => ({ c, r: calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!) })).filter((x) => x.r.taxaCentral > 0);
+    .map((c) => ({ c, r: calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!, c.pagamento) })).filter((x) => x.r.taxaCentral > 0);
 }
 
 // ------------------------------------------------------------------ extrato geral
@@ -160,7 +161,7 @@ export function producaoMotoristas(empresaId: string, f: FiltroProducao) {
     if (q && !normal(`${c.motorista} ${m?.placa ?? ""} ${c.telefoneMotorista}`).includes(q)) continue;
     const k = `${c.motoristaId}|${c.categoria}`;
     const g = grupos.get(k) ?? { motoristaId: c.motoristaId!, motorista: c.motorista, placa: String(m?.placa ?? ""), veiculo: String(m?.veiculo ?? ""), categoria: c.categoria, qtd: 0, faturamento: 0, comissao: 0 };
-    g.qtd++; g.faturamento += c.valor!; g.comissao += calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!).taxaCentral;
+    g.qtd++; g.faturamento += c.valor!; g.comissao += calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!, c.pagamento).taxaCentral;
     grupos.set(k, g);
   }
   const campo = ({ nome: "motorista", qtd_corridas: "qtd", faturamento_total: "faturamento", ticket_medio: "ticket", comissao_total: "comissao" } as Record<string, string>)[f.ordem ?? ""] ?? "faturamento";

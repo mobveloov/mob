@@ -10,8 +10,8 @@ const { FUNCOES, GRUPOS } = await import("../src/comum/funcoes.ts");
 const { datasDoPeriodo, variacao, nps } = await import("../src/servidor/indicadores.ts");
 const D = await import("../src/servidor/dados.ts");
 
-test("menu: grupos na ordem da referência, 'Mais' no fim, ids e rotas fixos", () => {
-  assert.deepEqual(GRUPOS, ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Config", "Cobrança", "Avaliações", "Ajuda", "Mais"]);
+test("menu: grupos na ordem da Machine, 'Mais' no fim, ids e rotas fixos", () => {
+  assert.deepEqual(GRUPOS, ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Configurações", "Avaliações", "Ajuda", "Cobrança", "Mais"]);
   const ids = ["painel", "motoristas", "destravar", "passageiros", "veiculos", "equipe", "cupons", "empresas", "areas", "punicoes", "desafios", "indicacoes", "solicitar", "recuperacao", "monitoramento", "mapa", "historico", "ocorrencias", "programadas", "pagamentos-pendentes", "objetos", "carteiras", "extrato", "saques", "recargas", "relatorios", "conversas", "notificacoes", "config-gerais", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app", "avaliacoes", "juridico", "central-ajuda", "alterar-senha"];
   for (const id of ids) {
     const f = FUNCOES.find((x) => x.id === id);
@@ -19,6 +19,12 @@ test("menu: grupos na ordem da referência, 'Mais' no fim, ids e rotas fixos", (
     assert.equal(f.rota, id === "painel" ? "/" : `/${id}`);
   }
   assert.equal(new Set(FUNCOES.map((f) => f.rota)).size, FUNCOES.length, "rotas repetidas");
+  // submenus e nomes da Machine (menu do topo)
+  const nomes = (g: string, secao?: string) => FUNCOES.filter((f) => f.grupo === g && (secao === undefined || f.secao === secao) && f.secao !== "Outras telas").map((f) => f.nome);
+  assert.deepEqual(nomes("Cadastro").slice(0, 9), ["Cupons", "Empresas", "Faixa de Vouchers", "Áreas", "Plantão", "Motoristas", "Punições", "Clientes", "Ruas"]);
+  assert.deepEqual(nomes("Financeiro", "Estatísticas"), ["OS por motorista", "OS por empresa", "OS por bairro", "OS por forma de pagamento", "OS por operador", "% de OS por motorista"]);
+  assert.deepEqual(nomes("Configurações"), ["Gerais", "Taxas da central", "Personalização app passageiro", "Despacho", "Transbordos", "Tarifas e categorias", "Tarifas dinâmicas", "Descontos", "Integrações", "NPS", "Termos de uso"]);
+  assert.equal(FUNCOES.find((f) => f.id === "alterar-senha")!.nome, "Trocar senha");
   const todas = FUNCOES.flatMap((f) => [f.rota, ...(f.antigas ?? [])]);
   assert.equal(new Set(todas).size, todas.length, "rota antiga colide com outra");
 });

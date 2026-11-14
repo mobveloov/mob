@@ -7,7 +7,7 @@
   --barra: #ffffff; --barra-borda: #f1f5f9;
   --primaria: #0368ea; --primaria-txt: #ffffff;
   --primaria-suave: color-mix(in srgb, var(--primaria) 9%, transparent);
-  --primaria-viva: var(--primaria);
+  --primaria-viva: color-mix(in srgb, var(--primaria) 70%, #000000);
   --sombra: 0 4px 6px -1px rgba(0, 0, 0, .05), 0 2px 4px -1px rgba(0, 0, 0, .03);
   --sombra-alta: 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04);
   --campo: #f8fafc;
@@ -28,7 +28,7 @@
 * { box-sizing: border-box; }
 html, body { overflow-x: hidden; }
 body { margin: 0; background: var(--fundo); color: var(--texto); font: 14px/1.5 var(--fonte, "Plus Jakarta Sans", system-ui, sans-serif); -webkit-font-smoothing: antialiased; transition: background-color .3s, color .3s; }
-a { color: var(--primaria); }
+a { color: var(--primaria-viva); }
 code { background: var(--fundo); padding: 1px 5px; border-radius: 4px; }
 
 /* ------------------------------------------------------------------ layout e menu do topo */
@@ -51,6 +51,7 @@ code { background: var(--fundo); padding: 1px 5px; border-radius: 4px; }
 .nav-link .seta { opacity: .5; }
 .nav-dropdown { position: absolute; top: calc(100% + 5px); left: 0; min-width: 250px; padding: 8px; background: var(--barra); border: 1px solid var(--barra-borda); border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, .1), 0 8px 10px -6px rgba(0, 0, 0, .01); opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.98); transition: all .2s; z-index: 60; }
 .nav-dropdown::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.nav-dropdown { top: 100%; max-height: calc(100vh - 70px); overflow-y: auto; } /* sem vão entre o botão e o menu: o menu longo rola */
 .nav-dropdown.direita { left: auto; right: 0; }
 .nav-grupo:hover > .nav-dropdown, .nav-grupo:focus-within > .nav-dropdown { opacity: 1; visibility: visible; transform: none; }
 .nav-grupo.fechar > .nav-dropdown { opacity: 0; visibility: hidden; }
@@ -62,7 +63,6 @@ code { background: var(--fundo); padding: 1px 5px; border-radius: 4px; }
 .dropdown-item:hover svg, .dropdown-item.ativo svg { color: var(--primaria-viva); }
 .dropdown-item.sair { color: #ef4444; } .dropdown-item.sair svg { color: #ef4444; }
 .dropdown-item.sair:hover { background: rgba(239, 68, 68, .1); color: #dc2626; }
-.etiqueta-novo { margin-left: auto; background: #10b981; color: #fff; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
 .separador { height: 1px; background: var(--barra-borda); margin: 4px 8px; }
 .botao-tema { display: grid; place-items: center; width: 36px; height: 36px; margin-left: 8px; border: 0; border-radius: 999px; background: none; color: var(--suave); cursor: pointer; transition: background .2s; }
 .botao-tema:hover { background: var(--primaria-suave); color: var(--primaria-viva); }
@@ -86,29 +86,29 @@ code { background: var(--fundo); padding: 1px 5px; border-radius: 4px; }
 .barra-celular .avatar { width: 32px; height: 32px; font-size: 12px; border: 0; cursor: pointer; }
 .hamburguer { display: grid; place-items: center; width: 40px; height: 40px; margin-left: -8px; border: 0; border-radius: 8px; background: none; color: var(--suave); cursor: pointer; }
 .cortina { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .5); backdrop-filter: blur(2px); }
-.lateral { position: fixed; inset: 0 auto 0 0; z-index: 70; width: 288px; max-width: 86vw; display: flex; flex-direction: column; background: #151e32; color: #94a3b8; border-right: 1px solid #1e293b; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .5); transform: translateX(-100%); transition: transform .3s cubic-bezier(.4, 0, .2, 1); }
+.lateral { position: fixed; inset: 0 auto 0 0; z-index: 70; width: 288px; max-width: 86vw; display: flex; flex-direction: column; background: var(--barra); color: var(--suave); border-right: 1px solid var(--barra-borda); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .5); transform: translateX(-100%); transition: transform .3s cubic-bezier(.4, 0, .2, 1); }
 .lateral.aberta { transform: none; }
 .lateral:not(.aberta) { box-shadow: none; visibility: hidden; transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s .3s; }
-.lateral-topo { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #1e293b; }
-.lateral-topo strong { color: #fff; font-size: 18px; }
-.lateral-topo button { background: none; border: 0; color: #64748b; cursor: pointer; padding: 4px; }
+.lateral-topo { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--barra-borda); }
+.lateral-topo strong { color: var(--texto); font-size: 18px; }
+.lateral-topo button { background: none; border: 0; color: var(--suave); cursor: pointer; padding: 4px; }
 .lateral nav { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
-.mobile-link { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 13px 16px; border: 0; border-radius: 8px; background: none; color: #94a3b8; font: inherit; font-size: 15px; font-weight: 500; text-decoration: none; cursor: pointer; text-align: left; transition: all .2s; }
+.mobile-link { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 13px 16px; border: 0; border-radius: 8px; background: none; color: var(--suave); font: inherit; font-size: 15px; font-weight: 500; text-decoration: none; cursor: pointer; text-align: left; transition: all .2s; }
 .mobile-link > span { display: flex; align-items: center; gap: 12px; }
-.mobile-link:hover { background: rgba(255, 255, 255, .05); color: #fff; }
+.mobile-link:hover { background: var(--primaria-suave); color: var(--texto); }
 .mobile-link.ativo { background: var(--primaria); color: var(--primaria-txt); font-weight: 600; }
 .mobile-link .girar { transform: rotate(180deg); }
-.mobile-sub { margin: 4px 0; padding: 4px 0; background: rgba(0, 0, 0, .2); border: 1px solid rgba(51, 65, 85, .3); border-radius: 8px; }
-.mobile-sublink { display: block; position: relative; padding: 9px 16px 9px 44px; color: #64748b; font-size: 14.5px; text-decoration: none; }
-.mobile-sublink::before { content: ""; position: absolute; left: 29px; top: 50%; width: 4px; height: 4px; border-radius: 50%; background: #475569; transform: translateY(-50%); }
-.mobile-sublink:hover, .mobile-sublink.ativo { color: #fff; }
+.mobile-sub { margin: 4px 0; padding: 4px 0; background: var(--fundo); border: 1px solid var(--barra-borda); border-radius: 8px; }
+.mobile-sublink { display: block; position: relative; padding: 9px 16px 9px 44px; color: var(--suave); font-size: 14.5px; text-decoration: none; }
+.mobile-sublink::before { content: ""; position: absolute; left: 29px; top: 50%; width: 4px; height: 4px; border-radius: 50%; background: var(--borda); transform: translateY(-50%); }
+.mobile-sublink:hover, .mobile-sublink.ativo { color: var(--texto); }
 .mobile-sublink.ativo::before { background: var(--primaria); }
-.mobile-secao { padding: 8px 16px 2px 29px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #475569; }
-.lateral-pref { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(30, 41, 59, .6); }
-.lateral-pref p { margin: 0 0 8px; padding: 0 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #64748b; }
-.lateral-rodape { padding: 16px; border-top: 1px solid #1e293b; }
+.mobile-secao { padding: 8px 16px 2px 29px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); opacity: .8; }
+.lateral-pref { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--barra-borda); }
+.lateral-pref p { margin: 0 0 8px; padding: 0 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
+.lateral-rodape { padding: 16px; border-top: 1px solid var(--barra-borda); }
 .lateral-rodape button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: 8px; background: none; color: #f87171; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
-.lateral-rodape button:hover { background: #1e293b; color: #fca5a5; }
+.lateral-rodape button:hover { background: var(--ruim-bg); color: var(--ruim); }
 
 /* ------------------------------------------------------------------ títulos, campos e botões */
 .titulo { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin: 0 0 32px; padding-bottom: 24px; border-bottom: 1px solid var(--borda); }
@@ -499,3 +499,18 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 /* nomes longos quebram em até 2 linhas (o nome inteiro também fica no balão do item) */
 .ml-item .ml-texto { white-space: normal; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .menu-recolhido .ml-lateral .ml-item .ml-texto { display: none; }
+/* troca de tema sem piscar: desliga as transições por um instante (classe posta em App.tsx) */
+.trocando-tema, .trocando-tema *, .trocando-tema *::before, .trocando-tema *::after { transition: none !important; }
+:root[data-theme="dark"] .barra-topo { box-shadow: 0 1px 0 rgba(255, 255, 255, .02), 0 4px 12px rgba(0, 0, 0, .25); }
+:root[data-theme="dark"] .nav-dropdown { box-shadow: 0 12px 28px rgba(0, 0, 0, .5); }
+
+/* Barra do topo em qualquer zoom: o logo nunca some, as abas não quebram linha e o que não cabe vai para "Mais". */
+.barra-centro { overflow: visible; }
+.logo-topo, .divisor-v, .barra-lado, .nav-itens > *, .nav-grupo { flex-shrink: 0; }
+.nav-itens { flex-wrap: nowrap; min-width: 0; }
+.barra-lado { gap: 2px; }
+.logo-topo img { max-width: 150px; }
+.nav-medida { position: absolute; left: -9999px; top: 0; height: 0; overflow: hidden; visibility: hidden; display: flex; white-space: nowrap; pointer-events: none; }
+.nav-dropdown .grupo-titulo { color: var(--primaria-viva); opacity: 1; }
+.nav-dropdown .dropdown-header.sub { padding-left: 16px; text-transform: none; letter-spacing: 0; font-weight: 600; }
+@media (max-width: 1180px) { .usuario-nome { display: none; } }

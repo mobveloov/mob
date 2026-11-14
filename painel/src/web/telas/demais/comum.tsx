@@ -90,7 +90,10 @@ export const textoPeriodo = (p: PeriodoSel) => (p.chave === "personalizado" ? `$
 export const queryPeriodo = (p: PeriodoSel) => `periodo=${p.chave}${p.chave === "personalizado" ? `&inicio=${p.inicio}&fim=${p.fim}` : ""}`;
 
 /** Filtro de período em lista suspensa (Hoje, Ontem, ... Personalizado). */
-export function FiltroPeriodo({ valor, onChange, extras }: { valor: PeriodoSel; onChange: (p: PeriodoSel) => void; extras?: Array<[string, string]> }) {
+/** Atalhos de período na ordem da Machine (telas do Financeiro). */
+export const PERIODOS_MACHINE = ["hoje", "ontem", "semana_passada", "mes_passado", "ultimos_7", "ultimos_30"];
+
+export function FiltroPeriodo({ valor, onChange, extras, atalhos }: { valor: PeriodoSel; onChange: (p: PeriodoSel) => void; extras?: Array<[string, string]>; atalhos?: string[] }) {
   const [aberto, setAberto] = useState(false);
   const [de, setDe] = useState(""), [ate, setAte] = useState("");
   const [perso, setPerso] = useState(false);
@@ -100,7 +103,7 @@ export function FiltroPeriodo({ valor, onChange, extras }: { valor: PeriodoSel; 
     document.addEventListener("mousedown", fora);
     return () => document.removeEventListener("mousedown", fora);
   }, []);
-  const lista = [...(extras ?? []), ...PERIODOS];
+  const lista = [...(extras ?? []), ...(atalhos ? atalhos.map((c) => PERIODOS.find(([k]) => k === c)!).filter(Boolean) : PERIODOS)];
   return (
     <div className="dm-dropdown" ref={caixa}>
       <button type="button" className="botao" aria-haspopup="listbox" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>{(lista.find(([c]) => c === valor.chave) ?? ["", textoPeriodo(valor)])[1]} ▾</button>

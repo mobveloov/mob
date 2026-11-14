@@ -68,7 +68,7 @@ function impedimento(empresaId: string, papel: PapelApp, telefone: string): stri
     return null;
   }
   const c = clienteDoTelefone(empresaId, telefone);
-  if (c && (c.status === "Bloqueado" || c.status === "Suspenso")) return "Este telefone está bloqueado. Fale com a central.";
+  if (c && (["Bloqueado", "Suspenso", "Suspenso por nota", "Deletado"].includes(String(c.status)))) return "Este telefone está bloqueado. Fale com a central.";
   return null;
 }
 
