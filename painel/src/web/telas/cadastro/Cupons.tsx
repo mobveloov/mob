@@ -1,63 +1,120 @@
 // Cadastro › Cupons: campanhas por cidade ou cupons exclusivos de cliente (VIP). Lista: /api/gestao/cupons; gravação: /api/cadastros/cupons.
 
-import { useState } from "react";
-import { Plus } from "lucide-react";
-import { api } from "../../api";
+import { useEffect, useState } from "react";
+import { Download, Plus } from "lucide-react";
+import { api, empresaEscolhidaAgora } from "../../api";
 import { useCarregar } from "../../componentes/ui";
-import { Abas, Cabecalho, Campo, chamar, consulta, dataBr, dinheiro, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
+import { Cabecalho, Campo, chamar, consulta, dataBr, dinheiro, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
 
 type Cupom = Record<string, string | number | boolean | null> & { id: string; usos: number; descontoTotal: number; situacao: string };
-interface Resposta { cupons: Cupom[]; paginacao: { atual: number; totalPaginas: number }; kpis: { total: number; usos: number; economia: number } }
+interface Resposta { cupons: Cupom[]; automaticos: Cupom[]; paginacao: { atual: number; totalPaginas: number }; kpis: { total: number; usos: number; economia: number } }
 const TOM: Record<string, "ok" | "ruim" | "alerta" | "neutro"> = { Ativo: "ok", Vencido: "ruim", Esgotado: "alerta", Inativo: "neutro" };
-const ABAS = [["Todos", "Todos"], ["Validos", "Ativos"], ["Vencidos", "Vencidos"], ["Pausados", "Pausados"]] as const;
+const TIPOS = [["Todos", "Todos"], ["Resgatavel", "Resgatável"], ["Automatico", "Automático"]] as const;
+const SITUACOES = [["Todos", "Todas as situações"], ["Validos", "Ativos"], ["Vencidos", "Vencidos"], ["Pausados", "Pausados"]] as const;
+
+async function baixarPlanilha(tipo: string) {
+  const emp = empresaEscolhidaAgora();
+  const r = await fetch(`/api/gestao/cupons/exportar${consulta({ tipo })}`, { credentials: "same-origin", headers: emp ? { "X-Empresa": emp } : {} });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erro?: string }).erro || `Erro ${r.status}`);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(await r.blob()); a.download = "cupons.csv"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
 
 export default function Cupons() {
+  const [tipo, setTipo] = useState("Todos");
   const [aba, setAba] = useState("Todos");
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
-  const l = useCarregar(() => chamar<Resposta>("GET", `/cupons${consulta({ status: aba, busca, pagina })}`), [aba, busca, pagina]);
+  const [exportar, setExportar] = useState(false);
+  const l = useCarregar(() => chamar<Resposta>("GET", `/cupons${consulta({ status: aba, tipo, busca, pagina })}`), [aba, tipo, busca, pagina]);
   const cidades = useCarregar(() => chamar<{ cidades: string[] }>("GET", "/cidades"), []);
   const [editando, setEditando] = useState<Cupom | "novo" | null>(null);
+  const [auto, setAuto] = useState<Cupom | null>(null);
   const { aviso, tentar } = useAviso();
   const d = l.dados;
+  useEffect(() => { if (!exportar) return; const f = () => setExportar(false); window.addEventListener("click", f); return () => window.removeEventListener("click", f); }, [exportar]);
+  const mostraAuto = tipo !== "Resgatavel", mostraResg = tipo !== "Automatico";
 
   return (
     <div className="cg-pagina-solta">
       {aviso}
-      <Cabecalho titulo="Gestão de Cupons" sub="Crie campanhas para sua cidade ou envie cupons exclusivos para clientes VIP."><button className="cg-botao primario" onClick={() => setEditando("novo")}><Plus size={16} /> Novo Cupom</button></Cabecalho>
-      <div className="cg-kpis">
-        <div className="cg-kpi"><span>Total de Cupons</span><strong>{d?.kpis.total ?? 0}</strong></div>
-        <div className="cg-kpi"><span>Usos Realizados</span><strong>{d?.kpis.usos ?? 0}</strong></div>
-        <div className="cg-kpi"><span>Descontos Aplicados</span><strong>{dinheiro(d?.kpis.economia)}</strong></div>
-      </div>
+      <Cabecalho titulo="Cupons"><button className="cg-botao primario" onClick={() => setEditando("novo")}><Plus size={16} /> Criar cupom</button></Cabecalho>
       <div className="cg-linha-tab">
-        <div style={{ flex: "2 1 320px" }}><Abas itens={ABAS.map(([id, rotulo]) => ({ id, rotulo }))} valor={aba as "Todos"} onChange={(v) => { setAba(v); setPagina(1); }} /></div>
-        <input placeholder="Buscar" value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(1); }} aria-label="Buscar" />
+        <label className="cg-campo" style={{ flex: "0 1 200px" }}><span>Tipo de cupom</span><select value={tipo} onChange={(e) => { setTipo(e.target.value); setPagina(1); }} aria-label="Tipo de cupom">{TIPOS.map(([id, r]) => <option key={id} value={id}>{r}</option>)}</select></label>
+        {mostraResg && <label className="cg-campo" style={{ flex: "0 1 200px" }}><span>Situação</span><select value={aba} onChange={(e) => { setAba(e.target.value); setPagina(1); }} aria-label="Situação">{SITUACOES.map(([id, r]) => <option key={id} value={id}>{r}</option>)}</select></label>}
+        {mostraResg && <input placeholder="Buscar" value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(1); }} aria-label="Buscar" />}
+        <div className="cg-menu-acoes">
+          <button className="cg-botao" aria-haspopup="menu" aria-expanded={exportar} onClick={(e) => { e.stopPropagation(); setExportar(!exportar); }}><Download size={16} /> Exportar</button>
+          {exportar && <ul role="menu">
+            <li><button role="menuitem" onClick={() => { setExportar(false); window.print(); }}>Impressão (PDF)</button></li>
+            <li><button role="menuitem" onClick={() => { setExportar(false); void tentar(() => baixarPlanilha(tipo), "Planilha exportada."); }}>Planilha (CSV)</button></li>
+          </ul>}
+        </div>
       </div>
-      <div className="cg-tabela-caixa">
-        <div className="cg-rolagem"><table className="cg-tabela">
-          <thead><tr><th>Cupom</th><th>Desconto</th><th>Destinatário</th><th>Validade &amp; Regras</th><th>Usos</th><th>Status</th><th className="direita">Ações</th></tr></thead>
-          <tbody>{d?.cupons.map((c) => (
-            <tr key={c.id}>
-              <td><strong>{String(c.codigo)}</strong><br /><small className="cg-mono">{String(c.descricao ?? "")}</small></td>
-              <td>{c.tipoDesconto === "Percentual" ? `${c.valor}%` : dinheiro(Number(c.valor))}{c.valorMaximo ? <><br /><small className="cg-mono">teto {dinheiro(Number(c.valorMaximo))}</small></> : null}</td>
-              <td>{c.clienteTelefone ? <Selo tom="roxo">VIP {String(c.clienteNome || c.clienteTelefone)}</Selo> : <span>Todos{c.cidade ? ` · ${c.cidade}` : ""}</span>}</td>
-              <td>{c.inicio ? dataBr(String(c.inicio)) : "—"} a {c.fim ? dataBr(String(c.fim)) : "sem fim"}<br /><small className="cg-mono">{c.minimoCorrida ? `mín. ${dinheiro(Number(c.minimoCorrida))}` : "sem mínimo"}{c.usoPorPassageiro ? ` · ${c.usoPorPassageiro}/cliente` : ""}</small></td>
-              <td>{c.usos}{c.limiteUsos ? ` / ${c.limiteUsos}` : ""}</td>
-              <td><Selo tom={TOM[c.situacao] ?? "neutro"}>{c.situacao === "Inativo" ? "Pausado" : c.situacao}</Selo></td>
-              <td className="direita"><MenuAcoes itens={[
-                { rotulo: "Editar", onClick: () => setEditando(c) },
-                { rotulo: c.ativo === true ? "Pausar" : "Ativar", onClick: () => void tentar(async () => { await api.salvarRegistro("cupons", c.id, { ...c, ativo: c.ativo !== true }); l.recarregar(); }) },
-                { rotulo: "Excluir", perigo: true, onClick: () => confirm(`Excluir o cupom ${c.codigo}?`) && void tentar(async () => { await api.apagarRegistro("cupons", c.id); l.recarregar(); }, "Cupom excluído.") },
-              ]} /></td>
-            </tr>))}
-          </tbody>
-        </table></div>
-        {d && !d.cupons.length && <Vazio titulo="Nenhum cupom encontrado." />}
-        <Paginacao atual={d?.paginacao.atual ?? 1} total={d?.paginacao.totalPaginas ?? 1} onChange={setPagina} />
-      </div>
+      {mostraAuto && <>
+        <h2 className="cg-secao">Cupons automáticos</h2>
+        <div className="cg-autos">{d?.automaticos.map((c) => (
+          <div className="cg-auto" key={String(c.codigo)}>
+            <strong>{String(c.codigo)}</strong>
+            <span>{String(c.descricao)}</span>
+            <span><Selo tom="info">Automático</Selo> <Selo tom={c.ativo === true ? "ok" : "neutro"}>{c.ativo === true ? "Ativo" : "Inativo"}</Selo></span>
+            <span>Cupom utilizado: <strong>{c.usos ? `${c.usos} ${c.usos === 1 ? "vez" : "vezes"}` : "Nenhuma vez"}</strong></span>
+            <span>Limite de uso: <strong>{String(c.limite)}</strong></span>
+            {Number(c.valor) > 0 && <small className="cg-mono">{c.tipoDesconto === "Percentual" ? `${c.valor}%` : dinheiro(Number(c.valor))}{c.valorMaximo ? `, teto ${dinheiro(Number(c.valorMaximo))}` : ""}</small>}
+            <button className="cg-botao" onClick={() => setAuto(c)}>{c.ativo === true ? "Configurar" : "Ativar"}</button>
+          </div>))}</div>
+      </>}
+      {mostraResg && <>
+        {mostraAuto && <h2 className="cg-secao">Cupons resgatáveis</h2>}
+        <div className="cg-tabela-caixa">
+          <div className="cg-rolagem"><table className="cg-tabela">
+            <thead><tr><th>Cupom</th><th>Desconto</th><th>Destinatário</th><th>Validade &amp; Regras</th><th>Usos</th><th>Status</th><th className="direita">Ações</th></tr></thead>
+            <tbody>{d?.cupons.map((c) => (
+              <tr key={c.id}>
+                <td><strong>{String(c.codigo)}</strong><br /><small className="cg-mono">{String(c.descricao ?? "")}</small></td>
+                <td>{c.tipoDesconto === "Percentual" ? `${c.valor}%` : dinheiro(Number(c.valor))}{c.valorMaximo ? <><br /><small className="cg-mono">teto {dinheiro(Number(c.valorMaximo))}</small></> : null}</td>
+                <td>{c.clienteTelefone ? <Selo tom="roxo">VIP {String(c.clienteNome || c.clienteTelefone)}</Selo> : <span>Todos{c.cidade ? ` · ${c.cidade}` : ""}</span>}</td>
+                <td>{c.inicio ? dataBr(String(c.inicio)) : "—"} a {c.fim ? dataBr(String(c.fim)) : "sem fim"}<br /><small className="cg-mono">{c.minimoCorrida ? `mín. ${dinheiro(Number(c.minimoCorrida))}` : "sem mínimo"}{c.usoPorPassageiro ? ` · ${c.usoPorPassageiro}/cliente` : ""}</small></td>
+                <td>{c.usos}{c.limiteUsos ? ` / ${c.limiteUsos}` : ""}</td>
+                <td><Selo tom={TOM[c.situacao] ?? "neutro"}>{c.situacao === "Inativo" ? "Pausado" : c.situacao}</Selo></td>
+                <td className="direita"><MenuAcoes itens={[
+                  { rotulo: "Editar", onClick: () => setEditando(c) },
+                  { rotulo: c.ativo === true ? "Pausar" : "Ativar", onClick: () => void tentar(async () => { await api.salvarRegistro("cupons", c.id, { ...c, ativo: c.ativo !== true }); l.recarregar(); }) },
+                  { rotulo: "Excluir", perigo: true, onClick: () => confirm(`Excluir o cupom ${c.codigo}?`) && void tentar(async () => { await api.apagarRegistro("cupons", c.id); l.recarregar(); }, "Cupom excluído.") },
+                ]} /></td>
+              </tr>))}
+            </tbody>
+          </table></div>
+          {d && !d.cupons.length && <Vazio titulo="Nenhum cupom resgatável encontrado." />}
+          <Paginacao atual={d?.paginacao.atual ?? 1} total={d?.paginacao.totalPaginas ?? 1} onChange={setPagina} />
+        </div>
+      </>}
       {editando && <Formulario c={editando === "novo" ? null : editando} cidades={cidades.dados?.cidades ?? []} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
+      {auto && <FormularioAutomatico c={auto} onFechar={() => setAuto(null)} onSalvo={() => l.recarregar()} />}
     </div>
+  );
+}
+
+function FormularioAutomatico({ c, onFechar, onSalvo }: { c: Cupom; onFechar: () => void; onSalvo: () => void }) {
+  const [f, setF] = useState({ tipoDesconto: String(c.tipoDesconto || "Percentual"), valor: Number(c.valor) > 0 ? String(c.valor) : "", valorMaximo: c.valorMaximo ? String(c.valorMaximo) : "", ativo: c.ativo === true });
+  const { aviso, tentar } = useAviso();
+  const salvar = async () => {
+    const n = (v: string) => (v === "" ? null : Number(v.replace(",", ".")));
+    const corpo: Record<string, unknown> = { ...c, tipoDesconto: f.tipoDesconto, valor: n(f.valor), valorMaximo: n(f.valorMaximo), ativo: f.ativo, automatico: true };
+    for (const k of ["usos", "descontoTotal", "situacao", "limite", "id"]) delete corpo[k];
+    if (await tentar(() => (c.id ? api.salvarRegistro("cupons", c.id, corpo) : api.criarRegistro("cupons", corpo)), "Cupom automático salvo.")) { onSalvo(); onFechar(); }
+  };
+  return (
+    <Janela aberta titulo={String(c.codigo)} sub={`${String(c.descricao)}. Limite de uso: ${String(c.limite)}.`} onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar</button></>}>
+      {aviso}
+      <div className="cg-grade">
+        <Campo rotulo="Tipo"><select value={f.tipoDesconto} onChange={(e) => setF({ ...f, tipoDesconto: e.target.value })}><option value="Percentual">% Porcentagem</option><option value="Valor fixo">R$ Fixo</option></select></Campo>
+        <Campo rotulo="Valor"><input inputMode="decimal" value={f.valor} onChange={(e) => setF({ ...f, valor: e.target.value })} /></Campo>
+        <Campo rotulo="Teto Máx (R$)"><input inputMode="decimal" value={f.valorMaximo} onChange={(e) => setF({ ...f, valorMaximo: e.target.value })} /></Campo>
+        <Campo rotulo="Situação"><select value={f.ativo ? "1" : "0"} onChange={(e) => setF({ ...f, ativo: e.target.value === "1" })}><option value="1">Ativo</option><option value="0">Inativo</option></select></Campo>
+      </div>
+    </Janela>
   );
 }
 

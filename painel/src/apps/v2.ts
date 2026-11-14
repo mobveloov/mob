@@ -213,7 +213,7 @@ rotasV2.get("/foto/:papel/:chave", ok((req, res) => {
 rotasV2.get("/cupons", so("passageiro"), ok((req, res) => {
   const hoje = agoraBr().toISOString().slice(0, 10);
   const lista = listar(ctx(req).empresaId, cadastroPorId("cupons")!)
-    .filter((c) => c.ativo === true && !(c.inicio && String(c.inicio) > hoje) && !(c.fim && String(c.fim) < hoje))
+    .filter((c) => c.ativo === true && c.automatico !== true && !(c.inicio && String(c.inicio) > hoje) && !(c.fim && String(c.fim) < hoje))
     .map((c) => ({
       codigo: String(c.codigo ?? ""), tipo: c.tipoDesconto === "Valor fixo" ? "valor" : "percentual", valor: Number(c.valor) || 0,
       maximo: typeof c.valorMaximo === "number" && c.valorMaximo > 0 ? c.valorMaximo : null,

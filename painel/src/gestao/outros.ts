@@ -2,7 +2,8 @@
 
 import type { Router } from "express";
 import { atualizar, criar, type Registro } from "../cadastros/armazem.ts";
-import { listarProprias, type CorridaPropria } from "../corridas/index.ts";
+import { CUPONS_AUTOMATICOS, listarProprias, type CorridaPropria } from "../corridas/index.ts";
+import { montarCsv } from "../config/financeiro-visao.ts";
 import { lancar, pessoa, salvarPessoa } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
 import { hashSenha } from "../servidor/dados.ts";
@@ -113,24 +114,47 @@ export function situacaoCupom(c: Registro, usos: number, hoje = hojeBr()): "Ativ
   return "Ativo";
 }
 
+type CupomLinha = Registro & { usos: number; descontoTotal: number; situacao: string };
+
+/** Cupons da empresa com usos, desconto dado e situação. Os automáticos (PRIMEIRA CORRIDA e DE VOLTA) vêm sempre, inativos até alguém configurar. */
+function cuponsDaEmpresa(e: string) {
+  const uso = new Map<string, { usos: number; desconto: number }>();
+  for (const c of listarProprias(e)) {
+    if (!c.cupom || c.status === "cancelada" || c.status === "nao_atendida") continue;
+    const k = normal(c.cupom), u = uso.get(k) ?? { usos: 0, desconto: 0 };
+    u.usos++; u.desconto += c.desconto ?? 0; uso.set(k, u);
+  }
+  const todos = registros(e, "cupons").map((c): CupomLinha => {
+    const u = uso.get(normal(c.codigo)) ?? { usos: 0, desconto: 0 };
+    return { ...c, usos: u.usos, descontoTotal: arred(u.desconto), situacao: situacaoCupom(c, u.usos) };
+  });
+  const automaticos = CUPONS_AUTOMATICOS.map((a) => {
+    const reg = todos.find((c) => normal(c.codigo) === normal(a.codigo) && c.automatico === true);
+    const u = uso.get(normal(a.codigo)) ?? { usos: 0, desconto: 0 };
+    return reg ?? ({ id: "", codigo: a.codigo, descricao: a.descricao, automatico: true, ativo: false, tipoDesconto: "Percentual", valor: 0, usos: u.usos, descontoTotal: arred(u.desconto), situacao: "Inativo" } as unknown as CupomLinha);
+  }).map((c, i) => ({ ...c, limite: CUPONS_AUTOMATICOS[i].limite }));
+  return { resgataveis: todos.filter((c) => c.automatico !== true), automaticos, todos };
+}
+
 function rotasCupons(r: Router) {
   r.get("/cupons", ok((req, res) => {
     const e = emp(req), q = req.query as Record<string, unknown>;
-    const uso = new Map<string, { usos: number; desconto: number }>();
-    for (const c of listarProprias(e)) {
-      if (!c.cupom || c.status === "cancelada" || c.status === "nao_atendida") continue;
-      const k = normal(c.cupom), u = uso.get(k) ?? { usos: 0, desconto: 0 };
-      u.usos++; u.desconto += c.desconto ?? 0; uso.set(k, u);
-    }
-    const todos = registros(e, "cupons").map((c): Registro & { usos: number; descontoTotal: number; situacao: string } => {
-      const u = uso.get(normal(c.codigo)) ?? { usos: 0, desconto: 0 };
-      return { ...c, usos: u.usos, descontoTotal: arred(u.desconto), situacao: situacaoCupom(c, u.usos) };
-    });
-    const st = String(q.status ?? "Todos");
-    const f = todos.filter((c) => contem(c.codigo, texto(q.busca)) && (st === "Todos" || (st === "Validos" ? c.situacao === "Ativo" : st === "Vencidos" ? c.situacao === "Vencido" || c.situacao === "Esgotado" : c.situacao === "Inativo")))
+    const { resgataveis, automaticos, todos } = cuponsDaEmpresa(e);
+    const st = String(q.status ?? "Todos"), tipo = String(q.tipo ?? "Todos");
+    const f = resgataveis.filter((c) => contem(c.codigo, texto(q.busca)) && (st === "Todos" || (st === "Validos" ? c.situacao === "Ativo" : st === "Vencidos" ? c.situacao === "Vencido" || c.situacao === "Esgotado" : c.situacao === "Inativo")))
       .sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)));
-    const pg = paginar(f, q.pagina);
-    res.json({ cupons: pg.itens, paginacao: pg.paginacao, kpis: { total: todos.length, usos: todos.reduce((a, c) => a + c.usos, 0), economia: arred(todos.reduce((a, c) => a + c.descontoTotal, 0)) } });
+    const pg = paginar(tipo === "Automatico" ? [] : f, q.pagina);
+    res.json({ cupons: pg.itens, automaticos: tipo === "Resgatavel" ? [] : automaticos, paginacao: pg.paginacao, kpis: { total: todos.length, usos: todos.reduce((a, c) => a + c.usos, 0), economia: arred(todos.reduce((a, c) => a + c.descontoTotal, 0)) } });
+  }));
+  // Exportar (Planilha CSV): todos os cupons, com proteção contra injeção de fórmula.
+  r.get("/cupons/exportar", ok((req, res) => {
+    const { resgataveis, automaticos } = cuponsDaEmpresa(emp(req));
+    const tipo = String((req.query as Record<string, unknown>).tipo ?? "Todos");
+    const linha = (c: CupomLinha, t: string) => [c.codigo, t, c.descricao ?? "", c.tipoDesconto === "Percentual" ? `${c.valor}%` : c.valor, c.valorMaximo ?? "", c.cidade ?? "", c.clienteTelefone ?? "", c.inicio ?? "", c.fim ?? "", c.minimoCorrida ?? "", c.limiteUsos ?? "", c.usoPorPassageiro ?? "", c.usos, c.descontoTotal, c.situacao === "Inativo" ? "Inativo" : c.situacao];
+    const linhas = [...(tipo === "Resgatavel" ? [] : automaticos.map((c) => linha(c, "Automático"))), ...(tipo === "Automatico" ? [] : resgataveis.map((c) => linha(c, "Resgatável")))];
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="cupons-${hojeBr()}.csv"`);
+    res.send(montarCsv(["Cupom", "Tipo", "Descrição", "Desconto", "Teto (R$)", "Cidade", "Cliente VIP", "Início", "Fim", "Mínimo da corrida", "Limite de usos", "Usos por passageiro", "Usos", "Desconto dado (R$)", "Situação"], linhas));
   }));
 }
 
