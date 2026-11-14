@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { TransacoesFinanceiras } from "./TransacoesFinanceiras";
 import IntegracoesSistemas from "../../paginas/Integracoes";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
-type Aba = "mp" | "app" | "met" | "fin" | "sistemas";
+type Aba = "transacoes" | "mp" | "app" | "met" | "fin" | "sistemas";
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const MASCARA = "••••••";
 
 export function Integracoes() {
   const admin = useAdmin();
-  const [aba, setAba] = useState<Aba>("mp");
+  const [aba, setAba] = useState<Aba>("transacoes");
   const d = useCarregar(() => pedirConfig("/pagamentos"), []);
   const [p, setP] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setP(structuredClone(d.dados)); }
@@ -22,8 +23,8 @@ export function Integracoes() {
   return (
     <>
       <Cab titulo="Integrações" sub="Configure gateways de pagamento e métodos." />
-      <Abas abas={[["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
-      {aba === "sistemas" ? <IntegracoesSistemas /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
+      <Abas abas={[["transacoes", "Transações financeiras"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
+      {aba === "sistemas" ? <IntegracoesSistemas /> : aba === "transacoes" ? <TransacoesFinanceiras /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
         <>
           <Aviso erro={msg?.erro} ok={msg?.ok} />
           {aba === "mp" && (

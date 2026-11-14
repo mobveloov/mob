@@ -55,3 +55,10 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Sessão principal** (`local_5851c421...`): coordena e fala com o usuário.
 - Pastas `mob-igual-*` e `mob-v2-*` (git worktree) são sobras e podem ser removidas (`git worktree remove`).
 - Regra de modelos: Sonnet constrói, Haiku faz o mecânico, Fable só para a passada de auditoria e para bug difícil. Tudo em português.
+
+
+## Andamento da construção (atualizado 13/11/2026)
+- **No main:** Mapa de engajamento; Visão geral do financeiro + Extrato da central + Transações online; Consultar corridas (filtros, Exportar) + NPS; Descontos (matriz por forma de pagamento) + Integrações (Transações financeiras); **Casas corrigidas** (base extra de endereços, `npm run importar-casas`). 183 testes passando.
+- **Em andamento (ramos machine-*):** Tarifa + Dinâmica (inclui ligar a matriz de descontos ao preço); Relatórios + Vouchers; Pix, pendências, taxas de cancelamento, alertas e central de notificações.
+- **Falta:** cadastros completos (motorista, empresa, categoria, nova solicitação), Plantão e Ruas, telas de centrais (Controle financeiro, Meus planos, Demonstrativo, seletor), Funil de Clientes e Mapa de Bairros e Demanda (do 88), comparação tela a tela no navegador, carga de 500 corridas, Docker.
+- **Pendente de arquivo:** o arquivo completo das casas (só há 400 linhas de exemplo); o usuário precisa exportar do servidor.
