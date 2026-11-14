@@ -65,6 +65,7 @@ export default function Objetos() {
                     <button className="oc-btn peq" onClick={() => { setMenu(null); void fazer(() => op(`/objetos/${o.id}/status`, {})); }}><CheckCircle2 size={13} /> {o.resolvido ? "Reabrir" : "Finalizar"}</button>
                     <button className="oc-btn peq" onClick={() => void verPassageiro(o)}>Dados do passageiro</button>
                     <a className="oc-btn peq" style={{ textDecoration: "none", textAlign: "center" }} href="/conversas" onClick={() => setMenu(null)}>Chat com motorista</a>
+                    <button className="oc-btn peq ruim" onClick={() => { setMenu(null); if (confirm("Apagar este registro? Não dá para desfazer.")) void fazer(() => op(`/objetos/${o.id}`, undefined, "DELETE")); }}>Excluir registro</button>
                   </div>}
                 </td></tr>))}</tbody></table></div>
           <Paginacao pagina={dados.pagina} paginas={dados.paginas} total={dados.total} onMudar={setPagina} rotulo="registros" />
