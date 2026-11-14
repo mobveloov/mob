@@ -24,7 +24,7 @@ function conveniadaValida(empresaId: string, nome: unknown): string {
   const alvo = normal(nome);
   if (!alvo) throw new Error("Escolha a empresa.");
   const achada = nomesConveniadas(empresaId).find((n) => normal(n) === alvo);
-  if (!achada) throw new Error("Empresa não encontrada no cadastro de Empresas.");
+  if (!achada) throw new Error("Empresa inexistente no cadastro de Empresas.");
   return achada;
 }
 

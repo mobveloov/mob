@@ -225,7 +225,7 @@ function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
   const nomes = nomesConveniadas(empresaId);
   const pedida = String(b.empresaConveniada ?? "").trim();
   const conveniada = pedida ? nomes.find((n) => normal(n) === normal(pedida)) : undefined;
-  if (pedida && !conveniada) throw new Error("Empresa não encontrada no cadastro de Empresas.");
+  if (pedida && !conveniada) throw new Error("Empresa inexistente no cadastro de Empresas.");
   const centro = String(b.centroCusto ?? "").trim();
   if (centro && conveniada) {
     const cad = listar(empresaId, cadastroPorId("conveniadas")!).find((r) => normal(r.nome) === normal(conveniada));

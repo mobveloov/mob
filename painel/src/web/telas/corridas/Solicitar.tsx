@@ -6,7 +6,7 @@ import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEnder
 import { Aviso, L, fone, hojeBr, msgErro, op, pino, reais, soDig, useDados, useMapa } from "./comum";
 import "./corridas.css";
 
-const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App"];
+const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App", "Voucher"];
 const EXIGENCIAS = ["Porta-malas grande", "Aceita encomendas", "Adaptado para cadeirante", "Ficar à disposição do passageiro"];
 const P0: PontoEscolhido = { texto: "" };
 
@@ -31,6 +31,7 @@ export default function Solicitar() {
   const [pagamento, setPagamento] = useState("");
   const [exigencias, setExigencias] = useState<string[]>([]);
   const [observacao, setObservacao] = useState("");
+  const [empresaConv, setEmpresaConv] = useState(""), [centroCusto, setCentroCusto] = useState(""), [voucher, setVoucher] = useState("");
   const [est, setEst] = useState<{ valor: number | null; distanciaKm: number | null } | null>(null);
   const [manual, setManual] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -38,6 +39,9 @@ export default function Solicitar() {
   const [ok, setOk] = useState<string | null>(null);
 
   const cats = useDados(() => api.registros("categorias"), []);
+  const conv = useDados(() => api.registros("conveniadas"), []);
+  const conveniadas = (conv.dados?.registros ?? []).filter((c) => c.status !== "Encerrada");
+  const centros = String(conveniadas.find((c) => String(c.nome) === empresaConv)?.centrosCusto ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const mots = useDados<{ motoristas: any[] }>(() => op("/motoristas"), []);
   const mapa = useDados<any>(() => op("/mapa"), [], 15_000);
   const categorias = (cats.dados?.registros ?? []).filter((c) => c.ativa !== false);
@@ -97,14 +101,15 @@ export default function Solicitar() {
     if (!semDestino && !destino.texto.trim()) return setErro("Informe o destino ou marque \"Sem Destino\".");
     if (agendar && !quando) return setErro("Escolha a data e a hora do agendamento.");
     if (!pagamento) return setErro("Escolha a forma de pagamento.");
+    if (pagamento === "Voucher" && (!empresaConv || !voucher.trim())) return setErro("Para pagar com voucher, escolha a empresa e informe o número do voucher.");
     setEnviando(true);
     try {
       const r = await op<any>("/solicitar", {
         passageiro: { nome, telefone: tel }, embarque: origem, complemento, paradas: paradas.filter((p) => p.texto.trim()), destino: semDestino ? undefined : destino, referencia,
-        motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, exigencias, observacao, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
+        motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, exigencias, observacao, empresaConveniada: empresaConv || undefined, centroCusto: centroCusto || undefined, voucher: pagamento === "Voucher" ? voucher : undefined, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
       });
       setOk(`Corrida solicitada: OS ${r.corrida.os}${r.corrida.valor != null ? ` · ${reais(r.corrida.valor)}` : ""}.${r.avisos?.length ? ` ${r.avisos.join(" ")}` : ""}`);
-      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId("");
+      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
       setBusca(""); setNome(""); setContato(""); setTelCadastro(""); setRecentes([]);
     } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
   }
@@ -180,6 +185,13 @@ export default function Solicitar() {
               </div>
               <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Pagamento</span>
                 <div className="oc-pagto">{PAGAMENTOS.map((p) => <label key={p} className={pagamento === p ? "on" : ""}><input type="radio" name="forma_pagamento" checked={pagamento === p} onChange={() => setPagamento(p)} />{p}</label>)}</div></div>
+              {conveniadas.length > 0 && (
+                <div className="oc-grid2">
+                  <label className="oc-l">Empresa conveniada<select value={empresaConv} onChange={(e) => { setEmpresaConv(e.target.value); setCentroCusto(""); }}><option value="">Nenhuma</option>{conveniadas.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
+                  {centros.length > 0 && <label className="oc-l">Centro de custo<select value={centroCusto} onChange={(e) => setCentroCusto(e.target.value)}><option value="">Nenhum</option>{centros.map((c) => <option key={c}>{c}</option>)}</select></label>}
+                </div>
+              )}
+              {pagamento === "Voucher" && <label className="oc-l">Número do voucher<input value={voucher} maxLength={30} onChange={(e) => setVoucher(e.target.value)} placeholder="Ex.: A-1234" /></label>}
               <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Filtros (Opcionais)</span>
                 <div className="oc-pagto">{EXIGENCIAS.map((x) => <label key={x} className={exigencias.includes(x) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x] : exigencias.filter((y) => y !== x))} />{x}</label>)}</div></div>
               <textarea placeholder="Observação para o motorista..." value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={300} />

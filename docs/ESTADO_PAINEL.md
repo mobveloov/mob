@@ -29,6 +29,7 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - Exportar (CSV) com proteção contra injeção de fórmula (apóstrofo em células que começam com `=`, `+`, `-` ou `@`).
 - **Recarregar saldo** só registra o pedido e o valor (sem gateway); o admin confirma ou cancela. Chargeback e estorno são marcações do admin, sem mexer na carteira. Leitura segue aberta a quem está logado e escrita só do admin, como o resto do financeiro.
 - Teste: `painel/test/financeiro-machine.test.ts`.
+- **Relatórios e Vouchers** (branch machine-relvou): índice de Relatórios com "Criar modelo"; Faturamento por empresa, por centro de custo e por período; Vouchers e tickets por motoristas; OS por motorista, empresa, bairro, forma de pagamento, operador e % por motorista; Km rodados. Todos com período, paginação de 10 e Exportar CSV (apóstrofo contra fórmula). Faixa de Vouchers (Cadastro › Gestão) e Entrega de voucher (Corridas). Código em `painel/src/relatorios/` (API em `/api/relatorios`) e `painel/src/web/telas/relatorios/`. As corridas ganharam empresa conveniada, centro de custo e nº do voucher (Nova Solicitação); voucher exige faixa da empresa e não repete. Bairro vem do texto do endereço de embarque; operador, de quem criou a corrida pelo painel (App, WhatsApp e Totem aparecem como o próprio canal). Teste: `painel/test/relatorios-vouchers.test.ts`.
 
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
 - **Abonar ou baixar pendência** devolve o valor editado, não o debitado (`operacao/servico.ts`).
