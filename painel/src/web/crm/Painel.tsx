@@ -13,6 +13,7 @@ import Jornadas from "./Jornadas";
 import Publico from "./Publico";
 import Templates from "./Templates";
 import Visao from "./Visao";
+import { ABAS_CRM2 } from "../crm2/registro";
 
 type Aba = "dashboard" | "triggers" | "queue" | "journeys" | "regua" | "behavior_templates" | "campaigns" | "templates" | "logs" | "behavior_history" | "whatsapp" | "optout"
   | "passengers" | "drivers" | "behavior" | "contacts" | "segments" | "rfm" | "conversion" | "heatmap" | "rewards" | "cities" | "governance" | "audit";
@@ -46,8 +47,7 @@ const GRUPOS: Array<{ key: string; label: string; icon: LucideIcon; abas: Item[]
 const AINDA_NAO: Partial<Record<Aba, string>> = {
   triggers: "Gatilhos por evento (cadastro, simulação, status da corrida, aniversário)", queue: "Fila de dispatches", regua: "Régua de reativação",
   behavior_templates: "Templates comportamentais", logs: "Notificações enviadas", behavior_history: "Histórico de disparos", behavior: "Comportamentos",
-  contacts: "Contatos", segments: "Segmentos", rfm: "Análise RFM", conversion: "Conversão", heatmap: "Mapa de calor", rewards: "Recompensas",
-  cities: "Cidades", governance: "Governança", audit: "Auditoria",
+  segments: "Segmentos",
 };
 
 /** CRM & Engajamento: menu em grupos (o grupo escolhe as abas da segunda linha), igual ao do sistema de referência. */
@@ -90,6 +90,7 @@ export default function CrmPainel() {
       {aba === "whatsapp" && <Envio />}
       {aba === "optout" && <Descadastros />}
       {(aba === "passengers" || aba === "drivers") && <Publico key={aba} tipoInicial={aba === "drivers" ? "motorista" : "passageiro"} />}
+      {ABAS_CRM2.map((a) => aba === a.id && <a.componente key={a.id} />)}
       {AINDA_NAO[aba] && (
         <Cartao titulo={AINDA_NAO[aba]}>
           <p className="vazio">Esta aba do CRM ainda está sendo portada para este painel. As demais já funcionam.</p>
