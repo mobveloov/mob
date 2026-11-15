@@ -15,7 +15,7 @@ export interface Corrida {
   motorista: MotoristaDaCorrida | null;
   paradas?: Ponto[]; agendadaPara?: string | null; comentario?: string; taxaCancelamento?: number | null; compartilhar?: string | null; motoristaId?: string | null;
   valorOferecido?: number | null; opcionais?: string[]; mensagensNaoLidas?: number;
-  distanciaMotoristaKm?: number | null; minutosMotorista?: number | null; chegando?: boolean;
+  gravada?: boolean; distanciaMotoristaKm?: number | null; minutosMotorista?: number | null; chegando?: boolean;
 }
 export interface Eu { nome: string; telefone: string; foto?: string | null; email?: string; genero?: string; cidadeId?: string | null }
 export interface Endereco { texto: string; lat: number; lng: number; rua?: string; numero?: string; bairro?: string; cidade?: string; uf?: string }

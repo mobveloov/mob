@@ -28,6 +28,7 @@ import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { arquivo, gravar, ler } from "./armazem.ts";
 import { emitir, empresasComOuvintes, temOuvinte, type Alvo, conectado } from "./eventos.ts";
 import { avisar } from "./push.ts";
+import { configGravacao, limparGravacoes } from "./gravacoes.ts";
 import type { PapelApp } from "./sessoes.ts";
 
 /** Quanto tempo o motorista tem para aceitar. */
@@ -137,6 +138,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
     paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, comentario: c.comentario ?? "",
     avaliacaoPassageiro: papel === "motorista" ? c.avaliacaoPassageiro ?? null : undefined,
     taxaCancelamento: c.taxaCancelamento ?? null,
+    gravada: configGravacao(empresaId).ativa && aberta,
     compartilhar: papel === "passageiro" && c.compartilhamento ? `acompanhar/${c.compartilhamento}` : null,
     motoristaId: papel === "passageiro" ? c.motoristaId : undefined,
   };
@@ -522,12 +524,14 @@ function limparMemoria(empresaId: string, e: Estado, agora: number) {
 }
 
 /** Uma volta do despacho: vence ofertas, avisa mudanças e oferece corridas. O servidor chama de tempos em tempos. */
+const ultimaLimpezaGravacoes = new Map<string, number>();
 export function ciclo(empresaId: string) {
   const e = estado(empresaId);
   const agora = Date.now();
   for (const o of [...e.ofertas.values()]) if (o.expira <= agora) passarOferta(empresaId, o, "expirou");
   for (const [id, p] of e.online) if (agora - p.em > 2 * POSICAO_MS) e.online.delete(id);
   limparMemoria(empresaId, e, agora);
+  if (agora - (ultimaLimpezaGravacoes.get(empresaId) ?? 0) > 3600_000) { ultimaLimpezaGravacoes.set(empresaId, agora); try { limparGravacoes(empresaId, agora); } catch { /* sem pasta de gravações */ } }
   vigiar(empresaId);
   despachar(empresaId);
 }

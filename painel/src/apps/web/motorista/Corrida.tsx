@@ -12,6 +12,7 @@ import { Estrelas, mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { falar, linkNavegar, useAjustes } from "./ajustes";
 import { Mapa, type PontoMapa } from "./Mapa";
 import { textoMetros, useNavegacao } from "./Navegacao";
+import { iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
 import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
 
@@ -67,6 +68,17 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   const alvo: Ponto = !emViagem ? c.embarque : naParada ? paradas[parada] : c.destino ?? c.embarque;
   const nomeAlvo = !emViagem ? "LOCAL DE EMBARQUE" : naParada ? `PARADA ${parada + 1}` : c.destino ? "DESTINO" : "EMBARQUE";
   const longe = posicao && temPosicao(alvo) ? distanciaKm(posicao, alvo) : null;
+  // Gravação da corrida (áudio, ou vídeo se a empresa liberar): liga quando a corrida começa a andar e para ao fim.
+  const [cfgGravacao, setCfgGravacao] = useState<ConfigGravacao | null>(null);
+  const [gravandoAgora, setGravandoAgora] = useState(false);
+  useEffect(() => { void api<ConfigGravacao>("/gravacao/config").then(setCfgGravacao).catch(() => undefined); }, []);
+  const querGravar = !!cfgGravacao?.ativa && (cfgGravacao.obrigatoria || ajustes.gravar);
+  useEffect(() => {
+    if (!querGravar) { pararGravacao(); setGravandoAgora(false); return; }
+    let vivo = true;
+    void iniciarGravacao(c.id, ajustes.gravarVideo && !!cfgGravacao?.video).then((ok) => { if (vivo) setGravandoAgora(ok); });
+    return () => { vivo = false; pararGravacao(); setGravandoAgora(false); };
+  }, [c.id, querGravar, ajustes.gravarVideo]); // eslint-disable-line react-hooks/exhaustive-deps
   // GPS do próprio app: instrução da próxima curva, rota pelas ruas, recálculo e voz.
   const nativo = ajustes.navegador === "nativo";
   const nav = useNavegacao(posicao, alvo, nativo, ajustes.voz);
@@ -152,6 +164,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
       <button type="button" className="mapa-botao mapa-tema-corrida" aria-label="Trocar o tema do mapa" onClick={trocarTema}>{(temaMapa ?? (document.documentElement.dataset.tema === "escuro" ? "escuro" : "claro")) === "escuro" ? <Sun size={20} /> : <Moon size={20} />}</button>
       <button type="button" className="mapa-botao centralizar-corrida" aria-label="Centralizar o mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={20} /></button>
 
+      {gravandoAgora && <span className="gravando-chip"><i /> Gravando</span>}
       <div className={`folha-corrida n${nivel}`}>
         <button type="button" className="puxador-botao" aria-label="Mudar a altura dos detalhes"
           onPointerDown={(e) => { arraste.current = e.clientY; }}

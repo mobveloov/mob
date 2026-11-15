@@ -153,3 +153,14 @@ Ganho por km, minuto e hora aparecem na chamada e na corrida do motorista.
 GPS com a tela apagada: serviço em primeiro plano nativo (`PosicaoService.java`, notificação "Você está online") manda a posição ao servidor a cada ~15 s com o motorista
 online. **Compila no APK, mas ainda não foi testado num aparelho.** Falta ainda: gravação das corridas (áudio e vídeo), importação das `casas` do mobveloov,
 cabeçalhos anti-clonagem do painel (arquivo `servidor/index.ts` é da sessão do painel).
+
+### 10. Gravação das corridas (14/11, noite) — `painel/src/apps/gravacoes.ts`
+- **Motorista:** em corrida, o app grava o **áudio** (Opus ~24 kbps) ou o **vídeo** (480p, 15 quadros, ~500 kbps, só se a empresa liberar) em pedaços de 60 s e envia ao servidor; o que não foi enviado fica
+  na fila e sai quando a rede volta. Ajustes: "Gravar as corridas (áudio)" e "Gravar também o vídeo"; se a empresa tornar obrigatório, vale sempre. Aparece "● Gravando" na tela da corrida.
+- **Passageiro:** vê "Esta corrida é gravada" no acompanhar viagem (a corrida traz `gravada: true`).
+- **Servidor:** `POST /corridas/:id/gravacao` (só o motorista da corrida), `GET /gravacao/config`. Fica em `DADOS_DIR/empresas/<id>/apps/gravacoes/<corrida>/`.
+  Configuração por empresa em `ajustes.json › gravacao` (`ativa`, `obrigatoria`, `video`, `dias`; padrão: ativa, opcional, só áudio, 30 dias).
+- **Central (painel, só cargo admin):** `GET /api/apps-central/gravacoes[?corrida=]`, `GET /api/apps-central/gravacoes/:corrida/:parte` (cada abertura registra quem viu em `acessos`),
+  `POST /api/apps-central/gravacoes/:corrida/guardar` (impede apagar). **Falta a tela no painel** (sessão do painel) e uma tela de configuração para `ajustes.json › gravacao`.
+- **Retenção:** apaga sozinho depois de `dias`, menos corrida com SOS/ocorrência ou marcada para guardar (roda de hora em hora no ciclo do despacho).
+- **Falta:** guardar uma cópia no celular, enviar só no Wi-Fi (hoje envia em qualquer rede) e o texto de consentimento do motorista/LGPD revisado por jurídico. Teste: `apps-painel.test.ts` (8º).

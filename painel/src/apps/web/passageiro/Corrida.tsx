@@ -251,6 +251,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
             <div className="motorista-placa"><small>PLACA</small><Placa placa={m.placa} /></div>
           </div>
         )}>
+          {c.gravada && <div className="faixa-gravacao"><i /> Esta corrida é gravada</div>}
           {chegando && <div className="faixa-chegando">Seu motorista está chegando!</div>}
           <div className="folha-detalhe">
             <h2>Acompanhar viagem</h2>

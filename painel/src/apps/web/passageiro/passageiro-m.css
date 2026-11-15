@@ -238,3 +238,4 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .inicio .mapa-controles { top: auto; bottom: 112px; }
 .folha-corpo.n1 { max-height: 30vh; overflow-y: auto; } .folha-corpo.n2 { max-height: 62vh; overflow-y: auto; } .folha.recolhida { padding-bottom: .6rem; }
 .topo-vazio { width: 44px; height: 44px; display: inline-block; }
+.faixa-gravacao { display: flex; align-items: center; gap: .5rem; padding: .5rem .8rem; border-radius: 12px; background: #fff3f3; color: #8a1c1c; font-weight: 700; font-size: .85rem; } .faixa-gravacao i { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; animation: pisca 1.2s infinite; } @keyframes pisca { 50% { opacity: .25; } }

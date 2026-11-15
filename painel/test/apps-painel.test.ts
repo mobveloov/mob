@@ -22,7 +22,7 @@ const D = await import("../src/servidor/dados.ts");
 const { criarCookie, exigirLogin } = await import("../src/servidor/sessao.ts");
 const { cadastroPorId } = await import("../src/comum/cadastros.ts");
 const { criar } = await import("../src/cadastros/armazem.ts");
-const { rotasApps } = await import("../src/apps/rotas.ts");
+const { rotasApps, rotasAppsCentral } = await import("../src/apps/rotas.ts");
 const { rotasOperacao } = await import("../src/operacao/rotas.ts");
 const { rotasCorridasProprias } = await import("../src/corridas/rotas.ts");
 const { rotasCadastros } = await import("../src/cadastros/rotas.ts");
@@ -35,6 +35,7 @@ app.use("/api", exigirLogin);
 app.use("/api/operacao", rotasOperacao);
 app.use("/api/corridas-proprias", rotasCorridasProprias);
 app.use("/api/cadastros", rotasCadastros);
+app.use("/api/apps-central", rotasAppsCentral);
 const servidor = app.listen(0);
 const base = `http://127.0.0.1:${(servidor.address() as AddressInfo).port}`;
 test.after(() => servidor.close());
@@ -220,4 +221,44 @@ test("motorista desiste com motivo: a corrida volta a procurar, vai para outro m
   const of2 = await esperarOferta(tokE);
   assert.ok(of2 && of2.corrida.id === id, "Edu recebe a mesma corrida");
   assert.equal((await chamar("GET", `${API}/estado`, undefined, tokD)).corpo.oferta, null, "quem desistiu não recebe a mesma de novo");
+});
+
+test("gravação da corrida: o motorista envia, o passageiro vê o aviso, só a central abre (com registro de quem viu) e some depois do prazo", async () => {
+  const cookie = await cookieDoPainel();
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Gui Grava", telefone: "11900000030", status: "Ativo", veiculo: "Hatch", placa: "GUI1A23" }, "teste");
+  const tokP = await entrar("passageiro", "11988884444");
+  const tokM = await entrar("motorista", "11900000030");
+  await chamar("POST", `${API}/online`, { lat: -23.55, lng: -46.63 }, tokM);
+  const pedido = await chamar("POST", `${API}/corridas`, { embarque: EMBARQUE, destino: DESTINO, categoria: "Econômico", pagamento: "Pix", pedidoId: "ponta-grav" }, tokP);
+  const id = pedido.corpo.corrida.id as string;
+  let o = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta;
+  for (let i = 0; i < 10 && !o; i++) { await new Promise((r) => setTimeout(r, 300)); o = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta; }
+  await chamar("POST", `${API}/ofertas/${o.id}/aceitar`, {}, tokM);
+  assert.equal((await chamar("GET", `${API}/gravacao/config`, undefined, tokM)).corpo.ativa, true);
+  assert.equal((await chamar("GET", `${API}/corridas/${id}`, undefined, tokP)).corpo.corrida.gravada, true, "o passageiro vê que a corrida é gravada");
+  const enviar = async (n: number, bytes: Buffer, tipo = "audio/webm", tok = tokM) => (await fetch(`${base}${API}/corridas/${id}/gravacao`, { method: "POST", headers: { authorization: `Bearer ${tok}`, "content-type": tipo, "x-parte": String(n), "x-segundos": "60" }, body: bytes as unknown as BodyInit })).status;
+  { const r0 = await fetch(`${base}${API}/corridas/${id}/gravacao`, { method: "POST", headers: { authorization: `Bearer ${tokM}`, "content-type": "audio/webm", "x-parte": "0", "x-segundos": "60" }, body: Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]) as unknown as BodyInit }); assert.equal(r0.status, 200, await r0.text()); }
+  { const r1 = await fetch(`${base}${API}/corridas/${id}/gravacao`, { method: "POST", headers: { authorization: `Bearer ${tokM}`, "content-type": "audio/webm", "x-parte": "1", "x-segundos": "60" }, body: Buffer.from([9, 9, 9, 9]) as unknown as BodyInit }); assert.equal(r1.status, 200, await r1.text()); }
+  assert.equal(await enviar(0, Buffer.from("não é webm")), 400, "o primeiro pedaço precisa ter o cabeçalho de gravação");
+  assert.equal(await enviar(2, Buffer.from([1, 2, 3]), "text/html"), 400, "formato não aceito");
+  assert.equal(await enviar(2, Buffer.from([1, 2, 3]), "audio/webm", tokP), 403, "passageiro não envia gravação");
+  // Só a central abre, e cada acesso fica registrado.
+  assert.equal((await chamar("GET", "/api/apps-central/gravacoes")).status, 401, "sem login do painel não abre");
+  const lista = (await chamar("GET", "/api/apps-central/gravacoes", undefined, undefined, cookie)).corpo.gravacoes;
+  const g = lista.find((x: any) => x.corridaId === id);
+  assert.equal(g.partes.length, 2);
+  const arq = await fetch(`${base}/api/apps-central/gravacoes/${id}/0`, { headers: { cookie } });
+  assert.equal(arq.status, 200);
+  assert.equal((await arq.arrayBuffer()).byteLength, 8);
+  const depois = (await chamar("GET", "/api/apps-central/gravacoes", undefined, undefined, cookie)).corpo.gravacoes.find((x: any) => x.corridaId === id);
+  assert.equal(depois.acessos.length, 1);
+  assert.equal(depois.acessos[0].por, "admin@ponta.test", "fica registrado quem viu");
+  // Prazo: com a corrida marcada para guardar nada é apagado; sem marcar, depois dos dias da empresa, some.
+  const { limparGravacoes } = await import("../src/apps/gravacoes.ts");
+  await chamar("POST", `/api/apps-central/gravacoes/${id}/guardar`, { guardar: true }, undefined, cookie);
+  assert.equal(limparGravacoes(E.id, Date.now() + 400 * 86_400_000), 0, "marcada para guardar: fica");
+  await chamar("POST", `/api/apps-central/gravacoes/${id}/guardar`, { guardar: false }, undefined, cookie);
+  assert.equal(limparGravacoes(E.id, Date.now() + 5 * 86_400_000), 0, "ainda dentro do prazo (30 dias)");
+  assert.ok(limparGravacoes(E.id, Date.now() + 400 * 86_400_000) >= 1, "passado o prazo, apaga");
+  assert.equal((await chamar("GET", "/api/apps-central/gravacoes", undefined, undefined, cookie)).corpo.gravacoes.some((x: any) => x.corridaId === id), false);
 });

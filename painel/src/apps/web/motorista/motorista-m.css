@@ -498,3 +498,5 @@ html[data-tema="escuro"] { --m-bg: #0b0e14; --m-card: #161b26; --m-card2: #222a3
 .puxador-botao { touch-action: none; }
 .botao-m.perigo { background: var(--m-ruim); color: #fff; }
 .motivos-lista { display: flex; flex-direction: column; }
+.gravando-chip { position: absolute; z-index: 26; left: 14px; top: 170px; display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .7rem; border-radius: 999px; background: rgba(0,0,0,.7); color: #fff; font-size: .78rem; font-weight: 700; }
+.gravando-chip i, .faixa-gravacao i { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; animation: pisca 1.2s infinite; } @keyframes pisca { 50% { opacity: .25; } }
