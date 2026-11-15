@@ -236,8 +236,10 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
 | Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
-| Totem: jogos de recompensa (roleta e raspadinha) | Não | Falta (CRM › Recompensas). |
-| Totens & Preços (Totens & Locais, Preços por totem, copiar para todos) | Sim | Sem "Preços por cidade". Senha só como hash. |
+| Totem: jogos de recompensa (roleta e raspadinha, página pública /p/… e /premios/…) | Sim | Módulo do totem (`src/totem/premios*.ts`) com gancho `definirGanchoPremio` para o CRM › Recompensas. Falta o envio automático por horário (depende do agendador do CRM) e cartão fidelidade/pontos (CRM). |
+| Totem: Preços por cidade (dentro da cidade, locais, entre cidades, noturno, domingo, feriado, pedágio) | Sim | `src/totem/tarifas-cidade.ts`. A resposta do bot à pergunta de preço com esta tabela fica para a área do Bot. |
+| Totem: busca de endereço com sugestões no destino | Sim | Usa a base de endereços da empresa (`src/enderecos`). |
+| Totens & Preços (Totens & Locais, Preços por totem, Preços por cidade, Jogos de recompensa) | Sim | Senha só como hash. |
 | App do Totem (baixar APK; dono publica versões) | Sim | Senha de fechamento nativa do app Android: pendente de aparelho/build nativo. |
 
 Conferência no navegador: CRM (Visão Geral, Templates com modelos prontos) e o totem (ativação por senha e primeira tela). O sistema de referência
