@@ -235,8 +235,10 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | whatsapp-webhook (11 mil linhas: endereços aprendidos, casas, agendamento, repasse de mídia) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento e as regras acima. O resto falta. |
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
-| Totem: jogos de recompensa, checagem do número no WhatsApp, logo e rodapé próprios | Não | Falta. |
-| Locais do totem (cadastro) | Já existia | |
+| Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
+| Totem: jogos de recompensa (roleta e raspadinha) | Não | Falta (CRM › Recompensas). |
+| Totens & Preços (Totens & Locais, Preços por totem, copiar para todos) | Sim | Sem "Preços por cidade". Senha só como hash. |
+| App do Totem (baixar APK; dono publica versões) | Sim | Senha de fechamento nativa do app Android: pendente de aparelho/build nativo. |
 
 Conferência no navegador: CRM (Visão Geral, Templates com modelos prontos) e o totem (ativação por senha e primeira tela). O sistema de referência
 não foi aberto lado a lado: a comparação foi feita pelo código das telas.
