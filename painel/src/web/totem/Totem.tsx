@@ -64,6 +64,7 @@ export default function Totem(props: { empresa?: string; local?: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [conferindo, setConferindo] = useState(false);
+  const [cotadas, setCotadas] = useState<Array<CategoriaTotem & { fixo?: boolean }> | null>(null);
   const [imagens, setImagens] = useState({ logo: "", rodape: "" });
   const versao = useRef<number | null>(null);
 
@@ -139,6 +140,15 @@ export default function Totem(props: { empresa?: string; local?: string }) {
     return () => { document.removeEventListener("contextmenu", menu); document.removeEventListener("pointerdown", cheia); };
   }, []);
 
+  // Escolha da viagem: o preço sai do destino digitado (valor fixo de outra cidade ou de um local da tabela, quando há).
+  useEffect(() => {
+    if (passo !== "categoria" || !chave) { setCotadas(null); return; }
+    let vivo = true;
+    api.cotacao(chave, pedido.destino.trim()).then((r) => { if (vivo) setCotadas(r.categorias); }, () => { if (vivo) setCotadas(null); });
+    return () => { vivo = false; };
+  }, [passo, chave, api, pedido.destino]);
+
+  const cats = cotadas ?? config?.categorias ?? [];
   const voltar = () => { setErro(null); setPasso("inicio"); };
 
   /** Primeira tela: confere nome, telefone e pagamento. Com categorias, escolhe a viagem; sem elas, pede direto. */
@@ -258,13 +268,13 @@ export default function Totem(props: { empresa?: string; local?: string }) {
                 <div><span>Destino</span><b>{pedido.semDestino || !pedido.destino.trim() ? "A definir pelo motorista" : pedido.destino}</b></div>
               </div>
               <p><MapPin size={16} /> O valor é uma estimativa e o motorista confirma no final.</p>
-              {config.categorias.length > 1 && <p className="tt-rotulo">Categorias disponíveis</p>}
+              {cats.length > 1 && <p className="tt-rotulo">Categorias disponíveis</p>}
               {erro && <div className="tt-erro" role="alert">{erro}</div>}
-              {config.categorias.length === 1 ? (
-                <button className="tt-botao primario grande" disabled={enviando} onClick={() => enviar(config.categorias[0].nome)}>{enviando ? <><Loader2 size={30} className="tt-gira" /> Pedindo...</> : <>Solicitar corrida <ArrowRight size={30} /></>}</button>
+              {cats.length === 1 ? (
+                <button className="tt-botao primario grande" disabled={enviando} onClick={() => enviar(cats[0].nome)}>{enviando ? <><Loader2 size={30} className="tt-gira" /> Pedindo...</> : <>Solicitar corrida <ArrowRight size={30} /></>}</button>
               ) : (
                 <div className="tt-opcoes">
-                  {config.categorias.map((c) => (
+                  {cats.map((c) => (
                     <button key={c.nome} disabled={enviando} className={`tt-botao tt-opcao ${c.nome === pedido.categoria ? "ativo" : ""}`} onClick={() => enviar(c.nome)}>
                       <span>{c.nome}{c.descricao && <small>{c.descricao}</small>}<small>Solicitar <ArrowRight size={14} /></small></span>
                       <strong>{c.preco == null ? "" : <><small>a partir de</small>{reais(c.preco)}</>}</strong>

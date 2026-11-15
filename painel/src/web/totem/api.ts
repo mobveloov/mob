@@ -6,6 +6,12 @@ import type { Marca } from "../../comum/marca.ts";
 export interface Ponto { texto: string; lat?: number; lng?: number }
 export interface CategoriaTotem { nome: string; descricao: string; preco: number | null; espera?: number | null }
 export interface CategoriaLocal { nome: string; descricao: string; taxaBase: number; porKm: number; porMin: number; minima: number; espera: number; ordem: number; ativa: boolean }
+export type TipoTarifa = "dentro" | "local" | "cidades";
+export interface TarifaCidade {
+  id: string; tipo: TipoTarifa; titulo: string; resumo: string; origemCidade: string; origemUf: string; destinoCidade: string; destinoUf: string; local: string; categoria: string;
+  normal: number; noite: number | null; noiteInicio: string; noiteFim: string; domingo: number | null; feriado: number | null;
+  faixas: Array<{ inicio: string; fim: string; valor: number }>; pedagio: number | null; pedagioIdaVolta: boolean; ativa: boolean; obs: string;
+}
 export interface ConexaoZap { situacao: "conectado" | "aguardando_qr" | "desconectado" | "nao_configurado" | "erro"; qr?: string; codigo?: string; detalhe?: string; modo?: string; instancia?: string | null }
 export interface VersaoApk { id: string; nome: string; codigo: number; url: string; tamanho: number | null; notas: string; ativa: boolean; criadaEm: string }
 export type Grupo = "aberta" | "finalizada" | "cancelada" | "nao_atendida";
@@ -65,6 +71,8 @@ export const apiTotem = (empresa: string, local: string) => {
     entrar: (senha: string) => pedir<{ chave: string }>(`${b}/entrar`, post({ senha, aparelho: aparelhoDoTotem() })),
     config: (chave: string) => pedir<{ marca: Marca; local: { id: string; nome: string; endereco: string; pagamentos: string[]; versao: number; logo: string; rodape: string; whatsappPronto: boolean | null }; categorias: CategoriaTotem[] }>(`${b}/config`, { chave }),
     /** O número tem WhatsApp? null = não deu para conferir (o totem segue normal). */
+    /** Preços das categorias para o destino digitado (valor fixo de cidade ou local, quando há). */
+    cotacao: (chave: string, destino: string) => pedir<{ categorias: Array<CategoriaTotem & { fixo: boolean; pedagio: number }> }>(`${b}/cotacao`, post({ destino }, chave)),
     temWhatsapp: (chave: string, telefone: string) => pedir<{ existe: boolean | null }>(`${b}/whatsapp/existe`, post({ telefone }, chave)).then((r) => r.existe, (e) => { if (e instanceof ErroTotem && e.status === 400) throw e; return null; }),
     versao: (chave: string) => pedir<{ versao: number }>(`${b}/versao`, { chave }),
     pedir: (chave: string, p: PedidoTotem) => pedir<{ corrida: { id: string; os: string; valor: number | null; categoria: string } }>(`${b}/corridas`, post(p, chave)),
@@ -87,6 +95,13 @@ export const apiCentral = {
   whatsapp: (id: string) => pedir<ConexaoZap>(`/api/totem/locais/${id}/whatsapp`),
   conectarWhatsapp: (id: string) => pedir<ConexaoZap>(`/api/totem/locais/${id}/whatsapp/conectar`, post({})),
   desconectarWhatsapp: (id: string) => pedir(`/api/totem/locais/${id}/whatsapp/desconectar`, post({})),
+  tarifasCidade: () => pedir<{ tarifas: TarifaCidade[]; feriados: Array<{ id: string; data: string; nome: string }>; esperaPorHora: number | null }>("/api/totem/tarifas-cidade"),
+  novaTarifaCidade: (tipo: TipoTarifa, d: unknown) => pedir<{ tarifa: TarifaCidade }>(`/api/totem/tarifas-cidade/${tipo}`, post(d)),
+  salvarTarifaCidade: (tipo: TipoTarifa, d: unknown, id: string) => pedir<{ tarifa: TarifaCidade }>(`/api/totem/tarifas-cidade/${tipo}/${id}`, { method: "PUT", body: JSON.stringify(d) }),
+  apagarTarifaCidade: (id: string) => pedir(`/api/totem/tarifas-cidade/${id}`, { method: "DELETE" }),
+  novoFeriadoCidade: (data: string, nome: string) => pedir("/api/totem/tarifas-cidade-feriados", post({ data, nome })),
+  apagarFeriadoCidade: (id: string) => pedir(`/api/totem/tarifas-cidade-feriados/${id}`, { method: "DELETE" }),
+  esperaCidade: (valor: string) => pedir("/api/totem/tarifas-cidade-espera", { method: "PUT", body: JSON.stringify({ valor }) }),
   apk: () => pedir<{ versao: VersaoApk | null }>("/api/totem/apk"),
   apkVersoes: () => pedir<{ versoes: VersaoApk[] }>("/api/totem/apk/versoes"),
   publicarApk: (d: Record<string, unknown>) => pedir<{ versao: VersaoApk }>("/api/totem/apk/versoes", post(d)),

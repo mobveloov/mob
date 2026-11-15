@@ -18,6 +18,7 @@ import { cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, 
 import * as D from "../servidor/dados.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./apk.ts";
+import * as TC from "./tarifas-cidade.ts";
 import * as T from "./dados.ts";
 import { esquecerWhatsapp, instanciaDoTotem, provedorDoTotem, whatsappPronto } from "./whatsapp.ts";
 
@@ -178,6 +179,17 @@ rotasTotem.post(`${P}/whatsapp/existe`, exigirChave, ok(async (req, res) => {
   res.json({ existe });
 }));
 
+/** Preços das categorias para o destino digitado (valor fixo de cidade ou local, quando há). */
+rotasTotem.post(`${P}/cotacao`, exigirChave, ok((req, res) => {
+  const { empresaId, local: l } = req.totem!;
+  const destino = txt(req.body?.destino, 200);
+  const cats = categoriasDoLocal(empresaId, l).map((c) => {
+    const fixo = destino ? TC.valorFixoDoDestino(empresaId, { cidade: l.cidade, uf: l.uf, embarque: l.endereco.texto }, destino, c.nome) : null;
+    return fixo ? { ...c, preco: fixo.total, fixo: true, pedagio: fixo.pedagio } : { ...c, fixo: false, pedagio: 0 };
+  });
+  res.json({ categorias: cats });
+}));
+
 rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   const { empresaId, local: l } = req.totem!;
   const b = (req.body ?? {}) as Record<string, unknown>;
@@ -193,7 +205,7 @@ rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   const categoria = txt(b.categoria, 60);
   if (cats.length && !cats.some((c) => c.nome === categoria)) throw new Error("Escolha a categoria.");
   if (await whatsappPronto(empresaId, l) === false) return res.status(503).json({ erro: "Totem indisponível no momento. Procure a recepção." });
-  const preco = precoPrefixado(l, categoria, destino);
+  const preco = precoPrefixado(empresaId, l, categoria, destino);
   const c = await umaVez(chave, async () => {
     const nova = await criarCorridaPropria(empresaId, {
       passageiro: { nome: txt(b.nome, 80), telefone: String(b.telefone ?? "") },
@@ -208,7 +220,10 @@ rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   res.json({ corrida: { id: c.id, os: c.os, valor: c.estimativa.valor, categoria: c.categoria } });
 }));
 
-function precoPrefixado(l: T.Local, categoria: string, destino?: T.Ponto): number | null {
+function precoPrefixado(empresaId: string, l: T.Local, categoria: string, destino?: T.Ponto): number | null {
+  // Preços por cidade: destino em outra cidade ou num local com valor próprio vale o valor fixo (horário + pedágio).
+  const fixo = destino?.texto ? TC.valorFixoDoDestino(empresaId, { cidade: l.cidade, uf: l.uf, embarque: l.endereco.texto }, destino.texto, categoria) : null;
+  if (fixo) return fixo.total;
   const c = l.tabela.find((x) => x.ativa && x.nome === categoria);
   if (!c) return null;
   const km = destino ? distanciaEstimada(l.endereco, destino) : null;
@@ -306,6 +321,19 @@ const dono = exigirPapel();
 interno.get("/apk/versoes", dono, ok((_req, res) => { res.json({ versoes: A.listarVersoes() }); }));
 interno.post("/apk/versoes", dono, ok((req, res) => { res.json({ versao: A.publicarVersao(req.body ?? {}) }); }));
 interno.put("/apk/versoes/:id", dono, ok((req, res) => { res.json({ versao: A.ativarVersao(req.params.id, req.body?.ativa !== false) }); }));
+
+/** Preços por cidade (tarifas fixas por trecho, feriados da empresa e hora de espera). Só admin. */
+interno.get("/tarifas-cidade", admin, ok((req, res) => {
+  const d = TC.dados(emp(req));
+  res.json({ ...d, tarifas: d.tarifas.map((t) => ({ ...t, tipo: TC.tipoDaTarifa(t), titulo: TC.tituloDaTarifa(t), resumo: TC.resumoDaTarifa(t) })) });
+}));
+const tipoTarifa = (v: string) => { if (v !== "dentro" && v !== "local" && v !== "cidades") throw new Error("Tipo de tarifa inválido."); return v; };
+interno.post("/tarifas-cidade/:tipo", admin, ok((req, res) => { res.json({ tarifa: TC.salvarTarifa(emp(req), tipoTarifa(req.params.tipo), req.body ?? {}) }); }));
+interno.put("/tarifas-cidade/:tipo/:id", admin, ok((req, res) => { res.json({ tarifa: TC.salvarTarifa(emp(req), tipoTarifa(req.params.tipo), req.body ?? {}, req.params.id) }); }));
+interno.delete("/tarifas-cidade/:id", admin, ok((req, res) => { TC.removerTarifa(emp(req), req.params.id); res.json({ ok: true }); }));
+interno.post("/tarifas-cidade-feriados", admin, ok((req, res) => { res.json({ feriado: TC.adicionarFeriado(emp(req), String(req.body?.data ?? ""), String(req.body?.nome ?? "")) }); }));
+interno.delete("/tarifas-cidade-feriados/:id", admin, ok((req, res) => { TC.removerFeriado(emp(req), req.params.id); res.json({ ok: true }); }));
+interno.put("/tarifas-cidade-espera", admin, ok((req, res) => { TC.definirEspera(emp(req), req.body?.valor); res.json({ ok: true }); }));
 
 interno.post("/locais/:id/recarregar", admin, ok((req, res) => { res.json({ local: T.localPublico(T.recarregarLocal(emp(req), req.params.id)) }); }));
 
