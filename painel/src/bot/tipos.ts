@@ -107,6 +107,8 @@ export interface ConfigBot {
   instancia: string;
   /** Outros números da empresa (além do principal). Cada um com a própria instância e os próprios segredos. */
   conexoes: ConexaoBot[];
+  /** Cidade ativa de cada conexão (id da conexão -> código do município atendido). */
+  cidades: Record<string, string>;
 }
 
 /** Mensagem recebida do provedor, já traduzida. */

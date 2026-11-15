@@ -14,11 +14,11 @@ export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: Ti
 export interface ConexaoVista {
   id: string; nome: string; ativa: boolean; provedor: TipoProvedor; principal: boolean; instancia: string;
   servidor: { daPlataforma: boolean; plataformaPronta: boolean; urlApi: string; tokenSalvo: boolean; clientTokenSalvo: boolean; appSecretSalvo: boolean; phoneId: string; wabaId: string };
-  webhook: string | null; senhaVerificacao: string | null;
+  webhook: string | null; senhaVerificacao: string | null; cidade: string;
 }
 export interface DadosConexao {
   nome?: string; ativa?: boolean; provedor?: TipoProvedor; instancia?: string; urlApi?: string; token?: string; clientToken?: string;
-  phoneId?: string; wabaId?: string; appSecret?: string;
+  phoneId?: string; wabaId?: string; appSecret?: string; cidade?: string;
 }
 export interface RespostaConfig {
   config: ConfigBot; webhook: string | null;
@@ -59,7 +59,7 @@ export const apiBot = {
   config: () => pedir<RespostaConfig>("/api/bot/config"),
   salvarAvancada: (d: Partial<ConfigAvancada>) => pedir<{ ok: true }>("/api/bot/config/avancada", json("PUT", d)),
   salvar: (d: Partial<Pick<ConfigBot, "ativo" | "provedor" | "instancia">> & { urlApi?: string; token?: string }) => pedir<{ ok: true }>("/api/bot/config", json("PUT", d)),
-  conexoes: () => pedir<{ ativo: boolean; conexoes: ConexaoVista[]; maximo: number }>("/api/bot/conexoes"),
+  conexoes: () => pedir<{ ativo: boolean; conexoes: ConexaoVista[]; maximo: number; cidades: Array<{ codigo: string; nome: string; uf: string }> }>("/api/bot/conexoes"),
   criarConexao: (d: DadosConexao) => pedir<{ ok: true; conexao: ConexaoVista }>("/api/bot/conexoes", json("POST", d)),
   salvarConexao: (id: string, d: DadosConexao & { ativo?: boolean }) => pedir<{ ok: true; conexao: ConexaoVista }>(`/api/bot/conexoes/${encodeURIComponent(id)}`, json("PUT", d)),
   removerConexao: (id: string) => pedir<{ ok: true }>(`/api/bot/conexoes/${encodeURIComponent(id)}`, { method: "DELETE" }),

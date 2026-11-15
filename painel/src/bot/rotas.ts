@@ -8,6 +8,8 @@ import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
+import { cidadePorCodigo } from "./cidades.ts";
+import { cidadesAtendidas } from "../enderecos/index.ts";
 import * as S from "./sugestoes-cadastro.ts";
 import { controlarConversa, encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
 import crypto from "node:crypto";
@@ -100,6 +102,7 @@ function visaoConexao(req: Request, empresaId: string, cx: ConexaoBot, ehAdmin: 
       phoneId: s.phoneId ?? "", wabaId: s.wabaId ?? "",
     },
     webhook: ehAdmin ? urlWebhook(req, empresaId, cx.id) : null,
+    cidade: A.cidadeDaConexao(empresaId, cx.id) ?? "",
     senhaVerificacao: ehAdmin && cx.provedor === "meta" ? s.verifyToken ?? null : null,
   };
 }
@@ -139,6 +142,10 @@ function gravarConexao(empresaId: string, id: string, b: Record<string, unknown>
     nova = A.salvarConexao(empresaId, { id, nome, ativa, provedor, instancia });
   }
   A.salvarSegredosBot(empresaId, s, id);
+  if (typeof b.cidade === "string") {
+    if (b.cidade && !cidadePorCodigo(empresaId, b.cidade)) throw new Error("Escolha uma cidade atendida (Endereços › cidades da empresa).");
+    A.definirCidade(empresaId, id, b.cidade);
+  }
   return nova;
 }
 
@@ -181,7 +188,7 @@ rotasBot.put("/config/avancada", admin, ok((req, res) => {
 rotasBot.get("/conexoes", ok((req, res) => {
   const id = ctx(req).empresaId;
   const ehAdmin = podeCargo(ctx(req).usuario.papel, "admin");
-  res.json({ ativo: A.config(id).ativo, conexoes: A.conexoesDe(id).map((cx) => visaoConexao(req, id, cx, ehAdmin)), maximo: A.MAX_CONEXOES });
+  res.json({ ativo: A.config(id).ativo, conexoes: A.conexoesDe(id).map((cx) => visaoConexao(req, id, cx, ehAdmin)), maximo: A.MAX_CONEXOES, cidades: cidadesAtendidas(id) });
 }));
 
 rotasBot.post("/conexoes", admin, ok((req, res) => {
