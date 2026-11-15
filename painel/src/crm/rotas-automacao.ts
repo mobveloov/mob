@@ -7,6 +7,7 @@ import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
 import { MODELOS_GATILHO } from "./catalogo.ts";
+import * as C from "./comportamento.ts";
 import * as G from "./gatilhos.ts";
 import * as L from "./limites.ts";
 import { estatisticas, listarEnvios } from "./registro.ts";
@@ -142,3 +143,27 @@ router.get("/limites", ok((req, res) => {
 }));
 router.put("/limites/governanca", admin, ok((req, res) => res.json({ governanca: L.salvarGovernanca(emp(req), req.body ?? {}) })));
 router.post("/limites/pausa", admin, ok((req, res) => res.json({ pausa: L.definirPausaGeral(emp(req), req.body?.pausar === true, req.ctx?.usuario.nome ?? "") })));
+
+// ------------------------------------------------------------------ comportamento (aba Comportamentos, templates e histórico)
+
+router.get("/comportamento", ok((req, res) => res.json(C.visaoComportamento(emp(req)))));
+router.post("/comportamento/analisar", admin, ok(async (req, res) => res.json({ atualizados: await C.analisar(emp(req)) })));
+
+router.get("/comport-templates", ok((req, res) => res.json({ templates: C.templatesComportamentais(emp(req)) })));
+router.post("/comport-templates/instalar", admin, ok((req, res) => {
+  const chaves = Array.isArray(req.body?.chaves) ? (req.body.chaves as unknown[]).map(String) : [];
+  res.json({ instalados: C.instalarComportamentais(emp(req), chaves) });
+}));
+router.post("/comport-templates", admin, ok((req, res) => res.json({ template: C.salvarComportamental(emp(req), null, C.sanearComportamental(req.body ?? {})) })));
+router.put("/comport-templates/:id", admin, ok((req, res) => res.json({ template: C.salvarComportamental(emp(req), String(req.params.id), C.sanearComportamental(req.body ?? {})) })));
+router.post("/comport-templates/:id/ligar", admin, ok((req, res) => res.json({ template: C.ligarComportamental(emp(req), String(req.params.id)) })));
+router.delete("/comport-templates/:id", admin, ok((req, res) => res.json({ ok: C.apagarComportamental(emp(req), String(req.params.id)) })));
+router.post("/comport-templates/:id/teste", admin, ok(async (req, res) => res.json(await C.testarComportamental(emp(req), String(req.params.id), txt(req.body?.telefone, 30)))));
+
+router.post("/comport-historico", ok((req, res) => {
+  const b = req.body ?? {};
+  const dias = [1, 7, 30].includes(Number(b.dias)) ? Number(b.dias) : 7;
+  const de = dias === 1 ? L.inicioDoDiaBr() : Date.now() - dias * 86_400_000; // "Hoje" = desde a meia-noite de Brasília
+  res.json(C.historicoComportamental(emp(req), { de, fase: txt(b.fase, 20) || undefined, estado: txt(b.estado, 12) || undefined, template: txt(b.template, 40) || undefined, pagina: Math.max(0, Number(b.pagina) || 0) }));
+}));
+router.get("/pausas", ok((req, res) => res.json({ pausas: L.historicoDePausas(emp(req)) })));

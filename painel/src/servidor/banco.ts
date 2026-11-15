@@ -162,6 +162,21 @@ export function banco(): Banco {
       UNIQUE (empresa, id));
     CREATE INDEX IF NOT EXISTS crm_envios_em ON crm_envios (empresa, em);
     CREATE INDEX IF NOT EXISTS crm_envios_origem ON crm_envios (empresa, origem, origem_id);
+    CREATE TABLE IF NOT EXISTS crm_simulacoes (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', em INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS crm_simulacoes_tel ON crm_simulacoes (empresa, telefone, em);
+    CREATE TABLE IF NOT EXISTS crm_comportamento (
+      empresa TEXT NOT NULL, chave TEXT NOT NULL, telefone TEXT NOT NULL DEFAULT '', nome TEXT NOT NULL DEFAULT '', hora INTEGER, dias TEXT NOT NULL DEFAULT '[]',
+      amostras INTEGER NOT NULL DEFAULT 0, corridas INTEGER NOT NULL DEFAULT 0, canceladas INTEGER NOT NULL DEFAULT 0, gasto REAL NOT NULL DEFAULT 0,
+      ultima INTEGER, estagio TEXT NOT NULL DEFAULT 'novo', atualizado_em INTEGER NOT NULL, PRIMARY KEY (empresa, chave));
+    CREATE INDEX IF NOT EXISTS crm_comportamento_hora ON crm_comportamento (empresa, hora);
+    CREATE TABLE IF NOT EXISTS crm_comport_templates (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL, UNIQUE (empresa, id));
+    CREATE TABLE IF NOT EXISTS crm_comport_disparos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, template_id TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '',
+      fase TEXT NOT NULL, estado TEXT NOT NULL, hora_pref INTEGER, agendado_para INTEGER NOT NULL, enviado_em INTEGER, erro TEXT NOT NULL DEFAULT '', dia TEXT NOT NULL, criado_em INTEGER NOT NULL,
+      UNIQUE (empresa, template_id, telefone, dia, fase));
+    CREATE INDEX IF NOT EXISTS crm_comport_disparos_em ON crm_comport_disparos (empresa, criado_em);
     CREATE TABLE IF NOT EXISTS crm_regua_envios (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, telefone TEXT NOT NULL, faixa INTEGER NOT NULL, estado TEXT NOT NULL, em INTEGER NOT NULL,
       instancia TEXT NOT NULL DEFAULT '', erro TEXT NOT NULL DEFAULT '');
