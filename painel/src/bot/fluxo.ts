@@ -12,6 +12,13 @@ import { botSilencedFor, brPhoneVariants, parseBotCommand, parseBotCommandWithPh
 import { decideSkip } from "./destino.ts";
 import { customText, matchFaq, shouldSendGreetingImage } from "./textos-editaveis.ts";
 import { marcador, NOME_STATUS, PAGAMENTOS, T, type Marcador } from "./textos.ts";
+import { isVaguePickup } from "./embarque-vago.ts";
+import { parseCoordPaste } from "./coordenadas.ts";
+import { resolveMapLink } from "./link-mapa.ts";
+import { addressHasNumber, fixHouseNumberTypo, insertHouseNumber, looseHouseNumber, romanizeBairroNumber, sameStreetNumber } from "./numero-casa.ts";
+import { detectUrgentRide, URGENT_ASK_ADDRESS, URGENT_FLOW } from "./urgente.ts";
+import { supportCloseDecision } from "./fim-suporte.ts";
+import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
 import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
 
 export interface Dependencias {

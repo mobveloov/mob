@@ -1,7 +1,7 @@
 // Tipos do bot de WhatsApp. Cada empresa tem o próprio número (instância) e as próprias conversas.
 
 export type Etapa =
-  | "inicio" | "menu" | "embarque" | "destino" | "confirmar" | "categoria" | "pagamento"
+  | "inicio" | "menu" | "embarque" | "numero_embarque" | "destino" | "numero_destino" | "confirmar" | "categoria" | "pagamento"
   | "criando" | "em_corrida" | "avaliacao" | "suporte";
 
 export interface Local { texto: string; lat?: number; lng?: number }
@@ -33,7 +33,14 @@ export interface CorridaBot {
 export interface Rascunho {
   embarque?: Local; destino?: Local; semDestino?: boolean;
   categorias?: CategoriaBot[]; categoria?: CategoriaBot; pagamento?: string;
+  /** Pedido urgente: só pergunta o embarque e chama o carro (sem destino, categoria nem pagamento). */
+  urgente?: boolean;
+  /** Endereços salvos oferecidos na pergunta do embarque (na ordem das opções). */
+  salvos?: Local[];
 }
+
+/** Endereço de embarque que o passageiro já usou (o bot oferece os mais usados). */
+export interface EnderecoUsado { texto: string; lat?: number; lng?: number; usos: number; em: string }
 
 export interface Conversa {
   /** Telefone só com dígitos (é o id da conversa dentro da empresa). */
@@ -56,6 +63,8 @@ export interface Conversa {
   imagemEm?: string;
   /** Conexão (número) por onde o passageiro escreveu; as respostas saem por ela. */
   conexao?: string;
+  /** Embarques já usados em corridas pedidas pelo bot (os mais usados viram opções). */
+  enderecos?: EnderecoUsado[];
   criadaEm: string;
   atualizadaEm: string;
 }
