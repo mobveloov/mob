@@ -112,7 +112,7 @@ crm: <CrmPainel />,
 - Gatilhos por evento em tempo real (corrida finalizada agora): hoje a jornada confere a cada hora.
 - Push no app e outros canais: só WhatsApp por enquanto.
 
-## O que veio do mobveloov (14/11/2026)
+## O que veio do sistema de referência (14/11/2026)
 
 O CRM agora é uma tela só, **CRM & Engajamento**, com os mesmos grupos e abas do CRM de referência (sem a aba da Machine:
 a corrida é nativa). Também veio o botão "Emojis nas mensagens".
