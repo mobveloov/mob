@@ -218,11 +218,11 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 |---|---|---|
 | CRM › Visão Geral | Sim | Sem "receita recuperada" e "viraram corrida" (dependem da conversão) e sem eventos da Machine. |
 | CRM › Automação › Jornadas | Já existia | Só os gatilhos "sem corrida" e "cancelou". |
-| CRM › Automação › Gatilhos, Fila de Dispatches, Régua, Templates comportamentais | Não | Falta. |
+| CRM › Automação › Gatilhos, Fila de Dispatches, Régua | Sim | Eventos vêm das corridas e do cadastro do painel (sem Machine); só WhatsApp (sem push/in-app). "Simulou" só dispara se o app avisar a estimativa (ainda não liga). Templates comportamentais: não. |
 | CRM › Comunicação › Campanhas, WhatsApp | Já existiam | Só o canal WhatsApp. |
 | CRM › Comunicação › Templates | Sim | Título/imagem/botão ficam guardados, mas só o texto sai pelo WhatsApp. |
 | CRM › Comunicação › Descadastros | Sim | A resposta "NÃO QUERO MAIS" no WhatsApp ainda não descadastra sozinha (as regras de texto estão prontas em `crm/optout.ts`). |
-| CRM › Comunicação › Notificações, Histórico de Disparos | Não | Falta. |
+| CRM › Comunicação › Notificações | Sim | Histórico de Disparos (aba separada) ainda não. Pausa geral, horário de envio e teto diário (rotas `/api/crm/limites`, usadas também pela futura Governança). |
 | CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
 | CRM › Público › Comportamentos, Contatos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
 | CRM › Análises (RFM, Conversão, Mapa de Calor), Recompensas | Não | Falta. |
