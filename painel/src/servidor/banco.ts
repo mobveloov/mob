@@ -162,6 +162,8 @@ export function banco(): Banco {
       UNIQUE (empresa, id));
     CREATE INDEX IF NOT EXISTS crm_envios_em ON crm_envios (empresa, em);
     CREATE INDEX IF NOT EXISTS crm_envios_origem ON crm_envios (empresa, origem, origem_id);
+    CREATE TABLE IF NOT EXISTS crm_segmentos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL, UNIQUE (empresa, id));
     CREATE TABLE IF NOT EXISTS crm_simulacoes (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', em INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS crm_simulacoes_tel ON crm_simulacoes (empresa, telefone, em);

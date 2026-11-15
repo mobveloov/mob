@@ -10,6 +10,7 @@ import { MODELOS_GATILHO } from "./catalogo.ts";
 import * as C from "./comportamento.ts";
 import * as G from "./gatilhos.ts";
 import * as L from "./limites.ts";
+import * as S from "./segmentos.ts";
 import { estatisticas, listarEnvios } from "./registro.ts";
 import * as R from "./regua.ts";
 import "./ganchos-crm2.ts";
@@ -167,3 +168,12 @@ router.post("/comport-historico", ok((req, res) => {
   res.json(C.historicoComportamental(emp(req), { de, fase: txt(b.fase, 20) || undefined, estado: txt(b.estado, 12) || undefined, template: txt(b.template, 40) || undefined, pagina: Math.max(0, Number(b.pagina) || 0) }));
 }));
 router.get("/pausas", ok((req, res) => res.json({ pausas: L.historicoDePausas(emp(req)) })));
+
+// ------------------------------------------------------------------ segmentos
+
+router.get("/segmentos", ok((req, res) => res.json({ segmentos: S.segmentos(emp(req)) })));
+router.post("/segmentos/prontos", admin, ok((req, res) => res.json({ criados: S.instalarProntos(emp(req)) })));
+router.post("/segmentos", admin, ok((req, res) => res.json({ segmento: S.salvarSegmento(emp(req), null, req.body ?? {}) })));
+router.put("/segmentos/:id", admin, ok((req, res) => res.json({ segmento: S.salvarSegmento(emp(req), String(req.params.id), req.body ?? {}) })));
+router.post("/segmentos/:id/contar", ok((req, res) => res.json({ segmento: S.recontarSegmento(emp(req), String(req.params.id)) })));
+router.delete("/segmentos/:id", admin, ok((req, res) => res.json({ ok: S.apagarSegmento(emp(req), String(req.params.id)) })));

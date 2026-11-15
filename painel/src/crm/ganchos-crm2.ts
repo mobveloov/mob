@@ -4,6 +4,7 @@ import { registrarEntidadeAuditada } from "../crm2/auditoria.ts";
 import { registrarFonteDeEnvios, type Envio } from "../crm2/conversao.ts";
 import { banco } from "../servidor/banco.ts";
 import { gatilhos } from "./gatilhos.ts";
+import { segmentos } from "./segmentos.ts";
 import { chaveDe } from "./publico.ts";
 
 registrarFonteDeEnvios((empresa, desde): Envio[] => {
@@ -16,3 +17,4 @@ registrarFonteDeEnvios((empresa, desde): Envio[] => {
 });
 
 registrarEntidadeAuditada("/gatilhos", "gatilho", (e) => gatilhos(e) as unknown as Array<Record<string, unknown>>, "is_active");
+registrarEntidadeAuditada("/segmentos", "segmento", (e) => segmentos(e).map((x) => ({ ...x, nome: x.name })) as unknown as Array<Record<string, unknown>>);

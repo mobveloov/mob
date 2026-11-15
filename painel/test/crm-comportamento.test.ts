@@ -148,3 +148,28 @@ test("régua: o lote do WhatsApp de verdade é de no máximo 10 e depois vem a p
   // Com o provedor simulado a régua não usa lote (não manda nada para fora)
   assert.equal((await R.numerosDaEmpresa(e)).find((n) => n.tipo === "crm")!.real, false);
 });
+
+test("segmentos: regras, contagem sobre os contatos e segmentos prontos", async () => {
+  const S = await import("../src/crm/segmentos.ts");
+  const { bd } = await import("../src/crm2/base.ts");
+  const e = D.criarEmpresa("Comp Seis").id;
+  const agora = Date.now();
+  const ins = (n: number, stage: string, corridas: number, canc: number, ultimaDias: number | null, cidade = "Norte", tags = "[]") =>
+    bd().prepare("INSERT INTO crm_contatos (empresa, chave, telefone, nome, cidade, stage, opt_in_status, tags, total_corridas, cancelamentos, ultima_corrida, criado_em, atualizado_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(e, `p:${n}`, String(n), `P${n}`, cidade, stage, "in", tags, corridas, canc, ultimaDias == null ? null : agora - ultimaDias * 86_400_000, agora, agora);
+  ins(1, "novo", 0, 0, null); ins(2, "fiel", 12, 0, 3, "Norte", '["vip"]'); ins(3, "perdido", 4, 2, 120, "Sul"); ins(4, "inativo", 3, 3, 70);
+  assert.equal(S.contarSegmento(e, { stage: "novo", total_rides_max: 0 }), 1);
+  assert.equal(S.contarSegmento(e, { stage: ["inativo", "perdido"] }), 2);
+  assert.equal(S.contarSegmento(e, { cancelations_min: 2 }), 2);
+  assert.equal(S.contarSegmento(e, { has_tag: "VIP" }), 1);
+  assert.equal(S.contarSegmento(e, { city: "sul" }), 1);
+  assert.equal(S.contarSegmento(e, { inactive_days_min: 60, inactive_days_max: 100 }), 1);
+  assert.throws(() => S.sanearRegrasSegmento({ inactive_days_min: 30, inactive_days_max: 30 }), /teto de dias/);
+  assert.throws(() => S.sanearRegrasSegmento({ total_rides_min: 5, total_rides_max: 2 }), /Corridas máx/);
+  assert.equal(S.instalarProntos(e), 8);
+  assert.equal(S.instalarProntos(e), 0);
+  const novo = S.salvarSegmento(e, null, { name: "Fiéis vip", rules: { stage: "fiel", has_tag: "vip" } });
+  assert.equal(novo.estimated_count, 1);
+  assert.equal(S.segmentos(e).length, 9);
+  assert.equal(S.apagarSegmento(e, novo.id), true);
+});
