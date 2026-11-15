@@ -48,6 +48,7 @@ export const T = {
   pedirNumeroDestino: (rua: string) => `🎯 Anotei o destino *${rua.slice(0, 80)}*.\n\n🏢 Qual é o NÚMERO do destino? (só o número, ex.: 120)\nSe não souber, mande *não sei* que o motorista combina com você.`,
   salvos: (lista: string[], intro = "📍 Encontrei seus endereços salvos. Qual é o endereço de embarque?") =>
     `${intro}\n${lista.map((l, i) => `*${i + 1}* - ${l}`).join("\n")}\n*${lista.length + 1}* - Outro endereço 📝`,
+  repassado: () => "✅ Pronto! O que você escrever ou gravar por aqui chega ao motorista. Para cancelar a corrida, envie *cancelar*.",
   audioFalhou: () => "Não consegui entender esse áudio agora. Pode enviar novamente ou escrever sua mensagem?",
   erroCriar: () => "Não consegui criar a corrida agora. 😕 Responda a forma de pagamento para tentar de novo, ou *menu* para recomeçar.",
   jaTemAberta: (motivo: string) => `${motivo} Para falar com um atendente, envie *menu* e escolha *2*.`,

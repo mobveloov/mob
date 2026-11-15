@@ -29,7 +29,7 @@ export function BotAjustes() {
   useEffect(() => {
     if (!cfg.dados) return;
     const a = cfg.dados.config;
-    setC({ fluxo: a.fluxo, textos: a.textos, saudacao: a.saudacao, faq: a.faq, controle: a.controle, textosStatus: a.textosStatus });
+    setC({ fluxo: a.fluxo, textos: a.textos, saudacao: a.saudacao, faq: a.faq, controle: a.controle, textosStatus: a.textosStatus, voz: a.voz });
     setFaqTxt(a.faq.map((f) => f.keywords.join(", ")));
   }, [cfg.dados]);
   if (!c) return cfg.erro ? <div className="aviso erro">{cfg.erro}</div> : null;
@@ -112,6 +112,19 @@ export function BotAjustes() {
           ))}
         </div>
         <button className="botao primario" disabled={!admin || ocupado} onClick={() => salvar({ controle: c.controle }, "Comandos salvos")}><Ban size={14} /> Salvar comandos</button>
+      </Cartao>
+
+      <Cartao titulo="Voz do bot">
+        <p className="sub">Quando o passageiro manda um áudio, o bot responde com o texto e, em seguida, com a mesma resposta em áudio. Só funciona com chave de voz da plataforma ou da empresa (Gemini ou OpenAI); sem chave, a resposta fica só em texto. Menus e listas longas não viram áudio.</p>
+        <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 0" }}>
+          <input type="checkbox" role="switch" disabled={!admin} checked={c.voz.ligada} onChange={() => setC({ ...c, voz: { ...c.voz, ligada: !c.voz.ligada } })} /> <strong>Responder em áudio</strong>
+        </label>
+        <label>Voz
+          <select disabled={!admin} value={c.voz.nome} onChange={(e) => setC({ ...c, voz: { ...c.voz, nome: e.target.value } })}>
+            {["Kore", "Puck", "Charon", "Fenrir", "Aoede", "Leda", "Orus", "Zephyr"].map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </label>
+        <button className="botao primario" disabled={!admin || ocupado} onClick={() => salvar({ voz: c.voz }, "Voz do bot salva")}><CheckCircle2 size={14} /> Salvar voz</button>
       </Cartao>
 
       <Cartao titulo="Mensagens de status da corrida">

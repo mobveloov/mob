@@ -11,6 +11,7 @@ import { banco, migrarUmaVez } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import { normalizeBotControl } from "./controle.ts";
 import { normalizeBotTexts, normalizeFaq, normalizeGreeting } from "./textos-editaveis.ts";
+import { limparVoz, VOZ_PADRAO } from "./voz.ts";
 import { normalizeStatusMessages } from "./mensagens-status.ts";
 import { FLUXO_PADRAO, ID_PRINCIPAL, TIPOS_PROVEDOR, type ConexaoBot, type ConfigBot, type Conversa, type FluxoBot, type TipoProvedor } from "./tipos.ts";
 
@@ -41,15 +42,15 @@ export function configPadrao(empresaId: string): ConfigBot {
 }
 
 const avancadaPadrao = () => ({
-  fluxo: { ...FLUXO_PADRAO }, textos: {}, saudacao: normalizeGreeting(null), faq: [], controle: normalizeBotControl(null), textosStatus: {},
+  fluxo: { ...FLUXO_PADRAO }, textos: {}, saudacao: normalizeGreeting(null), faq: [], controle: normalizeBotControl(null), textosStatus: {}, voz: { ligada: false, nome: VOZ_PADRAO },
 });
 
 /** Confere as configurações avançadas (fluxo, textos, saudação, respostas prontas, comandos, status). */
-export function sanearAvancada(c: Partial<ConfigBot>): Pick<ConfigBot, "fluxo" | "textos" | "saudacao" | "faq" | "controle" | "textosStatus"> {
+export function sanearAvancada(c: Partial<ConfigBot>): Pick<ConfigBot, "fluxo" | "textos" | "saudacao" | "faq" | "controle" | "textosStatus" | "voz"> {
   const f = (c.fluxo ?? {}) as Partial<FluxoBot>;
   const fluxo = { ...FLUXO_PADRAO };
   for (const k of Object.keys(FLUXO_PADRAO) as Array<keyof FluxoBot>) if (typeof f[k] === "boolean") fluxo[k] = f[k]!;
-  return { fluxo, textos: normalizeBotTexts(c.textos), saudacao: normalizeGreeting(c.saudacao), faq: normalizeFaq(c.faq), controle: normalizeBotControl(c.controle), textosStatus: normalizeStatusMessages(c.textosStatus) };
+  return { fluxo, textos: normalizeBotTexts(c.textos), saudacao: normalizeGreeting(c.saudacao), faq: normalizeFaq(c.faq), controle: normalizeBotControl(c.controle), textosStatus: normalizeStatusMessages(c.textosStatus), voz: { ligada: c.voz?.ligada === true, nome: limparVoz(c.voz?.nome) } };
 }
 
 export function config(empresaId: string): ConfigBot {

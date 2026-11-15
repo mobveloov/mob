@@ -8,6 +8,9 @@ import { clienteDoTelefone, corridasDoBot } from "./corridas.ts";
 import { provedorEvolution, provedorSimulado, type ProvedorWhatsApp } from "./provedores.ts";
 import { provedorMeta, provedorZapi } from "./provedores-api.ts";
 import { textoDoAudio, type DepsAudio } from "./audio.ts";
+import { comMotorista, repassarAoMotorista } from "./repasse.ts";
+import { sintetizar, type DepsVoz } from "./voz.ts";
+import { speakableText } from "./voz-texto.ts";
 import { botSilencedFor, brPhoneVariants, parseBotCommand, parseBotCommandWithPhone, type BotCommand } from "./controle.ts";
 import { decideSkip } from "./destino.ts";
 import { customText, matchFaq, shouldSendGreetingImage } from "./textos-editaveis.ts";
@@ -31,6 +34,8 @@ export interface Dependencias {
   classificar?: Classificador;
   /** Transcrição de áudio (testes trocam o fetch e as chaves). */
   audio?: DepsAudio;
+  /** Voz do bot (testes trocam o fetch e as chaves). */
+  voz?: DepsVoz;
 }
 
 /**
@@ -76,6 +81,19 @@ export async function enviar(empresaId: string, p: ProvedorWhatsApp, telefone: s
   }
 }
 
+/** Depois do texto, a mesma resposta em áudio (só para quem falou por áudio). Falhou ou sem chave: fica o texto. */
+async function responderEmVoz(empresaId: string, p: ProvedorWhatsApp, telefone: string, textos: string[], voz: string, deps?: DepsVoz) {
+  if (!p.enviarMidia) return;
+  for (const t of textos) {
+    try {
+      const a = await sintetizar(empresaId, t, voz, deps);
+      if (!a) { if (!speakableOk(t)) continue; return; } // sem chave ou voz fora do ar: o resto da conversa vai em texto
+      await p.enviarMidia(telefone, { tipo: "audio", bytes: a.bytes, mimetype: a.mimetype });
+    } catch (e) { console.error("[bot] voz", empresaId, e instanceof Error ? e.message : e); return; }
+  }
+}
+const speakableOk = (t: string) => speakableText(t) !== null;
+
 /** Fecha a corrida atual (vai para o histórico). */
 export function fecharCorrida(c: Conversa, final: Partial<CorridaBot>) {
   if (c.corrida) c.historico.push({ ...c.corrida, ...final });
@@ -118,6 +136,7 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   const provedor = deps.provedor ?? provedorDe(empresaId, c.conexao);
   let texto = (r.texto ?? "").trim();
   let audioFalhou = false;
+  const ouviuAudio = Boolean(!r.texto && !r.local && r.audio);
   if (!texto && !r.local && r.audio) {
     // Áudio: vira texto (quando há chave de transcrição) e segue como se tivesse sido digitado.
     const dito = await textoDoAudio(empresaId, r.audio, provedor, deps.audio);
@@ -145,7 +164,7 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
     return [];
   }
   // Áudio que não deu para ouvir: pede para repetir ou escrever (com o operador na conversa, quem responde é ele).
-  if (audioFalhou) {
+  if (audioFalhou && !comMotorista(c)) {
     const aviso = c.etapa === "suporte" ? [] : [T.audioFalhou()];
     for (const t of aviso) c.mensagens.push({ de: "bot", texto: t, em: agora() });
     A.salvarConversa(empresaId, c);
@@ -173,6 +192,7 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
     try { await provedor.enviarImagem(c.id, ctx.imagem.url, ctx.imagem.caption); } catch (e) { console.error("[bot] imagem", empresaId, e instanceof Error ? e.message : e); }
   }
   await enviar(empresaId, provedor, c.id, respostas);
+  if (ouviuAudio && cfg.voz.ligada) await responderEmVoz(empresaId, provedor, c.id, respostas, cfg.voz.nome, deps.voz);
   return respostas;
 }
 
@@ -284,6 +304,12 @@ async function passo(p: Passo) {
   if (c.corrida && c.corrida.grupo === "aberta") {
     c.etapa = "em_corrida";
     if (CANCELAR.test(n)) return cancelar(p);
+    if (comMotorista(c)) {
+      // Com o motorista a caminho ou na corrida, o que o passageiro escreve, grava ou localiza vai para o chat do motorista.
+      const prov = p.deps.provedor ?? provedorDe(p.empresaId, c.conexao);
+      const rep = await repassarAoMotorista(p.empresaId, c, r, texto, (a) => (prov.baixarAudio ? prov.baixarAudio(a) : Promise.resolve(null)));
+      if (rep) { if (!c.corrida!.avisouRepasse) { c.corrida!.avisouRepasse = true; p.dizer(T.repassado()); } return; }
+    }
     return p.dizer(T.jaTemCorrida(NOME_STATUS[c.corrida.status] ?? c.corrida.status));
   }
 

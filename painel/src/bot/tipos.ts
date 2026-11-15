@@ -28,6 +28,10 @@ export interface CorridaBot {
   status: string; grupo: "aberta" | "finalizada" | "cancelada" | "nao_atendida";
   criadaEm: string; valor?: number; motorista?: string;
   nota?: number;
+  /** Última mensagem do motorista já repassada ao passageiro (ISO). */
+  chatEm?: string;
+  /** Já avisou o passageiro de que as mensagens chegam ao motorista. */
+  avisouRepasse?: boolean;
 }
 
 export interface Rascunho {
@@ -102,6 +106,8 @@ export interface ConfigBot {
   controle: { blockWord: string; unblockWord: string; pauseWord: string; resumeWord: string; pauseMinutes: number };
   /** Textos das mensagens de status da corrida trocados pela empresa. */
   textosStatus: Record<string, string>;
+  /** Responder em áudio quando o passageiro manda áudio (só com chave de voz). */
+  voz: { ligada: boolean; nome: string };
   provedor: TipoProvedor;
   /** Nome da instância no provedor (única por empresa). No servidor da plataforma é sempre bot-<empresa>. */
   instancia: string;

@@ -86,6 +86,14 @@ export function provedorZapi(d: DadosZapi, tipo: "zapi" | "zpro" = "zapi"): Prov
     tipo,
     async enviarTexto(telefone, texto) { await chamar("POST", "/send-text", { phone: soDigitos(telefone), message: texto }); },
     async enviarImagem(telefone, url, legenda) { await chamar("POST", "/send-image", { phone: soDigitos(telefone), image: url, caption: legenda }); },
+    async enviarMidia(telefone, m) {
+      const dado = `data:${m.mimetype};base64,${m.bytes.toString("base64")}`;
+      const phone = soDigitos(telefone);
+      if (m.tipo === "audio") await chamar("POST", "/send-audio", { phone, audio: dado });
+      else if (m.tipo === "image") await chamar("POST", "/send-image", { phone, image: dado, caption: m.legenda ?? "" });
+      else if (m.tipo === "video") await chamar("POST", "/send-video", { phone, video: dado, caption: m.legenda ?? "" });
+      else await chamar("POST", `/send-document/${(m.nome?.split(".").pop() ?? m.mimetype.split("/")[1] ?? "pdf").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "pdf"}`, { phone, document: dado, fileName: m.nome ?? "arquivo" });
+    },
     async conectar(webhookUrl) {
       const s = await situacao();
       if (s.situacao === "erro" || s.situacao === "nao_configurado") return s;
@@ -189,6 +197,20 @@ export function provedorMeta(d: DadosMeta): ProvedorWhatsApp {
     tipo: "meta",
     enviarTexto: (telefone, texto) => enviar({ to: soDigitos(telefone), type: "text", text: { body: texto } }),
     enviarImagem: (telefone, url, legenda) => enviar({ to: soDigitos(telefone), type: "image", image: { link: url, caption: legenda } }),
+    async enviarMidia(telefone, m) {
+      if (!configurado) throw new Error("Falta o token ou o phone id da Meta.");
+      // A Meta pede o envio do arquivo antes (devolve um id) e depois a mensagem com esse id.
+      const form = new FormData();
+      form.append("messaging_product", "whatsapp");
+      form.append("type", m.mimetype);
+      form.append("file", new Blob([new Uint8Array(m.bytes)], { type: m.mimetype }), m.nome ?? `arquivo.${m.mimetype.split("/")[1] ?? "bin"}`);
+      const up = await f(`${GRAPH}/${encodeURIComponent(d.phoneId)}/media`, { method: "POST", headers: { Authorization: `Bearer ${d.token}` }, body: form, signal: AbortSignal.timeout(30_000) });
+      if (!up.ok) throw new Error(`A Meta respondeu ${up.status} ao receber o arquivo.`);
+      const id = ((await up.json()) as { id?: string }).id;
+      if (!id) throw new Error("A Meta não devolveu o id do arquivo.");
+      const tipo = m.tipo;
+      await enviar({ to: soDigitos(telefone), type: tipo, [tipo]: { id, ...(m.legenda && tipo !== "audio" ? { caption: m.legenda } : {}), ...(tipo === "document" ? { filename: m.nome ?? "arquivo" } : {}) } });
+    },
     async conectar() {
       const s = await situacao();
       return s.situacao === "conectado"

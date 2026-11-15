@@ -7,6 +7,7 @@ export interface ConfigAvancada {
   faq: Array<{ question: string; keywords: string[]; answer: string }>;
   controle: { blockWord: string; unblockWord: string; pauseWord: string; resumeWord: string; pauseMinutes: number };
   textosStatus: Record<string, string>;
+  voz: { ligada: boolean; nome: string };
 }
 export type TipoProvedor = "evolution" | "zapi" | "zpro" | "meta" | "simulado";
 export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: TipoProvedor; instancia: string }

@@ -4,6 +4,7 @@
 import * as A from "./armazem.ts";
 import { corridasDoBot } from "./corridas.ts";
 import { enviar, fecharCorrida, provedorDe, type Dependencias } from "./fluxo.ts";
+import { repassarAoPassageiro } from "./repasse.ts";
 import { marcador, textoStatus } from "./textos.ts";
 
 /** Olha a corrida aberta de uma conversa e avisa o passageiro se mudou. Devolve o texto enviado (ou null). */
@@ -12,6 +13,8 @@ export function atualizarStatus(empresaId: string, conversaId: string, deps: Dep
     const c = A.conversa(empresaId, conversaId);
     const corrida = c?.corrida;
     if (!c || !corrida || corrida.grupo !== "aberta") return null;
+    // Mensagens que o motorista mandou pelo chat da corrida seguem para o WhatsApp do passageiro.
+    if (await repassarAoPassageiro(empresaId, c, deps.provedor ?? provedorDe(empresaId, c.conexao))) A.salvarConversa(empresaId, c);
     const d = await corridasDoBot().detalhar(empresaId, corrida.id);
     if (!d) return null; // corrida apagada no painel: deixa como está
     const anterior = corrida.status;

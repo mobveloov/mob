@@ -178,7 +178,7 @@ rotasBot.put("/config/avancada", admin, ok((req, res) => {
   const id = ctx(req).empresaId;
   const b = (req.body ?? {}) as Partial<ConfigBot>;
   const atual = A.config(id);
-  const nova = A.sanearAvancada({ ...atual, ...Object.fromEntries(Object.entries(b).filter(([k]) => ["fluxo", "textos", "saudacao", "faq", "controle", "textosStatus"].includes(k))) });
+  const nova = A.sanearAvancada({ ...atual, ...Object.fromEntries(Object.entries(b).filter(([k]) => ["fluxo", "textos", "saudacao", "faq", "controle", "textosStatus", "voz"].includes(k))) });
   A.salvarConfig(id, { ativo: atual.ativo, provedor: atual.provedor, instancia: atual.instancia, ...nova });
   res.json({ ok: true, config: { ...A.config(id) } });
 }));
