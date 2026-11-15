@@ -179,6 +179,45 @@ function textoMenu(p: Passo): string {
   return custom ? `${custom}${OPCOES_MENU}` : T.menu(p.m, p.c.nome);
 }
 
+
+const VIA_RE = /^(rua|r\.?|avenida|av\.?|travessa|tv\.?|alameda|al\.?|estrada|rodovia|praca|praça|largo|viela)\s/i;
+
+/** Entende o endereço digitado: link de mapa, coordenadas coladas, "estou em casa", só número, rua sem número. */
+async function entenderLocal(texto: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean }> {
+  const mapa = await resolveMapLink(texto).catch(() => null);
+  if (mapa?.kind === "point") return { local: { texto: mapa.name || "Localização do mapa", lat: mapa.lat, lng: mapa.lng } };
+  if (mapa?.kind === "text") return { local: { texto: mapa.text } };
+  const col = parseCoordPaste(texto);
+  if (col) return { local: { texto: col.name || "Localização enviada", lat: col.lat, lng: col.lng } };
+  const fixo = romanizeBairroNumber(fixHouseNumberTypo(texto.trim())).replace(/(\p{L})\.(?=\p{L}{2})/gu, "$1 ");
+  if (isVaguePickup(fixo)) return { recusa: T.embarqueVago() };
+  if (looseHouseNumber(fixo) === fixo.trim()) return { recusa: T.embarqueSoNumero() };
+  if (!pareceEndereco(fixo)) return {};
+  const limpo = limparEndereco(fixo);
+  return { local: { texto: limpo }, pedirNumero: VIA_RE.test(limpo) && !addressHasNumber(limpo) };
+}
+
+/** Pergunta o embarque, oferecendo os endereços que a pessoa já usou (os de 2 usos ou mais). */
+function perguntarEmbarque(p: Passo, corrigindo: boolean, intro?: string) {
+  const usados = (p.c.enderecos ?? []).filter((e) => e.usos >= 2).sort((a, b) => b.usos - a.usos)
+    .map((e, i) => ({ id: String(i), address_text: e.texto, e }));
+  const unicos = uniqueFreqAddresses(usados, 3);
+  if (!corrigindo && unicos.length) {
+    p.c.rascunho.salvos = unicos.map((u) => ({ texto: u.e.texto, lat: u.e.lat, lng: u.e.lng }));
+    return p.dizer(T.salvos(unicos.map(freqLabel), intro));
+  }
+  p.c.rascunho.salvos = undefined;
+  p.dizer(corrigindo ? p.txt("address_correction", T.embarqueCorrecao()) : p.txt("ask_address", T.embarque()));
+}
+
+function guardarEndereco(c: Conversa, l: Local) {
+  const chave = normalizar(l.texto);
+  const lista = c.enderecos ?? [];
+  const e = lista.find((x) => normalizar(x.texto) === chave);
+  if (e) { e.usos++; e.em = agora(); } else lista.push({ texto: l.texto, lat: l.lat, lng: l.lng, usos: 1, em: agora() });
+  c.enderecos = lista.sort((a, b) => b.usos - a.usos).slice(0, 20);
+}
+
 function irPara(p: Passo, etapa: Conversa["etapa"], corrigindo = false): void | Promise<void> {
   const { cfg, c } = p;
   // Menu de boas-vindas desligado: vai direto para o endereço de embarque.
@@ -192,7 +231,7 @@ function irPara(p: Passo, etapa: Conversa["etapa"], corrigindo = false): void | 
     if (shouldSendGreetingImage(cfg.saudacao, c.imagemEm, Date.now())) { p.imagem = { url: cfg.saudacao.imageUrl, caption: cfg.saudacao.caption }; c.imagemEm = agora(); }
     p.dizer(textoMenu(p));
   }
-  if (etapa === "embarque") p.dizer(corrigindo ? p.txt("address_correction", T.embarqueCorrecao()) : p.txt("ask_address", T.embarque()));
+  if (etapa === "embarque") perguntarEmbarque(p, corrigindo);
   if (etapa === "destino") {
     const base = p.txt("ask_destination", "");
     p.dizer(base ? `${base}${cfg.fluxo.allow_skip_destination ? "\nSe preferir não informar, responda *2*." : ""}` : T.destino(cfg.fluxo.allow_skip_destination));
@@ -207,7 +246,8 @@ function irPara(p: Passo, etapa: Conversa["etapa"], corrigindo = false): void | 
 }
 
 async function passo(p: Passo) {
-  const { c, n, texto, r } = p;
+  const { c, r } = p;
+  let { n, texto } = p;
 
   // Corrida em andamento: nada de pedir outra. Só cancelar ou ver o status.
   if (c.etapa === "criando" && !c.corrida) {
@@ -223,10 +263,25 @@ async function passo(p: Passo) {
   }
 
   if (c.etapa === "suporte") {
-    if (MENU.test(n)) { const saiu = p.txt("support_exit", ""); if (saiu) p.dizer(saiu); return irPara(p, "menu"); }
+    if (MENU.test(n) || supportCloseDecision("passenger", texto).sendMenu) { const saiu = p.txt("support_exit", ""); if (saiu) p.dizer(saiu); return irPara(p, "menu"); }
     return; // o operador responde pelo painel
   }
   if (MENU.test(n) && c.etapa !== "inicio") { c.rascunho = {}; return irPara(p, "menu"); }
+
+  // Pedido urgente ("urgente", "rápido", "com pressa"): só o embarque, sem destino, categoria nem pagamento.
+  if (texto && !localDe(r) && !c.rascunho.urgente && c.etapa !== "avaliacao" && !bloqueado(p)) {
+    const u = detectUrgentRide(texto);
+    if (u.urgent) {
+      c.rascunho = { urgente: true };
+      c.etapa = "embarque";
+      p.cfg = { ...p.cfg, fluxo: { ...p.cfg.fluxo, ...URGENT_FLOW } };
+      if (!u.rest) return p.dizer(URGENT_ASK_ADDRESS);
+      texto = u.rest; n = normalizar(u.rest); p.texto = texto; p.n = n;
+    }
+  }
+  if (c.rascunho.urgente) p.cfg = { ...p.cfg, fluxo: { ...p.cfg.fluxo, ...URGENT_FLOW } };
+  // "Estou em casa" no começo: não é endereço; explica o que falta.
+  if ((c.etapa === "inicio" || c.etapa === "menu") && texto && !localDe(r) && isVaguePickup(texto) && !bloqueado(p)) { c.etapa = "embarque"; return p.dizer(T.embarqueVago()); }
 
   // Respostas prontas ("aceita pet?"): no começo vale qualquer pergunta; no meio do pedido só com "?" (não confunde com endereço).
   if (texto && !localDe(r) && ["inicio", "menu", "embarque", "destino", "confirmar"].includes(c.etapa)) {
@@ -257,10 +312,32 @@ async function passo(p: Passo) {
       return p.dizer(p.txt("welcome_repeat", "") ? `${p.txt("welcome_repeat", "")}${OPCOES_MENU}` : T.menuDeNovo());
     }
 
-    case "embarque":
+    case "embarque": {
+      const salvos = c.rascunho.salvos;
+      if (salvos?.length && !localDe(r)) {
+        const o = opcao(texto, salvos.length + 1);
+        if (o && o <= salvos.length) { c.rascunho.embarque = salvos[o - 1]; c.rascunho.salvos = undefined; return irPara(p, "destino"); }
+        if (o === salvos.length + 1) { c.rascunho.salvos = undefined; return p.dizer(p.txt("ask_address", T.embarque())); }
+      }
+      if (localDe(r)) { c.rascunho.embarque = localDe(r)!; c.rascunho.salvos = undefined; return irPara(p, "destino"); }
+      const e = await entenderLocal(texto);
+      if (e.recusa) return p.dizer(e.recusa);
+      if (!e.local) return p.dizer(p.txt("address_retry", T.embarqueDeNovo()));
+      c.rascunho.salvos = undefined;
+      c.rascunho.embarque = e.local;
+      if (e.pedirNumero) { c.etapa = "numero_embarque"; return p.dizer(T.pedirNumeroEmbarque(e.local.texto)); }
+      return irPara(p, "destino");
+    }
+
+    case "numero_embarque": {
+      const base = c.rascunho.embarque?.texto ?? "";
+      const num = looseHouseNumber(fixHouseNumberTypo(texto)) ?? sameStreetNumber(base, texto);
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; return irPara(p, "destino"); }
-      if (pareceEndereco(texto)) { c.rascunho.embarque = { texto: limparEndereco(texto) }; return irPara(p, "destino"); }
-      return p.dizer(p.txt("address_retry", T.embarqueDeNovo()));
+      if (num) { c.rascunho.embarque = { texto: insertHouseNumber(base, num) }; return irPara(p, "destino"); }
+      const e = await entenderLocal(texto); // mandou outro endereço no lugar do número
+      if (e.local && !e.pedirNumero) { c.rascunho.embarque = e.local; return irPara(p, "destino"); }
+      return p.dizer(T.pedirNumeroEmbarque(base));
+    }
 
     case "destino":
       {
@@ -271,8 +348,26 @@ async function passo(p: Passo) {
         if (pular === "required") return p.dizer(T.destinoObrigatorio());
       }
       if (localDe(r)) { c.rascunho.destino = localDe(r)!; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
-      if (pareceEndereco(texto)) { c.rascunho.destino = { texto: limparEndereco(texto) }; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
+      {
+        const e = await entenderLocal(texto);
+        if (e.local) {
+          c.rascunho.destino = e.local; c.rascunho.semDestino = false;
+          if (e.pedirNumero) { c.etapa = "numero_destino"; return p.dizer(T.pedirNumeroDestino(e.local.texto)); }
+          return irPara(p, "confirmar");
+        }
+      }
       return p.dizer(p.txt("destination_retry", T.destinoDeNovo(p.cfg.fluxo.allow_skip_destination)));
+
+    case "numero_destino": {
+      const base = c.rascunho.destino?.texto ?? "";
+      if (localDe(r)) { c.rascunho.destino = localDe(r)!; return irPara(p, "confirmar"); }
+      if (/^(nao sei|n sei|sem numero|s n|nao tenho)(\s|$)/.test(n)) return irPara(p, "confirmar"); // o motorista combina o número
+      const num = looseHouseNumber(fixHouseNumberTypo(texto)) ?? sameStreetNumber(base, texto);
+      if (num) { c.rascunho.destino = { texto: insertHouseNumber(base, num) }; return irPara(p, "confirmar"); }
+      const e = await entenderLocal(texto);
+      if (e.local && !e.pedirNumero) { c.rascunho.destino = e.local; return irPara(p, "confirmar"); }
+      return p.dizer(T.pedirNumeroDestino(base));
+    }
 
     case "confirmar": {
       const o = opcao(texto, 2, { 1: SIM, 2: NAO });
@@ -371,6 +466,7 @@ async function criar(p: Passo): Promise<void> {
       pagamento: rasc.pagamento, observacao: "Pedido pelo WhatsApp",
     });
     c.corrida = { id: nova.id, os: nova.os, status: "procurando", grupo: "aberta", criadaEm: agora(), valor: nova.valor };
+    guardarEndereco(c, rasc.embarque);
     c.etapa = "em_corrida";
     c.rascunho = {};
     const ok = p.txt("ride_success", "");

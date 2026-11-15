@@ -75,7 +75,7 @@ export const apiBot = {
 };
 
 export const ETAPA: Record<string, string> = {
-  inicio: "Início", menu: "Menu", embarque: "Embarque", destino: "Destino", confirmar: "Confirmação", categoria: "Categoria",
+  inicio: "Início", menu: "Menu", embarque: "Embarque", numero_embarque: "Número do embarque", destino: "Destino", numero_destino: "Número do destino", confirmar: "Confirmação", categoria: "Categoria",
   pagamento: "Pagamento", criando: "Criando corrida", em_corrida: "Em corrida", avaliacao: "Avaliação", suporte: "Suporte (operador)",
 };
 

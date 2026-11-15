@@ -120,3 +120,11 @@ Tela **Bot de WhatsApp › Ajustes do bot** (só admin muda) e regras do bot de 
 
 Arquivos novos: `bot/textos-editaveis.ts`, `bot/mensagens-status.ts`, `bot/controle.ts`, `bot/destino.ts`, `web/bot/Ajustes.tsx`.
 Testes: `test/bot-fluxo-avancado.test.ts` e `test/bot-regras-*.test.ts`.
+
+## Conexões, provedores e áudio (14/11/2026)
+
+- **Várias conexões:** cada empresa tem a conexão principal e até 10 extras (tela Conexões do Bot). Cada uma tem provedor, instância e segredos próprios (`bot-whatsapp` e `bot-whatsapp-<id>`). O webhook da extra é `/api/bot/webhook/:empresa/:segredo/:conexao`. A conversa guarda o número e as respostas saem por ele.
+- **Provedores:** Evolution, Z-API, Z-Pro e Meta atrás de `ProvedorWhatsApp` (`provedores.ts`, `provedores-api.ts`), mais o simulado. Meta: cadastre no painel da Meta o endereço e a senha de verificação mostrados na conexão; com o App Secret salvo, avisos sem assinatura são recusados; mensagens com mais de 10 min são ignoradas.
+- **Áudio:** `audio.ts` baixa o áudio pelo provedor e transcreve com Groq ou OpenAI (`GROQ_API_KEYS`, `OPENAI_API_KEY`, da empresa ou da plataforma). Sem chave, o bot pede para escrever. No Testar conversa dá para simular um áudio digitando o que foi falado.
+- **Regras de endereço copiadas do mobveloov:** embarque vago ("estou em casa"), rua sem número (pede e junta o número), pedido urgente, link de mapa, coordenadas coladas, endereços salvos (usados 2 vezes ou mais) e fim do suporte.
+- **Falta:** sugestões por apelido, agendamento, repasse de mídia entre motorista e passageiro, cidades ativas, voz do bot.

@@ -1,7 +1,7 @@
 // v14.40.10: numero da casa mandado SOZINHO depois do endereco ("Rua Amazonas" ... "43").
 // O numero vai logo depois do nome da rua: "RUA AMAZONAS, CENTRO, Pitangueiras - SP" + 43
 // -> "RUA AMAZONAS, 43, CENTRO, Pitangueiras - SP". Antes ia para o fim (depois da cidade) e
-// so no endereco interno; a confirmacao e a Machine recebiam o endereco SEM numero.
+// so no endereco interno; a confirmacao e o sistema de corridas recebia o endereco SEM numero.
 
 /** "43", "n 43", "nº 43", "numero 43" -> "43". Outra coisa -> null. */
 export function looseHouseNumber(text: string | null | undefined): string | null {
