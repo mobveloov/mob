@@ -271,6 +271,7 @@ export default function Totem(props: { empresa?: string; local?: string }) {
               <p><MapPin size={16} /> O valor é uma estimativa e o motorista confirma no final.</p>
               {cats.length > 1 && <p className="tt-rotulo">Categorias disponíveis</p>}
               {erro && <div className="tt-erro" role="alert">{erro}</div>}
+              {cats.length === 1 && cats[0].preco != null && <div className="tt-resumo"><div><span>{cotadas?.[0]?.fixo ? "Valor da corrida" : "Valor estimado"}</span><b>{reais(cats[0].preco)}</b></div></div>}
               {cats.length === 1 ? (
                 <button className="tt-botao primario grande" disabled={enviando} onClick={() => enviar(cats[0].nome)}>{enviando ? <><Loader2 size={30} className="tt-gira" /> Pedindo...</> : <>Solicitar corrida <ArrowRight size={30} /></>}</button>
               ) : (
