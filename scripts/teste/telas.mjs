@@ -44,6 +44,12 @@ try {
   await page.fill('input[type="password"]', SENHA);
   await page.click('button:has-text("Entrar")');
   await page.waitForSelector("nav", { timeout: 15_000 });
+  // Menu lateral: abre todos os blocos recolhíveis para os links aparecerem.
+  for (let i = 0; i < 12; i++) {
+    const abriu = await page.$$eval('.ml-nav button[aria-expanded="false"]', (bs) => { bs.forEach((b) => b.click()); return bs.length; });
+    if (!abriu) break;
+    await page.waitForTimeout(150);
+  }
   const rotas = await page.$$eval("header a[href], nav a[href]", (as) => [...new Set(as.map((a) => new URL(a.href).pathname).filter((r) => r.startsWith("/") && !r.startsWith("/apps") && !r.startsWith("/api")))]);
   console.log(`Painel: ${rotas.length} telas no menu.`);
   for (const rota of rotas) {
