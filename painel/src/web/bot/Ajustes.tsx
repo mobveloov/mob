@@ -29,7 +29,7 @@ export function BotAjustes() {
   useEffect(() => {
     if (!cfg.dados) return;
     const a = cfg.dados.config;
-    setC({ fluxo: a.fluxo, textos: a.textos, saudacao: a.saudacao, faq: a.faq, controle: a.controle, textosStatus: a.textosStatus, voz: a.voz });
+    setC({ fluxo: a.fluxo, textos: a.textos, saudacao: a.saudacao, faq: a.faq, controle: a.controle, textosStatus: a.textosStatus, voz: a.voz, agendar: a.agendar });
     setFaqTxt(a.faq.map((f) => f.keywords.join(", ")));
   }, [cfg.dados]);
   if (!c) return cfg.erro ? <div className="aviso erro">{cfg.erro}</div> : null;
@@ -112,6 +112,14 @@ export function BotAjustes() {
           ))}
         </div>
         <button className="botao primario" disabled={!admin || ocupado} onClick={() => salvar({ controle: c.controle }, "Comandos salvos")}><Ban size={14} /> Salvar comandos</button>
+      </Cartao>
+
+      <Cartao titulo="Agendamento pelo bot">
+        <p className="sub">Ligado, o menu ganha "Agendar uma corrida" (1 pedir, 2 agendar, 3 suporte) e o bot entende frases como "amanhã 7h" ou "me pega na Rua X às 10:45". Mínimo de 15 minutos de antecedência e até 7 dias à frente; até 3 agendadas por passageiro. O passageiro recebe um aviso 15 e 5 minutos antes.</p>
+        <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 0" }}>
+          <input type="checkbox" role="switch" disabled={!admin} checked={c.agendar} onChange={() => setC({ ...c, agendar: !c.agendar })} /> <strong>Permitir agendar corrida</strong>
+        </label>
+        <button className="botao primario" disabled={!admin || ocupado} onClick={() => salvar({ agendar: c.agendar }, "Agendamento salvo")}><CheckCircle2 size={14} /> Salvar agendamento</button>
       </Cartao>
 
       <Cartao titulo="Voz do bot">

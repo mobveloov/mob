@@ -17,7 +17,7 @@ const { receber } = await import("../src/bot/fluxo.ts");
 const { definirCorridasDoBot } = await import("../src/bot/corridas.ts");
 
 const empresa = D.criarEmpresa("Central Enderecos", { nomeExibido: "Central Enderecos", assistente: { nome: "Lia", tom: "cordial" } });
-A.salvarConfig(empresa.id, { ativo: true, provedor: "simulado", instancia: "bot-enderecos" });
+A.salvarConfig(empresa.id, { ativo: true, provedor: "simulado", instancia: "bot-enderecos", agendar: false });
 
 const criadas: Array<{ embarque: string; destino?: string; categoria: string; pagamento: string }> = [];
 let abertas = 0;

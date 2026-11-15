@@ -29,7 +29,7 @@ const express = (await import("express")).default;
 
 const empresa = D.criarEmpresa("Rota Teste", { nomeExibido: "Rota Teste", assistente: { nome: "Lia", tom: "cordial" } });
 const outra = D.criarEmpresa("Outra Central");
-A.salvarConfig(empresa.id, { ativo: true, provedor: "simulado", instancia: "bot-rota" });
+A.salvarConfig(empresa.id, { ativo: true, provedor: "simulado", instancia: "bot-rota", agendar: false });
 A.salvarConfig(outra.id, { ativo: true, provedor: "simulado", instancia: "bot-outra" });
 // Cadastros da empresa: categorias com tarifa, um motorista e um passageiro bloqueado.
 const cad = (id: string) => cadastroPorId(id)!;

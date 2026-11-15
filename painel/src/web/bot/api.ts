@@ -8,6 +8,7 @@ export interface ConfigAvancada {
   controle: { blockWord: string; unblockWord: string; pauseWord: string; resumeWord: string; pauseMinutes: number };
   textosStatus: Record<string, string>;
   voz: { ligada: boolean; nome: string };
+  agendar: boolean;
 }
 export type TipoProvedor = "evolution" | "zapi" | "zpro" | "meta" | "simulado";
 export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: TipoProvedor; instancia: string }
@@ -81,7 +82,7 @@ export const apiBot = {
 };
 
 export const ETAPA: Record<string, string> = {
-  inicio: "Início", menu: "Menu", embarque: "Embarque", numero_embarque: "Número do embarque", destino: "Destino", numero_destino: "Número do destino", confirmar: "Confirmação", categoria: "Categoria",
+  inicio: "Início", menu: "Menu", embarque: "Embarque", numero_embarque: "Número do embarque", destino: "Destino", numero_destino: "Número do destino", agendamento: "Data e hora do agendamento", cancelar_agendamento: "Cancelando agendamento", confirmar: "Confirmação", categoria: "Categoria",
   pagamento: "Pagamento", criando: "Criando corrida", em_corrida: "Em corrida", avaliacao: "Avaliação", suporte: "Suporte (operador)",
 };
 

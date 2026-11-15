@@ -1,7 +1,7 @@
 // Tipos do bot de WhatsApp. Cada empresa tem o próprio número (instância) e as próprias conversas.
 
 export type Etapa =
-  | "inicio" | "menu" | "embarque" | "numero_embarque" | "destino" | "numero_destino" | "confirmar" | "categoria" | "pagamento"
+  | "inicio" | "menu" | "embarque" | "numero_embarque" | "destino" | "numero_destino" | "agendamento" | "cancelar_agendamento" | "confirmar" | "categoria" | "pagamento"
   | "criando" | "em_corrida" | "avaliacao" | "suporte";
 
 export interface Local { texto: string; lat?: number; lng?: number }
@@ -39,6 +39,10 @@ export interface Rascunho {
   categorias?: CategoriaBot[]; categoria?: CategoriaBot; pagamento?: string;
   /** Pedido urgente: só pergunta o embarque e chama o carro (sem destino, categoria nem pagamento). */
   urgente?: boolean;
+  /** Corrida agendada: o instante (ms) em que o passageiro quer o carro. */
+  agendarPara?: number;
+  /** Agendamentos mostrados para cancelar (ids das corridas, na ordem das opções). */
+  agendCancelar?: string[];
   /** Endereços salvos oferecidos na pergunta do embarque (na ordem das opções). */
   salvos?: Local[];
 }
@@ -69,6 +73,8 @@ export interface Conversa {
   conexao?: string;
   /** Embarques já usados em corridas pedidas pelo bot (os mais usados viram opções). */
   enderecos?: EnderecoUsado[];
+  /** Avisos de corrida agendada já enviados (15 e 5 minutos antes), por corrida. */
+  lembretes?: Record<string, { 15?: boolean; 5?: boolean }>;
   criadaEm: string;
   atualizadaEm: string;
 }
@@ -108,6 +114,8 @@ export interface ConfigBot {
   textosStatus: Record<string, string>;
   /** Responder em áudio quando o passageiro manda áudio (só com chave de voz). */
   voz: { ligada: boolean; nome: string };
+  /** Oferece "Agendar uma corrida" no menu e entende "amanhã 7h". */
+  agendar: boolean;
   provedor: TipoProvedor;
   /** Nome da instância no provedor (única por empresa). No servidor da plataforma é sempre bot-<empresa>. */
   instancia: string;

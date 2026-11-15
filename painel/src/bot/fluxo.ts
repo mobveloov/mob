@@ -14,7 +14,8 @@ import { speakableText } from "./voz-texto.ts";
 import { botSilencedFor, brPhoneVariants, parseBotCommand, parseBotCommandWithPhone, type BotCommand } from "./controle.ts";
 import { decideSkip } from "./destino.ts";
 import { customText, matchFaq, shouldSendGreetingImage } from "./textos-editaveis.ts";
-import { marcador, NOME_STATUS, PAGAMENTOS, T, type Marcador } from "./textos.ts";
+import { marcador, NOME_STATUS, opcoesMenu, PAGAMENTOS, T, type Marcador } from "./textos.ts";
+import { formatScheduleBR, parseScheduleWhen, scheduleErrorText, scheduleInRideText, SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES } from "./agendamento-texto.ts";
 import { isVaguePickup } from "./embarque-vago.ts";
 import { parseCoordPaste } from "./coordenadas.ts";
 import { resolveMapLink } from "./link-mapa.ts";
@@ -207,11 +208,10 @@ interface Passo {
 
 const localDe = (r: Recebida): Local | null => (r.local ? { texto: r.local.texto || "Localização enviada", lat: r.local.lat, lng: r.local.lng } : null);
 
-const OPCOES_MENU = "\n*1* - Pedir uma corrida\n*2* - Falar com o suporte";
 
 function textoMenu(p: Passo): string {
   const custom = customText(p.cfg.textos, p.c.historico.length ? "welcome_back" : "welcome_menu", "");
-  return custom ? `${custom}${OPCOES_MENU}` : T.menu(p.m, p.c.nome);
+  return custom ? `${custom}${opcoesMenu(p.cfg.agendar)}` : T.menu(p.m, p.c.nome, p.cfg.agendar);
 }
 
 
@@ -334,6 +334,24 @@ async function passo(p: Passo) {
   // "Estou em casa" no começo: não é endereço; explica o que falta.
   if ((c.etapa === "inicio" || c.etapa === "menu") && texto && !localDe(r) && isVaguePickup(texto) && !bloqueado(p)) { c.etapa = "embarque"; return p.dizer(T.embarqueVago()); }
 
+  // Agendar: "agendar", "meus agendamentos", "cancelar agendamento", e horário no meio do pedido ("me pega na Rua X às 10:45").
+  if (p.cfg.agendar && texto && !localDe(r)) {
+    if (c.etapa === "inicio" || c.etapa === "menu") {
+      if (/\b(meus agendamentos|minhas corridas agendadas|ver agendamentos|listar agendamentos)\b/.test(n)) return listarAgendamentos(p);
+      if (/\bcancel/.test(n) && /\bagendamento/.test(n)) return iniciarCancelamento(p);
+      if (!n.includes("cancel") && (/\bagend(ar|a|amento|ada|ado)\b/.test(n) || /\b(programar|reservar|marcar)\b.{0,20}\b(corrida|carro|viagem|moto)\b/.test(n)) && !bloqueado(p)) return iniciarAgendamento(p, texto);
+    }
+    if (["inicio", "menu", "embarque", "destino"].includes(c.etapa)) {
+      const sch = scheduleInRideText(texto, Date.now());
+      if (sch?.when.ok && !bloqueado(p)) {
+        c.rascunho.agendarPara = sch.when.whenMs;
+        p.dizer(`🗓️ Agendando para *${formatScheduleBR(sch.when.whenMs)}*.`);
+        if (!sch.text) return irPara(p, c.etapa === "destino" ? "destino" : "embarque");
+        texto = sch.text; n = normalizar(texto); p.texto = texto; p.n = n;
+      }
+    }
+  }
+
   // Respostas prontas ("aceita pet?"): no começo vale qualquer pergunta; no meio do pedido só com "?" (não confunde com endereço).
   if (texto && !localDe(r) && ["inicio", "menu", "embarque", "destino", "confirmar"].includes(c.etapa)) {
     const resposta = matchFaq(texto, p.cfg.faq, c.etapa !== "inicio" && c.etapa !== "menu");
@@ -347,20 +365,22 @@ async function passo(p: Passo) {
   switch (c.etapa) {
     case "inicio":
     case "em_corrida":
-      c.rascunho = {};
+      c.rascunho = c.rascunho.agendarPara ? { agendarPara: c.rascunho.agendarPara } : {};
       if (bloqueado(p)) return irPara(p, "menu");
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; return irPara(p, "destino"); }
       if (!ehCumprimento(texto) && (await fraseLivre(p))) return;
       return irPara(p, "menu");
 
     case "menu": {
-      const o = opcao(texto, 2, { 1: /\b(corrida|carro|moto|pedir|taxi|motorista)\b/, 2: /\b(suporte|atendente|ajuda|reclamacao|falar)\b/ });
-      if (o === 2) return irPara(p, "suporte");
+      const ag = p.cfg.agendar, SUP = ag ? 3 : 2;
+      const o = opcao(texto, SUP, { 1: /\b(corrida|carro|moto|pedir|taxi|motorista)\b/, [SUP]: /\b(suporte|atendente|ajuda|reclamacao|falar)\b/ });
+      if (o === SUP) return irPara(p, "suporte");
+      if (ag && o === 2) return iniciarAgendamento(p, "");
       if (bloqueado(p)) { c.etapa = "menu"; return p.dizer(T.bloqueado(p.m)); }
       if (o === 1) return irPara(p, "embarque");
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; return irPara(p, "destino"); }
       if (!ehCumprimento(texto) && (await fraseLivre(p))) return;
-      return p.dizer(p.txt("welcome_repeat", "") ? `${p.txt("welcome_repeat", "")}${OPCOES_MENU}` : T.menuDeNovo());
+      return p.dizer(p.txt("welcome_repeat", "") ? `${p.txt("welcome_repeat", "")}${opcoesMenu(p.cfg.agendar)}` : T.menuDeNovo(p.cfg.agendar));
     }
 
     case "embarque": {
@@ -418,6 +438,42 @@ async function passo(p: Passo) {
       const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
       if (e.local && !e.pedirNumero) { c.rascunho.destino = e.local; return irPara(p, "confirmar"); }
       return p.dizer(T.pedirNumeroDestino(base));
+    }
+
+    case "agendamento": {
+      if (!texto) return p.dizer(scheduleErrorText({ ok: false, reason: "no_time" }));
+      const quando = parseScheduleWhen(texto, Date.now());
+      if (quando.ok === false) {
+        // Quem tocou em "Agendar" sem querer: "1", "agora" ou um endereço saem do agendamento; "sair/menu" voltam ao menu.
+        const querAgora = /^(?:1|corrida|agora|ja|pra agora|para agora|e agora|quero agora|agora mesmo|nao quero agendar|nao e agendado)$/.test(n) || pareceRua(texto);
+        const querSair = /^(?:sair|cancelar|cancela|menu|voltar|nao)$/.test(n);
+        if (querSair) { c.rascunho = {}; return irPara(p, "menu"); }
+        if (querAgora) {
+          c.rascunho = {};
+          p.dizer("👍 Sem agendamento: vou pedir a corrida para *agora*.");
+          if (pareceRua(texto)) { c.rascunho.embarque = { texto: limparEndereco(texto) }; return irPara(p, "destino"); }
+          return irPara(p, "embarque");
+        }
+        return p.dizer(`${scheduleErrorText(quando)}\n\n🚕 Para pedir a corrida *agora*, mande *1* (ou o endereço).`);
+      }
+      c.rascunho.agendarPara = quando.whenMs;
+      p.dizer(`🗓️ Agendando para *${formatScheduleBR(quando.whenMs)}*.`);
+      return irPara(p, "embarque");
+    }
+
+    case "cancelar_agendamento": {
+      const ids = c.rascunho.agendCancelar ?? [];
+      const sim = /^(?:sim|s|1|confirmo|cancelar|cancela|pode)\b/.test(n);
+      const nao = /^(?:n|nao|manter|0|2)\b/.test(n);
+      const o = ids.length > 1 ? opcao(texto, ids.length) : null;
+      const alvo = ids.length === 1 ? (sim ? ids[0] : null) : o ? ids[o - 1] : null;
+      if (!alvo) {
+        if (nao || (ids.length > 1 && /^(?:n|nao|manter)\b/.test(n))) { c.rascunho = {}; c.etapa = "inicio"; return p.dizer("✅ Combinado, seu agendamento foi mantido."); }
+        return p.dizer(ids.length === 1 ? "Responda *1* para cancelar o agendamento ou *2* para manter." : `Responda com o número do agendamento (de 1 a ${ids.length}) ou *não* para manter todos.`);
+      }
+      c.rascunho = {}; c.etapa = "inicio";
+      try { await corridasDoBot().cancelar(p.empresaId, alvo); return p.dizer("✅ Agendamento cancelado."); }
+      catch (e) { console.error("[bot] cancelar agendamento", p.empresaId, e instanceof Error ? e.message : e); return p.dizer("📅 Esse agendamento não está mais ativo."); }
     }
 
     case "confirmar": {
@@ -503,6 +559,52 @@ async function mostrarCategorias(p: Passo): Promise<void> {
   p.dizer(titulo ? T.categorias(lista).replace(/^[^\n]*/, titulo) : T.categorias(lista));
 }
 
+/** "AAAA-MM-DDTHH:MM" no horário de Brasília (UTC-3 fixo), o formato que a corrida própria aceita. */
+export function horarioBrasilia(ms: number): string {
+  const d = new Date(ms - 3 * 3_600_000), p2 = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}T${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+}
+
+const LIMITE_AGENDADAS = 3;
+const agendadasDe = (p: Passo) => (corridasDoBot().agendadas ? corridasDoBot().agendadas!(p.empresaId, p.c.id) : Promise.resolve([]));
+
+/** Começa o agendamento: com data e hora no texto já agenda; sem, pergunta. */
+async function iniciarAgendamento(p: Passo, texto: string) {
+  const { c } = p;
+  if ((await agendadasDe(p)).length >= LIMITE_AGENDADAS) {
+    c.etapa = "inicio";
+    return p.dizer(`📅 Você já tem ${LIMITE_AGENDADAS} corridas agendadas (o limite). Mande *meus agendamentos* para ver, ou *cancelar agendamento* para liberar uma vaga.`);
+  }
+  const quando = parseScheduleWhen(texto, Date.now());
+  if (quando.ok) {
+    c.rascunho = { agendarPara: quando.whenMs };
+    p.dizer(`🗓️ Agendando para *${formatScheduleBR(quando.whenMs)}*.`);
+    return irPara(p, "embarque");
+  }
+  c.rascunho = {};
+  c.etapa = "agendamento";
+  p.dizer(quando.reason === "no_time"
+    ? `📅 Vamos agendar! Para quando você quer a corrida? Me diga o dia e a hora, por exemplo: *amanhã 7h*, *sexta 18:30* ou *05/10 14h*.\n\n(Mínimo ${SCHEDULE_MIN_MINUTES} minutos de antecedência e até ${SCHEDULE_MAX_DAYS} dias à frente.)`
+    : scheduleErrorText(quando));
+}
+
+async function listarAgendamentos(p: Passo) {
+  const lista = await agendadasDe(p);
+  if (!lista.length) return p.dizer("📅 Você não tem corridas agendadas. Para agendar, é só mandar *agendar*.");
+  const linhas = lista.map((x, i) => `${i + 1}. *${formatScheduleBR(x.quandoMs)}*\n   📍 ${x.embarque}${x.destino ? `\n   🏁 ${x.destino}` : ""}`);
+  p.dizer(`📅 *Suas corridas agendadas:*\n\n${linhas.join("\n\n")}\n\nPara cancelar, mande *cancelar agendamento*.`);
+}
+
+async function iniciarCancelamento(p: Passo) {
+  const lista = await agendadasDe(p);
+  if (!lista.length) return p.dizer("📅 Você não tem corridas agendadas para cancelar.");
+  p.c.rascunho = { agendCancelar: lista.map((x) => x.id) };
+  p.c.etapa = "cancelar_agendamento";
+  p.dizer(lista.length === 1
+    ? `⚠️ Deseja cancelar sua corrida agendada para *${formatScheduleBR(lista[0].quandoMs)}*?\n*1* - Sim, cancelar ✅\n*2* - Não, manter 🚕`
+    : `📅 Qual agendamento você quer cancelar? Responda com o número:\n\n${lista.map((x, i) => `${i + 1} - ${formatScheduleBR(x.quandoMs)}`).join("\n")}\n\n(ou *não* para manter todos)`);
+}
+
 async function criar(p: Passo): Promise<void> {
   const { c, empresaId } = p;
   const rasc = c.rascunho;
@@ -514,8 +616,14 @@ async function criar(p: Passo): Promise<void> {
     const nova = await corridasDoBot().criar(empresaId, {
       passageiro: { nome: c.nome, telefone: c.id }, embarque: rasc.embarque,
       destino: rasc.semDestino ? undefined : rasc.destino, categoria: rasc.categoria?.nome ?? "",
-      pagamento: rasc.pagamento, observacao: "Pedido pelo WhatsApp",
+      pagamento: rasc.pagamento, observacao: "Pedido pelo WhatsApp", agendadaPara: rasc.agendarPara ? horarioBrasilia(rasc.agendarPara) : undefined,
     });
+    if (rasc.agendarPara) {
+      // Corrida agendada não prende a conversa: a pessoa pode pedir outra para agora. Os avisos saem 15 e 5 minutos antes.
+      guardarEndereco(c, rasc.embarque);
+      c.etapa = "inicio"; c.rascunho = {};
+      return p.dizer(T.agendada(nova.os, formatScheduleBR(rasc.agendarPara), nova.valor));
+    }
     c.corrida = { id: nova.id, os: nova.os, status: "procurando", grupo: "aberta", criadaEm: agora(), valor: nova.valor };
     guardarEndereco(c, rasc.embarque);
     c.etapa = "em_corrida";
@@ -527,6 +635,7 @@ async function criar(p: Passo): Promise<void> {
     console.error("[bot] criar corrida", empresaId, msg);
     if (/em aberto/i.test(msg)) { c.etapa = "inicio"; c.rascunho = {}; return p.dizer(T.jaTemAberta(msg.replace(/^Este passageiro já tem/, "Você já tem"))); }
     if (/bloqueado/i.test(msg)) { c.etapa = "menu"; c.rascunho = {}; return p.dizer(T.bloqueado(p.m)); }
+    if (/antecedência|no máximo 30 dias/i.test(msg) && rasc.agendarPara) { c.etapa = "agendamento"; c.rascunho = {}; return p.dizer(scheduleErrorText({ ok: false, reason: "too_soon" })); }
     c.etapa = p.cfg.fluxo.ask_payment ? "pagamento" : "menu";
     p.dizer(p.txt("ride_error", T.erroCriar()));
   }
