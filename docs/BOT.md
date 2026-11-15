@@ -127,4 +127,10 @@ Testes: `test/bot-fluxo-avancado.test.ts` e `test/bot-regras-*.test.ts`.
 - **Provedores:** Evolution, Z-API, Z-Pro e Meta atrás de `ProvedorWhatsApp` (`provedores.ts`, `provedores-api.ts`), mais o simulado. Meta: cadastre no painel da Meta o endereço e a senha de verificação mostrados na conexão; com o App Secret salvo, avisos sem assinatura são recusados; mensagens com mais de 10 min são ignoradas.
 - **Áudio:** `audio.ts` baixa o áudio pelo provedor e transcreve com Groq ou OpenAI (`GROQ_API_KEYS`, `OPENAI_API_KEY`, da empresa ou da plataforma). Sem chave, o bot pede para escrever. No Testar conversa dá para simular um áudio digitando o que foi falado.
 - **Regras de endereço copiadas do mobveloov:** embarque vago ("estou em casa"), rua sem número (pede e junta o número), pedido urgente, link de mapa, coordenadas coladas, endereços salvos (usados 2 vezes ou mais) e fim do suporte.
-- **Falta:** sugestões por apelido, agendamento, repasse de mídia entre motorista e passageiro, cidades ativas, voz do bot.
+- **Sugestões de endereço:** aba no Bot (`sugestoes-cadastro.ts`, rotas `/api/bot/sugestoes`). O apelido vira o ponto cadastrado no embarque e no destino.
+- **Agendamento:** menu 1 pedir, 2 agendar, 3 suporte (desligável em Ajustes). Frases como "amanhã 7h" ou "me pega na Rua X às 10:45"; "meus agendamentos" e "cancelar agendamento". Avisos 15 e 5 min antes (`status.ts`).
+- **Cidade ativa:** `cidades.ts`, uma cidade atendida por conexão.
+- **Voz:** `voz.ts` (Gemini, OpenAI de reserva), `voz-texto.ts` e `voz-gemini.ts` copiados do mobveloov. Só para quem mandou áudio.
+- **Repasse:** `repasse.ts`. Com o motorista a caminho, o que o passageiro manda vai ao chat da corrida; o que o motorista manda no chat sai pelo WhatsApp.
+- **Descadastro:** `descadastro.ts` liga PARAR/SAIR/NÃO QUERO MAIS ao opt-out do CRM (regras de `crm/optout.ts`).
+- **Falta:** foto e vídeo entre motorista e passageiro (o chat da corrida só tem texto e áudio).
