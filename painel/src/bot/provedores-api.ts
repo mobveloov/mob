@@ -84,6 +84,8 @@ export function provedorZapi(d: DadosZapi, tipo: "zapi" | "zpro" = "zapi"): Prov
 
   return {
     tipo,
+    /** Não dá para conferir o número neste provedor: o totem segue sem checar. */
+    async existeNoWhatsApp() { return null; },
     async enviarTexto(telefone, texto) { await chamar("POST", "/send-text", { phone: soDigitos(telefone), message: texto }); },
     async enviarImagem(telefone, url, legenda) { await chamar("POST", "/send-image", { phone: soDigitos(telefone), image: url, caption: legenda }); },
     async conectar(webhookUrl) {
@@ -180,6 +182,7 @@ export function provedorMeta(d: DadosMeta): ProvedorWhatsApp {
   }
   return {
     tipo: "meta",
+    async existeNoWhatsApp() { return null; },
     enviarTexto: (telefone, texto) => enviar({ to: soDigitos(telefone), type: "text", text: { body: texto } }),
     enviarImagem: (telefone, url, legenda) => enviar({ to: soDigitos(telefone), type: "image", image: { link: url, caption: legenda } }),
     async conectar() {
