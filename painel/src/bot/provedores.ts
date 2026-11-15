@@ -1,13 +1,16 @@
 // Provedores de WhatsApp. O bot só conhece a interface ProvedorWhatsApp.
 // - Evolution API: instância da PRÓPRIA empresa (URL e token dela, nos segredos da empresa). Nunca compartilhada.
+// - Z-API e Z-Pro: instância + token (e token de cliente, se houver). Mesmo formato de envio.
+// - Meta (WhatsApp Cloud API): token, phone id e WABA id; sem QR, o webhook é cadastrado no painel da Meta.
 // - Simulado: guarda as mensagens enviadas na memória. Para testes e para a tela "Testar conversa".
 
-import type { Recebida, SituacaoConexao } from "./tipos.ts";
+import crypto from "node:crypto";
+import type { AudioRecebido, Recebida, SituacaoConexao, TipoProvedor } from "./tipos.ts";
 
 export interface Conexao { situacao: SituacaoConexao; qr?: string; codigo?: string; detalhe?: string }
 
 export interface ProvedorWhatsApp {
-  readonly tipo: "evolution" | "simulado";
+  readonly tipo: TipoProvedor;
   enviarTexto(telefone: string, texto: string): Promise<void>;
   /** Imagem de saudação (endereço https público) com legenda opcional. */
   enviarImagem(telefone: string, url: string, legenda: string): Promise<void>;
@@ -19,6 +22,8 @@ export interface ProvedorWhatsApp {
   existeNoWhatsApp(telefone: string): Promise<boolean | null>;
   /** Traduz o corpo do webhook do provedor em mensagens recebidas (ignora as enviadas pelo próprio número). */
   lerWebhook(corpo: unknown): Recebida[];
+  /** Baixa o arquivo de um áudio recebido (para transcrever). null quando não dá. */
+  baixarAudio?(a: AudioRecebido): Promise<{ bytes: Buffer; mimetype: string } | null>;
 }
 
 export const soDigitos = (t: unknown) => String(t ?? "").replace(/\D/g, "");
@@ -66,6 +71,7 @@ ${legenda}` : ""}`, em: new Date().toISOString() });
         telefone, nome: c.nome ? String(c.nome).slice(0, 60) : undefined,
         texto: c.texto != null ? String(c.texto).slice(0, 1000) : undefined,
         daCentral: c.daCentral === true,
+        audio: typeof c.transcricao === "string" && c.transcricao.trim() ? { mimetype: "audio/ogg", transcricao: c.transcricao.trim().slice(0, 1000) } : undefined,
         local: local && Number.isFinite(Number(local.lat)) && Number.isFinite(Number(local.lng))
           ? { lat: Number(local.lat), lng: Number(local.lng), texto: String(local.texto ?? "") } : undefined,
       }];
@@ -167,7 +173,8 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
         const m = (item ?? {}) as {
           key?: { remoteJid?: string; fromMe?: boolean; id?: string }; pushName?: string;
           message?: { conversation?: string; extendedTextMessage?: { text?: string };
-            locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string; address?: string } };
+            locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string; address?: string };
+            audioMessage?: { mimetype?: string; url?: string }; base64?: string };
         };
         const jid = m.key?.remoteJid ?? "";
         if (!jid || !jid.endsWith("@s.whatsapp.net")) continue; // ignora grupos (@g.us), status e transmissões
@@ -176,14 +183,23 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
         const texto = m.message?.conversation ?? m.message?.extendedTextMessage?.text;
         // As próprias mensagens do número só interessam se forem comandos da central (#bloquear, #pausar...).
         if (daCentral && !String(texto ?? "").trim().startsWith("#")) continue;
+        const au = m.message?.audioMessage;
+        const idMsg = String(m.key?.id ?? `${jid}-${Date.now()}`);
         out.push({
-          id: String(m.key?.id ?? `${jid}-${Date.now()}`), telefone: soDigitos(jid.split("@")[0]), nome: daCentral ? undefined : m.pushName?.slice(0, 60),
+          id: idMsg, telefone: soDigitos(jid.split("@")[0]), nome: daCentral ? undefined : m.pushName?.slice(0, 60),
+          audio: au ? { id: idMsg, base64: m.message?.base64, mimetype: au.mimetype ?? "audio/ogg" } : undefined,
           texto: texto ? texto.slice(0, 1000) : undefined, daCentral: daCentral || undefined,
           local: loc && Number.isFinite(loc.degreesLatitude) && Number.isFinite(loc.degreesLongitude)
             ? { lat: loc.degreesLatitude!, lng: loc.degreesLongitude!, texto: [loc.name, loc.address].filter(Boolean).join(" - ") } : undefined,
         });
       }
-      return out.filter((r) => r.texto || r.local);
+      return out.filter((r) => r.texto || r.local || r.audio);
+    },
+    async baixarAudio(a) {
+      if (a.base64) return { bytes: Buffer.from(a.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: a.mimetype };
+      if (!a.id) return null;
+      const j = await chamar<{ base64?: string; mimetype?: string }>("POST", `/chat/getBase64FromMediaMessage/${inst}`, { message: { key: { id: a.id } }, convertToMp4: false });
+      return j.base64 ? { bytes: Buffer.from(j.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: j.mimetype ?? a.mimetype } : null;
     },
   };
 }

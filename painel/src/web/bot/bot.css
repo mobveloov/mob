@@ -22,3 +22,6 @@
 .bot-linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .form label.bot-check { flex-direction: row; align-items: center; gap: 8px; text-align: left; }
 .form label.bot-check input { width: auto; }
+.bot-conexao { border: 1px solid var(--borda); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+.bot-conexao-topo { padding: 10px 12px; }
+.bot-conexao-corpo { border-top: 1px solid var(--borda); padding: 12px; background: var(--fundo); }

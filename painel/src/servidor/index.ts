@@ -19,7 +19,7 @@ import { NOME_CARGO } from "../comum/cargos.ts";
 import { rotasCadastros } from "../cadastros/rotas.ts";
 import { rotasCorridasProprias } from "../corridas/rotas.ts";
 import { encerrarSemMotorista, listarProprias } from "../corridas/index.ts";
-import { rotasBot } from "../bot/rotas.ts";
+import { guardarCorpoCru, rotasBot } from "../bot/rotas.ts";
 import { rotasTotem } from "../totem/rotas.ts";
 import { router as rotasCrm } from "../crm/rotas.ts";
 import { rotasEnderecos } from "../enderecos/rotas.ts";
@@ -55,7 +55,7 @@ const app = express();
   if (p) app.set("trust proxy", /^\d+$/.test(p) ? Number(p) : p);
 }
 app.disable("x-powered-by");
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "1mb", verify: guardarCorpoCru }));
 app.use("/api", cabecalhosDaApi);
 
 /** Verificação de saúde (Docker, túnel, monitoramento): pública, sem dado nenhum e sem filtro de User-Agent. */

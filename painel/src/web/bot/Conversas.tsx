@@ -24,6 +24,7 @@ export function BotConversas() {
   const [erro, setErro] = useState<string | null>(null);
   const fim = useRef<HTMLDivElement>(null);
   const c = conv.dados?.conversa;
+  const varios = new Set((lista.dados?.conversas ?? []).map((x) => x.conexao)).size > 1;
 
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [c?.mensagens.length]);
 
@@ -59,7 +60,7 @@ export function BotConversas() {
                   <strong>{x.nome}</strong>
                   {x.naoLidas > 0 && <span className="bot-bolinha">{x.naoLidas}</span>}
                 </div>
-                <small>{ETAPA[x.etapa] ?? x.etapa}{x.corrida ? ` · corrida ${x.corrida.os}` : ""} · {hora(x.atualizadaEm)}</small>
+                <small>{ETAPA[x.etapa] ?? x.etapa}{x.corrida ? ` · corrida ${x.corrida.os}` : ""} · {hora(x.atualizadaEm)}{varios && x.conexao ? ` · ${x.conexao}` : ""}</small>
                 {x.ultima && <small>{x.ultima.texto.replaceAll("*", "")}</small>}
               </button>
             </li>
@@ -73,6 +74,7 @@ export function BotConversas() {
           <>
             <div className="bot-linha" style={{ marginBottom: 8 }}>
               <span className={`selo ${c.etapa === "suporte" ? "alerta" : c.corrida ? "info" : ""}`}>{ETAPA[c.etapa] ?? c.etapa}</span>
+              {varios && c.conexaoNome && <span className="selo">Número: {c.conexaoNome}</span>}
               {c.corrida && <span className="selo info">OS {c.corrida.os}: {c.corrida.status}</span>}
               {c.historico.length > 0 && <span className="selo">{c.historico.length} corrida(s) antes</span>}
               {c.bloqueado && <span className="selo ruim">Bloqueado</span>}

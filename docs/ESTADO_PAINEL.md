@@ -231,8 +231,11 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | SpinText `{a|b}` e variáveis `{{x}}` | Sim | Variáveis antigas `{x}` continuam valendo. |
 | Bot › Ajustes (fluxo, textos, saudação, respostas prontas, comandos, status) | Sim | Ver docs/BOT.md. |
 | Bot › Conversas: bloquear e pausar o bot | Sim | |
-| Bot › várias conexões, Z-API, Z-Pro, Meta, cidades, voz, áudio | Não | Falta. |
-| whatsapp-webhook (11 mil linhas: endereços aprendidos, casas, agendamento, repasse de mídia) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento e as regras acima. O resto falta. |
+| Bot › várias conexões por empresa (até 10, cada uma com instância e segredos próprios) | Sim | Tela "Conexões do Bot". O passageiro é respondido pelo número em que escreveu. |
+| Bot › provedores Z-API, Z-Pro, Meta e Evolution (modo simulado sem chaves) | Sim | Mesma interface. Meta confere assinatura e senha de verificação. Falta testar com contas reais. |
+| Bot › áudio do passageiro (transcrição) | Sim | Groq ou OpenAI, só com chave. Sem chave o bot pede para escrever. |
+| Bot › cidades ativas e voz do bot (resposta em áudio) | Não | Falta. |
+| whatsapp-webhook (11 mil linhas) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento, comandos da central, bloqueio e pausa. Novo: embarque vago, número da casa (pede e junta), pedido urgente, link de mapa e coordenadas, endereços salvos (mais usados), fim do suporte. Módulos copiados com os testes originais (`bot/embarque-vago`, `numero-casa`, `urgente`, `link-mapa`, `coordenadas`, `enderecos-frequentes`, `fim-suporte`, `sugestoes`). Falta: sugestões de endereço por apelido (precisa de cadastro), agendamento, repasse de mídia, cidades. |
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
 | Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
