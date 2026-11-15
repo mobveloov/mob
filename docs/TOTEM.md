@@ -188,5 +188,22 @@ Arquivos: `web/totem/Totem.tsx` (reescrito), `web/totem/Bloqueio.tsx` (novo).
 Diferenças em relação ao sistema de referência: a senha do totem fica só como hash (a tela não mostra a senha atual); o vínculo usa um
 identificador gerado no aparelho; versões do APK guardam só o endereço do arquivo.
 
-**Pendente:** jogos de recompensa (roleta e raspadinha) e a página pública de prêmios; "Preços por cidade" (trechos entre cidades, locais, noturno,
-domingo, feriado, pedágio); senha de fechamento nativa do app Android (exige build nativo e aparelho para testar); busca de endereço com sugestões no destino.
+## Terceira leva: preços por cidade, endereços e prêmios (14/11/2026)
+
+- **Preços por cidade** (Totens & Preços › Preços › Preços por cidade): três abas (dentro da cidade, locais, entre cidades), valor de dia, noite
+  (com janela), faixas extras de horário, domingo, feriado e pedágio (por passagem, ida e volta ×2). Feriados nacionais calculados; os da empresa
+  entram na lista. Hora de espera. Tarifa repetida é recusada (entre cidades vale nos dois sentidos). No totem, o destino digitado que cita um local
+  da tabela ou uma cidade da tabela (a partir da cidade do local) vai com o valor fixo do horário + pedágio; a tela de escolha da viagem mostra esse
+  preço (`POST .../cotacao`). Código: `src/totem/tarifas-cidade.ts`, teste `test/totem-tarifas-cidade.test.ts`.
+- **Sugestões de endereço no destino**: botões grandes embaixo do campo; o endereço escolhido leva o ponto no mapa (`GET .../enderecos?q=`, só com a chave do aparelho, com limite).
+- **Jogos de recompensa** (Totens & Preços › Jogos de recompensa): Roleta e Raspadinha. O passageiro recebe o link no WhatsApp da empresa e joga em
+  `/p/<empresa>/<token>`; o link aberto `/premios/<empresa>/<roleta|raspadinha>` pede o telefone (só passageiro ativo do cadastro) e manda o link do jogo
+  pelo WhatsApp (o link nunca volta na resposta). O sorteio é no servidor, uma jogada por convite; o prêmio vira um cupom do cadastro Cupons (uso único,
+  só para aquele telefone) e também sai pelo WhatsApp. Admin: prêmios e chances, cores e textos, "Enviar agora", convite para um telefone, copiar o link.
+  Código: `src/totem/premios-jogos.ts` (regras), `premios.ts` (convites, jogo, cupom), teste `test/totem-premios.test.ts`.
+- **Gancho para o CRM**: `definirGanchoPremio(fn)` em `premios.ts` recebe cada prêmio ganho. Quando a aba Recompensas do CRM entrar no main, ela registra a função
+  por essa interface, sem editar este módulo. Cartão fidelidade e pontos ficam com o CRM.
+
+**Pendente:** senha de fechamento nativa do app Android (a ponte do app guarda a senha em SharedPreferences; exige build nativo e aparelho para testar);
+envio automático dos convites por horário (os dias, horários e a regra `horarioVencido` já estão prontos; falta o agendador do CRM chamar `enviarAgora`);
+resposta do bot à pergunta de preço usando a tabela de Preços por cidade (área do Bot).

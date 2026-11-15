@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Copy, Loader2, MapPin, Plus, Save, Trash2, Car } from "lucide-react";
 import { Cartao, Titulo, useCarregar } from "../componentes/ui";
 import { apiCentral, type CategoriaLocal, type CategoriaTotem } from "./api";
+import PrecosCidade from "./PrecosCidade";
 
 interface FormCat { nome: string; descricao: string; taxaBase: string; porKm: string; porMin: string; minima: string; espera: string; ordem: string; ativa: boolean }
 const paraForm = (c: CategoriaLocal): FormCat => ({
@@ -25,6 +26,19 @@ function padrao(cats: CategoriaTotem[]): FormCat[] {
 }
 
 export default function PrecosTotem() {
+  const [sub, setSub] = useState<"categorias" | "cidades">("categorias");
+  return (
+    <>
+      <div className="abas" style={{ marginBottom: 14, width: "fit-content" }}>
+        <button className={sub === "categorias" ? "ativo" : ""} onClick={() => setSub("categorias")}>Categorias por totem</button>
+        <button className={sub === "cidades" ? "ativo" : ""} onClick={() => setSub("cidades")}>Preços por cidade</button>
+      </div>
+      {sub === "cidades" ? <PrecosCidade /> : <CategoriasPorTotem />}
+    </>
+  );
+}
+
+function CategoriasPorTotem() {
   const { dados, erro: erroLista, recarregar } = useCarregar(() => apiCentral.locais(), []);
   const [escolhido, setEscolhido] = useState<string | null>(null);
   const [forms, setForms] = useState<FormCat[]>([]);

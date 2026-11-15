@@ -3,13 +3,14 @@
 
 import { podeCargo } from "../../comum/cargos.ts";
 import { useState } from "react";
-import { Building2, Copy, DollarSign, ExternalLink, Lock, MapPin, Pencil, Plus, RefreshCw, Save, Smartphone, Trash2, Upload, X } from "lucide-react";
+import { Building2, Copy, Gift, DollarSign, ExternalLink, Lock, MapPin, Pencil, Plus, RefreshCw, Save, Smartphone, Trash2, Upload, X } from "lucide-react";
 import { useSessao } from "../App";
 import { Cartao, Gaveta, Titulo, useCarregar } from "../componentes/ui";
 import { apiCentral, urlArquivo, type LocalTotem } from "./api";
 import { Detalhe, Item } from "./SolicitarCorrida";
 import PrecosTotem from "./PrecosTotem";
 import ZapTotem from "./ZapTotem";
+import PremiosAdmin from "./PremiosAdmin";
 
 interface Form {
   id?: string; nome: string; slug: string; cidade: string; uf: string; texto: string; lat: string; lng: string; senha: string;
@@ -21,7 +22,7 @@ const doLocal = (l: LocalTotem): Form => ({
   senha: "", modoWhatsapp: l.modoWhatsapp, categorias: l.categorias, pagamentos: l.pagamentos, ativo: l.ativo,
 });
 const slugDe = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
-type Aba = "locais" | "precos";
+type Aba = "locais" | "precos" | "premios";
 
 /** Quadro de tamanho fixo (18:5), como no totem: a imagem preenche por dentro e as sobras ficam de fora. */
 const Previa = ({ src, alt }: { src: string; alt: string }) => (
@@ -40,9 +41,10 @@ export default function LocaisTotem() {
         <div className="abas" style={{ marginBottom: 14, width: "fit-content" }}>
           <button className={aba === "locais" ? "ativo" : ""} onClick={() => setAba("locais")}><MapPin size={14} /> Totens &amp; Locais</button>
           <button className={aba === "precos" ? "ativo" : ""} onClick={() => setAba("precos")}><DollarSign size={14} /> Preços</button>
+          <button className={aba === "premios" ? "ativo" : ""} onClick={() => setAba("premios")}><Gift size={14} /> Jogos de recompensa</button>
         </div>
       )}
-      {aba === "locais" || !admin ? <Locais admin={admin} empresaId={sessao.empresa.id} /> : <PrecosTotem />}
+      {aba === "locais" || !admin ? <Locais admin={admin} empresaId={sessao.empresa.id} /> : aba === "precos" ? <PrecosTotem /> : <PremiosAdmin />}
     </>
   );
 }

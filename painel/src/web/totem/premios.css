@@ -1,0 +1,32 @@
+/* Página pública dos Prêmios (/p/... e /premios/...): fundo escuro, coluna estreita, toque grande. */
+.pr { min-height: 100vh; background: #020617; color: #f1f5f9; padding: 32px 16px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+.pr * { box-sizing: border-box; }
+.pr-col { max-width: 448px; margin: 0 auto; }
+.pr-empresa { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; margin: 0 0 16px; }
+.pr-cartao { border: 1px solid #1e293b; background: #0f172a; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+.pr-centro { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.pr-cartao.pr-centro { align-items: center; }
+.pr-icone { align-self: center; }
+.pr-titulo { font-size: 26px; font-weight: 900; margin: 0; }
+.pr-titulo-pequeno { font-size: 18px; font-weight: 700; margin: 0; text-align: center; }
+.pr-maiusculo { text-transform: uppercase; }
+.pr-grande { font-size: 24px; font-weight: 900; margin: 0; }
+.pr-nome { font-size: 14px; font-weight: 700; margin: 0; }
+.pr-suave { color: #94a3b8; font-size: 14px; margin: 0; }
+.pr-mini { color: #64748b; font-size: 12px; margin: 0; }
+.pr-erro { color: #f87171; font-size: 14px; margin: 0; text-align: center; }
+.pr p { margin: 0; }
+.pr-campo { font: inherit; font-size: 18px; text-align: center; border: 1px solid #334155; background: #020617; color: inherit; border-radius: 12px; padding: 12px 16px; width: 100%; }
+.pr-botao { font: inherit; font-size: 18px; font-weight: 900; color: #020617; border: 0; border-radius: 12px; padding: 14px 16px; width: 100%; cursor: pointer; margin-top: 8px; }
+.pr-botao:disabled { opacity: .5; }
+.pr-cupom { font: inherit; font-family: ui-monospace, monospace; font-size: 20px; font-weight: 700; letter-spacing: .12em; display: inline-flex; align-items: center; gap: 8px; border: 2px dashed; background: none; border-radius: 12px; padding: 10px 20px; cursor: pointer; }
+.pr-resultado { margin-top: 12px; }
+.pr-gira { animation: pr-gira 1.2s linear infinite; }
+@keyframes pr-gira { to { transform: rotate(360deg); } }
+.pr-roleta { position: relative; width: 100%; max-width: 320px; margin: 4px auto 0; }
+.pr-roleta svg { width: 100%; display: block; filter: drop-shadow(0 10px 15px #0008); }
+.pr-ponteiro { position: absolute; left: 50%; top: 0; z-index: 2; transform: translate(-50%, -4px); width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 26px solid #D4A017; }
+.pr-raspa-fundo { border-radius: 24px; padding: 24px; width: 100%; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.pr-premio { position: relative; width: 100%; max-width: 320px; aspect-ratio: 2 / 1; overflow: hidden; border-radius: 16px; background: #fff; margin-top: 12px; }
+.pr-premio > p { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; font-size: 20px; font-weight: 900; color: #0f172a; }
+.pr-premio canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }

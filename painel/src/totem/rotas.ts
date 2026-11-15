@@ -17,7 +17,10 @@ import { listar } from "../cadastros/armazem.ts";
 import { cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
+import { buscarEndereco } from "../enderecos/index.ts";
 import * as A from "./apk.ts";
+import * as PR from "./premios.ts";
+import * as TC from "./tarifas-cidade.ts";
 import * as T from "./dados.ts";
 import { esquecerWhatsapp, instanciaDoTotem, provedorDoTotem, whatsappPronto } from "./whatsapp.ts";
 
@@ -134,6 +137,30 @@ function exigirChave(req: Request, res: Response, next: NextFunction) {
 // A instância do totem só envia: o webhook dela é aceito e ignorado (o bot não responde pelo número do totem).
 rotasTotem.post("/webhook/:empresa/:local", (_req, res) => { res.json({ ok: true, ignorado: true }); });
 
+// Prêmios (roleta e raspadinha): páginas públicas /p/<empresa>/<token> e /premios/<empresa>/<jogo>. Sem login; o jogo
+// só abre com o token do convite (40 letras e números) e o link aberto pede o telefone (com limite de tentativas).
+const baseDaRequisicao = (req: Request) => (process.env.PUBLICO_URL ?? "").trim().replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+const empresaDoPremio = (req: Request) => { const e = req.params.empresa; if (!D.idValido(e) || !D.empresa(e)?.ativa) throw Object.assign(new Error("Link inválido."), { status: 404 }); return e; };
+const podeAbrirPremio = limitador(20, 10 * 60_000);
+const premioPublico = (fn: (req: Request, e: string) => Promise<{ status: number; corpo: Record<string, unknown> }> | { status: number; corpo: Record<string, unknown> }) => async (req: Request, res: Response) => {
+  try { const r = await fn(req, empresaDoPremio(req)); res.status(r.status).json(r.corpo); } catch (e) {
+    const st = (e as { status?: number }).status ?? 400;
+    res.status(st).json({ erro: e instanceof Error ? e.message : "Erro." });
+  }
+};
+rotasTotem.post("/premios/publico/:empresa/info", premioPublico((req, e) => {
+  const i = PR.infoDoConvite(e, req.body?.token);
+  return i ? { status: 200, corpo: i } : { status: 404, corpo: { erro: "Convite não encontrado." } };
+}));
+rotasTotem.post("/premios/publico/:empresa/play", premioPublico((req, e) => PR.jogar(e, req.body?.token, baseDaRequisicao(req))));
+rotasTotem.post("/premios/publico/:empresa/abrir", premioPublico((req, e) => {
+  const kind = req.body?.kind;
+  if (!PR.ehJogo(kind)) return { status: 400, corpo: { erro: "Link inválido." } };
+  const tel = PR.soNumeros(req.body?.telefone);
+  if (!podeAbrirPremio(`${req.ip}|${e}`) || !podeAbrirPremio(`tel|${e}|${tel}`)) return { status: 429, corpo: { erro: "Muitas tentativas. Espere alguns minutos e tente de novo." } };
+  return PR.abrirPeloTelefone(e, kind, tel, baseDaRequisicao(req));
+}));
+
 const P = "/publico/:empresa/:local";
 const MSG_OUTRO_APARELHO = "Este link de Totem já está ativo em outro dispositivo físico. Para transferir este Totem de local, o Administrador deve liberar o dispositivo no Painel de Controle clicando em 'Limpar Dispositivo'.";
 const aparelhoValido = (v: unknown): v is string => typeof v === "string" && /^[\w.-]{8,80}$/.test(v);
@@ -178,6 +205,27 @@ rotasTotem.post(`${P}/whatsapp/existe`, exigirChave, ok(async (req, res) => {
   res.json({ existe });
 }));
 
+/** Sugestões de endereço para o destino (base de endereços e casas da empresa). Só com a chave do aparelho; com limite por local. */
+const podeBuscar = limitador(120, 10 * 60_000);
+rotasTotem.get(`${P}/enderecos`, exigirChave, ok((req, res) => {
+  const { empresaId, local: l } = req.totem!;
+  if (!podeBuscar(`${empresaId}|${l.id}`)) return res.status(429).json({ erro: "Muitas buscas seguidas. Espere um pouco." });
+  const q = String(req.query.q ?? "").slice(0, 200);
+  const r = q.trim().length >= 3 ? buscarEndereco(empresaId, q, 6) : { enderecos: [], aviso: null };
+  res.json({ enderecos: r.enderecos.map((e) => ({ texto: e.texto, lat: e.lat, lng: e.lng, exato: e.exato })), aviso: r.aviso });
+}));
+
+/** Preços das categorias para o destino digitado (valor fixo de cidade ou local, quando há). */
+rotasTotem.post(`${P}/cotacao`, exigirChave, ok((req, res) => {
+  const { empresaId, local: l } = req.totem!;
+  const destino = txt(req.body?.destino, 200);
+  const cats = categoriasDoLocal(empresaId, l).map((c) => {
+    const fixo = destino ? TC.valorFixoDoDestino(empresaId, { cidade: l.cidade, uf: l.uf, embarque: l.endereco.texto }, destino, c.nome) : null;
+    return fixo ? { ...c, preco: fixo.total, fixo: true, pedagio: fixo.pedagio } : { ...c, fixo: false, pedagio: 0 };
+  });
+  res.json({ categorias: cats });
+}));
+
 rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   const { empresaId, local: l } = req.totem!;
   const b = (req.body ?? {}) as Record<string, unknown>;
@@ -193,7 +241,7 @@ rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   const categoria = txt(b.categoria, 60);
   if (cats.length && !cats.some((c) => c.nome === categoria)) throw new Error("Escolha a categoria.");
   if (await whatsappPronto(empresaId, l) === false) return res.status(503).json({ erro: "Totem indisponível no momento. Procure a recepção." });
-  const preco = precoPrefixado(l, categoria, destino);
+  const preco = precoPrefixado(empresaId, l, categoria, destino);
   const c = await umaVez(chave, async () => {
     const nova = await criarCorridaPropria(empresaId, {
       passageiro: { nome: txt(b.nome, 80), telefone: String(b.telefone ?? "") },
@@ -208,7 +256,10 @@ rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   res.json({ corrida: { id: c.id, os: c.os, valor: c.estimativa.valor, categoria: c.categoria } });
 }));
 
-function precoPrefixado(l: T.Local, categoria: string, destino?: T.Ponto): number | null {
+function precoPrefixado(empresaId: string, l: T.Local, categoria: string, destino?: T.Ponto): number | null {
+  // Preços por cidade: destino em outra cidade ou num local com valor próprio vale o valor fixo (horário + pedágio).
+  const fixo = destino?.texto ? TC.valorFixoDoDestino(empresaId, { cidade: l.cidade, uf: l.uf, embarque: l.endereco.texto }, destino.texto, categoria) : null;
+  if (fixo) return fixo.total;
   const c = l.tabela.find((x) => x.ativa && x.nome === categoria);
   if (!c) return null;
   const km = destino ? distanciaEstimada(l.endereco, destino) : null;
@@ -306,6 +357,40 @@ const dono = exigirPapel();
 interno.get("/apk/versoes", dono, ok((_req, res) => { res.json({ versoes: A.listarVersoes() }); }));
 interno.post("/apk/versoes", dono, ok((req, res) => { res.json({ versao: A.publicarVersao(req.body ?? {}) }); }));
 interno.put("/apk/versoes/:id", dono, ok((req, res) => { res.json({ versao: A.ativarVersao(req.params.id, req.body?.ativa !== false) }); }));
+
+/** Preços por cidade (tarifas fixas por trecho, feriados da empresa e hora de espera). Só admin. */
+interno.get("/tarifas-cidade", admin, ok((req, res) => {
+  const d = TC.dados(emp(req));
+  res.json({ ...d, tarifas: d.tarifas.map((t) => ({ ...t, tipo: TC.tipoDaTarifa(t), titulo: TC.tituloDaTarifa(t), resumo: TC.resumoDaTarifa(t) })) });
+}));
+const tipoTarifa = (v: string) => { if (v !== "dentro" && v !== "local" && v !== "cidades") throw new Error("Tipo de tarifa inválido."); return v; };
+interno.post("/tarifas-cidade/:tipo", admin, ok((req, res) => { res.json({ tarifa: TC.salvarTarifa(emp(req), tipoTarifa(req.params.tipo), req.body ?? {}) }); }));
+interno.put("/tarifas-cidade/:tipo/:id", admin, ok((req, res) => { res.json({ tarifa: TC.salvarTarifa(emp(req), tipoTarifa(req.params.tipo), req.body ?? {}, req.params.id) }); }));
+interno.delete("/tarifas-cidade/:id", admin, ok((req, res) => { TC.removerTarifa(emp(req), req.params.id); res.json({ ok: true }); }));
+interno.post("/tarifas-cidade-feriados", admin, ok((req, res) => { res.json({ feriado: TC.adicionarFeriado(emp(req), String(req.body?.data ?? ""), String(req.body?.nome ?? "")) }); }));
+interno.delete("/tarifas-cidade-feriados/:id", admin, ok((req, res) => { TC.removerFeriado(emp(req), req.params.id); res.json({ ok: true }); }));
+interno.put("/tarifas-cidade-espera", admin, ok((req, res) => { TC.definirEspera(emp(req), req.body?.valor); res.json({ ok: true }); }));
+
+/** Prêmios (só admin): configuração das duas brincadeiras, números do dia, enviar agora e convite para um telefone. */
+interno.get("/premios", admin, ok((req, res) => { res.json({ jogos: PR.painelDosJogos(emp(req)), empresa: emp(req) }); }));
+interno.put("/premios/:kind", admin, ok((req, res) => {
+  if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
+  const cfg = PR.salvarConfigDoJogo(emp(req), req.params.kind, req.body?.config);
+  res.json({ ok: true, config: cfg });
+}));
+interno.post("/premios/:kind/enviar-agora", admin, ok(async (req, res) => {
+  if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
+  res.json({ ok: true, ...(await PR.enviarAgora(emp(req), req.params.kind, baseDaRequisicao(req))) });
+}));
+interno.post("/premios/:kind/convite", admin, ok(async (req, res) => {
+  if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
+  const tel = PR.soNumeros(req.body?.telefone);
+  if (tel.length < 10 || tel.length > 11) throw new Error("Digite o telefone com DDD.");
+  const { convite } = PR.convidar(emp(req), req.params.kind, tel, String(req.body?.nome ?? "").slice(0, 60), "manual");
+  const r = await PR.enviarLink(emp(req), baseDaRequisicao(req), convite);
+  if (!r.ok) throw new Error(`Não foi possível enviar: ${r.erro}`);
+  res.json({ ok: true, link: `${baseDaRequisicao(req)}/p/${emp(req)}/${convite.token}` });
+}));
 
 interno.post("/locais/:id/recarregar", admin, ok((req, res) => { res.json({ local: T.localPublico(T.recarregarLocal(emp(req), req.params.id)) }); }));
 
