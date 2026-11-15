@@ -12,6 +12,15 @@ export interface TarifaCidade {
   normal: number; noite: number | null; noiteInicio: string; noiteFim: string; domingo: number | null; feriado: number | null;
   faixas: Array<{ inicio: string; fim: string; valor: number }>; pedagio: number | null; pedagioIdaVolta: boolean; ativa: boolean; obs: string;
 }
+export interface PremioConfig { label: string; type: "percent" | "fixed" | "none"; value: number; chance: number; color?: string }
+export interface ConfigJogoPremio {
+  invites_enabled: boolean; public_open: boolean; title: string; message: string; button_text: string; card_headline: string; card_phrase: string; color: string;
+  prizes: PremioConfig[]; coupon_valid_days: number; schedule_enabled: boolean; days: number[]; send_time: string; times_per_day: number; every_n_days: number;
+}
+export interface JogoPremio {
+  kind: "roleta" | "raspadinha"; rotulo: string; saved: boolean; config: ConfigJogoPremio; odds: { coupon: number; nothing: number };
+  stats: { today: number; played_today: number; coupons_today: number; failed_today: number; total: number; played: number };
+}
 export interface ConexaoZap { situacao: "conectado" | "aguardando_qr" | "desconectado" | "nao_configurado" | "erro"; qr?: string; codigo?: string; detalhe?: string; modo?: string; instancia?: string | null }
 export interface VersaoApk { id: string; nome: string; codigo: number; url: string; tamanho: number | null; notas: string; ativa: boolean; criadaEm: string }
 export type Grupo = "aberta" | "finalizada" | "cancelada" | "nao_atendida";
@@ -104,6 +113,10 @@ export const apiCentral = {
   novoFeriadoCidade: (data: string, nome: string) => pedir("/api/totem/tarifas-cidade-feriados", post({ data, nome })),
   apagarFeriadoCidade: (id: string) => pedir(`/api/totem/tarifas-cidade-feriados/${id}`, { method: "DELETE" }),
   esperaCidade: (valor: string) => pedir("/api/totem/tarifas-cidade-espera", { method: "PUT", body: JSON.stringify({ valor }) }),
+  premios: () => pedir<{ jogos: JogoPremio[]; empresa: string }>("/api/totem/premios"),
+  salvarPremio: (kind: string, config: ConfigJogoPremio) => pedir(`/api/totem/premios/${kind}`, { method: "PUT", body: JSON.stringify({ config }) }),
+  enviarPremiosAgora: (kind: string) => pedir<{ enviados: number; falhas: number; criados: number }>(`/api/totem/premios/${kind}/enviar-agora`, post({})),
+  convidarPremio: (kind: string, telefone: string) => pedir<{ link: string }>(`/api/totem/premios/${kind}/convite`, post({ telefone })),
   apk: () => pedir<{ versao: VersaoApk | null }>("/api/totem/apk"),
   apkVersoes: () => pedir<{ versoes: VersaoApk[] }>("/api/totem/apk/versoes"),
   publicarApk: (d: Record<string, unknown>) => pedir<{ versao: VersaoApk }>("/api/totem/apk/versoes", post(d)),
