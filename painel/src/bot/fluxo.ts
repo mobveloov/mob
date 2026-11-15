@@ -17,6 +17,7 @@ import { parseCoordPaste } from "./coordenadas.ts";
 import { resolveMapLink } from "./link-mapa.ts";
 import { addressHasNumber, fixHouseNumberTypo, insertHouseNumber, looseHouseNumber, romanizeBairroNumber, sameStreetNumber } from "./numero-casa.ts";
 import { detectUrgentRide, URGENT_ASK_ADDRESS, URGENT_FLOW } from "./urgente.ts";
+import { localDaSugestao } from "./sugestoes-cadastro.ts";
 import { tratarDescadastro } from "./descadastro.ts";
 import { supportCloseDecision } from "./fim-suporte.ts";
 import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
@@ -195,7 +196,10 @@ function textoMenu(p: Passo): string {
 const VIA_RE = /^(rua|r\.?|avenida|av\.?|travessa|tv\.?|alameda|al\.?|estrada|rodovia|praca|praça|largo|viela)\s/i;
 
 /** Entende o endereço digitado: link de mapa, coordenadas coladas, "estou em casa", só número, rua sem número. */
-async function entenderLocal(texto: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean }> {
+async function entenderLocal(empresaId: string, texto: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean }> {
+  // Apelido cadastrado em Sugestões de Endereço ("espetinho do gui"): vai direto para o lugar cadastrado.
+  const sug = localDaSugestao(empresaId, texto, /\d/.test(texto) ? 80 : 30);
+  if (sug) return { local: sug };
   const mapa = await resolveMapLink(texto).catch(() => null);
   if (mapa?.kind === "point") return { local: { texto: mapa.name || "Localização do mapa", lat: mapa.lat, lng: mapa.lng } };
   if (mapa?.kind === "text") return { local: { texto: mapa.text } };
@@ -332,7 +336,7 @@ async function passo(p: Passo) {
         if (o === salvos.length + 1) { c.rascunho.salvos = undefined; return p.dizer(p.txt("ask_address", T.embarque())); }
       }
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; c.rascunho.salvos = undefined; return irPara(p, "destino"); }
-      const e = await entenderLocal(texto);
+      const e = await entenderLocal(p.empresaId, texto);
       if (e.recusa) return p.dizer(e.recusa);
       if (!e.local) return p.dizer(p.txt("address_retry", T.embarqueDeNovo()));
       c.rascunho.salvos = undefined;
@@ -346,7 +350,7 @@ async function passo(p: Passo) {
       const num = looseHouseNumber(fixHouseNumberTypo(texto)) ?? sameStreetNumber(base, texto);
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; return irPara(p, "destino"); }
       if (num) { c.rascunho.embarque = { texto: insertHouseNumber(base, num) }; return irPara(p, "destino"); }
-      const e = await entenderLocal(texto); // mandou outro endereço no lugar do número
+      const e = await entenderLocal(p.empresaId, texto); // mandou outro endereço no lugar do número
       if (e.local && !e.pedirNumero) { c.rascunho.embarque = e.local; return irPara(p, "destino"); }
       return p.dizer(T.pedirNumeroEmbarque(base));
     }
@@ -361,7 +365,7 @@ async function passo(p: Passo) {
       }
       if (localDe(r)) { c.rascunho.destino = localDe(r)!; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
       {
-        const e = await entenderLocal(texto);
+        const e = await entenderLocal(p.empresaId, texto);
         if (e.local) {
           c.rascunho.destino = e.local; c.rascunho.semDestino = false;
           if (e.pedirNumero) { c.etapa = "numero_destino"; return p.dizer(T.pedirNumeroDestino(e.local.texto)); }
@@ -376,7 +380,7 @@ async function passo(p: Passo) {
       if (/^(nao sei|n sei|sem numero|s n|nao tenho)(\s|$)/.test(n)) return irPara(p, "confirmar"); // o motorista combina o número
       const num = looseHouseNumber(fixHouseNumberTypo(texto)) ?? sameStreetNumber(base, texto);
       if (num) { c.rascunho.destino = { texto: insertHouseNumber(base, num) }; return irPara(p, "confirmar"); }
-      const e = await entenderLocal(texto);
+      const e = await entenderLocal(p.empresaId, texto);
       if (e.local && !e.pedirNumero) { c.rascunho.destino = e.local; return irPara(p, "confirmar"); }
       return p.dizer(T.pedirNumeroDestino(base));
     }

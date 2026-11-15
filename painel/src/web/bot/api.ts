@@ -50,7 +50,12 @@ async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
 }
 const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
+export interface SugestaoVista { id: string; nickname: string; address_text: string; lat: number | null; lng: number | null }
+
 export const apiBot = {
+  sugestoes: (busca = "") => pedir<{ total: number; resultados: SugestaoVista[] }>(`/api/bot/sugestoes?busca=${encodeURIComponent(busca)}`),
+  adicionarSugestao: (d: { nickname: string; address: string }) => pedir<{ ok: true; total: number }>("/api/bot/sugestoes", json("POST", d)),
+  excluirSugestao: (id: string) => pedir<{ ok: true; total: number }>(`/api/bot/sugestoes/${encodeURIComponent(id)}`, { method: "DELETE" }),
   config: () => pedir<RespostaConfig>("/api/bot/config"),
   salvarAvancada: (d: Partial<ConfigAvancada>) => pedir<{ ok: true }>("/api/bot/config/avancada", json("PUT", d)),
   salvar: (d: Partial<Pick<ConfigBot, "ativo" | "provedor" | "instancia">> & { urlApi?: string; token?: string }) => pedir<{ ok: true }>("/api/bot/config", json("PUT", d)),

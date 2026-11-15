@@ -8,6 +8,7 @@ import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
+import * as S from "./sugestoes-cadastro.ts";
 import { controlarConversa, encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
 import crypto from "node:crypto";
 import { caixaSimulada, soDigitos } from "./provedores.ts";
@@ -227,6 +228,21 @@ rotasBot.post("/conexoes/:id/desconectar", admin, ok(async (req, res) => {
 rotasBot.get("/situacao", ok(async (req, res) => { res.json(await provedorDe(ctx(req).empresaId).situacao()); }));
 rotasBot.post("/conectar", admin, ok(async (req, res) => { const id = ctx(req).empresaId; res.json(await provedorDe(id).conectar(urlWebhook(req, id))); }));
 rotasBot.post("/desconectar", admin, ok(async (req, res) => { await provedorDe(ctx(req).empresaId).desconectar(); res.json({ ok: true }); }));
+
+// ------------------------------------------------------------------ sugestões de endereço (apelidos)
+
+rotasBot.get("/sugestoes", ok((req, res) => {
+  const id = ctx(req).empresaId;
+  res.json({ total: S.contarSugestoes(id), resultados: S.buscarSugestoes(id, String(req.query.busca ?? "")) });
+}));
+rotasBot.post("/sugestoes", admin, ok((req, res) => {
+  const s = S.adicionarSugestao(ctx(req).empresaId, (req.body ?? {}) as Record<string, unknown>);
+  res.json({ ok: true, sugestao: s, total: S.contarSugestoes(ctx(req).empresaId) });
+}));
+rotasBot.delete("/sugestoes/:id", admin, ok((req, res) => {
+  S.excluirSugestao(ctx(req).empresaId, String(req.params.id));
+  res.json({ ok: true, total: S.contarSugestoes(ctx(req).empresaId) });
+}));
 
 // ------------------------------------------------------------------ conversas
 
