@@ -224,9 +224,13 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | CRM › Comunicação › Descadastros | Sim | A resposta "NÃO QUERO MAIS" no WhatsApp ainda não descadastra sozinha (as regras de texto estão prontas em `crm/optout.ts`). |
 | CRM › Comunicação › Notificações, Histórico de Disparos | Não | Falta. |
 | CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
-| CRM › Público › Comportamentos, Contatos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
-| CRM › Análises (RFM, Conversão, Mapa de Calor), Recompensas | Não | Falta. |
-| CRM › Configurações › Cidades, Governança, Auditoria | Não | Falta. A aba Machine foi retirada de propósito. |
+| CRM › Público › Comportamentos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
+| CRM › Público › Contatos | Sim | Base 360° no banco (etapa, tags, opt-out, CSV, linha do tempo, LGPD). Sem id de push da Machine; "Atualizar Métricas" lê o cadastro e as corridas do painel. |
+| CRM › Análises › RFM | Sim | "Criar segmento" grava uma lista fixa (o público do CRM usa listas de pessoas). |
+| CRM › Análises › Conversão | Sim | Conta as corridas do painel; a janela de atribuição fica na Governança (a aba Machine saiu). |
+| CRM › Análises › Mapa de Calor | Sim | Usa as corridas próprias, que têm coordenada. |
+| CRM › Recompensas | Sim | Cupons do cadastro de Cupons (sem gerador/área da Machine; "cidade" no lugar da área). Cartão fidelidade/roleta não existem no painel. |
+| CRM › Configurações › Cidades, Governança, Auditoria | Sim | Janela de horário e opt-in da Governança valem na fila (só depois que a empresa salva). Auditoria anota campanhas, jornadas, templates e segmentos. A aba Machine foi retirada de propósito. |
 | CRM › Emojis nas mensagens | Sim | |
 | SpinText `{a|b}` e variáveis `{{x}}` | Sim | Variáveis antigas `{x}` continuam valendo. |
 | Bot › Ajustes (fluxo, textos, saudação, respostas prontas, comandos, status) | Sim | Ver docs/BOT.md. |

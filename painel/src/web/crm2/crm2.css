@@ -1,0 +1,28 @@
+/* Abas de análise do CRM (Contatos, RFM, Conversão, Mapa de Calor, Recompensas, Cidades, Governança, Auditoria).
+   Usa só as cores do tema do painel. */
+.linha-contato { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--borda); }
+.linha-contato:last-child { border-bottom: 0; }
+.linha-contato:hover { background: var(--primaria-suave); }
+.topo-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+button.kpi { font: inherit; text-align: left; cursor: pointer; }
+button.kpi:hover { border-color: var(--primaria); }
+button.kpi span { order: 2; }
+.girar { animation: crm2-girar 1s linear infinite; }
+@keyframes crm2-girar { to { transform: rotate(360deg); } }
+.crm2-rfm { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.crm2-rfm .cartao { margin: 0; }
+.crm2-bolinha { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.crm2-mapa { height: 420px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--borda); }
+.crm2-legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--suave); }
+.crm2-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.crm2-mapa-grade { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 14px; }
+@media (max-width: 900px) { .crm2-mapa-grade { grid-template-columns: 1fr; } }
+.crm2-resumo { display: flex; justify-content: space-between; align-items: center; background: var(--campo); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.crm2-resumo strong { font-size: 20px; }
+.crm2-consentimento { height: 12px; border-radius: 99px; background: var(--borda); overflow: hidden; margin: 8px 0; }
+.crm2-consentimento span { display: block; height: 100%; background: var(--ok); }
+.crm2-auditoria { border: 1px solid var(--borda); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; background: var(--cartao); }
+.crm2-auditoria > button { width: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; text-align: left; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0; }
+.crm2-diff { font-family: ui-monospace, monospace; font-size: 12px; color: var(--suave); margin: 4px 0 0; }
+.crm2-diff del { color: var(--ruim); } .crm2-diff ins { color: var(--ok); text-decoration: none; }
+.crm2-codigo { font-family: ui-monospace, monospace; font-weight: 700; background: var(--campo); border-radius: 6px; padding: 2px 8px; }
