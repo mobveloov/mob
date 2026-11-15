@@ -26,7 +26,7 @@ const { cadastroPorId } = await import("../src/comum/cadastros.ts");
 const express = (await import("express")).default;
 
 const empresa = D.criarEmpresa("Central Avancada", { nomeExibido: "Central Avancada", assistente: { nome: "Lia", tom: "cordial" } });
-const base = { ativo: true, provedor: "simulado" as const, instancia: "bot-avancada" };
+const base = { ativo: true, provedor: "simulado" as const, instancia: "bot-avancada", agendar: false };
 A.salvarConfig(empresa.id, base);
 const cad = (id: string) => cadastroPorId(id)!;
 criar(empresa.id, cad("categorias"), { nome: "Econômico", bandeirada: 5, valorKm: 2, valorMinimo: 9, ativa: true }, "teste");
@@ -37,7 +37,7 @@ let seq = 0;
 const semIa = async () => null;
 const msg = (telefone: string, texto: string, extra: Record<string, unknown> = {}) =>
   receber(empresa.id, { id: `a${++seq}`, telefone, nome: "Maria Silva", texto, ...extra }, { classificar: semIa });
-const mudar = (avancada: Record<string, unknown>) => A.salvarConfig(empresa.id, { ...base, ...A.sanearAvancada({ ...A.config(empresa.id), ...avancada }) });
+const mudar = (avancada: Record<string, unknown>) => A.salvarConfig(empresa.id, { ...base, ...A.sanearAvancada({ ...A.config(empresa.id), ...avancada }), agendar: false });
 
 test("textos editáveis: a empresa troca o texto; vazio volta ao padrão; chave desconhecida some", async () => {
   mudar({ textos: { ask_address: "📍 Manda o embarque aí!", address_retry: "Não deu. Manda de novo.", inventada: "x", welcome_menu: "  Fala, tudo bem?  " } });

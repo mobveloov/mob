@@ -15,17 +15,17 @@ const PROVEDORES: Array<{ valor: TipoProvedor; nome: string }> = [
   { valor: "meta", nome: "Meta Cloud API" }, { valor: "simulado", nome: "Simulado (teste, nada sai de verdade)" },
 ];
 
-interface Form { nome: string; provedor: TipoProvedor; instancia: string; proprio: boolean; urlApi: string; token: string; clientToken: string; phoneId: string; wabaId: string; appSecret: string }
+interface Form { nome: string; provedor: TipoProvedor; instancia: string; proprio: boolean; urlApi: string; token: string; clientToken: string; phoneId: string; wabaId: string; appSecret: string; cidade: string }
 
 const formDe = (c?: ConexaoVista): Form => ({
   nome: c?.nome ?? "", provedor: c?.provedor ?? "evolution", instancia: c?.instancia ?? "",
   proprio: c ? !c.servidor.daPlataforma || c.provedor !== "evolution" : false, urlApi: c?.servidor.urlApi ?? "", token: "", clientToken: "",
-  phoneId: c?.servidor.phoneId ?? "", wabaId: c?.servidor.wabaId ?? "", appSecret: "",
+  phoneId: c?.servidor.phoneId ?? "", wabaId: c?.servidor.wabaId ?? "", appSecret: "", cidade: c?.cidade ?? "",
 });
 
 /** Só o que a pessoa preencheu: segredo vazio mantém o que já está salvo. */
 function dadosDe(f: Form, principal: boolean): DadosConexao {
-  const d: DadosConexao = { provedor: f.provedor };
+  const d: DadosConexao = { provedor: f.provedor, cidade: f.cidade };
   if (!principal) d.nome = f.nome;
   if (f.provedor === "evolution") {
     d.urlApi = f.proprio ? f.urlApi : "";
@@ -38,7 +38,7 @@ function dadosDe(f: Form, principal: boolean): DadosConexao {
   return d;
 }
 
-function Campos({ f, set, c, admin, principal }: { f: Form; set: (f: Form) => void; c?: ConexaoVista; admin: boolean; principal: boolean }) {
+function Campos({ f, set, c, admin, principal, cidades }: { f: Form; set: (f: Form) => void; c?: ConexaoVista; admin: boolean; principal: boolean; cidades: Array<{ codigo: string; nome: string; uf: string }> }) {
   const s = c?.servidor;
   return (
     <>
@@ -91,13 +91,20 @@ function Campos({ f, set, c, admin, principal }: { f: Form; set: (f: Form) => vo
           </label>
         </>
       )}
+      <label>Cidade ativa deste número
+        <select value={f.cidade} disabled={!admin} onChange={(e) => set({ ...f, cidade: e.target.value })}>
+          <option value="">Nenhuma (o passageiro informa a cidade)</option>
+          {cidades.map((x) => <option key={x.codigo} value={x.codigo}>{x.nome} - {x.uf}</option>)}
+        </select>
+      </label>
+      {cidades.length === 0 && <p className="sub">As cidades vêm de Endereços › cidades da empresa.</p>}
       {f.provedor === "simulado" && <p className="sub">Nada sai pelo WhatsApp. Use a aba Testar conversa para conversar como passageiro.</p>}
     </>
   );
 }
 
-function CartaoConexao({ c, admin, aberto, onAbrir, onMudou, onMsg }: {
-  c: ConexaoVista; admin: boolean; aberto: boolean; onAbrir: () => void; onMudou: () => void; onMsg: (m: { texto: string; erro?: boolean }) => void;
+function CartaoConexao({ c, cidades, admin, aberto, onAbrir, onMudou, onMsg }: {
+  c: ConexaoVista; cidades: Array<{ codigo: string; nome: string; uf: string }>; admin: boolean; aberto: boolean; onAbrir: () => void; onMudou: () => void; onMsg: (m: { texto: string; erro?: boolean }) => void;
 }) {
   const [conexao, setConexao] = useState<Conexao | null>(null);
   const [f, setF] = useState<Form>(() => formDe(c));
@@ -124,7 +131,7 @@ function CartaoConexao({ c, admin, aberto, onAbrir, onMudou, onMsg }: {
           <strong>{c.nome}</strong>{" "}
           <span className="selo">{NOME_PROVEDOR[c.provedor]}</span>{" "}
           {s && <span className={`selo ${s.tom}`}>{s.texto}</span>}{" "}
-          {!c.ativa && <span className="selo">DESLIGADA</span>}
+          {!c.ativa && <span className="selo">DESLIGADA</span>}{c.cidade && <span className="selo">{cidades.find((x) => x.codigo === c.cidade)?.nome ?? "Cidade"}</span>}
           {atual?.detalhe && <small className="sub" style={{ display: "block" }}>{atual.detalhe}</small>}
         </div>
         {admin && (
@@ -154,7 +161,7 @@ function CartaoConexao({ c, admin, aberto, onAbrir, onMudou, onMsg }: {
       {aberto && (
         <div className="bot-conexao-corpo">
           <form className="form" onSubmit={(e) => { e.preventDefault(); salvar(); }}>
-            <Campos f={f} set={setF} c={c} admin={admin} principal={c.principal} />
+            <Campos f={f} set={setF} c={c} admin={admin} principal={c.principal} cidades={cidades} />
             {!c.principal && admin && (
               <label className="bot-check"><input type="checkbox" checked={c.ativa} onChange={(e) => tentar(async () => { await apiBot.salvarConexao(c.id, { ativa: e.target.checked }); onMudou(); })} /> Conexão ligada (responde os passageiros)</label>
             )}
@@ -217,14 +224,14 @@ export function BotConexao() {
         </div>
         {noLimite && <div className="aviso">Limite de {d!.maximo} conexões por empresa atingido.</div>}
         {d?.conexoes.map((c) => (
-          <CartaoConexao key={c.id} c={c} admin={admin} aberto={aberto === c.id} onAbrir={() => setAberto(aberto === c.id ? null : c.id)} onMudou={lista.recarregar} onMsg={setMsg} />
+          <CartaoConexao key={c.id} c={c} cidades={d.cidades} admin={admin} aberto={aberto === c.id} onAbrir={() => setAberto(aberto === c.id ? null : c.id)} onMudou={lista.recarregar} onMsg={setMsg} />
         ))}
         {d && d.conexoes.length === 1 && <p className="sub">Nenhuma conexão extra cadastrada. Conecte outro número para atender por mais de um WhatsApp.</p>}
       </Cartao>
 
       <Gaveta aberta={criando} onFechar={() => setCriando(false)} titulo="Conectar Novo Número do Bot">
         <form className="form" onSubmit={(e) => { e.preventDefault(); criar(); }}>
-          <Campos f={novo} set={setNovo} admin principal={false} />
+          <Campos f={novo} set={setNovo} admin principal={false} cidades={d?.cidades ?? []} />
           <p className="sub">As corridas nascem no próprio painel (Corridas, canal WhatsApp), com as categorias e tarifas do cadastro.</p>
           <button className="botao primario" disabled={ocupado || !novo.nome.trim()}><Plus size={14} /> Criar Conexão</button>
         </form>

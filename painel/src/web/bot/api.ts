@@ -7,6 +7,8 @@ export interface ConfigAvancada {
   faq: Array<{ question: string; keywords: string[]; answer: string }>;
   controle: { blockWord: string; unblockWord: string; pauseWord: string; resumeWord: string; pauseMinutes: number };
   textosStatus: Record<string, string>;
+  voz: { ligada: boolean; nome: string };
+  agendar: boolean;
 }
 export type TipoProvedor = "evolution" | "zapi" | "zpro" | "meta" | "simulado";
 export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: TipoProvedor; instancia: string }
@@ -14,11 +16,11 @@ export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: Ti
 export interface ConexaoVista {
   id: string; nome: string; ativa: boolean; provedor: TipoProvedor; principal: boolean; instancia: string;
   servidor: { daPlataforma: boolean; plataformaPronta: boolean; urlApi: string; tokenSalvo: boolean; clientTokenSalvo: boolean; appSecretSalvo: boolean; phoneId: string; wabaId: string };
-  webhook: string | null; senhaVerificacao: string | null;
+  webhook: string | null; senhaVerificacao: string | null; cidade: string;
 }
 export interface DadosConexao {
   nome?: string; ativa?: boolean; provedor?: TipoProvedor; instancia?: string; urlApi?: string; token?: string; clientToken?: string;
-  phoneId?: string; wabaId?: string; appSecret?: string;
+  phoneId?: string; wabaId?: string; appSecret?: string; cidade?: string;
 }
 export interface RespostaConfig {
   config: ConfigBot; webhook: string | null;
@@ -50,11 +52,16 @@ async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> {
 }
 const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
+export interface SugestaoVista { id: string; nickname: string; address_text: string; lat: number | null; lng: number | null }
+
 export const apiBot = {
+  sugestoes: (busca = "") => pedir<{ total: number; resultados: SugestaoVista[] }>(`/api/bot/sugestoes?busca=${encodeURIComponent(busca)}`),
+  adicionarSugestao: (d: { nickname: string; address: string }) => pedir<{ ok: true; total: number }>("/api/bot/sugestoes", json("POST", d)),
+  excluirSugestao: (id: string) => pedir<{ ok: true; total: number }>(`/api/bot/sugestoes/${encodeURIComponent(id)}`, { method: "DELETE" }),
   config: () => pedir<RespostaConfig>("/api/bot/config"),
   salvarAvancada: (d: Partial<ConfigAvancada>) => pedir<{ ok: true }>("/api/bot/config/avancada", json("PUT", d)),
   salvar: (d: Partial<Pick<ConfigBot, "ativo" | "provedor" | "instancia">> & { urlApi?: string; token?: string }) => pedir<{ ok: true }>("/api/bot/config", json("PUT", d)),
-  conexoes: () => pedir<{ ativo: boolean; conexoes: ConexaoVista[]; maximo: number }>("/api/bot/conexoes"),
+  conexoes: () => pedir<{ ativo: boolean; conexoes: ConexaoVista[]; maximo: number; cidades: Array<{ codigo: string; nome: string; uf: string }> }>("/api/bot/conexoes"),
   criarConexao: (d: DadosConexao) => pedir<{ ok: true; conexao: ConexaoVista }>("/api/bot/conexoes", json("POST", d)),
   salvarConexao: (id: string, d: DadosConexao & { ativo?: boolean }) => pedir<{ ok: true; conexao: ConexaoVista }>(`/api/bot/conexoes/${encodeURIComponent(id)}`, json("PUT", d)),
   removerConexao: (id: string) => pedir<{ ok: true }>(`/api/bot/conexoes/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -75,7 +82,7 @@ export const apiBot = {
 };
 
 export const ETAPA: Record<string, string> = {
-  inicio: "Início", menu: "Menu", embarque: "Embarque", numero_embarque: "Número do embarque", destino: "Destino", numero_destino: "Número do destino", confirmar: "Confirmação", categoria: "Categoria",
+  inicio: "Início", menu: "Menu", embarque: "Embarque", numero_embarque: "Número do embarque", destino: "Destino", numero_destino: "Número do destino", agendamento: "Data e hora do agendamento", cancelar_agendamento: "Cancelando agendamento", confirmar: "Confirmação", categoria: "Categoria",
   pagamento: "Pagamento", criando: "Criando corrida", em_corrida: "Em corrida", avaliacao: "Avaliação", suporte: "Suporte (operador)",
 };
 

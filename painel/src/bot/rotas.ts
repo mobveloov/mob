@@ -8,6 +8,9 @@ import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
+import { cidadePorCodigo } from "./cidades.ts";
+import { cidadesAtendidas } from "../enderecos/index.ts";
+import * as S from "./sugestoes-cadastro.ts";
 import { controlarConversa, encerrarAtendimento, marcarLida, provedorDe, receber, responderOperador, servidorWhatsApp } from "./fluxo.ts";
 import crypto from "node:crypto";
 import { caixaSimulada, soDigitos } from "./provedores.ts";
@@ -99,6 +102,7 @@ function visaoConexao(req: Request, empresaId: string, cx: ConexaoBot, ehAdmin: 
       phoneId: s.phoneId ?? "", wabaId: s.wabaId ?? "",
     },
     webhook: ehAdmin ? urlWebhook(req, empresaId, cx.id) : null,
+    cidade: A.cidadeDaConexao(empresaId, cx.id) ?? "",
     senhaVerificacao: ehAdmin && cx.provedor === "meta" ? s.verifyToken ?? null : null,
   };
 }
@@ -138,6 +142,10 @@ function gravarConexao(empresaId: string, id: string, b: Record<string, unknown>
     nova = A.salvarConexao(empresaId, { id, nome, ativa, provedor, instancia });
   }
   A.salvarSegredosBot(empresaId, s, id);
+  if (typeof b.cidade === "string") {
+    if (b.cidade && !cidadePorCodigo(empresaId, b.cidade)) throw new Error("Escolha uma cidade atendida (Endereços › cidades da empresa).");
+    A.definirCidade(empresaId, id, b.cidade);
+  }
   return nova;
 }
 
@@ -170,7 +178,7 @@ rotasBot.put("/config/avancada", admin, ok((req, res) => {
   const id = ctx(req).empresaId;
   const b = (req.body ?? {}) as Partial<ConfigBot>;
   const atual = A.config(id);
-  const nova = A.sanearAvancada({ ...atual, ...Object.fromEntries(Object.entries(b).filter(([k]) => ["fluxo", "textos", "saudacao", "faq", "controle", "textosStatus"].includes(k))) });
+  const nova = A.sanearAvancada({ ...atual, ...Object.fromEntries(Object.entries(b).filter(([k]) => ["fluxo", "textos", "saudacao", "faq", "controle", "textosStatus", "voz", "agendar"].includes(k))) });
   A.salvarConfig(id, { ativo: atual.ativo, provedor: atual.provedor, instancia: atual.instancia, ...nova });
   res.json({ ok: true, config: { ...A.config(id) } });
 }));
@@ -180,7 +188,7 @@ rotasBot.put("/config/avancada", admin, ok((req, res) => {
 rotasBot.get("/conexoes", ok((req, res) => {
   const id = ctx(req).empresaId;
   const ehAdmin = podeCargo(ctx(req).usuario.papel, "admin");
-  res.json({ ativo: A.config(id).ativo, conexoes: A.conexoesDe(id).map((cx) => visaoConexao(req, id, cx, ehAdmin)), maximo: A.MAX_CONEXOES });
+  res.json({ ativo: A.config(id).ativo, conexoes: A.conexoesDe(id).map((cx) => visaoConexao(req, id, cx, ehAdmin)), maximo: A.MAX_CONEXOES, cidades: cidadesAtendidas(id) });
 }));
 
 rotasBot.post("/conexoes", admin, ok((req, res) => {
@@ -227,6 +235,21 @@ rotasBot.post("/conexoes/:id/desconectar", admin, ok(async (req, res) => {
 rotasBot.get("/situacao", ok(async (req, res) => { res.json(await provedorDe(ctx(req).empresaId).situacao()); }));
 rotasBot.post("/conectar", admin, ok(async (req, res) => { const id = ctx(req).empresaId; res.json(await provedorDe(id).conectar(urlWebhook(req, id))); }));
 rotasBot.post("/desconectar", admin, ok(async (req, res) => { await provedorDe(ctx(req).empresaId).desconectar(); res.json({ ok: true }); }));
+
+// ------------------------------------------------------------------ sugestões de endereço (apelidos)
+
+rotasBot.get("/sugestoes", ok((req, res) => {
+  const id = ctx(req).empresaId;
+  res.json({ total: S.contarSugestoes(id), resultados: S.buscarSugestoes(id, String(req.query.busca ?? "")) });
+}));
+rotasBot.post("/sugestoes", admin, ok((req, res) => {
+  const s = S.adicionarSugestao(ctx(req).empresaId, (req.body ?? {}) as Record<string, unknown>);
+  res.json({ ok: true, sugestao: s, total: S.contarSugestoes(ctx(req).empresaId) });
+}));
+rotasBot.delete("/sugestoes/:id", admin, ok((req, res) => {
+  S.excluirSugestao(ctx(req).empresaId, String(req.params.id));
+  res.json({ ok: true, total: S.contarSugestoes(ctx(req).empresaId) });
+}));
 
 // ------------------------------------------------------------------ conversas
 

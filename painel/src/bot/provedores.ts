@@ -9,6 +9,9 @@ import type { AudioRecebido, Recebida, SituacaoConexao, TipoProvedor } from "./t
 
 export interface Conexao { situacao: SituacaoConexao; qr?: string; codigo?: string; detalhe?: string }
 
+/** Arquivo para enviar ao passageiro (voz do bot, mídia do motorista). */
+export interface MidiaSaida { tipo: "audio" | "image" | "video" | "document"; bytes: Buffer; mimetype: string; legenda?: string; nome?: string }
+
 export interface ProvedorWhatsApp {
   readonly tipo: TipoProvedor;
   enviarTexto(telefone: string, texto: string): Promise<void>;
@@ -22,6 +25,8 @@ export interface ProvedorWhatsApp {
   existeNoWhatsApp(telefone: string): Promise<boolean | null>;
   /** Traduz o corpo do webhook do provedor em mensagens recebidas (ignora as enviadas pelo próprio número). */
   lerWebhook(corpo: unknown): Recebida[];
+  /** Envia um arquivo (áudio, imagem, vídeo, documento). Sem este método o provedor só manda texto. */
+  enviarMidia?(telefone: string, m: MidiaSaida): Promise<void>;
   /** Baixa o arquivo de um áudio recebido (para transcrever). null quando não dá. */
   baixarAudio?(a: AudioRecebido): Promise<{ bytes: Buffer; mimetype: string } | null>;
 }
@@ -54,6 +59,13 @@ export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
       const l = caixas.get(empresaId) ?? [];
       l.push({ telefone: soDigitos(telefone), texto: `🖼️ ${url}${legenda ? `
 ${legenda}` : ""}`, em: new Date().toISOString() });
+      caixas.set(empresaId, l.slice(-500));
+    },
+    async enviarMidia(telefone, m) {
+      const l = caixas.get(empresaId) ?? [];
+      const icone = { audio: "🎤", image: "🖼️", video: "🎬", document: "📎" }[m.tipo];
+      l.push({ telefone: soDigitos(telefone), texto: `${icone} ${m.tipo} (${m.mimetype}, ${m.bytes.length} bytes)${m.legenda ? `
+${m.legenda}` : ""}`, em: new Date().toISOString() });
       caixas.set(empresaId, l.slice(-500));
     },
     async conectar() { return { situacao: "conectado", qr: QR_SIMULADO, detalhe: "Modo simulado: nenhuma mensagem sai de verdade." }; },
@@ -135,6 +147,13 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
     tipo: "evolution",
     async enviarTexto(telefone, texto) {
       await chamar("POST", `/message/sendText/${inst}`, { number: soDigitos(telefone), text: texto });
+    },
+    async enviarMidia(telefone, m) {
+      const base64 = m.bytes.toString("base64");
+      if (m.tipo === "audio") { await chamar("POST", `/message/sendWhatsAppAudio/${inst}`, { number: soDigitos(telefone), audio: base64 }); return; }
+      await chamar("POST", `/message/sendMedia/${inst}`, {
+        number: soDigitos(telefone), mediatype: m.tipo, mimetype: m.mimetype, media: base64, caption: m.legenda ?? "", fileName: m.nome ?? `arquivo.${m.mimetype.split("/")[1] ?? "bin"}`,
+      });
     },
     async enviarImagem(telefone, url, legenda) {
       await chamar("POST", `/message/sendMedia/${inst}`, { number: soDigitos(telefone), mediatype: "image", media: url, caption: legenda });

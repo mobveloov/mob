@@ -11,6 +11,7 @@ import { banco, migrarUmaVez } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import { normalizeBotControl } from "./controle.ts";
 import { normalizeBotTexts, normalizeFaq, normalizeGreeting } from "./textos-editaveis.ts";
+import { limparVoz, VOZ_PADRAO } from "./voz.ts";
 import { normalizeStatusMessages } from "./mensagens-status.ts";
 import { FLUXO_PADRAO, ID_PRINCIPAL, TIPOS_PROVEDOR, type ConexaoBot, type ConfigBot, type Conversa, type FluxoBot, type TipoProvedor } from "./tipos.ts";
 
@@ -37,19 +38,19 @@ function gravar(arq: string, valor: unknown) {
 export const instanciaPadrao = (empresaId: string) => `bot-${empresaId}`;
 
 export function configPadrao(empresaId: string): ConfigBot {
-  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId), conexoes: [], ...avancadaPadrao() };
+  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId), conexoes: [], cidades: {}, ...avancadaPadrao() };
 }
 
 const avancadaPadrao = () => ({
-  fluxo: { ...FLUXO_PADRAO }, textos: {}, saudacao: normalizeGreeting(null), faq: [], controle: normalizeBotControl(null), textosStatus: {},
+  fluxo: { ...FLUXO_PADRAO }, textos: {}, saudacao: normalizeGreeting(null), faq: [], controle: normalizeBotControl(null), textosStatus: {}, voz: { ligada: false, nome: VOZ_PADRAO }, agendar: true,
 });
 
 /** Confere as configurações avançadas (fluxo, textos, saudação, respostas prontas, comandos, status). */
-export function sanearAvancada(c: Partial<ConfigBot>): Pick<ConfigBot, "fluxo" | "textos" | "saudacao" | "faq" | "controle" | "textosStatus"> {
+export function sanearAvancada(c: Partial<ConfigBot>): Pick<ConfigBot, "fluxo" | "textos" | "saudacao" | "faq" | "controle" | "textosStatus" | "voz" | "agendar"> {
   const f = (c.fluxo ?? {}) as Partial<FluxoBot>;
   const fluxo = { ...FLUXO_PADRAO };
   for (const k of Object.keys(FLUXO_PADRAO) as Array<keyof FluxoBot>) if (typeof f[k] === "boolean") fluxo[k] = f[k]!;
-  return { fluxo, textos: normalizeBotTexts(c.textos), saudacao: normalizeGreeting(c.saudacao), faq: normalizeFaq(c.faq), controle: normalizeBotControl(c.controle), textosStatus: normalizeStatusMessages(c.textosStatus) };
+  return { fluxo, textos: normalizeBotTexts(c.textos), saudacao: normalizeGreeting(c.saudacao), faq: normalizeFaq(c.faq), controle: normalizeBotControl(c.controle), textosStatus: normalizeStatusMessages(c.textosStatus), voz: { ligada: c.voz?.ligada === true, nome: limparVoz(c.voz?.nome) }, agendar: c.agendar !== false };
 }
 
 export function config(empresaId: string): ConfigBot {
@@ -60,6 +61,7 @@ export function config(empresaId: string): ConfigBot {
     provedor: TIPOS_PROVEDOR.includes(c.provedor as TipoProvedor) ? (c.provedor as TipoProvedor) : "simulado",
     instancia: typeof c.instancia === "string" && c.instancia ? c.instancia : p.instancia,
     conexoes: sanearConexoes(c.conexoes),
+    cidades: Object.fromEntries(Object.entries(c.cidades && typeof c.cidades === "object" ? c.cidades : {}).filter(([k, v]) => typeof v === "string" && /^\d{4,8}$/.test(v) && (k === ID_PRINCIPAL || /^[a-z0-9-]{2,24}$/.test(k)))),
     ...sanearAvancada(c),
   };
 }
@@ -119,7 +121,8 @@ export function removerConexao(empresaId: string, id: string) {
   if (id === ID_PRINCIPAL) throw new Error("A conexão principal não pode ser removida.");
   const c = config(empresaId);
   if (!c.conexoes.some((x) => x.id === id)) throw new Error("Conexão não encontrada.");
-  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, conexoes: c.conexoes.filter((x) => x.id !== id) });
+  const { [id]: _c, ...cidades } = c.cidades;
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, conexoes: c.conexoes.filter((x) => x.id !== id), cidades });
   const s = D.segredos(empresaId);
   const { [`${CHAVE_SEGREDOS}-${id}`]: _fora, ...resto } = s.integracoes;
   D.salvarSegredos(empresaId, { ...s, integracoes: resto });
@@ -249,3 +252,13 @@ export async function aguardarFilas() {
 
 /** Empresas com o bot ligado. */
 export const empresasComBot = () => D.listarEmpresas().filter((e) => e.ativa && config(e.id).ativo).map((e) => e.id);
+
+/** Cidade ativa de uma conexão (código do município) ou null. */
+export const cidadeDaConexao = (empresaId: string, conexaoId: string = ID_PRINCIPAL): string | null => config(empresaId).cidades[conexaoId] ?? null;
+
+export function definirCidade(empresaId: string, conexaoId: string, codigo: string) {
+  const c = config(empresaId);
+  const cidades = { ...c.cidades };
+  if (codigo) cidades[conexaoId] = codigo; else delete cidades[conexaoId];
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, cidades });
+}

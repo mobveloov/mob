@@ -18,12 +18,15 @@ const primeiroNome = (nome: string) => (/^\d+$/.test(nome) ? "" : nome.trim().sp
 /** Formas de pagamento (o nome vai igual para a corrida própria). */
 export const PAGAMENTOS: string[] = ["Dinheiro", "Pix", "Cartão na maquininha"];
 
+/** Opções do menu (com "Agendar" quando o agendamento está ligado). */
+export const opcoesMenu = (agendar: boolean) => (agendar ? "\n*1* - Pedir uma corrida\n*2* - Agendar uma corrida\n*3* - Falar com o suporte" : "\n*1* - Pedir uma corrida\n*2* - Falar com o suporte");
+
 export const T = {
-  menu: (m: Marcador, nome: string) => {
+  menu: (m: Marcador, nome: string, agendar = false) => {
     const n = primeiroNome(nome);
-    return `Olá${n ? `, ${n}` : ""}! Aqui é ${m.assistente}, da ${m.empresa}. 👋\n\nComo posso ajudar?\n*1* - Pedir uma corrida\n*2* - Falar com o suporte`;
+    return `Olá${n ? `, ${n}` : ""}! Aqui é ${m.assistente}, da ${m.empresa}. 👋\n\nComo posso ajudar?${opcoesMenu(agendar)}`;
   },
-  menuDeNovo: () => "Não entendi. Responda *1* para pedir uma corrida ou *2* para falar com o suporte.",
+  menuDeNovo: (agendar = false) => (agendar ? "Não entendi. Responda *1* para pedir uma corrida, *2* para agendar ou *3* para falar com o suporte." : "Não entendi. Responda *1* para pedir uma corrida ou *2* para falar com o suporte."),
   embarque: () => "Onde você está? Envie o *endereço de embarque* (rua e número) ou a sua *localização* pelo clipe 📎.",
   embarqueCorrecao: () => "🔄 Sem problema! Qual é o *endereço* correto de embarque? Envie o endereço ou a localização 📎.",
   embarqueDeNovo: () => "Preciso do endereço de embarque. Exemplo: *Rua das Flores, 120*. Ou envie a localização 📎.",
@@ -48,6 +51,9 @@ export const T = {
   pedirNumeroDestino: (rua: string) => `🎯 Anotei o destino *${rua.slice(0, 80)}*.\n\n🏢 Qual é o NÚMERO do destino? (só o número, ex.: 120)\nSe não souber, mande *não sei* que o motorista combina com você.`,
   salvos: (lista: string[], intro = "📍 Encontrei seus endereços salvos. Qual é o endereço de embarque?") =>
     `${intro}\n${lista.map((l, i) => `*${i + 1}* - ${l}`).join("\n")}\n*${lista.length + 1}* - Outro endereço 📝`,
+  agendada: (os: string, quando: string, valor?: number) =>
+    `✅ Corrida agendada para *${quando}*! Número *${os}*.${valor ? ` Valor estimado: *${reais(valor)}*.` : ""}\nVou avisar aqui 15 e 5 minutos antes. Para ver ou cancelar, mande *meus agendamentos*.`,
+  repassado: () => "✅ Pronto! O que você escrever ou gravar por aqui chega ao motorista. Para cancelar a corrida, envie *cancelar*.",
   audioFalhou: () => "Não consegui entender esse áudio agora. Pode enviar novamente ou escrever sua mensagem?",
   erroCriar: () => "Não consegui criar a corrida agora. 😕 Responda a forma de pagamento para tentar de novo, ou *menu* para recomeçar.",
   jaTemAberta: (motivo: string) => `${motivo} Para falar com um atendente, envie *menu* e escolha *2*.`,

@@ -5,14 +5,15 @@ import { Titulo } from "../componentes/ui";
 import { BotAjustes } from "./Ajustes";
 import { BotConexao } from "./Conexao";
 import { BotConversas } from "./Conversas";
+import { BotSugestoes } from "./Sugestoes";
 import { BotTestar } from "./Testar";
 import "./bot.css";
 
-export { BotAjustes, BotConexao, BotConversas, BotTestar };
+export { BotAjustes, BotConexao, BotConversas, BotSugestoes, BotTestar };
 
-type Aba = "conversas" | "conexao" | "ajustes" | "testar";
+type Aba = "conversas" | "conexao" | "ajustes" | "sugestoes" | "testar";
 const ABAS: Array<{ id: Aba; nome: string }> = [
-  { id: "conversas", nome: "Conversas" }, { id: "conexao", nome: "Conexão do número" }, { id: "ajustes", nome: "Ajustes do bot" }, { id: "testar", nome: "Testar conversa" },
+  { id: "conversas", nome: "Conversas" }, { id: "conexao", nome: "Conexão do número" }, { id: "ajustes", nome: "Ajustes do bot" }, { id: "sugestoes", nome: "Sugestões de endereço" }, { id: "testar", nome: "Testar conversa" },
 ];
 
 export default function BotWhatsApp() {
@@ -27,6 +28,7 @@ export default function BotWhatsApp() {
       {aba === "conversas" && <BotConversas />}
       {aba === "conexao" && <BotConexao />}
       {aba === "ajustes" && <BotAjustes />}
+      {aba === "sugestoes" && <BotSugestoes />}
       {aba === "testar" && <BotTestar />}
     </>
   );

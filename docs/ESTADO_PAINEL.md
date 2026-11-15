@@ -238,8 +238,13 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | Bot › várias conexões por empresa (até 10, cada uma com instância e segredos próprios) | Sim | Tela "Conexões do Bot". O passageiro é respondido pelo número em que escreveu. |
 | Bot › provedores Z-API, Z-Pro, Meta e Evolution (modo simulado sem chaves) | Sim | Mesma interface. Meta confere assinatura e senha de verificação. Falta testar com contas reais. |
 | Bot › áudio do passageiro (transcrição) | Sim | Groq ou OpenAI, só com chave. Sem chave o bot pede para escrever. |
-| Bot › cidades ativas e voz do bot (resposta em áudio) | Não | Falta. |
-| whatsapp-webhook (11 mil linhas) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento, comandos da central, bloqueio e pausa. Novo: embarque vago, número da casa (pede e junta), pedido urgente, link de mapa e coordenadas, endereços salvos (mais usados), fim do suporte. Módulos copiados com os testes originais (`bot/embarque-vago`, `numero-casa`, `urgente`, `link-mapa`, `coordenadas`, `enderecos-frequentes`, `fim-suporte`, `sugestoes`). Falta: sugestões de endereço por apelido (precisa de cadastro), agendamento, repasse de mídia, cidades. |
+| Bot › cidades ativas | Sim | Cada número escolhe uma cidade atendida; o endereço sai com ", Cidade - UF" se o passageiro não citou outra. |
+| Bot › voz do bot (resposta em áudio) | Sim | Só quando o passageiro manda áudio, com chave Gemini ou OpenAI; sem chave, só texto. Ligar em Ajustes do bot. |
+| Bot › Sugestões de Endereço (apelidos) | Sim | Aba nova no Bot; cadastro por apelido com ponto do Google Maps ou endereço; vale no embarque e no destino. |
+| Bot › agendamento (menu, "amanhã 7h", lista, cancelar, avisos 15 e 5 min) | Sim | A corrida nasce agendada no painel e não prende a conversa. Até 3 por passageiro, 15 min a 7 dias. |
+| Bot › repasse passageiro e motorista | Sim | Passageiro: texto, áudio e localização vão ao chat da corrida. Motorista: texto e áudio do chat vão ao WhatsApp. Foto e vídeo não (o chat da corrida só tem texto e áudio). |
+| Bot › descadastro por resposta (PARAR, SAIR, NÃO QUERO MAIS) | Sim | Grava o opt-out no CRM (Contatos) e confirma ao passageiro. |
+| whatsapp-webhook (11 mil linhas) | Quase | Fluxo completo e as regras dos módulos copiados com os testes originais. Ficaram de fora só pontos sem equivalente no painel: casas (CNEFE) escolhidas por lista de ruas, preço por cidade e pesquisa de preferências da corrida. |
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
 | Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
