@@ -17,6 +17,7 @@ import { parseCoordPaste } from "./coordenadas.ts";
 import { resolveMapLink } from "./link-mapa.ts";
 import { addressHasNumber, fixHouseNumberTypo, insertHouseNumber, looseHouseNumber, romanizeBairroNumber, sameStreetNumber } from "./numero-casa.ts";
 import { detectUrgentRide, URGENT_ASK_ADDRESS, URGENT_FLOW } from "./urgente.ts";
+import { tratarDescadastro } from "./descadastro.ts";
 import { supportCloseDecision } from "./fim-suporte.ts";
 import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
 import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
@@ -123,6 +124,17 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
     c.mensagens.push({ de: "passageiro", texto: texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
   }
   c.naoLidas++;
+
+  // "PARAR", "SAIR", "NÃO QUERO MAIS": descadastra do WhatsApp do CRM (só confirma; o pedido de corrida segue como estava).
+  if (texto && !r.local) {
+    const conf = tratarDescadastro(empresaId, c, texto);
+    if (conf) {
+      c.mensagens.push({ de: "bot", texto: conf, em: agora() });
+      A.salvarConversa(empresaId, c);
+      await enviar(empresaId, provedor, c.id, [conf]);
+      return [conf];
+    }
+  }
 
   // Bloqueado pela central ou com o bot pausado: o bot fica quieto (a conversa continua no painel para a equipe).
   if (botSilencedFor({ blocked: c.bloqueado, paused_until: c.pausadoAte ?? null })) {

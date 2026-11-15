@@ -98,6 +98,13 @@ export function provedorZapi(d: DadosZapi, tipo: "zapi" | "zpro" = "zapi"): Prov
     },
     situacao,
     async desconectar() { await chamar("GET", "/disconnect"); },
+    async existeNoWhatsApp(telefone) {
+      try {
+        const n = soDigitos(telefone);
+        const r = await chamar<{ exists?: boolean }>("GET", `/phone-exists/${n.length <= 11 ? `55${n}` : n}`);
+        return typeof r.exists === "boolean" ? r.exists : null;
+      } catch { return null; }
+    },
     lerWebhook: lerWebhookZapi,
     async baixarAudio(a) { return a.url ? baixarUrl(a.url, a.mimetype, f) : null; },
   };
@@ -189,6 +196,7 @@ export function provedorMeta(d: DadosMeta): ProvedorWhatsApp {
     },
     situacao,
     async desconectar() { /* a Meta não tem "sair": remova o webhook no painel da Meta */ },
+    async existeNoWhatsApp() { return null; }, // a Meta não consulta número sem enviar
     lerWebhook: (corpo) => lerWebhookMeta(corpo, d.phoneId),
     async baixarAudio(a) {
       if (!a.id || !configurado) return null;
