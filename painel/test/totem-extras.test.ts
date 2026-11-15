@@ -213,11 +213,12 @@ test("cálculo do preço do local: base + km + minutos, nunca abaixo da mínima,
 });
 
 test("sugestões de endereço do destino: só com a chave; sem texto curto não busca; devolve lista (vazia sem base de endereços)", async () => {
-  const e = await pedir(`${TP}/entrar`, { corpo: { senha: "1234" } });
+  // (usa a chave do primeiro teste: a senha tem limite de tentativas)
   assert.equal((await pedir(`${TP}/enderecos?q=rua`)).status, 401);
-  const curto = await pedir(`${TP}/enderecos?q=ru`, { chave: e.corpo.chave });
+  const curto = await pedir(`${TP}/enderecos?q=ru`, { chave: chave });
+  assert.equal(curto.status, 200, curto.texto);
   assert.deepEqual(curto.corpo.enderecos, []);
-  const r = await pedir(`${TP}/enderecos?q=${encodeURIComponent("Rua das Flores 10")}`, { chave: e.corpo.chave });
+  const r = await pedir(`${TP}/enderecos?q=${encodeURIComponent("Rua das Flores 10")}`, { chave: chave });
   assert.equal(r.status, 200, r.texto);
   assert.ok(Array.isArray(r.corpo.enderecos));
 });
