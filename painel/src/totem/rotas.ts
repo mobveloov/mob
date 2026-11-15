@@ -17,6 +17,7 @@ import { listar } from "../cadastros/armazem.ts";
 import { cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
+import { buscarEndereco } from "../enderecos/index.ts";
 import * as A from "./apk.ts";
 import * as TC from "./tarifas-cidade.ts";
 import * as T from "./dados.ts";
@@ -177,6 +178,16 @@ rotasTotem.post(`${P}/whatsapp/existe`, exigirChave, ok(async (req, res) => {
   let existe: boolean | null = null;
   try { existe = await Promise.race([provedorDoTotem(empresaId, l).existeNoWhatsApp(tel), new Promise<null>((r) => setTimeout(() => r(null), 6000))]); } catch { existe = null; }
   res.json({ existe });
+}));
+
+/** Sugestões de endereço para o destino (base de endereços e casas da empresa). Só com a chave do aparelho; com limite por local. */
+const podeBuscar = limitador(120, 10 * 60_000);
+rotasTotem.get(`${P}/enderecos`, exigirChave, ok((req, res) => {
+  const { empresaId, local: l } = req.totem!;
+  if (!podeBuscar(`${empresaId}|${l.id}`)) return res.status(429).json({ erro: "Muitas buscas seguidas. Espere um pouco." });
+  const q = String(req.query.q ?? "").slice(0, 200);
+  const r = q.trim().length >= 3 ? buscarEndereco(empresaId, q, 6) : { enderecos: [], aviso: null };
+  res.json({ enderecos: r.enderecos.map((e) => ({ texto: e.texto, lat: e.lat, lng: e.lng, exato: e.exato })), aviso: r.aviso });
 }));
 
 /** Preços das categorias para o destino digitado (valor fixo de cidade ou local, quando há). */

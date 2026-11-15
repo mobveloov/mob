@@ -13,7 +13,7 @@ import "./totem.css";
 
 type Passo = "carregando" | "senha" | "inicio" | "categoria" | "acompanhar" | "indisponivel" | "nao-existe" | "outro-aparelho" | "sem-whatsapp";
 interface Config { local: { id: string; nome: string; endereco: string; pagamentos: string[]; versao: number; logo: string; rodape: string; whatsappPronto: boolean | null }; categorias: CategoriaTotem[] }
-interface Pedido { destino: string; semDestino: boolean; categoria: string; pagamento: string; nome: string; telefone: string }
+interface Pedido { destino: string; destinoPonto?: { lat: number; lng: number }; semDestino: boolean; categoria: string; pagamento: string; nome: string; telefone: string }
 const PEDIDO_VAZIO: Pedido = { destino: "", semDestino: false, categoria: "", pagamento: "", nome: "", telefone: "" };
 
 const INATIVO_MS = 90_000;
@@ -175,7 +175,7 @@ export default function Totem(props: { empresa?: string; local?: string }) {
     setEnviando(true); setErro(null);
     try {
       const r = await api.pedir(chave, {
-        pedidoId, destino: pedido.destino.trim() ? { texto: pedido.destino.trim() } : undefined, semDestino: !pedido.destino.trim(),
+        pedidoId, destino: pedido.destino.trim() ? { texto: pedido.destino.trim(), ...pedido.destinoPonto } : undefined, semDestino: !pedido.destino.trim(),
         categoria, pagamento: pedido.pagamento, nome: pedido.nome.trim(), telefone: pedido.telefone,
       });
       gravar(`${K}:corrida`, r.corrida.id);
@@ -242,8 +242,9 @@ export default function Totem(props: { empresa?: string; local?: string }) {
                 <input value={pedido.telefone} inputMode="numeric" enterKeyHint="next" autoComplete="off" placeholder="(11) 99999-9999" onChange={(e) => { setPedido({ ...pedido, telefone: mascaraTelefone(e.target.value) }); setErro(null); }} />
               </label>
               <label className="tt-campo"><span className="tt-linha-rotulo">Destino <small>Opcional</small></span>
-                <input value={pedido.destino} maxLength={200} enterKeyHint="done" placeholder="Para onde deseja ir? (opcional)" onChange={(e) => setPedido({ ...pedido, destino: e.target.value, semDestino: !e.target.value.trim() })} />
+                <input value={pedido.destino} maxLength={200} enterKeyHint="done" placeholder="Para onde deseja ir? (opcional)" autoComplete="off" onChange={(e) => setPedido({ ...pedido, destino: e.target.value, destinoPonto: undefined, semDestino: !e.target.value.trim() })} />
               </label>
+              {chave && !pedido.destinoPonto && <Sugestoes busca={(q) => api.enderecos(chave, q)} texto={pedido.destino} escolher={(o) => setPedido((p) => ({ ...p, destino: o.texto, destinoPonto: { lat: o.lat, lng: o.lng }, semDestino: false }))} />}
               <div>
                 <p className="tt-rotulo">Forma de pagamento</p>
                 <div className="tt-pagamentos">
@@ -294,6 +295,28 @@ export default function Totem(props: { empresa?: string; local?: string }) {
       </main>
       {chave && <TotemBloqueio verificar={(senha) => api.entrar(senha).then(() => true, () => false)} />}
       {(marca.textos.suporteTelefone || passo === "inicio") && <footer className="tt-rodape">{marca.nomeExibido}{marca.textos.suporteTelefone && ` · Ajuda: ${marca.textos.suporteTelefone}`}</footer>}
+    </div>
+  );
+}
+
+/** Sugestões de endereço para o destino: botões grandes embaixo do campo; toque escolhe (o endereço ganha o ponto no mapa). */
+function Sugestoes({ busca, texto, escolher }: { busca: (q: string) => Promise<{ enderecos: Array<{ texto: string; lat: number; lng: number; exato: boolean }> }>; texto: string; escolher: (o: { texto: string; lat: number; lng: number }) => void }) {
+  const [lista, setLista] = useState<Array<{ texto: string; lat: number; lng: number; exato: boolean }>>([]);
+  const ultimo = useRef("");
+  useEffect(() => {
+    const q = texto.trim();
+    if (q.length < 3) { setLista([]); ultimo.current = ""; return; }
+    if (q === ultimo.current) return;
+    const t = setTimeout(async () => {
+      ultimo.current = q;
+      try { setLista((await busca(q)).enderecos); } catch { setLista([]); }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [texto, busca]);
+  if (!lista.length) return null;
+  return (
+    <div className="tt-sugestoes" role="listbox" aria-label="Sugestões de endereço">
+      {lista.map((o, i) => <button type="button" key={i} className="tt-botao tt-opcao" onClick={() => escolher(o)}><span>{o.texto}{!o.exato && <small>número aproximado</small>}</span><MapPin size={20} /></button>)}
     </div>
   );
 }

@@ -212,6 +212,16 @@ test("cálculo do preço do local: base + km + minutos, nunca abaixo da mínima,
   assert.equal(T.precoDoLocal({ surge: 1 }, c, 1, 2), 12); // 5 + 2 + 1 = 8, sobe para a mínima
 });
 
+test("sugestões de endereço do destino: só com a chave; sem texto curto não busca; devolve lista (vazia sem base de endereços)", async () => {
+  const e = await pedir(`${TP}/entrar`, { corpo: { senha: "1234" } });
+  assert.equal((await pedir(`${TP}/enderecos?q=rua`)).status, 401);
+  const curto = await pedir(`${TP}/enderecos?q=ru`, { chave: e.corpo.chave });
+  assert.deepEqual(curto.corpo.enderecos, []);
+  const r = await pedir(`${TP}/enderecos?q=${encodeURIComponent("Rua das Flores 10")}`, { chave: e.corpo.chave });
+  assert.equal(r.status, 200, r.texto);
+  assert.ok(Array.isArray(r.corpo.enderecos));
+});
+
 test("app do totem (APK): só o dono publica; empresa só vê a versão ativa mais nova; endereço precisa ser https", async () => {
   const dono = D.criarUsuario({ email: "dono@x.test", nome: "Dono", senha: "senha-forte-9", empresaId: A.id, papel: "plataforma" });
   const cd = await cookieDe(dono.id);
