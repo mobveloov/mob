@@ -27,7 +27,7 @@ import AppsCentral from "./apps/AppsCentral";
 import Carteiras from "./apps/Carteiras";
 import DocumentosMotoristas from "./apps/DocumentosMotoristas";
 import { BotWhatsApp, ConversasWhatsApp } from "./bot";
-import { LocaisTotem, SolicitarCorrida } from "./totem";
+import { AppTotem, LocaisTotem, SolicitarCorrida } from "./totem";
 import { CrmPainel } from "./crm";
 
 // Tudo o que só existe depois do login: menu, telas e rotas internas. O App.tsx carrega este arquivo sob demanda
@@ -47,7 +47,7 @@ const PROVISORIAS: Record<string, JSX.Element> = {
   categorias: cad("categorias"), integracoes: <Integracoes />, avaliacoes: <Avaliacoes />,
   // Telas próprias (grupo "Mais")
   crm: <CrmPainel />,
-  bot: <BotWhatsApp />, totem: <LocaisTotem />, analise: <Analise />, apps: <AppsCentral />, documentos: <DocumentosMotoristas />,
+  bot: <BotWhatsApp />, totem: <LocaisTotem />, "app-totem": <AppTotem />, analise: <Analise />, apps: <AppsCentral />, documentos: <DocumentosMotoristas />,
   enderecos: <Enderecos />, marca: <MarcaAparencia />,
 };
 const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <EmConstrucao titulo={f.nome} sub="Em breve nesta versão do painel." />;

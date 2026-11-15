@@ -224,19 +224,28 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | CRM › Comunicação › Descadastros | Sim | A resposta "NÃO QUERO MAIS" no WhatsApp ainda não descadastra sozinha (as regras de texto estão prontas em `crm/optout.ts`). |
 | CRM › Comunicação › Notificações | Sim | Histórico de Disparos (aba separada) ainda não. Pausa geral, horário de envio e teto diário (rotas `/api/crm/limites`, usadas também pela futura Governança). |
 | CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
-| CRM › Público › Comportamentos, Contatos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
-| CRM › Análises (RFM, Conversão, Mapa de Calor), Recompensas | Não | Falta. |
-| CRM › Configurações › Cidades, Governança, Auditoria | Não | Falta. A aba Machine foi retirada de propósito. |
+| CRM › Público › Comportamentos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
+| CRM › Público › Contatos | Sim | Base 360° no banco (etapa, tags, opt-out, CSV, linha do tempo, LGPD). Sem id de push da Machine; "Atualizar Métricas" lê o cadastro e as corridas do painel. |
+| CRM › Análises › RFM | Sim | "Criar segmento" grava uma lista fixa (o público do CRM usa listas de pessoas). |
+| CRM › Análises › Conversão | Sim | Conta as corridas do painel; a janela de atribuição fica na Governança (a aba Machine saiu). |
+| CRM › Análises › Mapa de Calor | Sim | Usa as corridas próprias, que têm coordenada. |
+| CRM › Recompensas | Sim | Cupons do cadastro de Cupons (sem gerador/área da Machine; "cidade" no lugar da área). Cartão fidelidade/roleta não existem no painel. |
+| CRM › Configurações › Cidades, Governança, Auditoria | Sim | Janela de horário e opt-in da Governança valem na fila (só depois que a empresa salva). Auditoria anota campanhas, jornadas, templates e segmentos. A aba Machine foi retirada de propósito. |
 | CRM › Emojis nas mensagens | Sim | |
 | SpinText `{a|b}` e variáveis `{{x}}` | Sim | Variáveis antigas `{x}` continuam valendo. |
 | Bot › Ajustes (fluxo, textos, saudação, respostas prontas, comandos, status) | Sim | Ver docs/BOT.md. |
 | Bot › Conversas: bloquear e pausar o bot | Sim | |
-| Bot › várias conexões, Z-API, Z-Pro, Meta, cidades, voz, áudio | Não | Falta. |
-| whatsapp-webhook (11 mil linhas: endereços aprendidos, casas, agendamento, repasse de mídia) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento e as regras acima. O resto falta. |
+| Bot › várias conexões por empresa (até 10, cada uma com instância e segredos próprios) | Sim | Tela "Conexões do Bot". O passageiro é respondido pelo número em que escreveu. |
+| Bot › provedores Z-API, Z-Pro, Meta e Evolution (modo simulado sem chaves) | Sim | Mesma interface. Meta confere assinatura e senha de verificação. Falta testar com contas reais. |
+| Bot › áudio do passageiro (transcrição) | Sim | Groq ou OpenAI, só com chave. Sem chave o bot pede para escrever. |
+| Bot › cidades ativas e voz do bot (resposta em áudio) | Não | Falta. |
+| whatsapp-webhook (11 mil linhas) | Parcial | Fluxo menu, embarque, destino, confirmação, categoria, pagamento, comandos da central, bloqueio e pausa. Novo: embarque vago, número da casa (pede e junta), pedido urgente, link de mapa e coordenadas, endereços salvos (mais usados), fim do suporte. Módulos copiados com os testes originais (`bot/embarque-vago`, `numero-casa`, `urgente`, `link-mapa`, `coordenadas`, `enderecos-frequentes`, `fim-suporte`, `sugestoes`). Falta: sugestões de endereço por apelido (precisa de cadastro), agendamento, repasse de mídia, cidades. |
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
-| Totem: jogos de recompensa, checagem do número no WhatsApp, logo e rodapé próprios | Não | Falta. |
-| Locais do totem (cadastro) | Já existia | |
+| Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
+| Totem: jogos de recompensa (roleta e raspadinha) | Não | Falta (CRM › Recompensas). |
+| Totens & Preços (Totens & Locais, Preços por totem, copiar para todos) | Sim | Sem "Preços por cidade". Senha só como hash. |
+| App do Totem (baixar APK; dono publica versões) | Sim | Senha de fechamento nativa do app Android: pendente de aparelho/build nativo. |
 
 Conferência no navegador: CRM (Visão Geral, Templates com modelos prontos) e o totem (ativação por senha e primeira tela). O sistema de referência
 não foi aberto lado a lado: a comparação foi feita pelo código das telas.

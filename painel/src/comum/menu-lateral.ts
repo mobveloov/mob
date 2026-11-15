@@ -23,7 +23,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   },
   {
     id: "bot-totem", nome: "Bot & Totem", cor: "azul", blocos: [
-      { ids: ["bot", "totem", "notificacoes", "alertas-empresas", "apps", "enderecos"] },
+      { ids: ["bot", "totem", "app-totem", "notificacoes", "alertas-empresas", "apps", "enderecos"] },
     ],
   },
   {

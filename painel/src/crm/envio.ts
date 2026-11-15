@@ -7,6 +7,7 @@
 
 import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
+import { barrarEnvio } from "../crm2/governanca.ts";
 import * as A from "./armazem.ts";
 import { conferirCupom } from "./cupons.ts";
 import { ligarEventos, processarAtrasados, rodarGatilhosDeTempo } from "./gatilhos.ts";
@@ -191,8 +192,11 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
     const item = A.proximaPendente(empresaId, t, pausadas);
     if (!item) { r.motivo = n ? "fim" : "vazia"; break; }
     if (pausaGeral(empresaId).pausado) { r.motivo = "pausado"; break; }
-    if (real && !dentroDaJanela(empresaId)) { r.motivo = "janela"; break; }
     if (real && enviadosHoje(empresaId, t) >= tetoHoje(empresaId, t)) { r.motivo = "teto"; break; }
+    // Governança (CRM › Configurações): janela de horário e opt-in explícito.
+    const bar = barrarEnvio(empresaId, item, new Date(t - 3 * HORA));
+    if (bar.barrar === "janela") { r.motivo = "pausa"; break; }
+    if (bar.barrar === "optin") { A.alterarItem(empresaId, item.id, (i) => { if (i && i.estado === "pendente") { i.estado = "cancelado"; i.erro = bar.motivo; } }); continue; }
     const res = reservar(cfg, A.ritmo(empresaId), t, o.sorteio);
     if (!res.ok) {
       if (res.motivo === "limite" && res.ate - t <= esperaMax) { await dormir(res.ate - t); n--; continue; }

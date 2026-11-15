@@ -6,6 +6,7 @@
 
 import { banco } from "../servidor/banco.ts";
 import { agoraBr } from "../servidor/util.ts";
+import { config2, salvarConfig2 } from "../crm2/base.ts";
 import * as A from "./armazem.ts";
 import { waDailyCapToday, type WaCapConfig } from "./teto-diario.ts";
 
@@ -24,19 +25,17 @@ export function inicioDoDiaBr(agora = Date.now()): number {
 
 // ------------------------------------------------------------------ governança (horário e consentimento)
 
+// A janela de horário e o opt-in são os da aba Governança (crm2/base.ts): uma configuração só.
 export interface Governanca { janelaInicio: string; janelaFim: string; exigirOptIn: boolean }
 export const GOVERNANCA_PADRAO: Governanca = { janelaInicio: "08:00", janelaFim: "21:00", exigirOptIn: false };
 
-const hhmmOk = (v: unknown, d: string) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(v ?? "")) ? String(v) : d);
-
 export function governanca(e: string): Governanca {
-  const g = A.ler<Partial<Governanca>>(e, "governanca.json", {});
-  return { janelaInicio: hhmmOk(g.janelaInicio, GOVERNANCA_PADRAO.janelaInicio), janelaFim: hhmmOk(g.janelaFim, GOVERNANCA_PADRAO.janelaFim), exigirOptIn: g.exigirOptIn === true };
+  const c = config2(e);
+  return { janelaInicio: c.janelaInicio, janelaFim: c.janelaFim, exigirOptIn: c.exigirOptIn };
 }
 export function salvarGovernanca(e: string, g: Partial<Governanca>): Governanca {
-  const novo = { ...governanca(e), ...(g.janelaInicio !== undefined ? { janelaInicio: hhmmOk(g.janelaInicio, GOVERNANCA_PADRAO.janelaInicio) } : {}), ...(g.janelaFim !== undefined ? { janelaFim: hhmmOk(g.janelaFim, GOVERNANCA_PADRAO.janelaFim) } : {}), ...(g.exigirOptIn !== undefined ? { exigirOptIn: g.exigirOptIn === true } : {}) };
-  A.gravar(e, "governanca.json", novo);
-  return novo;
+  const c = salvarConfig2(e, { ...(g.janelaInicio !== undefined ? { janelaInicio: g.janelaInicio } : {}), ...(g.janelaFim !== undefined ? { janelaFim: g.janelaFim } : {}), ...(g.exigirOptIn !== undefined ? { exigirOptIn: g.exigirOptIn === true } : {}) });
+  return { janelaInicio: c.janelaInicio, janelaFim: c.janelaFim, exigirOptIn: c.exigirOptIn };
 }
 
 const minutos = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return (h || 0) * 60 + (m || 0); };

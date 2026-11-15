@@ -165,6 +165,28 @@ A tela do totem agora segue a do sistema de referência (com endereço fixo de e
 4. **Totem bloqueado:** fechar ou recarregar a página pede a senha do local ("Digite a senha para fechar o aplicativo", "Senha incorreta", "Cancelar e continuar usando").
 5. **Tela sempre acesa** (wake lock) e recarregar remoto só com a primeira tela vazia.
 
-Diferenças: o preço aparece como estimativa (o painel calcula pelas tarifas); a logo vem da marca da empresa; sem checagem do número no WhatsApp,
-sem jogos de recompensa e sem a ponte do app Android (senha de fechamento nativa).
+Diferenças: o preço aparece como estimativa (o painel calcula pelas tarifas); sem a ponte do app Android (senha de fechamento nativa).
 Arquivos: `web/totem/Totem.tsx` (reescrito), `web/totem/Bloqueio.tsx` (novo).
+
+## Totens & Preços, App do Totem e aparelho vinculado (14/11/2026, segunda leva)
+
+- **Tela Totens & Preços** (Bot & Totem): abas "Totens & Locais" e "Preços" (só admin). O local ganhou endereço (slug) escolhido na criação,
+  cidade e UF, imagem do topo e do rodapé (quadro 18:5, até 2 MB, PNG/JPG/WEBP), modo WhatsApp (individual ou compartilhado),
+  ativar/desativar, excluir (apaga as imagens), copiar link, abrir, recarregar e "Baixar app".
+- **Preços por totem**: tabela própria (taxa base, por km, por minuto, corrida mínima, tempo de espera, ordem, ativa), multiplicador (surge) e
+  "Copiar para todos os totens". O nome da categoria precisa existir em Categorias e tarifas. Com tabela, o totem mostra a dela e a corrida
+  nasce com o valor prefixado (com distância quando há coordenadas; sem destino no mapa vale a corrida mínima). Sem tabela, valem as tarifas da empresa.
+- **Aparelho vinculado**: o primeiro aparelho que digita a senha fica com o link; outro vê "Acesso Negado". O admin libera em "Limpar Dispositivo".
+- **WhatsApp do totem**: individual usa uma instância só dele (nome do bot + local) no servidor do bot; conectar por QR na lista de locais.
+  Sem WhatsApp conectado o totem mostra "Totem indisponível no momento" e volta sozinho. Sem servidor configurado (simulado) tudo funciona sem chave.
+  Antes de pedir, o totem confere se o telefone tem WhatsApp ("Esse número não foi encontrado no WhatsApp. Confira o telefone."); se não der para conferir, segue.
+- **App do Totem**: baixa a versão ativa mais nova do APK. O dono da plataforma publica o endereço (https) das versões nessa mesma tela.
+- Rotas novas: `/locais/:id/imagem/:tipo`, `/locais/:id/aparelho`, `/locais/:id/precos`, `/locais/:id/whatsapp[/conectar|/desconectar]`,
+  `/apk`, `/apk/versoes`, `POST /publico/:empresa/:local/whatsapp/existe`, `POST /webhook/:empresa/:local` (aceita e ignora).
+- Testes: `painel/test/totem-extras.test.ts`.
+
+Diferenças em relação ao sistema de referência: a senha do totem fica só como hash (a tela não mostra a senha atual); o vínculo usa um
+identificador gerado no aparelho; versões do APK guardam só o endereço do arquivo.
+
+**Pendente:** jogos de recompensa (roleta e raspadinha) e a página pública de prêmios; "Preços por cidade" (trechos entre cidades, locais, noturno,
+domingo, feriado, pedágio); senha de fechamento nativa do app Android (exige build nativo e aparelho para testar); busca de endereço com sugestões no destino.

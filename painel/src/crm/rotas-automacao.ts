@@ -11,6 +11,7 @@ import * as G from "./gatilhos.ts";
 import * as L from "./limites.ts";
 import { estatisticas, listarEnvios } from "./registro.ts";
 import * as R from "./regua.ts";
+import "./ganchos-crm2.ts";
 import { templates } from "./templates.ts";
 
 export const router = express.Router();

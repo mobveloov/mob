@@ -42,6 +42,13 @@ export const T = {
   criando: () => "Um momento, estou chamando um motorista... 🚗",
   criada: (os: string, valor?: number) =>
     `Pedido feito! Número *${os}*.${valor ? ` Valor estimado: *${reais(valor)}*.` : ""}\nEstou procurando um motorista. Aviso aqui quando alguém aceitar.\nPara cancelar, envie *cancelar*.`,
+  embarqueVago: () => "🤖 Olá! Eu sou a Inteligência Artificial de atendimento. Para chamar o seu carro, preciso do endereço exato.\n\n📍 Me diga a *rua e o número* (e o bairro, se puder) ou envie sua localização do WhatsApp.",
+  embarqueSoNumero: () => "📍 Me mande o *nome da rua com o número* (ex.: Rua Amazonas, 53), o nome do lugar ou a sua localização.",
+  pedirNumeroEmbarque: (rua: string) => `📍 Anotei *${rua.slice(0, 80)}*.\n\n🏢 Qual é o NÚMERO do embarque? (só o número, ex.: 474)`,
+  pedirNumeroDestino: (rua: string) => `🎯 Anotei o destino *${rua.slice(0, 80)}*.\n\n🏢 Qual é o NÚMERO do destino? (só o número, ex.: 120)\nSe não souber, mande *não sei* que o motorista combina com você.`,
+  salvos: (lista: string[], intro = "📍 Encontrei seus endereços salvos. Qual é o endereço de embarque?") =>
+    `${intro}\n${lista.map((l, i) => `*${i + 1}* - ${l}`).join("\n")}\n*${lista.length + 1}* - Outro endereço 📝`,
+  audioFalhou: () => "Não consegui entender esse áudio agora. Pode enviar novamente ou escrever sua mensagem?",
   erroCriar: () => "Não consegui criar a corrida agora. 😕 Responda a forma de pagamento para tentar de novo, ou *menu* para recomeçar.",
   jaTemAberta: (motivo: string) => `${motivo} Para falar com um atendente, envie *menu* e escolha *2*.`,
   bloqueado: (m: Marcador) => `Não consigo pedir corrida por aqui para este número. Fale com o suporte da ${m.empresa}: envie *2*.`,

@@ -28,7 +28,7 @@ export function atualizarStatus(empresaId: string, conversaId: string, deps: Dep
     }
     if (texto) c.mensagens.push({ de: "bot", texto, em: new Date().toISOString() });
     A.salvarConversa(empresaId, c);
-    if (texto) await enviar(empresaId, deps.provedor ?? provedorDe(empresaId), c.id, [texto]);
+    if (texto) await enviar(empresaId, deps.provedor ?? provedorDe(empresaId, c.conexao), c.id, [texto]);
     return texto;
   });
 }

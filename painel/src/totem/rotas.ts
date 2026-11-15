@@ -14,10 +14,12 @@ import crypto from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { cancelarCorrida, criarCorridaPropria, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
+import { cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
+import * as A from "./apk.ts";
 import * as T from "./dados.ts";
+import { esquecerWhatsapp, instanciaDoTotem, provedorDoTotem, whatsappPronto } from "./whatsapp.ts";
 
 export const rotasTotem = express.Router();
 export default rotasTotem;
@@ -78,8 +80,15 @@ function categoriasComPreco(empresaId: string, filtro: string[] = []) {
   return listar(empresaId, cadastroPorId("categorias")!)
     .filter((c) => c.ativa !== false && String(c.nome ?? "").trim())
     .filter((c) => !so.length || so.includes(String(c.nome).toLowerCase()))
-    .map((c) => ({ nome: String(c.nome), descricao: String(c.descricao ?? ""), preco: estimarPreco(empresaId, { categoria: String(c.nome), distanciaKm: null }).valor }))
+    .map((c) => ({ nome: String(c.nome), descricao: String(c.descricao ?? ""), preco: estimarPreco(empresaId, { categoria: String(c.nome), distanciaKm: null }).valor, espera: null as number | null }))
     .sort((a, b) => (a.preco ?? Infinity) - (b.preco ?? Infinity) || a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+/** O que o totem oferece: a tabela de preços do próprio local (Totens e Preços › Preços) ou, sem ela, as categorias da empresa. */
+function categoriasDoLocal(empresaId: string, l: T.Local) {
+  if (!l.tabela.length) return categoriasComPreco(empresaId, l.categorias);
+  return l.tabela.filter((c) => c.ativa).sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"))
+    .map((c) => ({ nome: c.nome, descricao: c.descricao, preco: T.precoDoLocal(l, c, null, null) as number | null, espera: c.espera as number | null }));
 }
 
 function motoristaDa(empresaId: string, c: CorridaPropria) {
@@ -116,17 +125,24 @@ function exigirChave(req: Request, res: Response, next: NextFunction) {
   if (!t) return res.status(404).json({ erro: "Totem não encontrado." });
   const chave = String(req.headers["x-totem-chave"] ?? "");
   if (!chave || !T.chaveConfere(t.empresaId, t.local, chave)) return res.status(401).json({ erro: "Digite a senha do totem." });
+  // Link já vinculado a um aparelho: outro aparelho (mesmo com a chave copiada) é barrado.
+  if (t.local.aparelho && String(req.headers["x-totem-aparelho"] ?? "") !== t.local.aparelho) return res.status(403).json({ erro: MSG_OUTRO_APARELHO, codigo: "outro_aparelho" });
   req.totem = t;
   next();
 }
 
+// A instância do totem só envia: o webhook dela é aceito e ignorado (o bot não responde pelo número do totem).
+rotasTotem.post("/webhook/:empresa/:local", (_req, res) => { res.json({ ok: true, ignorado: true }); });
+
 const P = "/publico/:empresa/:local";
+const MSG_OUTRO_APARELHO = "Este link de Totem já está ativo em outro dispositivo físico. Para transferir este Totem de local, o Administrador deve liberar o dispositivo no Painel de Controle clicando em 'Limpar Dispositivo'.";
+const aparelhoValido = (v: unknown): v is string => typeof v === "string" && /^[\w.-]{8,80}$/.test(v);
 
 /** Marca e nome do local (sem senha): a tela de senha já sai com a cara da empresa. */
 rotasTotem.get(P, ok((req, res) => {
   const t = acharTotem(req);
   if (!t) return res.status(404).json({ erro: "Totem não encontrado." });
-  res.json({ empresaId: t.empresaId, marca: D.marca(t.empresaId), local: { id: t.local.id, nome: t.local.nome } });
+  res.json({ empresaId: t.empresaId, marca: D.marca(t.empresaId), local: { id: t.local.id, nome: t.local.nome, logo: t.local.logo, rodape: t.local.rodape } });
 }));
 
 rotasTotem.post(`${P}/entrar`, ok((req, res) => {
@@ -134,18 +150,32 @@ rotasTotem.post(`${P}/entrar`, ok((req, res) => {
   if (!t) return res.status(404).json({ erro: "Totem não encontrado." });
   if (!podeTentarSenha(`${req.ip}|${t.empresaId}|${t.local.id}`)) return res.status(429).json({ erro: "Muitas tentativas. Espere alguns minutos." });
   if (!D.senhaConfere(String(req.body?.senha ?? ""), t.local.senhaHash)) return res.status(401).json({ erro: "Senha errada." });
+  // O primeiro aparelho que entra com a senha fica vinculado ao link (o admin libera em "Limpar Dispositivo").
+  if (aparelhoValido(req.body?.aparelho) && T.vincularAparelho(t.empresaId, t.local.id, req.body.aparelho) === "outro") return res.status(403).json({ erro: MSG_OUTRO_APARELHO, codigo: "outro_aparelho" });
   res.json({ chave: T.chaveDoAparelho(t.empresaId, t.local) });
 }));
 
 rotasTotem.get(`${P}/versao`, exigirChave, (req, res) => { res.json({ versao: req.totem!.local.versao }); });
 
-rotasTotem.get(`${P}/config`, exigirChave, ok((req, res) => {
+rotasTotem.get(`${P}/config`, exigirChave, ok(async (req, res) => {
   const { empresaId, local: l } = req.totem!;
   res.json({
     marca: D.marca(empresaId),
-    local: { id: l.id, nome: l.nome, endereco: l.endereco.texto, pagamentos: l.pagamentos, versao: l.versao },
-    categorias: categoriasComPreco(empresaId, l.categorias),
+    local: { id: l.id, nome: l.nome, endereco: l.endereco.texto, pagamentos: l.pagamentos, versao: l.versao, logo: l.logo, rodape: l.rodape, whatsappPronto: await whatsappPronto(empresaId, l) },
+    categorias: categoriasDoLocal(empresaId, l),
   });
+}));
+
+/** O número digitado tem WhatsApp? Sem WhatsApp o passageiro nunca receberia os dados do motorista. null = não deu para conferir. */
+const podeConferir = limitador(30, 10 * 60_000);
+rotasTotem.post(`${P}/whatsapp/existe`, exigirChave, ok(async (req, res) => {
+  const { empresaId, local: l } = req.totem!;
+  if (!podeConferir(`${empresaId}|${l.id}`)) return res.json({ existe: null });
+  const tel = String(req.body?.telefone ?? "").replace(/\D/g, "");
+  if (tel.length < 10 || tel.length > 13) throw new Error("Digite um telefone válido com DDD");
+  let existe: boolean | null = null;
+  try { existe = await Promise.race([provedorDoTotem(empresaId, l).existeNoWhatsApp(tel), new Promise<null>((r) => setTimeout(() => r(null), 6000))]); } catch { existe = null; }
+  res.json({ existe });
 }));
 
 rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
@@ -159,20 +189,31 @@ rotasTotem.post(`${P}/corridas`, exigirChave, ok(async (req, res) => {
   if (!semDestino && !destino?.texto) throw new Error("Informe o destino.");
   const pagamento = txt(b.pagamento, 40);
   if (!l.pagamentos.includes(pagamento)) throw new Error("Escolha a forma de pagamento.");
-  const cats = categoriasComPreco(empresaId, l.categorias);
+  const cats = categoriasDoLocal(empresaId, l);
   const categoria = txt(b.categoria, 60);
   if (cats.length && !cats.some((c) => c.nome === categoria)) throw new Error("Escolha a categoria.");
+  if (await whatsappPronto(empresaId, l) === false) return res.status(503).json({ erro: "Totem indisponível no momento. Procure a recepção." });
+  const preco = precoPrefixado(l, categoria, destino);
   const c = await umaVez(chave, async () => {
     const nova = await criarCorridaPropria(empresaId, {
       passageiro: { nome: txt(b.nome, 80), telefone: String(b.telefone ?? "") },
       embarque: l.endereco, destino, categoria, pagamento, canal: "totem",
       observacao: `Pedido pelo totem: ${l.nome}`,
+      // Preço do próprio local: valor fixado na hora do pedido (com distância, quando os dois pontos têm coordenada).
+      ...(preco != null ? { valorFinal: { modo: "prefixado" as const, valor: preco } } : {}),
     }, `totem:${l.id}`);
     T.registrarCorrida(empresaId, { corridaId: nova.id, os: nova.os, localId: l.id, criadaEm: new Date().toISOString() });
     return nova;
   });
   res.json({ corrida: { id: c.id, os: c.os, valor: c.estimativa.valor, categoria: c.categoria } });
 }));
+
+function precoPrefixado(l: T.Local, categoria: string, destino?: T.Ponto): number | null {
+  const c = l.tabela.find((x) => x.ativa && x.nome === categoria);
+  if (!c) return null;
+  const km = destino ? distanciaEstimada(l.endereco, destino) : null;
+  return T.precoDoLocal(l, c, km, null);
+}
 
 /** O totem só acompanha corrida que ele mesmo pediu, nas últimas 12 horas. */
 function daquiDoTotem(req: Request) {
@@ -211,6 +252,61 @@ interno.get("/locais", ok((req, res) => {
 interno.post("/locais", admin, ok((req, res) => { res.json({ local: T.localPublico(T.salvarLocal(emp(req), req.body ?? {})) }); }));
 interno.put("/locais/:id", admin, ok((req, res) => { res.json({ local: T.localPublico(T.salvarLocal(emp(req), req.body ?? {}, req.params.id)) }); }));
 interno.delete("/locais/:id", admin, ok((req, res) => { T.removerLocal(emp(req), req.params.id); res.json({ ok: true }); }));
+interno.post("/locais/:id/imagem/:tipo", admin, express.raw({ type: "image/*", limit: D.MAX_IMAGEM }), ok((req, res) => {
+  const tipo = req.params.tipo === "logo" ? "logo" : req.params.tipo === "rodape" ? "rodape" : null;
+  if (!tipo) throw new Error("Tipo de imagem inválido.");
+  const bytes = req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array();
+  if (!bytes.length) throw new Error("Arquivo vazio.");
+  res.json({ local: T.localPublico(T.definirImagem(emp(req), req.params.id, tipo, String(req.headers["content-type"] ?? "").split(";")[0], bytes)) });
+}));
+interno.delete("/locais/:id/imagem/:tipo", admin, ok((req, res) => {
+  const tipo = req.params.tipo === "logo" ? "logo" : req.params.tipo === "rodape" ? "rodape" : null;
+  if (!tipo) throw new Error("Tipo de imagem inválido.");
+  res.json({ local: T.localPublico(T.tirarImagem(emp(req), req.params.id, tipo)) });
+}));
+interno.delete("/locais/:id/aparelho", admin, ok((req, res) => { res.json({ local: T.localPublico(T.limparAparelho(emp(req), req.params.id)) }); }));
+
+/** Preços do local (aba Preços). `copiarPara`: "todos" ou lista de locais que recebem a mesma tabela. */
+interno.put("/locais/:id/precos", admin, ok((req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const e = emp(req);
+  const cadastradas = listar(e, cadastroPorId("categorias")!).map((c) => String(c.nome ?? "").trim().toLowerCase()).filter(Boolean);
+  if (cadastradas.length && Array.isArray(b.tabela)) {
+    for (const c of b.tabela as Array<{ nome?: unknown }>) {
+      if (!cadastradas.includes(String(c?.nome ?? "").trim().toLowerCase())) throw new Error(`A categoria "${String(c?.nome ?? "")}" não existe em Categorias e tarifas. Cadastre lá primeiro.`);
+    }
+  }
+  const copiar = b.copiarPara === "todos" ? "todos" : Array.isArray(b.copiarPara) ? b.copiarPara.map(String) : null;
+  res.json({ local: T.localPublico(T.salvarPrecos(e, req.params.id, { tabela: b.tabela, surge: b.surge }, copiar)) });
+}));
+
+/** WhatsApp do totem (modo individual): situação, conectar (QR) e desconectar. */
+const localDaRota = (req: Request) => { const l = T.local(emp(req), req.params.id); if (!l) throw new Error("Local não encontrado."); return l; };
+interno.get("/locais/:id/whatsapp", ok(async (req, res) => {
+  const l = localDaRota(req);
+  const s = await provedorDoTotem(emp(req), l).situacao().catch(() => ({ situacao: "erro" as const }));
+  res.json({ modo: l.modoWhatsapp, instancia: l.modoWhatsapp === "individual" ? instanciaDoTotem(emp(req), l) : null, ...s });
+}));
+interno.post("/locais/:id/whatsapp/conectar", admin, ok(async (req, res) => {
+  const l = localDaRota(req);
+  const base = (process.env.PUBLICO_URL ?? "").trim().replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+  esquecerWhatsapp(emp(req), l.id);
+  res.json(await provedorDoTotem(emp(req), l).conectar(`${base}/api/totem/webhook/${emp(req)}/${l.id}`));
+}));
+interno.post("/locais/:id/whatsapp/desconectar", admin, ok(async (req, res) => {
+  const l = localDaRota(req);
+  esquecerWhatsapp(emp(req), l.id);
+  await provedorDoTotem(emp(req), l).desconectar();
+  res.json({ ok: true });
+}));
+
+/** App Android do totem: a versão ativa mais nova (todas as empresas) e, para o dono da plataforma, publicar e ligar/desligar versões. */
+interno.get("/apk", ok((_req, res) => { res.json({ versao: A.versaoAtiva() }); }));
+const dono = exigirPapel();
+interno.get("/apk/versoes", dono, ok((_req, res) => { res.json({ versoes: A.listarVersoes() }); }));
+interno.post("/apk/versoes", dono, ok((req, res) => { res.json({ versao: A.publicarVersao(req.body ?? {}) }); }));
+interno.put("/apk/versoes/:id", dono, ok((req, res) => { res.json({ versao: A.ativarVersao(req.params.id, req.body?.ativa !== false) }); }));
+
 interno.post("/locais/:id/recarregar", admin, ok((req, res) => { res.json({ local: T.localPublico(T.recarregarLocal(emp(req), req.params.id)) }); }));
 
 /** O que a tela "Solicitar corrida" precisa: categorias com preço, motoristas ativos, pagamentos e locais. */
