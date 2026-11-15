@@ -17,6 +17,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import fs from "node:fs";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
+import { emitirEventoCrm } from "../crm/eventos.ts";
 import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
 import { buscarEndereco, enderecoDoPonto, rota } from "../enderecos/index.ts";
 import { buscarFora, caminhoPelasRuas, pontoFora } from "../enderecos/externo.ts";
@@ -220,7 +221,13 @@ r.get("/estimativa", ok(async (req, res) => {
   km ??= distanciaEstimada({ texto: "", ...a } as never, { texto: "", ...b } as never);
   const est = estimarPreco(ctx(req).empresaId, { categoria: txt(q.categoria, 60), distanciaKm: km, minutos, embarque: { texto: "", ...a }, destino: { texto: txt(q.destinoTexto, 200), ...b }, paradas: Math.min(3, Math.max(0, Math.round(num(q.paradas) ?? 0))), pagamento: txt(q.pagamento, 40), canal: "app" });
   // Radar de intenções (Recuperação de Vendas): guarda a cotação do passageiro para ver quem cotou e não pediu.
-  if (ctx(req).sessao.papel === "passageiro") registrarCotacao(ctx(req).empresaId, ctx(req).sessao.chave, { embarque: a, destino: b, categoria: est.categoria ?? txt(q.categoria, 60), valor: est.valor, distanciaKm: est.distanciaKm });
+  if (ctx(req).sessao.papel === "passageiro") {
+    registrarCotacao(ctx(req).empresaId, ctx(req).sessao.chave, { embarque: a, destino: b, categoria: est.categoria ?? txt(q.categoria, 60), valor: est.valor, distanciaKm: est.distanciaKm });
+    // Gatilhos do CRM: "Simulou" (toda estimativa) e "Simulou e não pediu" (sai depois do atraso se ele não pedir).
+    const vars = { valor: est.valor != null ? est.valor.toFixed(2).replace(".", ",") : "" };
+    emitirEventoCrm({ empresaId: ctx(req).empresaId, tipo: "simulated", telefone: ctx(req).sessao.chave, vars });
+    emitirEventoCrm({ empresaId: ctx(req).empresaId, tipo: "simulated_no_request", telefone: ctx(req).sessao.chave, vars });
+  }
   res.json(est);
 }));
 

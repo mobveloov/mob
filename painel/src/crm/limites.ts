@@ -60,9 +60,15 @@ export function proximaJanela(e: string, agora = Date.now()): number {
 
 export interface PausaGeral { pausado: boolean; por: string; em: string | null }
 export const pausaGeral = (e: string): PausaGeral => ({ pausado: false, por: "", em: null, ...A.ler<Partial<PausaGeral>>(e, "pausa.json", {}) });
+export interface RegistroPausa { acao: "pausou" | "continuou"; por: string; em: string }
+/** Histórico das pausas e retomadas (aba Histórico de Disparos › Pausas e retomadas). */
+export const historicoDePausas = (e: string): RegistroPausa[] => A.ler<RegistroPausa[]>(e, "pausas.json", []);
+
 export function definirPausaGeral(e: string, pausado: boolean, por: string): PausaGeral {
   const p = { pausado, por, em: new Date().toISOString() };
+  const antes = pausaGeral(e).pausado;
   A.gravar(e, "pausa.json", p);
+  if (antes !== pausado) A.gravar(e, "pausas.json", [{ acao: pausado ? "pausou" : "continuou", por, em: p.em }, ...historicoDePausas(e)].slice(0, 200));
   return p;
 }
 

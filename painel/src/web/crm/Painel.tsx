@@ -40,7 +40,6 @@ const GRUPOS: Array<{ key: string; label: string; icon: LucideIcon; abas: Item[]
 
 /** Abas do sistema de referência que ainda não foram portadas: a tela diz isso claramente (nada de dado inventado). */
 const AINDA_NAO: Partial<Record<Aba, string>> = {
-  behavior_templates: "Templates comportamentais", behavior_history: "Histórico de disparos", behavior: "Comportamentos", segments: "Segmentos",
 };
 
 /** CRM & Engajamento: menu em grupos (o grupo escolhe as abas da segunda linha), igual ao do sistema de referência. */

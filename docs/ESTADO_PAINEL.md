@@ -218,13 +218,13 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 |---|---|---|
 | CRM › Visão Geral | Sim | Sem "receita recuperada" e "viraram corrida" (dependem da conversão) e sem eventos da Machine. |
 | CRM › Automação › Jornadas | Já existia | Só os gatilhos "sem corrida" e "cancelou". |
-| CRM › Automação › Gatilhos, Fila de Dispatches, Régua | Sim | Eventos vêm das corridas e do cadastro do painel (sem Machine); só WhatsApp (sem push/in-app). "Simulou" só dispara se o app avisar a estimativa (ainda não liga). Templates comportamentais: não. |
+| CRM › Automação › Gatilhos, Fila de Dispatches, Régua, Templates Comportamentais | Sim | Eventos vêm das corridas, do cadastro e da estimativa de preço dos apps (sem Machine); só WhatsApp (push e in-app eram da Machine). A régua usa lotes de 10 no WhatsApp de verdade. |
 | CRM › Comunicação › Campanhas, WhatsApp | Já existiam | Só o canal WhatsApp. |
 | CRM › Comunicação › Templates | Sim | Título/imagem/botão ficam guardados, mas só o texto sai pelo WhatsApp. |
 | CRM › Comunicação › Descadastros | Sim | A resposta "NÃO QUERO MAIS" no WhatsApp ainda não descadastra sozinha (as regras de texto estão prontas em `crm/optout.ts`). |
-| CRM › Comunicação › Notificações | Sim | Histórico de Disparos (aba separada) ainda não. Pausa geral, horário de envio e teto diário (rotas `/api/crm/limites`, usadas também pela futura Governança). |
+| CRM › Comunicação › Notificações, Histórico de Disparos | Sim | Histórico com as 3 visões (comportamentais, automações por gatilho, pausas e retomadas). Pausa geral, horário (da Governança) e teto diário valem para tudo. |
 | CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
-| CRM › Público › Comportamentos, Segmentos | Não | Segmentos e listas existem dentro de Público. |
+| CRM › Público › Comportamentos, Segmentos | Sim | Análise de hora e dias preferidos dos últimos 180 dias (diária às 05:20); segmentos sobre a base de Contatos, com os 8 prontos. |
 | CRM › Público › Contatos | Sim | Base 360° no banco (etapa, tags, opt-out, CSV, linha do tempo, LGPD). Sem id de push da Machine; "Atualizar Métricas" lê o cadastro e as corridas do painel. |
 | CRM › Análises › RFM | Sim | "Criar segmento" grava uma lista fixa (o público do CRM usa listas de pessoas). |
 | CRM › Análises › Conversão | Sim | Conta as corridas do painel; a janela de atribuição fica na Governança (a aba Machine saiu). |

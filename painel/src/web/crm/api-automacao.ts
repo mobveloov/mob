@@ -4,10 +4,12 @@
 import type { Template } from "../../crm/templates.ts";
 import type { Gatilho, LinhaFila } from "../../crm/gatilhos.ts";
 import type { ConfigRegua, Governanca, PausaGeral } from "../../crm/limites.ts";
+import type { TemplateComportamental } from "../../crm/comportamento.ts";
+import type { Segmento } from "../../crm/segmentos.ts";
 import type { EnvioLog } from "../../crm/registro.ts";
 import { ErroCrm } from "./api";
 
-export type { ConfigRegua, EnvioLog, Gatilho, Governanca, LinhaFila, PausaGeral };
+export type { Segmento, TemplateComportamental, ConfigRegua, EnvioLog, Gatilho, Governanca, LinhaFila, PausaGeral };
 
 export type GatilhoLinha = Gatilho & { template: Template | null };
 export interface RespGatilhos {
@@ -31,6 +33,9 @@ export interface RespRegua {
   hoje: { regua: number; erros: number; numeroTodo: number; limite: number };
   numeros: NumeroRegua[];
 }
+export interface RespComportamento { total: number; with_pref: number; finished: number; canceled: number; updated_at: string | null; buckets: Record<string, number> }
+export interface DisparoComportamental { id: string; template_id: string; telefone: string; nome: string; fase: string; estado: string; hora_pref: number | null; agendado_para: number; enviado_em: number | null; erro: string; criado_em: number }
+export interface RespHistoricoComportamental { total: number; linhas: DisparoComportamental[]; stats: { total: number; by_phase: Record<string, number>; by_status: Record<string, number> }; nomes: Array<{ id: string; name: string }> }
 export interface RespLimites { governanca: Governanca; pausa: PausaGeral; tetoHoje: number; enviadosHoje: number }
 
 async function pedir<T>(url: string, metodo = "GET", corpo?: unknown): Promise<T> {
@@ -67,6 +72,21 @@ export const automacao = {
   notificacoes: (f: FiltroNotificacoes) => pedir<RespNotificacoes>("/notificacoes", "POST", f),
   regua: () => pedir<RespRegua>("/regua"),
   salvarRegua: (d: Record<string, unknown>) => pedir<{ ok: boolean }>("/regua", "PUT", d),
+  comportamento: () => pedir<RespComportamento>("/comportamento"),
+  analisar: () => pedir<{ atualizados: number }>("/comportamento/analisar", "POST", {}),
+  comportamentais: () => pedir<{ templates: TemplateComportamental[] }>("/comport-templates"),
+  salvarComportamental: (id: string | null, t: Record<string, unknown>) => pedir<{ template: TemplateComportamental }>(id ? `/comport-templates/${id}` : "/comport-templates", id ? "PUT" : "POST", t),
+  ligarComportamental: (id: string) => pedir<{ template: TemplateComportamental }>(`/comport-templates/${id}/ligar`, "POST", {}),
+  apagarComportamental: (id: string) => pedir(`/comport-templates/${id}`, "DELETE"),
+  testarComportamental: (id: string, telefone: string) => pedir<{ sent: boolean; error?: string }>(`/comport-templates/${id}/teste`, "POST", { telefone }),
+  instalarComportamentais: (chaves: string[]) => pedir<{ instalados: number }>("/comport-templates/instalar", "POST", { chaves }),
+  historicoComportamental: (f: { dias: number; fase?: string; estado?: string; template?: string; pagina?: number }) => pedir<RespHistoricoComportamental>("/comport-historico", "POST", f),
+  pausas: () => pedir<{ pausas: Array<{ acao: "pausou" | "continuou"; por: string; em: string }> }>("/pausas"),
+  segmentos: () => pedir<{ segmentos: Segmento[] }>("/segmentos"),
+  segmentosProntos: () => pedir<{ criados: number }>("/segmentos/prontos", "POST", {}),
+  salvarSegmento: (id: string | null, d: { name: string; description: string; rules: Record<string, unknown> }) => pedir<{ segmento: Segmento }>(id ? `/segmentos/${id}` : "/segmentos", id ? "PUT" : "POST", d),
+  recontarSegmento: (id: string) => pedir<{ segmento: Segmento }>(`/segmentos/${id}/contar`, "POST", {}),
+  apagarSegmento: (id: string) => pedir(`/segmentos/${id}`, "DELETE"),
   limites: () => pedir<RespLimites>("/limites"),
   pausar: (pausar: boolean) => pedir<{ pausa: PausaGeral }>("/limites/pausa", "POST", { pausar }),
   salvarGovernanca: (g: Partial<Governanca>) => pedir<{ governanca: Governanca }>("/limites/governanca", "PUT", g),

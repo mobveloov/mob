@@ -206,7 +206,7 @@ const A_semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").tr
 
 const nomeEmpresa = (e: string) => D.marca(e).nomeExibido || D.empresa(e)?.nome || "";
 
-function descadastrado(e: string, tel: string): boolean {
+export function descadastrado(e: string, tel: string): boolean {
   if (estaDescadastrado(e, tel)) return true;
   const k = waOptOutKey(tel);
   const marcas = A.optOuts(e);
@@ -281,8 +281,31 @@ const carga = (e: string, id: string) => (banco().prepare("SELECT carga FROM crm
 
 // ------------------------------------------------------------------ eventos
 
-/** Quem simulou há pouco (para "simulou e pediu"). Fica só na memória: vale por 1 hora. */
-const simulacoes = new Map<string, number>();
+/** Quem simulou nos últimos 60 minutos antes de `ate` (para "simulou e pediu"): guardado no banco, vale depois de reiniciar. */
+function simulouAntes(e: string, tel: string, ate: number): boolean {
+  const v = chavesDoTelefone(tel);
+  if (!v.length) return false;
+  const r = banco().prepare(`SELECT COUNT(*) AS n FROM crm_simulacoes WHERE empresa = ? AND em >= ? AND em <= ? AND telefone IN (${v.map(() => "?").join(",")})`).get(e, ate - HORA, ate, ...v) as { n: number };
+  return r.n > 0;
+}
+
+/** Já tem um envio esperando na fila deste gatilho para este telefone? (várias estimativas seguidas não empilham mensagens) */
+function jaNaFila(e: string, gatilhoId: string, tel: string): boolean {
+  const v = chavesDoTelefone(tel);
+  const r = banco().prepare(`SELECT COUNT(*) AS n FROM crm_gatilho_fila WHERE empresa = ? AND gatilho_id = ? AND estado IN ('pending','processing') AND telefone IN (${v.map(() => "?").join(",")})`).get(e, gatilhoId, ...v) as { n: number };
+  return r.n > 0;
+}
+
+/** Nome do passageiro no cadastro (quando o evento não traz). */
+function nomeDoCadastro(e: string, tel: string): string | null {
+  try {
+    const cad = cadastroPorId("clientes");
+    if (!cad) return null;
+    const k = waOptOutKey(tel);
+    const r = Cad.listar(e, cad).find((x) => waOptOutKey(String(x.telefone ?? "")) === k);
+    return r ? String(r.nome ?? "") || null : null;
+  } catch { return null; }
+}
 
 /** Evento do passageiro: dispara os gatilhos ligados desse tipo (agora ou com atraso). */
 export async function tratarEvento(ev: EventoCrm): Promise<{ disparados: number; agendados: number }> {
@@ -292,21 +315,22 @@ export async function tratarEvento(ev: EventoCrm): Promise<{ disparados: number;
   const quando = ev.em ?? Date.now();
   const vars = ev.vars ?? {};
   let disparados = 0, agendados = 0;
-  if (ev.tipo === "simulated" || ev.tipo === "simulated_no_request") simulacoes.set(`${e}:${waOptOutKey(tel)}`, quando);
+  if (!ev.nome) ev = { ...ev, nome: nomeDoCadastro(e, tel) ?? undefined };
+  if (ev.tipo === "simulated") banco().prepare("INSERT INTO crm_simulacoes (empresa, telefone, nome, em) VALUES (?,?,?,?)").run(e, tel, ev.nome ?? "", quando);
   const lista = gatilhos(e).filter((g) => g.is_active && g.trigger_type === ev.tipo);
   for (const g of lista) {
     if (passaFiltros(e, g, tel, ev.cidade ?? vars.cidade)) continue;
     const cfg = g.trigger_config;
     const atraso = num(cfg.delay_seconds) ?? ((num(cfg.delay_minutes) ?? 0) * 60 || (ATRASO_PADRAO[g.trigger_type] ?? 0));
     if (atraso > 0) {
+      if (jaNaFila(e, g.id, tel)) continue;
       inserirFila(e, g, tel, ev.nome ?? null, { estado: "pending", saiEm: quando + atraso * 1000, carga: { v: 2, vars, name: ev.nome ?? null, since: quando, cancelIf: CANCELA_SE[g.trigger_type] ?? null, tentativas: 0 } });
       agendados++;
     } else if (await enviarGatilho(e, g, { telefone: tel, nome: ev.nome ?? null, vars }) === "sent") disparados++;
   }
   // Simulou e pediu: abriu corrida até 1 hora depois de simular.
   if (ev.tipo === "ride_requested") {
-    const sim = simulacoes.get(`${e}:${waOptOutKey(tel)}`);
-    if (sim && quando - sim <= HORA && quando >= sim) {
+    if (simulouAntes(e, tel, quando)) {
       const r = await tratarEvento({ ...ev, tipo: "simulated_and_requested" });
       disparados += r.disparados; agendados += r.agendados;
     }

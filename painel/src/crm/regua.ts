@@ -15,6 +15,7 @@ import {
   isBotNumber, normalizeTiers, REGUA_PADRAO, reguaBudgetNow, reguaCandidates, reguaDailyCap, reguaGapMs, renderReguaMessage, inReguaWindow, shouldAutoPause,
   type ReguaContato, type ReguaEnvio,
 } from "./regua-pura.ts";
+import { reservar } from "./ritmo.ts";
 import { provedorDaEmpresa } from "./whatsapp.ts";
 
 const DIA = 86_400_000;
@@ -36,6 +37,8 @@ const hhmmOk = (v: unknown, d: string) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(Stri
 
 export interface NumeroEnvio {
   id: string | null; tipo: "bot" | "crm"; instance: string | null; phone?: string | null; connected: boolean; pausado: boolean;
+  /** WhatsApp de verdade (Evolution): só nele vale o lote. O simulado não manda nada. */
+  real: boolean;
   enviar: ((telefone: string, texto: string) => Promise<{ ok: boolean; erro?: string }>) | null;
 }
 
@@ -50,14 +53,14 @@ export async function numerosDaEmpresa(e: string): Promise<NumeroEnvio[]> {
     const sit = await p.situacao().catch(() => ({ situacao: "desconectado" }) as { situacao: string });
     const conectado = sit.situacao === "conectado";
     out.push({
-      id: "bot", tipo: "bot", instance: p.tipo === "simulado" ? "simulado" : (F.servidorWhatsApp(e).instancia || cfg.instancia || "bot"), phone: null, connected: conectado || p.tipo === "simulado", pausado: cfg.ativo === false,
+      id: "bot", tipo: "bot", instance: p.tipo === "simulado" ? "simulado" : (F.servidorWhatsApp(e).instancia || cfg.instancia || "bot"), phone: null, connected: conectado || p.tipo === "simulado", pausado: cfg.ativo === false, real: p.tipo !== "simulado",
       enviar: async (t, x) => { try { await p.enviarTexto(t, x); return { ok: true }; } catch (err) { return { ok: false, erro: err instanceof Error ? err.message : "Falha no envio." }; } },
     });
   } catch { /* bot indisponível */ }
   const prov = provedorDaEmpresa(e);
   const pend = await prov.pendencias().catch(() => ["Não consegui falar com o WhatsApp."]);
   out.push({
-    id: null, tipo: "crm", instance: prov.nome === "simulado" ? "simulado" : (A.credWhatsApp(e).instancia || "crm"), connected: pend.length === 0, pausado: false,
+    id: null, tipo: "crm", instance: prov.nome === "simulado" ? "simulado" : (A.credWhatsApp(e).instancia || "crm"), connected: pend.length === 0, pausado: false, real: prov.nome === "evolution",
     enviar: async (t, x) => { const r = await prov.enviar(t, x); return r.ok ? { ok: true } : { ok: false, erro: r.erro }; },
   });
   return out;
@@ -171,9 +174,20 @@ export async function rodarRegua(e: string, o: OpcoesRegua = {}): Promise<number
   const empresa = D.marca(e).nomeExibido || D.empresa(e)?.nome || "";
   let enviados = 0, erros = c.consecutive_errors ?? 0;
   const dormir = o.dormir ?? dormirReal;
+  // Ritmo próprio da régua, como no original: devagar (no máximo 3 por minuto) e em lotes de até 10, com pausa sorteada entre lotes.
+  // O estado do lote é o do WhatsApp da empresa inteira (campanhas e gatilhos dividem o mesmo lote).
+  const base = A.config(e);
+  const cfgLote = { ...base, lote: base.lote > 0 ? Math.min(base.lote, 10) : 10, limitePorMinuto: Math.min(base.limitePorMinuto, 3) };
+  let relogio = agora;
   for (let i = 0; i < lista.length; i++) {
     if (i > 0) { const atual = configRegua(e); if (atual.status !== "on") break; } // pausar/desligar vale no meio da rodada
     const x = lista[i];
+    if (n.real) {
+      let res = reservar(cfgLote, A.ritmo(e), relogio, o.sorteio);
+      if (!res.ok && res.motivo === "limite" && res.ate - relogio <= 25_000) { await dormir(res.ate - relogio); relogio = res.ate; res = reservar(cfgLote, A.ritmo(e), relogio, o.sorteio); }
+      if (!res.ok) break; // pausa entre lotes: o resto sai na próxima rodada
+      A.salvarRitmo(e, res.estado);
+    }
     const texto = renderReguaMessage(c.message, x.name, empresa);
     const r = await n.enviar!(x.phone, texto);
     const ins = (estado: string, err = "") => banco().prepare("INSERT INTO crm_regua_envios (empresa, telefone, faixa, estado, em, instancia, erro) VALUES (?,?,?,?,?,?,?)").run(e, x.phone, x.tier, estado, Date.now(), n.instance ?? "", err.slice(0, 300));
@@ -184,7 +198,7 @@ export async function rodarRegua(e: string, o: OpcoesRegua = {}): Promise<number
       erros++;
       if (shouldAutoPause(erros, c.error_limit)) { pausarPorErro(e, `Parou sozinha: ${erros} erros de envio seguidos. Confira o número em CRM > WhatsApp antes de ligar de novo.`); break; }
     }
-    if (i < lista.length - 1) await dormir(reguaGapMs(o.sorteio?.()));
+    if (i < lista.length - 1) { const g = reguaGapMs(o.sorteio?.()); await dormir(g); relogio += g; }
   }
   const final = configRegua(e);
   gravarConfig(e, { ...final, consecutive_errors: erros, last_run_at: new Date().toISOString() });
