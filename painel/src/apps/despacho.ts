@@ -10,7 +10,8 @@
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
 import { ajustes } from "./ajustes.ts";
 import { calcularComissao } from "../config/comissao.ts";
@@ -120,7 +121,9 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
       nome: c.passageiro.nome, telefone: aberta && papel === "motorista" ? c.passageiro.telefone : "",
       ...(papel === "motorista" ? { foto: urlDaFoto(empresaId, "passageiro", c.passageiro.telefone), nota: estatisticas(empresaId, "passageiro", c.passageiro.telefone).nota, corridas: estatisticas(empresaId, "passageiro", c.passageiro.telefone).viagens } : {}),
     },
-    ...(papel === "motorista" ? { infoAntes: c.infoAntes ?? "", infoDepois: c.motoristaId ? c.infoDepois ?? "" : "" } : {}),
+    ...(papel === "motorista" ? { infoAntes: c.infoAntes ?? "", infoDepois: c.motoristaId ? c.infoDepois ?? "" : "", obsEmpresa: observacaoDaEmpresa(empresaId, c.empresaConveniada) } : {}),
+    // Taxa de serviço do passageiro (vem à parte do valor da corrida; o app do passageiro mostra na estimativa e no recibo).
+    ...(papel === "passageiro" ? { taxaServico: taxaServicoDaCorrida(empresaId, c) } : {}),
     canal: c.canal, valorOferecido: c.valorOferecido ?? null, opcionais: c.opcionais ?? [], etiquetas: c.etiquetas ?? [],
     modo: c.macaneta?.modo, distanciaPercorridaKm: c.macaneta ? c.macaneta.km : undefined,
     ...(papel === "passageiro" ? { ...aproximacao(empresaId, c), mensagensNaoLidas: aberta ? naoLidas(empresaId, c.id, "passageiro") : 0 } : {}),
@@ -267,6 +270,7 @@ function extrasDaChamada(empresaId: string, c: CorridaPropria, motoristaId: stri
   const est = estatisticas(empresaId, "passageiro", c.passageiro.telefone);
   const nomes = new Map(ajustes(empresaId).opcionais.map((o) => [o.id, o.nome]));
   return {
+    obsEmpresa: observacaoDaEmpresa(empresaId, c.empresaConveniada),
     valorOferecido: c.valorOferecido ?? null, opcionais: (c.opcionais ?? []).map((id) => nomes.get(id) ?? id),
     nota: est.nota, viagens: est.viagens,
     minutosAteEmbarque: distanciaKm != null ? Math.max(1, Math.round(distanciaKm * 2.5)) : null,

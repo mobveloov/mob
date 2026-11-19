@@ -9,7 +9,7 @@ import { listar, atualizar, remover } from "../cadastros/armazem.ts";
 import { corridaDaFilial, pessoasDaFilial } from "../filiais/filiais.ts";
 import { alertas, estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
 import { mensagens } from "../apps/chat.ts";
-import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
+import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import * as D from "../servidor/dados.ts";
 import { buscarCorridas } from "../servidor/fontes/index.ts";
@@ -233,6 +233,8 @@ export function recibo(empresaId: string, id: string): string {
   const mot = c.motoristaId ? motoristasCad(empresaId).find((x) => x.id === c.motoristaId) : undefined;
   const linha = (r: string, v: string) => `<tr><td>${esc(r)}</td><td>${esc(v)}</td></tr>`;
   const valor = c.valor ?? c.estimativa.valor;
+  const taxa = taxaServicoDaCorrida(empresaId, c); // taxa de serviço do passageiro (Config › Taxas da central), cobrada à parte
+  const total = valor != null ? arred(valor + taxa) : null;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Recibo OS ${esc(c.os)}</title>
 <style>body{font-family:system-ui,sans-serif;color:#1c2434;max-width:640px;margin:24px auto;padding:0 16px}h1{margin:0;color:${esc(m.cores.primaria)}}
 table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:8px 4px;border-bottom:1px solid #e3e8f0}td:last-child{text-align:right;font-weight:600}
@@ -242,8 +244,9 @@ table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:8px 4px;bor
 ${linha("Embarque", c.embarque.texto)}${(c.paradas ?? []).map((p, i) => linha(`Parada ${i + 1}`, p.texto)).join("")}${linha("Destino", c.destino?.texto ?? "Sem destino")}
 ${linha("Distância", c.estimativa.distanciaKm != null ? `${String(c.estimativa.distanciaKm).replace(".", ",")} km` : "—")}${linha("Categoria", c.categoria)}
 ${linha("Motorista", c.motorista || "—")}${linha("Veículo", [mot?.veiculo, mot?.placa].filter(Boolean).join(" · ") || "—")}${linha("Pagamento", c.pagamento)}
-${c.desconto ? linha("Desconto", reais(c.desconto)) : ""}</table>
-<p class="total">Total: ${esc(reais(valor))}</p><p class="sub">Emitido em ${esc(dataHoraBr(agoraBr().toISOString()))}</p>
+${c.descontoEmpresa ? linha(`Desconto da empresa (${String(c.descontoEmpresa.pct).replace(".", ",")}%)`, reais(c.descontoEmpresa.valor)) : ""}${c.desconto && c.desconto !== (c.descontoEmpresa?.valor ?? 0) ? linha(c.descontoEmpresa ? "Desconto total" : "Desconto", reais(c.desconto)) : ""}
+${taxa > 0 ? linha("Valor da corrida", reais(valor)) + linha("Taxa de serviço", reais(taxa)) : ""}</table>
+<p class="total">Total: ${esc(reais(total))}</p><p class="sub">Emitido em ${esc(dataHoraBr(agoraBr().toISOString()))}</p>
 <button onclick="print()">Imprimir</button></body></html>`;
 }
 

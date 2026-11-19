@@ -17,6 +17,7 @@ import path from "node:path";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { corridaVazia, type CorridaPainel, type GrupoStatus } from "../comum/corrida.ts";
 import { listar, mesclar, type Registro } from "../cadastros/armazem.ts";
+import { descontoDaEmpresa } from "./empresa-conveniada.ts";
 import { emitirEventoCrm, EVENTO_DO_STATUS } from "../crm/eventos.ts";
 import { filial as acharFilial, filialDe } from "../filiais/filiais.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
@@ -146,6 +147,8 @@ export interface CorridaPropria {
   telefoneContato?: string;
   /** Oferta enviada a vários carros ao mesmo tempo. */
   enviarVariosCarros?: boolean;
+  /** Desconto da empresa conveniada pela forma de pagamento (já somado em "desconto"): percentual e valor em reais. */
+  descontoEmpresa?: { pct: number; valor: number };
   /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
   valorFinal?: { modo: "livre" | "prefixado"; valor?: number };
 }
@@ -305,6 +308,18 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
   return { valor: final, valorCheio: arred(valor), descontoPct, taxaServico, distanciaKm: km, minutos, categoria: nome, erro: null as string | null, tarifaExtra: extra };
 }
 
+/**
+ * Taxa de serviço do passageiro (Config › Taxas da central) desta corrida: a mesma conta que a carteira usa ao finalizar
+ * (valor depois do desconto, forma de pagamento da corrida). Os apps mostram à parte do valor da corrida.
+ */
+export function taxaServicoDaCorrida(empresaId: string, c: CorridaPropria): number {
+  const bruto = c.valor ?? c.valorOferecido ?? c.estimativa.valor;
+  if (bruto == null) return 0;
+  // c.valor (finalizada) já vem com o desconto; antes disso, desconta da estimativa ou do valor oferecido.
+  const base = c.valor != null ? Math.max(0, c.valor) : Math.max(0, arred(bruto - (c.desconto ?? 0)));
+  return somaCobrancas(cobrancas(empresaId, "passageiro", { categoria: c.categoria, valor: base, forma: formaDaTaxa(c.pagamento) }));
+}
+
 /** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). */
 export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string, automatico = false): number {
   if (!codigo || valor == null) return 0;
@@ -423,6 +438,11 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       const auto = cupomAutomatico(empresaId, lista.filter((c) => c.passageiro.telefone === telefone), valorOferecido ?? est.valor, n.categoria);
       if (auto) { desconto = auto.desconto; codigoCupom = auto.codigo; }
     }
+    // Desconto da empresa conveniada para a forma de pagamento (Cadastro › Empresas): soma com o cupom, sem passar do valor da corrida.
+    const baseDesconto = valorOferecido ?? est.valor;
+    const doCupom = desconto || 0;
+    const daEmpresa = descontoDaEmpresa(empresaId, n.empresaConveniada || (cliente?.conveniada ? String(cliente.conveniada) : undefined), n.pagamento, baseDesconto != null ? arred(baseDesconto - doCupom) : null);
+    if (daEmpresa) desconto = arred(doCupom + daEmpresa.valor);
     const agora = agoraBr().toISOString();
     const maiorOs = lista.reduce((m, c) => Math.max(m, Number(c.os) || 0), 100000);
     const corrida: CorridaPropria = {
@@ -454,6 +474,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(limpo(n.infoInterna, 500) ? { infoInterna: limpo(n.infoInterna, 500) } : {}),
       ...(soDigitos(n.telefoneContato ?? "").length >= 10 ? { telefoneContato: soDigitos(n.telefoneContato ?? "").slice(0, 13) } : {}),
       ...(n.enviarVariosCarros ? { enviarVariosCarros: true } : {}),
+      ...(daEmpresa ? { descontoEmpresa: daEmpresa } : {}),
       ...(n.valorFinal ? { valorFinal: n.valorFinal.modo === "prefixado" ? { modo: "prefixado" as const, valor: arred(Number(n.valorFinal.valor)) } : { modo: "livre" as const } } : {}),
     };
     gravar(empresaId, [corrida]);
@@ -563,6 +584,14 @@ export function avaliarPassageiro(empresaId: string, id: string, nota: number, c
     c.historico.push({ em: agoraBr().toISOString(), status: c.status, por, nota: `Nota do passageiro ${c.avaliacaoPassageiro.nota}` });
   });
 }
+
+/** OS paga pelo app (cartão no app) ou pela carteira de créditos do cliente: já foi cobrada, a central não pode alterar. */
+export const osPagaNoApp = (pagamento: string | undefined) => /cartao no app|carteira/.test(normal(pagamento ?? ""));
+/** Trava de OS paga: as telas de edição manual da central (Alteração de dados da OS, "Editar OS" do Histórico e Programadas) chamam antes de editar. */
+export function exigirOsAlteravel(c: { pagamento: string }, e: { pagamento?: string } = {}) {
+  if (osPagaNoApp(c.pagamento) || (e.pagamento != null && osPagaNoApp(e.pagamento))) throw new Error(MSG_OS_PAGA);
+}
+export const MSG_OS_PAGA = "OS's com pagamento via app ou \"Carteira de créditos do cliente\" não podem ser alteradas.";
 
 export interface EdicaoCorrida {
   status?: StatusProprio;

@@ -157,6 +157,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
             <div><small>IDENTIFICAÇÃO</small><strong>OS #{c.os}</strong></div>
             <div><small>SOLICITADO EM</small><strong>{soHora(c.solicitadaEm)}</strong></div>
           </div>
+          {c.obsEmpresa && <p className="dica">Obs. da empresa: {c.obsEmpresa}</p>}
           {c.observacao && <p className="dica">Obs.: {c.observacao}</p>}
         </div>
 

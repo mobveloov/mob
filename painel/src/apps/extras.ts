@@ -24,8 +24,8 @@ import { ajustes } from "./ajustes.ts";
 import { arquivo, num, txt } from "./armazem.ts";
 import type { Lugares, Veiculo } from "./perfil.ts";
 import type { PapelApp, SessaoApp } from "./sessoes.ts";
-import { regraDoMotorista } from "../config/comissao.ts";
-import { cobrancas, formaDaTaxa } from "../config/taxas.ts";
+import { calcularComissao, regraDoMotorista } from "../config/comissao.ts";
+import { cobrancas, formaDaTaxa, temTaxaDoMotorista } from "../config/taxas.ts";
 import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
 
 const arred = (n: number) => Math.round(n * 100) / 100;
@@ -224,6 +224,19 @@ function lancarUmaVez(empresaId: string, papel: PapelApp, chave: string, valor: 
   if (!ja) lancar(empresaId, papel, chave, valor, descricao, por, corridaId);
 }
 
+/**
+ * Deixa o total lançado na corrida (para esta pessoa e este nome) igual ao valor que deve ser. Roda quantas vezes precisar:
+ * sem diferença não lança nada; se a OS foi corrigida depois (valor novo), lança só a diferença ("... (ajuste)").
+ */
+function conciliar(empresaId: string, papel: PapelApp, chave: string, alvo: number, descricao: string, corridaId: string, por: string) {
+  const d = descricao.slice(0, 120), dAjuste = `${descricao} (ajuste)`.slice(0, 120);
+  const r = banco().prepare("SELECT COALESCE(SUM(valor), 0) AS s, COUNT(*) AS n FROM carteira WHERE empresa = ? AND papel = ? AND chave = ? AND corrida_id = ? AND descricao IN (?, ?)")
+    .get(empresaId, papel, chave, corridaId, d, dAjuste) as { s: number; n: number };
+  const diff = arred(alvo - r.s);
+  if (Math.abs(diff) < 0.005) return;
+  lancar(empresaId, papel, chave, diff, r.n ? dAjuste : d, por, corridaId);
+}
+
 export const PAGAMENTO_SALDO = "Saldo da carteira";
 
 /**
@@ -231,7 +244,9 @@ export const PAGAMENTO_SALDO = "Saldo da carteira";
  * - pago com saldo: sai do passageiro e entra para o motorista;
  * - taxas da central (Config › Taxas da central): as do motorista saem da carteira dele; as do passageiro saem da carteira dele
  *   (pago com saldo), do motorista (ele recebeu o valor com a taxa em mãos: dinheiro, máquina ou Pix) ou de ninguém (cartão no app, já cobrado).
- * Cada lançamento entra uma vez só por corrida e nome de taxa.
+ * - comissão da categoria (percentual, valor fixo, faixas de Regras de Crédito ou regra própria do motorista): sai da carteira do motorista,
+ *   menos quando as taxas do motorista da central estão ligadas (elas substituem a comissão: já saem pela linha acima, sem cobrar duas vezes).
+ * Pode rodar de novo (OS corrigida no "Editar OS"): cada lançamento entra uma vez só por corrida e nome; mudou o valor, lança só a diferença.
  */
 export function aposFinalizar(empresaId: string, c: CorridaPropria) {
   if (c.status !== "finalizada" || !c.valor || !c.motoristaId) return;
@@ -243,17 +258,29 @@ export function aposFinalizar(empresaId: string, c: CorridaPropria) {
     linhas.push(["motorista", motoristaId, valor, `Corrida OS ${c.os} (paga com saldo)`]);
   }
   const forma = formaDaTaxa(c.pagamento);
-  const base = Math.max(0, arred(valor - (c.desconto ?? 0)));
+  const base = Math.max(0, valor); // c.valor já é o que o passageiro pagou, com o desconto
   // Motorista com regra própria (Personalizado ou Isento) não paga as taxas da central.
-  if (!regraDoMotorista(empresaId, motoristaId)) {
+  const regraPropria = regraDoMotorista(empresaId, motoristaId);
+  if (!regraPropria) {
     for (const t of cobrancas(empresaId, "motorista", { categoria: c.categoria, valor: base, forma })) linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} · OS ${c.os}`]);
+  }
+  // Comissão "antiga" da categoria (ou regra própria do motorista): só quando as taxas do motorista não a substituem.
+  if (regraPropria || !temTaxaDoMotorista(empresaId)) {
+    const comissao = calcularComissao(empresaId, c.categoria, base, motoristaId, c.pagamento).taxaCentral;
+    if (comissao > 0) linhas.push(["motorista", motoristaId, -comissao, `Comissão da central · OS ${c.os}`]);
   }
   for (const t of cobrancas(empresaId, "passageiro", { categoria: c.categoria, valor: base, forma })) {
     if (c.pagamento === PAGAMENTO_SALDO) linhas.push(["passageiro", c.passageiro.telefone, -t.valor, `${t.nome} · OS ${c.os}`]);
     else if (forma !== "cartao_app") linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} (do passageiro) · OS ${c.os}`]);
   }
   if (!linhas.length) return;
-  transacao(() => { for (const [papel, chave, v, desc] of linhas) lancarUmaVez(empresaId, papel, chave, v, desc, c.id, "sistema"); });
+  // Mesma pessoa e mesmo nome somam (ex.: a corrida paga com saldo entra e sai da mesma carteira).
+  const alvos = new Map<string, [PapelApp, string, number, string]>();
+  for (const [papel, chave, v, desc] of linhas) {
+    const k = `${papel}|${chave}|${desc}`;
+    alvos.set(k, [papel, chave, arred((alvos.get(k)?.[2] ?? 0) + v), desc]);
+  }
+  transacao(() => { for (const [papel, chave, v, desc] of alvos.values()) conciliar(empresaId, papel, chave, v, desc, c.id, "sistema"); });
 }
 
 /** Depois que o passageiro cancela com taxa: a taxa sai da carteira dele e vai para o motorista. */

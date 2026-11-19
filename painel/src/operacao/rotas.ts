@@ -19,8 +19,8 @@ import { filialDe, filialForcada, listarFiliais } from "../filiais/filiais.ts";
 import fs from "node:fs";
 import { Router, type Request, type Response } from "express";
 import { arquivoDoAudio } from "../apps/chat.ts";
-import { aposCancelar } from "../apps/extras.ts";
-import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
+import { aposCancelar, aposFinalizar } from "../apps/extras.ts";
+import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { alterarCampos, listar } from "../cadastros/armazem.ts";
 import { alertas } from "../apps/despacho.ts";
@@ -36,6 +36,7 @@ import { periodo } from "../config/financeiro.ts";
 import { ABAS_TAXAS, csvPendencias, csvTaxas, listarPendencias, listarTaxas, mudarPendencia, registrarPendencia, type AcaoPendencia, type FiltroPendencias, type FiltroTaxas } from "./pendencias.ts";
 import { csvPix, listarPix, marcarPix, type FiltroPix } from "./pix.ts";
 import { categoriasDaEmpresa, pagamentosDaEmpresa } from "../gestao/empresas.ts";
+import { PAGAMENTO_MACHINE_PARA_CORRIDA } from "../corridas/empresa-conveniada.ts";
 
 export const rotasOperacao = Router();
 const hojeBr = () => agoraBr().toISOString().slice(0, 10);
@@ -168,7 +169,13 @@ rotasOperacao.put("/corridas/:id", central, ok(async (req, res) => {
   if ("valorInicial" in b) e.valorInicial = num(b.valorInicial) ?? null;
   if ("valorFinal" in b) e.valorFinal = num(b.valorFinal) ?? null;
   if (typeof b.pagamento === "string") e.pagamento = b.pagamento;
-  const c = await editarCorridaPropria(emp(req), S.acharPropria(emp(req), req.params.id).id, e, quem(req));
+  const antes = S.acharPropria(emp(req), req.params.id);
+  exigirOsAlteravel(antes, e);
+  const c = await editarCorridaPropria(emp(req), antes.id, e, quem(req));
+  // Virou finalizada ou mudou o valor, o pagamento ou o motorista de uma finalizada: aplica as taxas e a carteira (idempotente: só lança a diferença).
+  if (c.status === "finalizada" && (antes.status !== "finalizada" || antes.valor !== c.valor || antes.pagamento !== c.pagamento || antes.motoristaId !== c.motoristaId)) {
+    try { aposFinalizar(emp(req), c); } catch (x) { console.error("[operacao] após editar OS:", x instanceof Error ? x.message : x); }
+  }
   res.json({ corrida: { id: c.id, os: c.os, status: c.status } });
 }));
 
@@ -207,6 +214,7 @@ rotasOperacao.put("/programadas/:id", central, ok(async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   const c = S.acharPropria(emp(req), req.params.id);
   if (!c.agendadaPara) throw new Error("Esta corrida não é programada.");
+  exigirOsAlteravel(c);
   const e: EdicaoCorrida = {};
   if (typeof b.dataHora === "string" && b.dataHora && b.dataHora.slice(0, 16) !== c.agendadaPara.slice(0, 16)) e.agendadaPara = b.dataHora;
   if ("valor" in b) { const v = num(b.valor) ?? null; if (v !== c.estimativa.valor) e.valorInicial = v; }
@@ -268,9 +276,6 @@ rotasOperacao.post("/recuperacao/contato", central, ok((req, res) => res.json({ 
 rotasOperacao.get("/passageiro", ok((req, res) => res.json(S.buscarPassageiro(emp(req), { telefone: q(req, "telefone", 20), cpf: q(req, "cpf", 20) }))));
 rotasOperacao.get("/motoristas", ok((req, res) => res.json({ motoristas: S.opcoesMotoristas(emp(req)) })));
 
-const PAGAMENTO_MACHINE_PARA_CORRIDA: Record<string, string[]> = {
-  Dinheiro: ["Dinheiro"], "Maquininha de Débito": ["Cartão na Maquininha", "Débito (máquina)"], "Maquininha de Crédito": ["Cartão na Maquininha", "Crédito (máquina)"], "Cartão no app": ["Cartão no App"], Pix: ["Pix", "Pix no app"],
-};
 
 /** Empresa conveniada, centro de custo e voucher da solicitação. Voucher exige empresa e um número dentro de uma faixa dela, ainda não usado. */
 function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
@@ -348,7 +353,7 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
   if (typeof b.motoristaId === "string" && b.motoristaId) {
     try { await atribuirMotorista(emp(req), c.id, b.motoristaId, quem(req)); } catch (e) { avisos.push(`Motorista não atribuído: ${e instanceof Error ? e.message : e}`); }
   }
-  res.json({ corrida: { id: c.id, os: c.os, valor: valor ?? c.estimativa.valor }, avisos });
+  res.json({ corrida: { id: c.id, os: c.os, valor: valor ?? c.estimativa.valor, ...(c.descontoEmpresa ? { descontoEmpresa: c.descontoEmpresa } : {}) }, avisos });
 }));
 
 rotasOperacao.use((_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));

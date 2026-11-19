@@ -13,6 +13,8 @@ export interface Corrida {
   estimativa: Estimativa; valor: number | null; desconto: number | null; solicitadaEm: string; iniciadaEm?: string | null; finalizadaEm: string | null;
   passageiro: PassageiroCorrida;
   paradas?: Ponto[]; agendadaPara?: string | null;
+  /** Observação da empresa conveniada para o motorista (Cadastro › Empresas). */
+  obsEmpresa?: string;
   avaliacaoPassageiro?: { nota: number; comentario: string } | null; taxaCancelamento?: number | null;
   valorOferecido?: number | null; opcionais?: string[]; canal?: string; modo?: "taximetro" | "destino"; distanciaPercorridaKm?: number | null;
 }
@@ -21,6 +23,8 @@ export interface DadosChamada {
   id: string; os: string; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string; observacao: string; estimativa: Estimativa;
   passageiro: string | { nome: string; nota?: number | null }; paradas?: Ponto[]; agendadaPara?: string | null;
   valorOferecido?: number | null; opcionais?: string[]; nota?: number | null; viagens?: number | null;
+  /** Observação da empresa conveniada para o motorista. */
+  obsEmpresa?: string;
   /** Calculados no servidor: bruto (o que o passageiro paga), taxa da central e líquido (o que o motorista recebe). */
   valorBruto?: number | null; taxaCentral?: number | null; valorLiquido?: number | null; ganhoPorKm?: number | null;
   tabelaLiquido?: Array<{ valor: number; bruto: number; taxa: number; liquido: number }>;

@@ -53,12 +53,12 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Sem gateway:** nada é cobrado; valores dos planos são exemplos nossos. API em `/api/centrais` (`painel/src/centrais/rotas.ts`). Teste: `painel/test/centrais.test.ts`.
 
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
-- **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
+- **Comissão da central**: passou a ser debitada da carteira do motorista ao finalizar (ver "Pendências do painel fechadas").
 - **Saldo mínimo** existe em duas configurações (Regras de Crédito e gestão do motorista); só a da gestão vale no despacho.
 - **Operador** ainda mexe em punições e veículos; nos cadastros genéricos isso é só de admin (`gestao/motoristas.ts`).
 - **Saque:** `pedirSaque` ignora o bloqueio de saque do motorista e as regras de Integrações (`apps/extras.ts`).
 - **Desafios** automáticos ignoram hora, faixa de corridas e situação definidas no painel.
-- **Editar OS** finaliza ou cancela sem os efeitos da carteira e apaga a coordenada ao trocar o endereço.
+- **Editar OS** apaga a coordenada ao trocar o endereço (finalizar pela edição já aplica taxas e carteira).
 - **Fila virtual** ordena pela hora em que o motorista ficou online, não por "livre desde".
 - **Notificação agendada** pode sair duas vezes; **disparo para todos** segura o pedido por minutos.
 - **Financeiro** soma só os 2.000 lançamentos mais recentes do período (`config/financeiro.ts`).
@@ -104,7 +104,7 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Tudo no main:** todas as 15 prioridades do pente fino, telas de centrais, Plantão/Ruas/Áreas, Funil de Clientes, Mapa de Bairros, cadastros de motorista, empresa, categoria e solicitação, Painel inicial e Mapa de engajamento no formato da Machine, casas corrigidas (`npm run importar-casas`).
 - **Carga corrigida:** 500 corridas em 31 a 43 s, 0 erros (antes 85 a 122 s e até 288 erros). Números em `docs/AUDITORIA_COMPLETA.md`. 253 testes passando.
 - **Docker refeito** com o main; `up.veloov.com` responde.
-- **Falta:** comparar mais telas lado a lado com a Machine (imagem), "Enviar mais de um carro" no despacho, desconto da empresa por forma de pagamento no preço, observação da empresa para o motorista no app, passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
+- **Falta:** comparar mais telas lado a lado com a Machine (imagem), passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
 
 ## Menu lateral e foto da empresa (branch worktree-agent-a4657717dc85a0595, 14/11/2026)
 - **Menu lateral** é o menu principal (como no painel de referência do dono): 240 px, recolhe para só ícones (preferência em `localStorage` `menuLateral`), 6 grupos coloridos (Operação laranja, Bot & Totem azul, Clientes verde, Gestão roxo, Configuração rosa, Ajuda lima), item ativo destacado, claro e escuro. Abaixo de 1024 px vira a gaveta do celular, com o mesmo menu. As abas do topo saíram: o topo tem só empresa, central, sino, tema e perfil.
@@ -202,12 +202,12 @@ Cada tela da Machine foi lida e comparada com a nossa, com banco de teste própr
 
 ## Taxas da central e ajuste de carteira (branch worktree-agent-a538efdd5eef532ee, 14/11/2026)
 - **Taxas da central** (Config › Taxas da central, aba "Taxa por corrida", igual às capturas da Machine): nome (aparece no extrato), até 10 faixas de valor (porcentagem ou valor fixo), quem paga (motorista ou passageiro), categorias, formas de pagamento e simulador. Só admin grava; cada central (empresa) tem as suas. Aba "Automações" ainda sem conteúdo (a captura não mostra). Código: `comum/taxas.ts` (conta, também usada no simulador), `config/taxas.ts`, rotas `/api/config/taxas`, tela `web/telas/demais/TaxasCentral.tsx`.
-- **Efeito:** com ao menos uma taxa do motorista, elas substituem a comissão da categoria em `calcularComissao` (motorista Personalizado ou Isento continua valendo). Ao finalizar a corrida (app do motorista) a taxa do motorista é debitada da carteira dele, com o nome da taxa no extrato. A do passageiro: sai da carteira dele se pagou com saldo, do motorista se recebeu em dinheiro, máquina ou Pix, e de ninguém no cartão no app. `estimarPreco` devolve `taxaServico` (o app ainda não mostra). Não passa por "Editar OS" do painel.
+- **Efeito:** com ao menos uma taxa do motorista, elas substituem a comissão da categoria em `calcularComissao` (motorista Personalizado ou Isento continua valendo). Ao finalizar a corrida (app do motorista) a taxa do motorista é debitada da carteira dele, com o nome da taxa no extrato. A do passageiro: sai da carteira dele se pagou com saldo, do motorista se recebeu em dinheiro, máquina ou Pix, e de ninguém no cartão no app. `estimarPreco` devolve `taxaServico`. O "Editar OS" do painel também aplica (ver "Pendências do painel fechadas").
 - **Carteiras:** ajuste manual (`ajustarCarteira`, em `apps/extras.ts`) com motivo obrigatório (5 letras ou mais), chave única por clique (clique duplo não lança duas vezes), só admin, valor até R$ 10.000, débito não deixa saldo negativo, pessoa precisa existir. As duas rotas (`/api/config/carteiras/:papel/:chave/ajuste` e `/api/apps-central/carteiras/lancar`) usam a mesma função. O histórico mostra quem e quando. O app lê o mesmo saldo. Teste: `painel/test/taxas-carteira.test.ts`.
 
 ## Cargos, filiais e painel do dono (branch worktree-agent-a1a2562b7d9420c54)
 - **Cargos:** ADMIN Mestre (`plataforma`), ADMIN, Gestor (novo) e Operador, como na Machine. Menu e servidor (403 com requisição forjada) seguem o cargo mínimo de cada função. Matriz em `docs/CARGOS.md`. Operadores antigos passam a ter menos acesso (sem financeiro, regras e equipe).
-- **Filiais:** Cadastro > Gestão > Filiais. Motorista e usuário ligados a uma filial; corrida guarda a filial; Histórico e relatórios filtram por filial; Operador e Gestor ligados a uma filial só veem as corridas dela (Histórico e relatórios). Pendente: restringir Monitoramento, Mapa e Programadas por filial.
+- **Filiais:** Cadastro > Gestão > Filiais. Motorista e usuário ligados a uma filial; corrida guarda a filial; Histórico e relatórios filtram por filial; Operador e Gestor ligados a uma filial só veem as corridas dela (Histórico e relatórios). Monitoramento, Mapa e Programadas também filtram por filial (feito em 19/11).
 - **Painel do dono:** Mais > Painel do dono (só ADMIN Mestre): empresas, suspender/reativar (suspensa não loga), entrar como a empresa, planos e recursos, marca e domínio, uso e faturamento, centrais. Pendente: cobrança real (hoje o valor a pagar é calculado, sem gateway).
 
 ## CRM, Bot e Totem copiados do sistema de referência (14/11/2026)
@@ -287,14 +287,27 @@ Nenhuma parte do CRM, Bot ou Totem está 100% copiada do mobveloov: o que veio e
 - Quatro status de corrida da Machine que não existem no nosso fluxo; filtros de cartão e limite de crédito com a plataforma; coluna "Tipo de operação" da empresa; mapa sem Satélite/Google.
 - Notas do NPS de 1 a 5 (a Machine usa 0 a 10).
 - Valores dos planos das centrais são exemplos.
-- Alteração de dados da OS: a trava de OS paga só vale nessa tela (o "Editar OS" do Histórico ainda edita).
-- Monitoramento, Mapa em tempo real e Programadas ainda não filtram por filial.
-- "Enviar mais de um carro" só grava a marcação; desconto da empresa por forma de pagamento não entra no preço; observação da empresa para o motorista não aparece no app; documentos do veículo ficam por motorista; "Negociação" por categoria nos apps.
-- Comissão antiga da categoria nunca é debitada da carteira; a taxa do passageiro ainda não aparece nas telas dos apps; "Editar OS" não aplica as taxas.
-- Item "Carteiras de crédito" em Configurações (nas capturas) não criado; "Carteiras" segue em Financeiro.
+- Documentos do veículo ficam por motorista; "Negociação" por categoria nos apps.
+- Editar OS que troca o motorista de uma OS já finalizada não estorna os lançamentos do motorista antigo; nem desfaz taxas se a OS deixar de ser finalizada.
+- O desconto da empresa é calculado na criação da corrida; corrigir o valor ou a forma de pagamento depois não recalcula o desconto.
+- A taxa do passageiro aparece no app web do passageiro (estimativa, corrida); nos APKs só depois de gerar de novo o pacote web (a API já entrega `taxaServico`). A estimativa do app não envia a forma de pagamento, então mostra a taxa que vale para todas as formas.
+- Feito em 19/11 (branch deste agente): filtro por filial em Monitoramento, Mapa e Programadas; "Enviar mais de um carro" no despacho; desconto da empresa no preço; observação da empresa no app do motorista; trava de OS paga e carteira/taxas no "Editar OS"; comissão da categoria na carteira; item "Carteiras de crédito" em Configurações (mesma tela de Carteiras, rota `/carteiras-credito`); teste `consulta-nps` sem depender da hora. Detalhes na seção "Pendências do painel fechadas".
 - Decisão do dono: taxa do passageiro em dinheiro/Pix/máquina sai da carteira do motorista (confirmar a regra); 30 erros de login com um e-mail bloqueiam essa conta por 10 min de qualquer IP.
 - Arquivo completo das casas precisa ser exportado do servidor do mobveloov pelo dono.
 - Teste `consulta-nps` falha entre 0h e 2h30 (usa "hoje" e recua uma corrida 2,5 h): ajustar o teste.
 
 **Apps (sessão dos apps, PR #18)**
 - Passos 2 a 5 do cadastro do motorista no app; teste dos APKs em aparelho; push, WhatsApp real e pagamento dependem de chaves e aparelhos do dono.
+
+## Pendências do painel fechadas (19/11/2026, branch worktree-agent-a95e7f3608c94146f)
+- **Filtro por filial:** Acompanhamento, Mapa de motoristas e Programadas ganharam o seletor "Filial" (só aparece para quem pode escolher). Operador e Gestor presos a uma filial ficam nela, mesmo forjando `?filial=`. A corrida vale pela filial gravada; sem ela, pela do motorista. Teste em `test/filiais.test.ts`.
+- **Enviar mais de um carro:** a corrida marcada recebe a oferta de até `CARROS_SIMULTANEOS` (3, limitado pelo "limite de motoristas" do Despacho) motoristas ao mesmo tempo, os mais bem colocados pela regra de sempre. Recusa ou vencimento completam com o próximo; o primeiro que aceita leva e os outros perdem a chamada na hora (auditoria "Outro motorista aceitou"). Sem a marcação, continua uma oferta por vez. `apps/despacho.ts`; teste `test/despacho-varios-carros.test.ts`.
+- **Desconto da empresa por forma de pagamento:** ao criar a corrida (painel, bot, totem e apps), o percentual do cadastro da empresa para a forma de pagamento soma ao cupom em `desconto`, e o detalhe fica em `descontoEmpresa {pct, valor}`. `corridas/empresa-conveniada.ts`. Não recalcula se o valor ou a forma de pagamento forem corrigidos depois.
+- **Observação da empresa para o motorista:** o campo `obsEmpresa` vem na corrida e na chamada do app do motorista (tela de chamada e da corrida mostram). O passageiro não recebe.
+- **Trava de OS paga:** "Cartão no App" e "Carteira" não podem ser editadas, no servidor (`PUT /api/operacao/corridas/:id` e `/programadas/:id`), valendo para o Editar OS do Histórico e para Alteração de dados da OS.
+- **Editar OS aplica taxas e carteira:** ao virar finalizada ou ao mudar valor, pagamento ou motorista de uma finalizada, roda `aposFinalizar`, agora idempotente por diferença: sem mudança não lança nada; valor novo lança só a diferença ("... (ajuste)").
+- **Comissão da categoria na carteira:** `aposFinalizar` debita "Comissão da central · OS n" do motorista (percentual, valor fixo, faixas de Regras de Crédito ou regra própria Personalizado/Isento). Com taxas do motorista ligadas elas substituem a comissão (uma cobrança só). Também corrigido: as taxas e a comissão contam sobre o valor pago (`c.valor` já vem com o desconto), não descontando duas vezes.
+- **Taxa do passageiro:** `taxaServico` vem em `/estimativa`, na corrida do app do passageiro e no recibo (que passa a mostrar "Taxa de serviço" e o total com ela). O app web do passageiro mostra na estimativa e nos dados da corrida; o APK precisa do pacote web novo.
+- **Carteiras de crédito:** novo item em Configurações > Regras e integrações (rota `/carteiras-credito`), abre a mesma tela de Carteiras; "Carteiras" segue em Financeiro.
+- **Teste `consulta-nps`:** o esperado acompanha o dia da corrida recuada 2,5 h; confere também com o relógio fixado à 1h.
+- Testes novos: `test/painel-pendencias.test.ts` (desconto, observação, trava, Editar OS, comissão, taxa) e `test/despacho-varios-carros.test.ts`.

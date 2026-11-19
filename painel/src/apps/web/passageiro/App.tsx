@@ -168,6 +168,7 @@ function Historico({ irAgendadas }: { irAgendadas: () => void }) {
             <dt>Categoria</dt><dd>{c.categoria}</dd>
             <dt>Pagamento</dt><dd>{c.pagamento}</dd>
             {c.valor != null && <><dt>Valor</dt><dd>{reais(c.valor)}{c.desconto ? ` (desconto ${reais(c.desconto)})` : ""}</dd></>}
+            {c.taxaServico ? <><dt>Taxa de serviço</dt><dd>{reais(c.taxaServico)} (cobrada à parte)</dd></> : null}
             {c.taxaCancelamento ? <><dt>Taxa</dt><dd>{reais(c.taxaCancelamento)} de cancelamento</dd></> : null}
             {c.motorista && <><dt>Motorista</dt><dd>{c.motorista.nome}{c.motorista.veiculo ? ` · ${c.motorista.veiculo}` : ""}{c.motorista.placa ? ` · ${c.motorista.placa}` : ""}</dd></>}
             {c.avaliacao ? <><dt>Sua nota</dt><dd>{c.avaliacao}★{c.comentario ? ` · “${c.comentario}”` : ""}</dd></> : null}
