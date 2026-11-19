@@ -78,16 +78,19 @@ const recuar = (id: string, horas: number) => {
   db.prepare("UPDATE corridas_proprias SET solicitada_em = ?, dados = ? WHERE empresa = ? AND id = ?").run(em, JSON.stringify(d), A.id, id);
 };
 recuar(velha.id, 2.5);
+// Entre 0h e 2h30 (horário de Brasília) a corrida de 2h30 atrás cai no dia anterior e sai do "hoje": o esperado acompanha isso.
+const diaDe = (id: string) => (B.banco().prepare("SELECT solicitada_em AS s FROM corridas_proprias WHERE empresa = ? AND id = ?").get(A.id, id) as { s: string }).s.slice(0, 10);
+const TOTAL_HOJE = 37 + (diaDe(velha.id) === new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10) ? 1 : 0);
 
 test("consulta: paginação no banco, totais e isolamento por empresa", async () => {
   const p1 = await op("/historico?rapido=hoje", cAdm);
   assert.equal(p1.status, 200, p1.texto);
-  assert.equal(p1.corpo.total, 38);
+  assert.equal(p1.corpo.total, TOTAL_HOJE);
   assert.equal(p1.corpo.corridas.length, 30);
   assert.equal(p1.corpo.paginas, 2);
-  assert.equal(p1.corpo.stats.total, 38);
+  assert.equal(p1.corpo.stats.total, TOTAL_HOJE);
   assert.equal(p1.corpo.stats.canceladas, 1);
-  assert.equal((await op("/historico?rapido=hoje&pagina=2", cAdm)).corpo.corridas.length, 8);
+  assert.equal((await op("/historico?rapido=hoje&pagina=2", cAdm)).corpo.corridas.length, TOTAL_HOJE - 30);
   assert.equal((await op("/historico?rapido=hoje&pagina=99", cAdm)).corpo.pagina, 2, "página fora do limite volta para a última");
   assert.equal((await op("/historico?rapido=hoje", cZ)).corpo.total, 1, "a outra central só vê as suas");
   assert.equal((await op("/historico?rapido=hoje", cOp)).status, 200, "operador também consulta");
@@ -101,7 +104,7 @@ test("consulta: filtros da Machine (externo, central, empresa, CPF, urgência, v
   const t = async (q: string) => (await op(`/historico?rapido=hoje&${q}`, cAdm)).corpo.total;
   assert.equal(await t("osExterna=EXT-77"), 1);
   assert.equal(await t("osExterna=NAO-EXISTE"), 0);
-  assert.equal(await t("centralChamada=Central%20Alfa"), 38, "sem central gravada vale a própria central");
+  assert.equal(await t("centralChamada=Central%20Alfa"), TOTAL_HOJE, "sem central gravada vale a própria central");
   assert.equal(await t("centralCorrida=Outra"), 0);
   assert.equal(await t("empresa=Acme%20Ltda"), 1);
   assert.equal(await t("empresa=Outra%20Ltda"), 0);
@@ -109,14 +112,14 @@ test("consulta: filtros da Machine (externo, central, empresa, CPF, urgência, v
   assert.equal(await t("cpfPax=999"), 0);
   assert.equal(await t("cashback=1"), 1);
   assert.equal(await t("via=app"), 1);
-  assert.equal(await t("via=site"), 37);
+  assert.equal(await t("via=site"), TOTAL_HOJE - 1);
   assert.equal(await t("urgencia=5"), 1, "corporativa (empresa conveniada)");
   assert.equal(await t("urgencia=7"), 1, "voucher cancelada não conta como pendência: esta é a corporativa em andamento");
   assert.equal(await t("urgencia=1"), 0, "normais todas em pendência");
-  assert.equal(await t("urgencia=2"), 36);
+  assert.equal(await t("urgencia=2"), TOTAL_HOJE - 2);
   assert.equal(await t("urgencia=9"), 0);
   assert.equal(await t("status=cancelada"), 1);
-  assert.equal(await t("status=distribuindo"), 37);
+  assert.equal(await t("status=distribuindo"), TOTAL_HOJE - 1);
   assert.equal(await t("pagamento=voucher"), 1);
   assert.equal(await t("nomePax=carla"), 1);
   assert.equal(await t("telPax=5555-0001"), 1);
@@ -140,7 +143,7 @@ test("exportar: CSV de tudo o que o filtro mostra, protegido contra fórmula", a
   assert.match(linhas[0], /^Nº OS;Nº externo da OS;Solicitada em;Partida;/);
   assert.ok(linhas[1].includes(`"'=HYPERLINK(""http://x"")"`), linhas[1]);
   const tudo = await op("/historico/exportar?rapido=hoje", cAdm);
-  assert.equal(tudo.corpo.csv.replace(/^﻿/, "").split("\n").length, 39);
+  assert.equal(tudo.corpo.csv.replace(/^﻿/, "").split("\n").length, TOTAL_HOJE + 1);
   assert.equal((await op("/historico/exportar?rapido=hoje", cZ)).corpo.csv.includes("Passageiro 1"), false);
   for (const [entrada, saida] of [["=1+1", "'=1+1"], ["+55", "'+55"], ["-2", "'-2"], ["@x", "'@x"], ["normal", "normal"], ["a;b", "\"a;b\""]]) assert.equal(celulaCsv(entrada), saida);
 });
