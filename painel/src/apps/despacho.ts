@@ -71,9 +71,9 @@ type OuvinteOferta = (empresaId: string, o: Oferta, fim: FimOferta) => void;
 const ouvintesOferta: OuvinteOferta[] = [];
 /** Registra quem quer saber de cada oferta (criada, aceita, recusada, vencida). */
 export const aoMudarOferta = (f: OuvinteOferta) => { if (!ouvintesOferta.includes(f)) ouvintesOferta.push(f); };
-/** Guarda como terminou cada oferta (para a taxa de aceitação do motorista). "saiu" (ficou offline) não conta. */
+/** Guarda como terminou cada oferta (para a taxa de aceitação do motorista). "saiu" (ficou offline) e "perdeu" (outro aceitou antes) não contam. */
 function anotarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
-  if (fim === "oferecida" || fim === "saiu") return;
+  if (fim === "oferecida" || fim === "saiu" || fim === "perdeu") return;
   try { banco().prepare("INSERT INTO app_ofertas (empresa, motorista, resultado, em) VALUES (?, ?, ?, ?)").run(empresaId, o.motoristaId, fim, new Date().toISOString()); } catch { /* estatística: não pode travar a chamada */ }
 }
 
@@ -436,7 +436,7 @@ function encerrarOfertasDaCorrida(empresaId: string, corridaId: string, motivo: 
   for (const o of [...e.ofertas.values()]) {
     if (o.corridaId !== corridaId || o.id === exceto) continue;
     e.ofertas.delete(o.id);
-    avisarOferta(empresaId, o, "saiu"); // não conta como ignorada: o motorista não teve como responder
+    avisarOferta(empresaId, o, "perdeu"); // outro aceitou antes: não conta como ignorada nem como recusa
     emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id, motivo });
   }
 }
