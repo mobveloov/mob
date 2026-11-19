@@ -256,3 +256,45 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 
 Conferência no navegador: CRM (Visão Geral, Templates com modelos prontos) e o totem (ativação por senha e primeira tela). O sistema de referência
 não foi aberto lado a lado: a comparação foi feita pelo código das telas.
+
+## O que ainda falta (15/11/2026, depois do push parcial)
+
+Nenhuma parte do CRM, Bot ou Totem está 100% copiada do mobveloov: o que veio está na tabela "tela/função do mobveloov | portada? | diferença" (seção "CRM, Bot e Totem copiados do sistema de referência"). Lista do que falta, uma linha cada:
+
+**Bot de WhatsApp**
+- Foto e vídeo entre motorista e passageiro (o chat da corrida só tem texto e áudio).
+- Escolha de casa por lista de ruas (CNEFE) dentro da conversa.
+- Preço por cidade na resposta do bot (usar a tabela "Preços por cidade" do totem).
+- Pesquisa de preferências da corrida.
+- Z-API, Z-Pro, Meta e Evolution testados só com respostas simuladas, nunca com conta real.
+- Texto padrão do menu do bot mantém nome da empresa e do assistente (diferença do original).
+
+**CRM**
+- Cartão fidelidade e pontos.
+- "Criar segmento" no RFM grava lista fixa, não segmento dinâmico.
+- Canais push e in-app (eram da Machine: ficam de fora de propósito).
+- Mapa de Calor só com corridas próprias (as de integração não têm coordenada).
+
+**Totem**
+- Senha de fechamento nativa do app Android (precisa de build nativo e aparelho).
+- Envio automático dos convites dos jogos por horário (falta o agendador do CRM chamar "enviar agora").
+- Gancho dos prêmios para a aba Recompensas do CRM (hoje ela lê os cupons que o prêmio gera).
+
+**Painel (Machine)**
+- Config › Gerais: abas Motorista, Passageiro, Financeiro, Filtros, Formas de pagamento e Recursos Premium; e, em Integrações, Saque Automático e Marketplace de Integradores (faltam páginas salvas da Machine).
+- O motor de despacho ainda não lê os campos novos de Gerais › Despacho; o Transbordo não repassa corrida entre centrais.
+- Os apps ainda não leem a Personalização do app do passageiro nem escondem os termos no modo "Não mostrar".
+- Quatro status de corrida da Machine que não existem no nosso fluxo; filtros de cartão e limite de crédito com a plataforma; coluna "Tipo de operação" da empresa; mapa sem Satélite/Google.
+- Notas do NPS de 1 a 5 (a Machine usa 0 a 10).
+- Valores dos planos das centrais são exemplos.
+- Alteração de dados da OS: a trava de OS paga só vale nessa tela (o "Editar OS" do Histórico ainda edita).
+- Monitoramento, Mapa em tempo real e Programadas ainda não filtram por filial.
+- "Enviar mais de um carro" só grava a marcação; desconto da empresa por forma de pagamento não entra no preço; observação da empresa para o motorista não aparece no app; documentos do veículo ficam por motorista; "Negociação" por categoria nos apps.
+- Comissão antiga da categoria nunca é debitada da carteira; a taxa do passageiro ainda não aparece nas telas dos apps; "Editar OS" não aplica as taxas.
+- Item "Carteiras de crédito" em Configurações (nas capturas) não criado; "Carteiras" segue em Financeiro.
+- Decisão do dono: taxa do passageiro em dinheiro/Pix/máquina sai da carteira do motorista (confirmar a regra); 30 erros de login com um e-mail bloqueiam essa conta por 10 min de qualquer IP.
+- Arquivo completo das casas precisa ser exportado do servidor do mobveloov pelo dono.
+- Teste `consulta-nps` falha entre 0h e 2h30 (usa "hoje" e recua uma corrida 2,5 h): ajustar o teste.
+
+**Apps (sessão dos apps, PR #18)**
+- Passos 2 a 5 do cadastro do motorista no app; teste dos APKs em aparelho; push, WhatsApp real e pagamento dependem de chaves e aparelhos do dono.
