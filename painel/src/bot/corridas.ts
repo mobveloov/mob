@@ -16,6 +16,8 @@ export interface NovaCorridaBot {
   embarque: Local; destino?: Local; categoria: string; pagamento: string; observacao?: string;
   /** Corrida agendada: "AAAA-MM-DDTHH:MM" no horário de Brasília. */
   agendadaPara?: string;
+  /** Pesquisa de preferências: cupom, parada no caminho e recado que o motorista vê depois de aceitar. */
+  cupom?: string; parada?: Local; infoDepois?: string;
 }
 
 /** Corrida agendada que ainda não começou a procurar motorista. */
@@ -91,6 +93,7 @@ export const corridasProprias: CorridasBot = {
     const c = await criarCorridaPropria(empresaId, {
       passageiro: n.passageiro, embarque: n.embarque, destino: n.destino, categoria: n.categoria,
       pagamento: n.pagamento, canal: "bot", observacao: n.observacao, agendadaPara: n.agendadaPara,
+      ...(n.cupom ? { cupom: n.cupom } : {}), ...(n.parada ? { paradas: [n.parada] } : {}), ...(n.infoDepois ? { infoDepois: n.infoDepois } : {}),
     }, "bot");
     return { id: c.id, os: c.os, valor: c.estimativa.valor ?? undefined };
   },

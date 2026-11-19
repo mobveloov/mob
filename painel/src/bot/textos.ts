@@ -18,15 +18,19 @@ const primeiroNome = (nome: string) => (/^\d+$/.test(nome) ? "" : nome.trim().sp
 /** Formas de pagamento (o nome vai igual para a corrida própria). */
 export const PAGAMENTOS: string[] = ["Dinheiro", "Pix", "Cartão na maquininha"];
 
-/** Opções do menu (com "Agendar" quando o agendamento está ligado). */
-export const opcoesMenu = (agendar: boolean) => (agendar ? "\n*1* - Pedir uma corrida\n*2* - Agendar uma corrida\n*3* - Falar com o suporte" : "\n*1* - Pedir uma corrida\n*2* - Falar com o suporte");
+/**
+ * Menu do bot como no sistema de referência (botões "Solicitar corrida", "Agendar" e "Suporte"). Aqui vão numerados:
+ * o WhatsApp sem botões mostra as opções em lista e a pessoa responde o número ou o nome.
+ */
+export const opcoesMenu = (agendar: boolean) => (agendar ? "\n*1* - Solicitar corrida 🚕\n*2* - Agendar 📅\n*3* - Suporte 💬" : "\n*1* - Solicitar corrida 🚕\n*2* - Suporte 💬");
+
+/** Textos de boas-vindas do original: o primeiro contato se apresenta; quem volta (e o "menu" repetido) fala como "IA da central". */
+export const BOAS_VINDAS = "👋 Olá! Sou um assistente 🤖 inteligente. Como podemos ajudar? 🚕";
+export const MENU_REPETIDO = "👋 Sou a 🤖 IA da central. Como podemos ajudar? 🚕";
 
 export const T = {
-  menu: (m: Marcador, nome: string, agendar = false) => {
-    const n = primeiroNome(nome);
-    return `Olá${n ? `, ${n}` : ""}! Aqui é ${m.assistente}, da ${m.empresa}. 👋\n\nComo posso ajudar?${opcoesMenu(agendar)}`;
-  },
-  menuDeNovo: (agendar = false) => (agendar ? "Não entendi. Responda *1* para pedir uma corrida, *2* para agendar ou *3* para falar com o suporte." : "Não entendi. Responda *1* para pedir uma corrida ou *2* para falar com o suporte."),
+  menu: (_m: Marcador, _nome: string, agendar = false, quemVolta = false) => `${quemVolta ? MENU_REPETIDO : BOAS_VINDAS}${opcoesMenu(agendar)}`,
+  menuDeNovo: (agendar = false) => `${MENU_REPETIDO}${opcoesMenu(agendar)}`,
   embarque: () => "Onde você está? Envie o *endereço de embarque* (rua e número) ou a sua *localização* pelo clipe 📎.",
   embarqueCorrecao: () => "🔄 Sem problema! Qual é o *endereço* correto de embarque? Envie o endereço ou a localização 📎.",
   embarqueDeNovo: () => "Preciso do endereço de embarque. Exemplo: *Rua das Flores, 120*. Ou envie a localização 📎.",

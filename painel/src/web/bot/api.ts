@@ -1,5 +1,7 @@
 // Conversa das telas do bot com o servidor (/api/bot). Mesmo jeito do api.ts do painel.
 
+import type { RideOptionsConfig } from "../../bot/opcoes-pedido.ts";
+
 export interface ConfigAvancada {
   fluxo: { show_welcome_menu: boolean; ask_destination: boolean; allow_skip_destination: boolean; confirm_address: boolean; ask_category: boolean; ask_payment: boolean };
   textos: Record<string, string>;
@@ -9,6 +11,7 @@ export interface ConfigAvancada {
   textosStatus: Record<string, string>;
   voz: { ligada: boolean; nome: string };
   agendar: boolean;
+  opcoes: RideOptionsConfig;
 }
 export type TipoProvedor = "evolution" | "zapi" | "zpro" | "meta" | "simulado";
 export interface ConfigBot extends ConfigAvancada { ativo: boolean; provedor: TipoProvedor; instancia: string }

@@ -27,6 +27,7 @@ import { cidadesAtendidas } from "../enderecos/index.ts";
 import { tratarDescadastro } from "./descadastro.ts";
 import { supportCloseDecision } from "./fim-suporte.ts";
 import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
+import { applyInput, botOptionsMenu, describeChoices, enabledOptions, INPUT_PROMPTS, parseOptionsReply, sanitizeChoices, type InputKey, type RideChoices } from "./opcoes-pedido.ts";
 import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
 
 export interface Dependencias {
@@ -211,7 +212,7 @@ const localDe = (r: Recebida): Local | null => (r.local ? { texto: r.local.texto
 
 function textoMenu(p: Passo): string {
   const custom = customText(p.cfg.textos, p.c.historico.length ? "welcome_back" : "welcome_menu", "");
-  return custom ? `${custom}${opcoesMenu(p.cfg.agendar)}` : T.menu(p.m, p.c.nome, p.cfg.agendar);
+  return custom ? `${custom}${opcoesMenu(p.cfg.agendar)}` : T.menu(p.m, p.c.nome, p.cfg.agendar, p.c.historico.length > 0);
 }
 
 
@@ -283,7 +284,7 @@ function irPara(p: Passo, etapa: Conversa["etapa"], corrigindo = false): void | 
   }
   if (etapa === "confirmar") p.dizer(T.confirmar(c.rascunho));
   if (etapa === "pagamento") {
-    if (!cfg.fluxo.ask_payment) { c.rascunho.pagamento = PAGAMENTOS[0]; return criar(p); } // a corrida própria exige uma forma: sem perguntar, vai Dinheiro
+    if (!cfg.fluxo.ask_payment) { c.rascunho.pagamento = PAGAMENTOS[0]; return depoisDoPagamento(p); } // a corrida própria exige uma forma: sem perguntar, vai Dinheiro
     const base = p.txt("ask_payment", "");
     p.dizer(base ? `${base}\n${PAGAMENTOS.map((x, i) => `*${i + 1}* - ${x}`).join("\n")}` : T.pagamento());
   }
@@ -317,7 +318,9 @@ async function passo(p: Passo) {
     if (MENU.test(n) || supportCloseDecision("passenger", texto).sendMenu) { const saiu = p.txt("support_exit", ""); if (saiu) p.dizer(saiu); return irPara(p, "menu"); }
     return; // o operador responde pelo painel
   }
-  if (MENU.test(n) && c.etapa !== "inicio") { c.rascunho = {}; return irPara(p, "menu"); }
+  // "0" é "seguir sem preferência" / "pular" na pesquisa de preferências; nas outras etapas é voltar ao menu.
+  const zeroDaPesquisa = n === "0" && (c.etapa === "opcoes" || c.etapa === "opcao_detalhe");
+  if (MENU.test(n) && c.etapa !== "inicio" && !zeroDaPesquisa) { c.rascunho = {}; return irPara(p, "menu"); }
 
   // Pedido urgente ("urgente", "rápido", "com pressa"): só o embarque, sem destino, categoria nem pagamento.
   if (texto && !localDe(r) && !c.rascunho.urgente && c.etapa !== "avaliacao" && !bloqueado(p)) {
@@ -496,6 +499,38 @@ async function passo(p: Passo) {
       const o = opcao(texto, PAGAMENTOS.length, { 1: /\bdinheiro\b/, 2: /\bpix\b/, 3: /\b(cartao|credito|debito|maquininha)\b/ });
       if (!o) return p.dizer(p.txt("payment_retry", "") ? `${p.txt("payment_retry", "")}\n${PAGAMENTOS.map((x, i) => `*${i + 1}* - ${x}`).join("\n")}` : T.pagamentoDeNovo());
       c.rascunho.pagamento = PAGAMENTOS[o - 1];
+      return depoisDoPagamento(p);
+    }
+
+    case "opcoes": {
+      const itens = enabledOptions(p.cfg.opcoes);
+      if (!p.cfg.opcoes.bot || !itens.length) return criar(p);
+      const resp = parseOptionsReply(texto, itens);
+      if (resp.invalid) return p.dizer(`⚠️ Não entendi.
+
+${botOptionsMenu(itens)}`);
+      let escolhas: RideChoices = {};
+      const pendentes: InputKey[] = [];
+      for (const it of resp.picked) {
+        if (it.input) pendentes.push(it.input);
+        else if (it.key === "retorno") escolhas.retorno = true;
+        else escolhas = { ...escolhas, extras: { ...(escolhas.extras ?? {}), [it.key]: true } };
+      }
+      c.rascunho.opcoes = sanitizeChoices(escolhas, p.cfg.opcoes);
+      c.rascunho.opcoesPendentes = pendentes.length ? pendentes : undefined;
+      if (pendentes.length) { c.etapa = "opcao_detalhe"; return p.dizer(INPUT_PROMPTS[pendentes[0]]); }
+      return criar(p);
+    }
+
+    case "opcao_detalhe": {
+      const pendentes = (c.rascunho.opcoesPendentes ?? []).filter((k) => k in INPUT_PROMPTS);
+      if (!pendentes.length) return criar(p);
+      const res = applyInput(sanitizeChoices(c.rascunho.opcoes, p.cfg.opcoes), pendentes[0], texto);
+      if (res.error) return p.dizer(`⚠️ ${res.error}`);
+      const resto = pendentes.slice(1);
+      c.rascunho.opcoes = sanitizeChoices(res.choices, p.cfg.opcoes);
+      c.rascunho.opcoesPendentes = resto.length ? resto : undefined;
+      if (resto.length) return p.dizer(INPUT_PROMPTS[resto[0]]);
       return criar(p);
     }
 
@@ -605,10 +640,29 @@ async function iniciarCancelamento(p: Passo) {
     : `📅 Qual agendamento você quer cancelar? Responda com o número:\n\n${lista.map((x, i) => `${i + 1} - ${formatScheduleBR(x.quandoMs)}`).join("\n")}\n\n(ou *não* para manter todos)`);
 }
 
+/**
+ * Depois da forma de pagamento (ou da categoria, sem pagamento): se a empresa ligou opções para o bot, pergunta
+ * "Alguma preferência para esta corrida?" e a corrida só sai quando a pessoa responder. Pedido urgente não pergunta.
+ */
+async function depoisDoPagamento(p: Passo): Promise<void> {
+  const { c } = p;
+  const itens = enabledOptions(p.cfg.opcoes);
+  if (c.rascunho.urgente || !p.cfg.opcoes.bot || !itens.length) { c.rascunho.opcoes = undefined; return criar(p); }
+  c.etapa = "opcoes";
+  c.rascunho.opcoes = {};
+  c.rascunho.opcoesPendentes = undefined;
+  p.dizer(botOptionsMenu(itens));
+}
+
 async function criar(p: Passo): Promise<void> {
   const { c, empresaId } = p;
   const rasc = c.rascunho;
   if (!rasc.embarque || rasc.pagamento === undefined) { c.rascunho = {}; return irPara(p, "embarque"); }
+  const escolhas = sanitizeChoices(rasc.opcoes, p.cfg.opcoes);
+  const escolhidas = describeChoices(escolhas, p.cfg.opcoes);
+  const aviso = escolhidas.length ? `
+
+✨ ${escolhidas.join(" · ")}` : "";
   // Trava: a etapa "criando" fica gravada antes de chamar o sistema de origem.
   c.etapa = "criando";
   A.salvarConversa(empresaId, c);
@@ -616,20 +670,21 @@ async function criar(p: Passo): Promise<void> {
     const nova = await corridasDoBot().criar(empresaId, {
       passageiro: { nome: c.nome, telefone: c.id }, embarque: rasc.embarque,
       destino: rasc.semDestino ? undefined : rasc.destino, categoria: rasc.categoria?.nome ?? "",
-      pagamento: rasc.pagamento, observacao: "Pedido pelo WhatsApp", agendadaPara: rasc.agendarPara ? horarioBrasilia(rasc.agendarPara) : undefined,
+      pagamento: rasc.pagamento, observacao: ["Pedido pelo WhatsApp", ...escolhidas].join(" · "), agendadaPara: rasc.agendarPara ? horarioBrasilia(rasc.agendarPara) : undefined,
+      ...(escolhas.cupom ? { cupom: escolhas.cupom } : {}), ...(escolhas.parada ? { parada: { texto: escolhas.parada } } : {}), ...(escolhas.recado ? { infoDepois: escolhas.recado } : {}),
     });
     if (rasc.agendarPara) {
       // Corrida agendada não prende a conversa: a pessoa pode pedir outra para agora. Os avisos saem 15 e 5 minutos antes.
       guardarEndereco(c, rasc.embarque);
       c.etapa = "inicio"; c.rascunho = {};
-      return p.dizer(T.agendada(nova.os, formatScheduleBR(rasc.agendarPara), nova.valor));
+      return p.dizer(`${T.agendada(nova.os, formatScheduleBR(rasc.agendarPara), nova.valor)}${aviso}`);
     }
     c.corrida = { id: nova.id, os: nova.os, status: "procurando", grupo: "aberta", criadaEm: agora(), valor: nova.valor };
     guardarEndereco(c, rasc.embarque);
     c.etapa = "em_corrida";
     c.rascunho = {};
     const ok = p.txt("ride_success", "");
-    p.dizer(ok ? `${ok}\nNúmero *${nova.os}*.${nova.valor ? ` Valor estimado: *R$ ${nova.valor.toFixed(2).replace(".", ",")}*.` : ""}\nPara cancelar, envie *cancelar*.` : T.criada(nova.os, nova.valor));
+    p.dizer(ok ? `${ok}\nNúmero *${nova.os}*.${nova.valor ? ` Valor estimado: *R$ ${nova.valor.toFixed(2).replace(".", ",")}*.` : ""}\nPara cancelar, envie *cancelar*.${aviso}` : `${T.criada(nova.os, nova.valor)}${aviso}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[bot] criar corrida", empresaId, msg);

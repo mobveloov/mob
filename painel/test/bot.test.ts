@@ -58,9 +58,7 @@ test("cumprimento nunca vira endereço; endereço e lugar viram", () => {
 test("conversa completa: menu, embarque, destino, confirmação, categoria, pagamento, corrida própria, status e avaliação", async () => {
   const tel = "5511900000001";
   let r = await msg(tel, "oi lindo");
-  assert.match(r[0], /Lia/);
-  assert.match(r[0], /Rota Teste/);
-  assert.match(r[0], /Maria/);
+  assert.match(r[0], /assistente/);
   r = await msg(tel, "1");
   assert.match(r[0], /embarque/i);
   r = await msg(tel, "bom dia");
@@ -184,7 +182,7 @@ test("localização no embarque, sem destino, e erro não trava a conversa", asy
   r = await msg(tel, "1");
   assert.match(r[0], /Não consegui criar/);
   r = await msg(tel, "menu");
-  assert.match(r[0], /Como posso ajudar/);
+  assert.match(r[0], /Como podemos ajudar/);
 });
 
 test("cancelar pelo WhatsApp cancela a corrida própria; cancelamento da central avisa o passageiro", async () => {
@@ -209,7 +207,7 @@ test("cancelar pelo WhatsApp cancela a corrida própria; cancelamento da central
 
 test("passageiro bloqueado não pede corrida; corrida já aberta no painel não duplica", async () => {
   let r = await msg("5511900000008", "oi");
-  assert.match(r[0], /Bruno/); // nome vem do cadastro de passageiros
+  assert.match(r[0], /assistente/); assert.equal(A.conversa(empresa.id, "5511900000008")!.nome, "Bruno Bloqueado"); // nome vem do cadastro de passageiros
   r = await msg("5511900000008", "1");
   assert.match(r[0], /Não consigo pedir corrida/);
   assert.equal(propria("5511900000008").length, 0);
@@ -234,7 +232,7 @@ test("frase livre: a IA (caso classificação) tira embarque e destino; cumprime
   assert.match(r[0], /Santa Casa/);
   const tel2 = "5511900000005";
   r = await receber(empresa.id, { id: `m${++seq}`, telefone: tel2, texto: "e aí, sumido" }, { classificar });
-  assert.match(r[0], /Como posso ajudar/);
+  assert.match(r[0], /Como podemos ajudar/);
   // Sem IA (sem chave): pedido sem endereço vai para o embarque.
   r = await msg("5511900000006", "quero um carro");
   assert.match(r[0], /embarque/i);
@@ -334,7 +332,7 @@ test("webhook HTTP: segredo da empresa, resposta imediata e login nas outras rot
     const r = await fetch(`${base}/webhook/${empresa.id}/${segredo}`, { method: "POST", headers: h, body: corpo });
     assert.equal(r.status, 200);
     await A.aguardarFilas();
-    assert.match(A.conversa(empresa.id, "5511900000099")!.mensagens.at(-1)!.texto, /Lia/);
+    assert.match(A.conversa(empresa.id, "5511900000099")!.mensagens.at(-1)!.texto, /assistente/);
     assert.equal((await fetch(`${base}/conversas`)).status, 401);
     assert.equal((await fetch(`${base}/config`)).status, 401);
   } finally {

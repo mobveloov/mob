@@ -1,8 +1,10 @@
 // Tipos do bot de WhatsApp. Cada empresa tem o próprio número (instância) e as próprias conversas.
 
+import type { InputKey, RideChoices, RideOptionsConfig } from "./opcoes-pedido.ts";
+
 export type Etapa =
   | "inicio" | "menu" | "embarque" | "numero_embarque" | "destino" | "numero_destino" | "agendamento" | "cancelar_agendamento" | "confirmar" | "categoria" | "pagamento"
-  | "criando" | "em_corrida" | "avaliacao" | "suporte";
+  | "opcoes" | "opcao_detalhe" | "criando" | "em_corrida" | "avaliacao" | "suporte";
 
 export interface Local { texto: string; lat?: number; lng?: number }
 
@@ -45,6 +47,9 @@ export interface Rascunho {
   agendCancelar?: string[];
   /** Endereços salvos oferecidos na pergunta do embarque (na ordem das opções). */
   salvos?: Local[];
+  /** Pesquisa "Alguma preferência para esta corrida?": o que a pessoa escolheu e o que ainda falta perguntar (cupom, parada...). */
+  opcoes?: RideChoices;
+  opcoesPendentes?: InputKey[];
 }
 
 /** Endereço de embarque que o passageiro já usou (o bot oferece os mais usados). */
@@ -114,6 +119,8 @@ export interface ConfigBot {
   textosStatus: Record<string, string>;
   /** Responder em áudio quando o passageiro manda áudio (só com chave de voz). */
   voz: { ligada: boolean; nome: string };
+  /** Pesquisa de preferências da corrida (Bot › Ajustes › Opções do pedido). */
+  opcoes: RideOptionsConfig;
   /** Oferece "Agendar uma corrida" no menu e entende "amanhã 7h". */
   agendar: boolean;
   provedor: TipoProvedor;

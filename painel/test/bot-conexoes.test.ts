@@ -162,7 +162,7 @@ test("a conversa responde pelo número por onde o passageiro escreveu", async ()
   const fake = (por: string) => ({ ...provedorDe(empresa.id), enviarTexto: async (_t: string, texto: string) => { enviados.push({ por, texto }); } });
   await receber(empresa.id, { id: "c1", telefone: "5511911110001", nome: "Rui", texto: "oi", conexao: sec.id }, { provedor: fake(sec.id), classificar: async () => null });
   assert.equal(A.conversa(empresa.id, "5511911110001")!.conexao, sec.id);
-  assert.match(enviados[0].texto, /Lia/);
+  assert.match(enviados[0].texto, /assistente/);
   // Sem provedor injetado, usa o da conexão da conversa (simulado: cai na caixa da empresa).
   limpar();
   await receber(empresa.id, { id: "c2", telefone: "5511911110001", nome: "Rui", texto: "menu" }, { classificar: async () => null });
@@ -199,7 +199,7 @@ test("áudio no fluxo: vira texto e segue o pedido; sem transcrição avisa; ope
   const tel = "5511922220001";
   const base = { classificar: async () => null };
   const r1 = await receber(empresa.id, { id: "au1", telefone: tel, nome: "Ana", audio: { mimetype: "audio/ogg", transcricao: "oi" } }, base);
-  assert.match(r1[0], /Lia/);
+  assert.match(r1[0], /assistente/);
   assert.equal(A.conversa(empresa.id, tel)!.mensagens[0].texto, '🎤 Áudio: "oi"');
   const r2 = await receber(empresa.id, { id: "au2", telefone: tel, nome: "Ana", audio: { mimetype: "audio/ogg", transcricao: "1" } }, base);
   assert.match(r2[0], /endereço de embarque/i);

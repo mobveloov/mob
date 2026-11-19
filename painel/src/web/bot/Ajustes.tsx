@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Ban, BookOpenCheck, CheckCircle2, Image as Imagem, MessageSquare, Plus, Save, Settings, Trash2 } from "lucide-react";
 import { DEFAULT_BOT_CONTROL } from "../../bot/controle.ts";
+import { FILTER_KEYS, INPUT_LABELS, PREF_KEYS, PREF_LABELS } from "../../bot/opcoes-pedido.ts";
 import { STATUS_MESSAGE_DEFS, STATUS_MESSAGE_VARS } from "../../bot/mensagens-status.ts";
 import { BOT_TEXT_DEFS, BOT_TEXT_MAX, FAQ_MAX_ENTRIES } from "../../bot/textos-editaveis.ts";
 import { useSessao } from "../App";
@@ -29,7 +30,7 @@ export function BotAjustes() {
   useEffect(() => {
     if (!cfg.dados) return;
     const a = cfg.dados.config;
-    setC({ fluxo: a.fluxo, textos: a.textos, saudacao: a.saudacao, faq: a.faq, controle: a.controle, textosStatus: a.textosStatus, voz: a.voz, agendar: a.agendar });
+    setC({ fluxo: a.fluxo, textos: a.textos, saudacao: a.saudacao, faq: a.faq, controle: a.controle, textosStatus: a.textosStatus, voz: a.voz, agendar: a.agendar, opcoes: a.opcoes });
     setFaqTxt(a.faq.map((f) => f.keywords.join(", ")));
   }, [cfg.dados]);
   if (!c) return cfg.erro ? <div className="aviso erro">{cfg.erro}</div> : null;
@@ -120,6 +121,34 @@ export function BotAjustes() {
           <input type="checkbox" role="switch" disabled={!admin} checked={c.agendar} onChange={() => setC({ ...c, agendar: !c.agendar })} /> <strong>Permitir agendar corrida</strong>
         </label>
         <button className="botao primario" disabled={!admin || ocupado} onClick={() => salvar({ agendar: c.agendar }, "Agendamento salvo")}><CheckCircle2 size={14} /> Salvar agendamento</button>
+      </Cartao>
+
+      <Cartao titulo="Opções do pedido (preferências da corrida)">
+        <p className="sub">Ligado, depois da forma de pagamento o bot pergunta "Alguma preferência para esta corrida?" com as opções que você marcar abaixo. O passageiro responde com os números (ex.: 1 3) ou 0 para seguir sem preferência. O que ele escolher vai na observação da corrida; cupom, parada e recado seguem nos campos próprios. Pedido urgente não pergunta.</p>
+        <label style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 0" }}>
+          <input type="checkbox" role="switch" disabled={!admin} checked={c.opcoes.bot} onChange={() => setC({ ...c, opcoes: { ...c.opcoes, bot: !c.opcoes.bot } })} /> <strong>Perguntar as preferências no bot</strong>
+        </label>
+        {PREF_KEYS.map((k) => (
+          <label key={k} style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 0" }}>
+            <input type="checkbox" disabled={!admin} checked={c.opcoes.prefs[k]} onChange={() => setC({ ...c, opcoes: { ...c.opcoes, prefs: { ...c.opcoes.prefs, [k]: !c.opcoes.prefs[k] } } })} /> {PREF_LABELS[k]}
+          </label>
+        ))}
+        {FILTER_KEYS.map((k, i) => {
+          const f = c.opcoes.filters.find((x) => x.key === k) ?? { key: k, label: "", enabled: false };
+          const mudar = (n: Partial<typeof f>) => setC({ ...c, opcoes: { ...c.opcoes, filters: FILTER_KEYS.map((kk) => (kk === k ? { ...f, ...n } : c.opcoes.filters.find((x) => x.key === kk) ?? { key: kk, label: "", enabled: false })) } });
+          return (
+            <label key={k} style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 0" }}>
+              <input type="checkbox" disabled={!admin} checked={f.enabled} onChange={() => mudar({ enabled: !f.enabled })} />
+              <input disabled={!admin} maxLength={40} placeholder={`Filtro ${i + 1} (nome igual ao da central, ex.: Ar-condicionado)`} value={f.label} onChange={(e) => mudar({ label: e.target.value })} style={{ flex: 1 }} />
+            </label>
+          );
+        })}
+        {(["retorno", "parada", "cupom", "favorito", "recado"] as const).map((k) => (
+          <label key={k} style={{ display: "flex", gap: 10, alignItems: "center", padding: "4px 0" }}>
+            <input type="checkbox" disabled={!admin} checked={c.opcoes[k]} onChange={() => setC({ ...c, opcoes: { ...c.opcoes, [k]: !c.opcoes[k] } })} /> {INPUT_LABELS[k]}
+          </label>
+        ))}
+        <button className="botao primario" disabled={!admin || ocupado} onClick={() => salvar({ opcoes: c.opcoes }, "Opções do pedido salvas")}><CheckCircle2 size={14} /> Salvar opções do pedido</button>
       </Cartao>
 
       <Cartao titulo="Voz do bot">
