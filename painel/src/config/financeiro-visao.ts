@@ -300,7 +300,7 @@ function linhasFaturamento(empresaId: string, p: Per): LinhaFaturamento[] {
     if (!em || diaDe(em) < p.inicio || diaDe(em) > p.fim) continue;
     if (status === "Finalizada" && !(c.valor != null && c.valor >= 0)) continue;
     const valor = cent(c.valor ?? c.estimativa.valor ?? 0);
-    const taxa = status === "Finalizada" && c.motoristaId && valor > 0 ? cent(calcularComissao(empresaId, c.categoria, valor, c.motoristaId).taxaCentral) : 0;
+    const taxa = status === "Finalizada" && c.motoristaId && valor > 0 ? cent(calcularComissao(empresaId, c.categoria, valor, c.motoristaId, c.pagamento).taxaCentral) : 0;
     l.push({ id: c.id, em, os: c.os, pagamento: c.pagamento, valor, taxa, status });
   }
   return l.sort((a, b) => b.em.localeCompare(a.em));
