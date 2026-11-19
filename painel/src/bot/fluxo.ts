@@ -27,6 +27,7 @@ import { cidadesAtendidas } from "../enderecos/index.ts";
 import { tratarDescadastro } from "./descadastro.ts";
 import { supportCloseDecision } from "./fim-suporte.ts";
 import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
+import { isPriceQuestion, isPriceQuestionOnly, responderPreco, textoDeRetomada } from "./pergunta-preco.ts";
 import { applyInput, botOptionsMenu, describeChoices, enabledOptions, INPUT_PROMPTS, parseOptionsReply, sanitizeChoices, type InputKey, type RideChoices } from "./opcoes-pedido.ts";
 import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
 
@@ -322,6 +323,9 @@ async function passo(p: Passo) {
   const zeroDaPesquisa = n === "0" && (c.etapa === "opcoes" || c.etapa === "opcao_detalhe");
   if (MENU.test(n) && c.etapa !== "inicio" && !zeroDaPesquisa) { c.rascunho = {}; return irPara(p, "menu"); }
 
+  // Pergunta de preço ("quanto custa pra Ribeirão?"): responde com a tabela "Preços por cidade". No meio do pedido só vale a pergunta sozinha.
+  if (texto && !localDe(r) && await perguntaDePreco(p)) return;
+
   // Pedido urgente ("urgente", "rápido", "com pressa"): só o embarque, sem destino, categoria nem pagamento.
   if (texto && !localDe(r) && !c.rascunho.urgente && c.etapa !== "avaliacao" && !bloqueado(p)) {
     const u = detectUrgentRide(texto);
@@ -553,6 +557,30 @@ ${botOptionsMenu(itens)}`);
     default:
       return irPara(p, "menu");
   }
+}
+
+const ETAPAS_DO_PEDIDO: Array<Conversa["etapa"]> = ["embarque", "numero_embarque", "destino", "numero_destino", "agendamento", "confirmar", "categoria", "pagamento", "opcoes", "opcao_detalhe"];
+
+/** "Quanto custa?": responde com a tabela de preços por cidade. Devolve true quando respondeu (a mensagem não segue o fluxo). */
+async function perguntaDePreco(p: Passo): Promise<boolean> {
+  const { c, texto } = p;
+  const noMenu = c.etapa === "inicio" || c.etapa === "menu";
+  const noPedido = ETAPAS_DO_PEDIDO.includes(c.etapa) && isPriceQuestionOnly(texto);
+  if (!noPedido && !(noMenu && isPriceQuestion(texto) && !(pareceRua(texto) && /\d/.test(texto)))) return false;
+  const cod = A.cidadeDaConexao(p.empresaId, c.conexao ?? ID_PRINCIPAL);
+  const cidade = cod ? cidadePorCodigo(p.empresaId, cod) : null;
+  const resp = responderPreco(p.empresaId, texto, cidade ? { cidade: cidade.nome, uf: cidade.uf } : null, { noPedido });
+  if (noPedido) {
+    p.dizer(resp?.texto ?? "💰 Você vê o *valor da corrida* antes de confirmar, junto com a forma de pagamento.");
+    p.dizer(textoDeRetomada(c.etapa));
+    return true;
+  }
+  if (!resp) return false; // nada cadastrado: segue como conversa normal
+  p.dizer(resp.texto);
+  if (resp.semValor) { c.etapa = "suporte"; return true; } // a central responde pelo painel; "sair" volta ao menu
+  c.etapa = "menu";
+  p.dizer(`🚕 Quer pedir a corrida?${opcoesMenu(p.cfg.agendar)}`);
+  return true;
 }
 
 /** Passageiro bloqueado ou suspenso no cadastro "clientes" não pede corrida. */
