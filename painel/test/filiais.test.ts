@@ -184,3 +184,35 @@ test("filiais dos dois lados nunca se misturam (contagem do banco)", () => {
   assert.equal(F.pessoasDaFilial(Z, centro, "motorista").length, 0);
   assert.equal(F.pessoasDaFilial(A, centro, "motorista").length, 1);
 });
+
+test("Monitoramento, Mapa em tempo real e Programadas filtram por filial (e o Operador fica preso à dele)", async () => {
+  const futuro = new Date(Date.now() - 3 * 3600_000 + 5 * 86400_000).toISOString().slice(0, 16);
+  const prog = async (tel: string, filialId?: string) => C.criarCorridaPropria(A, { passageiro: { nome: `Prog ${tel}`, telefone: `1192${tel}` }, embarque: { texto: "Rua A, 1" }, destino: { texto: "Rua B, 2" }, categoria: "Pop", pagamento: "Pix", canal: "painel", agendadaPara: futuro, ...(filialId ? { filialId } : {}) } as never, "t");
+  await prog("00000001", centro);
+  await prog("00000002", norte);
+  const tudo = await api("admA", "GET", "/api/operacao/monitoramento");
+  assert.equal(tudo.status, 200);
+  assert.deepEqual(tudo.corpo.filiais.map((f: { nome: string }) => f.nome).sort(), ["Centro", "Norte"]);
+  const mc = await api("admA", "GET", `/api/operacao/monitoramento?filial=${centro}`);
+  const mn = await api("admA", "GET", `/api/operacao/monitoramento?filial=${norte}`);
+  assert.equal(tudo.corpo.corridas.length, 6);
+  assert.equal(mc.corpo.corridas.length, 4);
+  assert.equal(mn.corpo.corridas.length, 2);
+  const pt = await api("admA", "GET", "/api/operacao/programadas");
+  const pc = await api("admA", "GET", `/api/operacao/programadas?filial=${centro}`);
+  assert.equal(pt.corpo.total, 2);
+  assert.equal(pc.corpo.total, 1);
+  assert.equal(pc.corpo.itens[0].passageiro, "Prog 00000001");
+  assert.equal((await api("admA", "GET", `/api/operacao/programadas?filial=${zFilial}`)).corpo.total, 0);
+  const m0 = await api("admA", "GET", "/api/operacao/mapa");
+  const m1 = await api("admA", "GET", `/api/operacao/mapa?filial=${centro}`);
+  assert.equal(m0.corpo.stats.cadastrosAtivos, 2);
+  assert.equal(m1.corpo.stats.cadastrosAtivos, 1);
+  assert.equal(m1.corpo.motoristas[0].nome, "Motorista Centro");
+  // Operador do Norte: o filtro forjado é ignorado e a lista de filiais nem vem.
+  const on = await api("opNorte", "GET", `/api/operacao/monitoramento?filial=${centro}`);
+  assert.equal(on.corpo.corridas.length, 2);
+  assert.deepEqual(on.corpo.filiais, []);
+  assert.equal((await api("opNorte", "GET", `/api/operacao/programadas?filial=${centro}`)).corpo.total, 1);
+  assert.equal((await api("opNorte", "GET", `/api/operacao/mapa?filial=${centro}`)).corpo.motoristas[0].nome, "Motorista Norte");
+});

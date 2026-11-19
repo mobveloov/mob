@@ -6,7 +6,7 @@ import "./corridas.css";
 
 const TOM: Record<string, string> = { procurando: "alerta", a_caminho: "info", no_local: "info", em_andamento: "info", finalizada: "ok", cancelada: "ruim", nao_atendida: "alerta" };
 const TOM_SIT: Record<string, string> = { distribuida: "ok", aguardando: "alerta", cancelada: "ruim", erro: "ruim" };
-const VAZIO = { centralChamada: "", empresa: "", os: "", categoria: "", passageiro: "", motorista: "", dataIni: "", dataFim: "", pagamento: "", situacao: "" };
+const VAZIO = { centralChamada: "", empresa: "", os: "", categoria: "", passageiro: "", motorista: "", dataIni: "", dataFim: "", pagamento: "", situacao: "", filial: "" };
 type Filtros = typeof VAZIO;
 
 export default function Programadas() {
@@ -47,7 +47,7 @@ export default function Programadas() {
           {lista("centralChamada", "Central chamada", o?.centrais)}{lista("empresa", "Empresa", o?.empresas)}{campo("os", "Nº OS")}
           {lista("categoria", "Categoria", o?.categorias)}{campo("passageiro", "Nome do passageiro")}{campo("motorista", "Nome/VTR do motorista")}
           {campo("dataIni", "Data inicial", "date")}{campo("dataFim", "Data final", "date")}{lista("pagamento", "Forma de pagamento", o?.pagamentos)}
-          {lista("situacao", "Situação do disparo", o?.situacoes)}
+          {lista("situacao", "Situação do disparo", o?.situacoes)}{!!o?.filiais?.length && lista("filial", "Filial", o.filiais)}
         </div>
         <div className="oc-fila" style={{ marginTop: 12 }}>
           <button className="oc-btn pri" type="submit">Filtrar</button>

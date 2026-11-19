@@ -174,8 +174,11 @@ rotasOperacao.put("/corridas/:id", central, ok(async (req, res) => {
 
 // ------------------------------------------------------------------ telas
 
-rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20), motorista: q(req, "motorista", 80), endereco: q(req, "endereco", 120), empresa: q(req, "empresa", 80) }))));
-rotasOperacao.get("/mapa", ok((req, res) => res.json(S.mapa(emp(req)))));
+/** Filial da consulta: Operador/Gestor ligados a uma filial ficam presos a ela; os demais escolhem (ou deixam vazio = todas). */
+const filialPedida = (req: Request) => filialForcada(emp(req), req.ctx!.usuario) ?? (q(req, "filial", 60) || undefined);
+const listaFiliais = (req: Request) => (filialForcada(emp(req), req.ctx!.usuario) ? [] : OPCOES_FIXAS(req).filiais);
+rotasOperacao.get("/monitoramento", ok((req, res) => res.json({ ...S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20), motorista: q(req, "motorista", 80), endereco: q(req, "endereco", 120), empresa: q(req, "empresa", 80), filial: filialPedida(req) }), filiais: listaFiliais(req) })));
+rotasOperacao.get("/mapa", ok((req, res) => res.json({ ...S.mapa(emp(req), filialPedida(req)), filiais: listaFiliais(req) })));
 rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   const h = Number(req.query.horas);
   res.json(await S.ocorrencias(emp(req), h > 0 && h <= 72 ? h : 1, pag(req)));
@@ -184,12 +187,12 @@ rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
 const filtroProg = (req: Request): S.FiltroProgramadas => ({
   centralChamada: q(req, "centralChamada", 60), empresa: q(req, "empresa", 80), os: q(req, "os", 30), categoria: q(req, "categoria", 60),
   passageiro: q(req, "passageiro", 80), motorista: q(req, "motorista", 80), dataIni: dataOk(q(req, "dataIni")) || undefined, dataFim: dataOk(q(req, "dataFim")) || undefined,
-  pagamento: q(req, "pagamento", 40), situacao: S.SITUACOES_DISPARO[q(req, "situacao")] ? q(req, "situacao") : undefined,
+  pagamento: q(req, "pagamento", 40), situacao: S.SITUACOES_DISPARO[q(req, "situacao")] ? q(req, "situacao") : undefined, filial: filialPedida(req),
 });
 rotasOperacao.get("/programadas", ok((req, res) => {
   res.json({
     ...S.programadasFiltradas(emp(req), filtroProg(req), pag(req), false, empresasPorTelefone(emp(req))),
-    opcoes: { ...OPCOES_FIXAS(req), categorias: S.opcoesRapidas(emp(req)).categorias, situacoes: Object.entries(S.SITUACOES_DISPARO).map(([id, nome]) => ({ id, nome })) },
+    opcoes: { ...OPCOES_FIXAS(req), filiais: listaFiliais(req), categorias: S.opcoesRapidas(emp(req)).categorias, situacoes: Object.entries(S.SITUACOES_DISPARO).map(([id, nome]) => ({ id, nome })) },
   });
 }));
 /** Exportar (CSV com proteção contra fórmula). */

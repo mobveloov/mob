@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, MoreVertical } from "lucide-react";
-import { Aviso, L, Selo, hora, op, pino, useDados, useMapa } from "./comum";
+import { Aviso, L, Selo, hora, op, pino, qs, useDados, useMapa } from "./comum";
 import "./corridas.css";
 
 const SIT: Record<string, { rotulo: string; cor: string; tom: string }> = {
@@ -11,7 +11,8 @@ const SIT: Record<string, { rotulo: string; cor: string; tom: string }> = {
 };
 
 export default function MapaReal() {
-  const { dados, erro, carregando } = useDados<any>(() => op("/mapa"), [], 10_000);
+  const [filial, setFilial] = useState("");
+  const { dados, erro, carregando } = useDados<any>(() => op(`/mapa${qs({ filial })}`), [filial], 10_000);
   const [sit, setSit] = useState("");
   const [cat, setCat] = useState("");
   const [busca, setBusca] = useState("");
@@ -61,6 +62,7 @@ export default function MapaReal() {
       </div>
       <div className="oc-card oc-fila">
         <input style={{ maxWidth: 260 }} placeholder="Buscar" aria-label="Buscar motorista" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        {!!dados?.filiais?.length && <select style={{ maxWidth: 200 }} value={filial} onChange={(e) => setFilial(e.target.value)} aria-label="Filial"><option value="">Todas as filiais</option>{dados.filiais.map((x: { id: string; nome: string }) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select>}
         <select style={{ maxWidth: 200 }} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria"><option value="">Todas as categorias</option>{(dados?.categorias ?? []).map((c: string) => <option key={c}>{c}</option>)}</select>
         <select style={{ maxWidth: 200 }} value={sit} onChange={(e) => setSit(e.target.value)} aria-label="Situação"><option value="">Todos os status</option>{Object.entries(SIT).map(([k2, v]) => <option key={k2} value={k2}>{v.rotulo}</option>)}</select>
         <button className={`oc-chip ${offline ? "on" : ""}`} onClick={() => setOffline(!offline)}>{offline ? <Eye size={13} /> : <EyeOff size={13} />} Desconectados</button>
