@@ -268,7 +268,9 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
         km = 0;
         for (let i = 1; i < pontos.length; i++) km += (await rota({ lat: pontos[i - 1].lat!, lng: pontos[i - 1].lng! }, { lat: pontos[i].lat!, lng: pontos[i].lng! })).distanciaKm;
       }
-      conferirPagamento(empresaId, sessao.telefone, pagamento, estimarPreco(empresaId, { categoria: txt(b.categoria, 60), distanciaKm: km }).valor);
+      const est = estimarPreco(empresaId, { categoria: txt(b.categoria, 60), distanciaKm: km, pagamento });
+      // Pago com saldo, o passageiro também paga a taxa de serviço: o saldo cobre valor + taxa.
+      conferirPagamento(empresaId, sessao.telefone, pagamento, est.valor, "taxaServico" in est ? est.taxaServico : 0);
     }
     return criarCorridaPropria(empresaId, {
       passageiro: { nome, telefone: sessao.telefone }, embarque: ponto(b.embarque), destino: b.destino ? ponto(b.destino) : undefined,

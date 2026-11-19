@@ -266,10 +266,10 @@ export function aposCancelar(empresaId: string, c: CorridaPropria) {
 }
 
 /** Pagamento com saldo só se o saldo cobre a estimativa. */
-export function conferirPagamento(empresaId: string, telefone: string, pagamento: string, estimativa: number | null) {
+export function conferirPagamento(empresaId: string, telefone: string, pagamento: string, estimativa: number | null, taxaServico = 0) {
   if (pagamento !== PAGAMENTO_SALDO) return;
   const s = saldo(empresaId, "passageiro", telefone);
-  if (estimativa == null || s < estimativa) throw new Error(`Saldo insuficiente (R$ ${s.toFixed(2).replace(".", ",")}). Escolha outra forma de pagamento.`);
+  if (estimativa == null || s < arred(estimativa + (taxaServico || 0))) throw new Error(`Saldo insuficiente (R$ ${s.toFixed(2).replace(".", ",")}). Escolha outra forma de pagamento.`);
 }
 
 // ------------------------------------------------------------------ saques do motorista
