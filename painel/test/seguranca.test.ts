@@ -83,6 +83,8 @@ const PUBLICAS: Array<[string, string, string]> = [
   ["POST", "/api/totem/publico/:empresa/:local/entrar", "senha do totem (com limite de tentativas)"],
   ["POST", "/api/totem/premios/publico/:empresa/info", "página pública do jogo (só abre com o token do convite)"],
   ["POST", "/api/totem/premios/publico/:empresa/play", "jogar roleta ou raspadinha (token do convite, uma jogada por convite)"],
+  ["POST", "/api/totem/pontos/publico/:empresa/info", "página pública de pontos: com o token do aviso vê saldo e extrato; só com o telefone, apenas o saldo (regra do original), com limite de tentativas"],
+  ["POST", "/api/totem/pontos/publico/:empresa/trocar", "troca de pontos: só com o token do aviso (pelo telefone é recusada), com limite de tentativas"],
   ["POST", "/api/totem/premios/publico/:empresa/abrir", "link aberto do jogo: o telefone recebe o link no WhatsApp (com limite de tentativas)"],
   ["POST", "/api/totem/webhook/:empresa/:local", "webhook do WhatsApp do totem (aceita e ignora: o bot não responde pelo número do totem)"],
   ["POST", "/api/apps/:empresa/entrar/codigo", "app: pede o código"],
