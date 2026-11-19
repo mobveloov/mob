@@ -252,7 +252,7 @@ export function chat(empresaId: string, id: string) {
   const c = acharPropria(empresaId, id);
   const l = mensagens(empresaId, c.id);
   marcarChatLido(empresaId, c.id);
-  return l.map((m) => ({ id: m.id, de: m.de, nome: m.nome, texto: m.texto ?? "", audio: m.audio ? { id: m.audio.id, segundos: m.audio.segundos } : null, em: m.em }));
+  return l.map((m) => ({ id: m.id, de: m.de, nome: m.nome, texto: m.texto ?? "", audio: m.audio ? { id: m.audio.id, segundos: m.audio.segundos } : null, midia: m.midia ? { id: m.midia.id, tipo: m.midia.tipo, legenda: m.midia.legenda ?? "" } : null, em: m.em }));
 }
 
 // ====================================================================== monitoramento (acompanhamento)

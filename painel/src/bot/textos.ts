@@ -58,6 +58,8 @@ export const T = {
   agendada: (os: string, quando: string, valor?: number) =>
     `✅ Corrida agendada para *${quando}*! Número *${os}*.${valor ? ` Valor estimado: *${reais(valor)}*.` : ""}\nVou avisar aqui 15 e 5 minutos antes. Para ver ou cancelar, mande *meus agendamentos*.`,
   repassado: () => "✅ Pronto! O que você escrever ou gravar por aqui chega ao motorista. Para cancelar a corrida, envie *cancelar*.",
+  midiaRecusada: (motivo: string) => `⚠️ Não consegui enviar ao motorista: ${motivo} Aceito foto (JPG, PNG, WEBP) e vídeo (MP4, 3GP, MOV, WEBM).`,
+  midiaSemMotorista: () => "📷 Só consigo encaminhar foto e vídeo ao motorista durante a corrida. Para pedir um carro, envie o endereço por texto, áudio ou localização 📍.",
   audioFalhou: () => "Não consegui entender esse áudio agora. Pode enviar novamente ou escrever sua mensagem?",
   erroCriar: () => "Não consegui criar a corrida agora. 😕 Responda a forma de pagamento para tentar de novo, ou *menu* para recomeçar.",
   jaTemAberta: (motivo: string) => `${motivo} Para falar com um atendente, envie *menu* e escolha *2*.`,

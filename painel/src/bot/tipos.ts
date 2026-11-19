@@ -143,6 +143,8 @@ export interface Recebida {
   local?: Local;
   /** Áudio recebido. Sem texto, o bot transcreve (quando há chave) e segue como se fosse digitado. */
   audio?: AudioRecebido;
+  /** Foto ou vídeo recebido. Só é repassado ao motorista durante a corrida. */
+  midia?: MidiaRecebida;
   /** Conexão (número) por onde a mensagem chegou. */
   conexao?: string;
   /** Mensagem digitada pela central no próprio WhatsApp do bot (comandos #bloquear, #pausar...). */
@@ -155,5 +157,8 @@ export interface AudioRecebido {
   /** Texto já pronto (modo simulado / testes). */
   transcricao?: string;
 }
+
+/** Foto ou vídeo recebido (mesmos campos do áudio para baixar o arquivo). */
+export interface MidiaRecebida extends AudioRecebido { tipo: "imagem" | "video"; legenda?: string }
 
 export type SituacaoConexao = "conectado" | "aguardando_qr" | "desconectado" | "nao_configurado" | "erro";

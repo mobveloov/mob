@@ -14,6 +14,8 @@ process.env.NODE_ENV = "test";
 process.env.SESSAO_SEGREDO = "t".repeat(40);
 process.env.APPS_MOSTRAR_CODIGO = "1";
 process.env.APPS_AUDIO_MAX_KB = "64";
+process.env.APPS_FOTO_MAX_KB = "64";
+process.env.APPS_VIDEO_MAX_MB = "1";
 
 const express = (await import("express")).default;
 const D = await import("../src/servidor/dados.ts");
@@ -199,6 +201,34 @@ test("corrida completa: oferta ao mais perto, recusa passa ao próximo, aceitar,
   assert.equal((await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/audio`, new Uint8Array(70 * 1024), tokP, { "content-type": "audio/webm" })).status, 413);
   const chat = await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/chat`, undefined, tokP);
   assert.equal(chat.corpo.mensagens.length, 2);
+  // Foto e vídeo: corpo cru com o Content-Type; tipo, começo do arquivo e tamanho são conferidos.
+  const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...crypto.randomBytes(3000)]);
+  const foto = await esperarEvento(A.id, tokLia, "chat", () => chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, jpg, tokP, { "content-type": "image/jpeg", "x-legenda": encodeURIComponent("Portão azul") }));
+  assert.equal(foto.mensagem.midia.tipo, "imagem");
+  assert.equal(foto.mensagem.midia.legenda, "Portão azul");
+  const fotoId = foto.mensagem.midia.id as string;
+  const veio = await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/midia/${fotoId}`, undefined, tokLia);
+  assert.equal(veio.status, 200);
+  assert.equal(veio.headers.get("content-type"), "image/jpeg");
+  assert.equal(new Uint8Array(veio.corpo as ArrayBuffer).length, jpg.length);
+  const mp4 = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, ...crypto.randomBytes(5000)]);
+  const vid = await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, mp4, tokLia, { "content-type": "video/mp4" });
+  assert.equal(vid.status, 200, JSON.stringify(vid.corpo));
+  assert.equal(vid.corpo.mensagem.midia.tipo, "video");
+  assert.equal((await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/midia/${vid.corpo.mensagem.midia.id}`, undefined, tokP)).headers.get("content-type"), "video/mp4");
+  // Ninguém de fora baixa, e um id de áudio não serve como foto.
+  assert.equal((await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/midia/${fotoId}`, undefined, tokCarlos)).status, 400);
+  assert.equal((await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/midia/${au.corpo.mensagem.audio.id}`, undefined, tokP)).status, 404);
+  assert.equal((await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/audio/${fotoId}`, undefined, tokP)).status, 404);
+  // Tipo não aceito, cabeçalho falso, vazio e tamanho demais (foto 64 KB, vídeo 1 MB neste teste).
+  assert.equal((await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, jpg, tokP, { "content-type": "application/pdf" })).status, 400);
+  assert.equal((await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, jpg, tokP, { "content-type": "image/png" })).status, 400);
+  assert.equal((await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, new Uint8Array([1, 2, 3, 4, 5, 6]), tokP, { "content-type": "video/mp4" })).status, 400);
+  assert.equal((await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, new Uint8Array(70 * 1024), tokP, { "content-type": "image/jpeg" })).status, 400);
+  assert.equal((await chamar("POST", `/api/apps/${A.id}/corridas/${corridaId}/midia`, new Uint8Array(1100 * 1024), tokP, { "content-type": "video/mp4" })).status, 413);
+  const chat2 = await chamar("GET", `/api/apps/${A.id}/corridas/${corridaId}/chat`, undefined, tokP);
+  assert.equal(chat2.corpo.mensagens.length, 4);
+  assert.ok(fs.existsSync(path.join(DADOS, "empresas", A.id, "apps", "chat", "midia", `${fotoId}.jpg`)));
   // O arquivo fica na pasta da empresa.
   assert.ok(fs.existsSync(path.join(DADOS, "empresas", A.id, "apps", "chat", "audio", `${au.corpo.mensagem.audio.id}.webm`)));
 

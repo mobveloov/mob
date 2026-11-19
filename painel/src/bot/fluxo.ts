@@ -141,13 +141,19 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   let texto = (r.texto ?? "").trim();
   let audioFalhou = false;
   const ouviuAudio = Boolean(!r.texto && !r.local && r.audio);
+  // Foto ou vídeo sem texto: com motorista vai para o chat da corrida (passo); fora da corrida a legenda vale como texto, ou o bot explica.
+  let soMidia = false;
+  if (r.midia && !r.texto && !r.local && !r.audio) {
+    if (!comMotorista(c)) { if (r.midia.legenda) texto = r.midia.legenda.trim(); else soMidia = true; }
+  }
+  const rotuloMidia = r.midia ? `${r.midia.tipo === "video" ? "🎬 Vídeo" : "🖼️ Foto"}${r.midia.legenda ? `: ${r.midia.legenda}` : ""}` : "";
   if (!texto && !r.local && r.audio) {
     // Áudio: vira texto (quando há chave de transcrição) e segue como se tivesse sido digitado.
     const dito = await textoDoAudio(empresaId, r.audio, provedor, deps.audio);
     if (dito) texto = dito; else audioFalhou = true;
     c.mensagens.push({ de: "passageiro", texto: dito ? `🎤 Áudio: "${dito.slice(0, 900)}"` : "🎤 Áudio (não deu para transcrever)", em: agora() });
   } else {
-    c.mensagens.push({ de: "passageiro", texto: texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
+    c.mensagens.push({ de: "passageiro", texto: r.midia ? (r.texto ? `${rotuloMidia} (${r.texto})` : rotuloMidia) : texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
   }
   c.naoLidas++;
 
@@ -166,6 +172,13 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   if (botSilencedFor({ blocked: c.bloqueado, paused_until: c.pausadoAte ?? null })) {
     A.salvarConversa(empresaId, c);
     return [];
+  }
+  if (soMidia) {
+    const aviso = c.etapa === "suporte" ? [] : [T.midiaSemMotorista()];
+    for (const t of aviso) c.mensagens.push({ de: "bot", texto: t, em: agora() });
+    A.salvarConversa(empresaId, c);
+    await enviar(empresaId, provedor, c.id, aviso);
+    return aviso;
   }
   // Áudio que não deu para ouvir: pede para repetir ou escrever (com o operador na conversa, quem responde é ele).
   if (audioFalhou && !comMotorista(c)) {
@@ -314,6 +327,7 @@ async function passo(p: Passo) {
       // Com o motorista a caminho ou na corrida, o que o passageiro escreve, grava ou localiza vai para o chat do motorista.
       const prov = p.deps.provedor ?? provedorDe(p.empresaId, c.conexao);
       const rep = await repassarAoMotorista(p.empresaId, c, r, texto, (a) => (prov.baixarAudio ? prov.baixarAudio(a) : Promise.resolve(null)));
+      if (rep && typeof rep === "object") return p.dizer(T.midiaRecusada(rep.recusada));
       if (rep) { if (!c.corrida!.avisouRepasse) { c.corrida!.avisouRepasse = true; p.dizer(T.repassado()); } return; }
     }
     return p.dizer(T.jaTemCorrida(NOME_STATUS[c.corrida.status] ?? c.corrida.status));
