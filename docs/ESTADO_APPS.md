@@ -164,3 +164,8 @@ cabeçalhos anti-clonagem do painel (arquivo `servidor/index.ts` é da sessão d
   `POST /api/apps-central/gravacoes/:corrida/guardar` (impede apagar). **Falta a tela no painel** (sessão do painel) e uma tela de configuração para `ajustes.json › gravacao`.
 - **Retenção:** apaga sozinho depois de `dias`, menos corrida com SOS/ocorrência ou marcada para guardar (roda de hora em hora no ciclo do despacho).
 - **Falta:** guardar uma cópia no celular, enviar só no Wi-Fi (hoje envia em qualquer rede) e o texto de consentimento do motorista/LGPD revisado por jurídico. Teste: `apps-painel.test.ts` (8º).
+
+### 11. Opções da corrida e fichas ligadas (19/11)
+- App do motorista, durante a corrida: **Avisar problema** (lista de motivos; vai para o chat de suporte da central com a OS), **Compartilhar** (resumo da corrida), além de cancelar/desistir com motivos, SOS, ligar, chat, rota completa, editar rota (inclui paradas), cheguei, iniciar e finalizar.
+- Painel: `GET /api/apps-central/pessoas/<telefone>` devolve a ficha de passageiro e a de motorista da mesma pessoa (`doisPapeis`), para a tela do painel mostrar as duas ligadas (tela é da sessão do painel).
+- PR #18 sem conflitos com o `main` de 19/11 (verificado com `git merge-tree`).

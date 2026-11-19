@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Ban, Banknote, ChevronRight, CircleAlert, Flag, LocateFixed, MessageCircle, Navigation, PackageSearch, Pencil, Phone, Plus, Search,
-  ArrowUp, BadgeCheck, CornerUpLeft, CornerUpRight, Moon, ShieldAlert, Star, Sun, Undo2, Volume2, VolumeX, X,
+  ArrowUp, BadgeCheck, Share2, CornerUpLeft, CornerUpRight, Moon, ShieldAlert, Star, Sun, Undo2, Volume2, VolumeX, X,
 } from "lucide-react";
 import { api, reais, type Posicao } from "../comum/api";
 import { Estrelas, mensagemDeErro, type MarcaApp } from "../comum/ui";
@@ -46,7 +46,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [parada, setParada] = useState(() => lerParada(c.id));
-  const [folha, setFolha] = useState<"" | "rota" | "editar" | "perfil" | "finalizar" | "cancelar" | "sos">("");
+  const [folha, setFolha] = useState<"" | "rota" | "editar" | "perfil" | "finalizar" | "cancelar" | "sos" | "problema">("");
   // Folha de baixo com 3 alturas: 0 recolhida (só o passageiro e o botão de deslizar), 1 meio, 2 aberta. Lembra a última.
   const [nivel, setNivel] = useState<0 | 1 | 2>(() => { try { const n = Number(localStorage.getItem("folha-corrida-nivel")); return n === 0 || n === 1 || n === 2 ? n : 1; } catch { return 1; } });
   const mudarNivel = (n: number) => { const v = Math.max(0, Math.min(2, n)) as 0 | 1 | 2; setNivel(v); try { localStorage.setItem("folha-corrida-nivel", String(v)); } catch { /* sem armazenamento */ } };
@@ -110,6 +110,21 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
       gravarParada(c.id, null); mudou(null); avisar(desistir ? "Você desistiu da corrida." : "Corrida cancelada.");
     } catch (e) { setErro(mensagemDeErro(e)); }
     setFolha("");
+  };
+  const PROBLEMAS = ["Passageiro difícil ou agressivo", "Endereço errado ou local perigoso", "Problema no veículo", "Problema no aplicativo", "Cobrança ou pagamento", "Outro problema"];
+  const avisarProblema = async (tipo: string) => {
+    try {
+      await api("/suporte", { corpo: { texto: `Problema na corrida OS ${c.os} (${c.passageiro.nome}): ${tipo}.` } });
+      avisar("A central recebeu o seu aviso e vai falar com você.");
+    } catch (e) { setErro(mensagemDeErro(e)); }
+    setFolha("");
+  };
+  const compartilhar = async () => {
+    const texto = `Estou em uma corrida (OS ${c.os}). Embarque: ${c.embarque.texto}${c.destino ? `. Destino: ${c.destino.texto}` : ""}.`;
+    try {
+      if (navigator.share) await navigator.share({ text: texto });
+      else { await navigator.clipboard.writeText(texto); avisar("Resumo da corrida copiado."); }
+    } catch { /* cancelou o compartilhamento */ }
   };
   const sos = async () => {
     try { await api(`/corridas/${c.id}/sos`, { corpo: posicao ?? {} }); avisar("A central foi avisada. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
@@ -218,6 +233,8 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
         <Erro texto={erro} />
         <div className="links-rota">
           <button type="button" className="link-m perigo" onClick={() => setFolha("cancelar")}><Ban size={15} /> {c.status === "a_caminho" ? "Desistir da corrida" : "Cancelar corrida"}</button>
+          <button type="button" className="link-m aviso" onClick={() => setFolha("problema")}><CircleAlert size={15} /> Avisar problema</button>
+          <button type="button" className="link-m" onClick={() => void compartilhar()}><Share2 size={15} /> Compartilhar</button>
           <button type="button" className="link-m perigo" onClick={() => setFolha("sos")}><ShieldAlert size={15} /> SOS</button>
         </div>
         {marca.suporte.telefone && <p className="dica centro">Central: <a href={`tel:${marca.suporte.telefone.replace(/\D/g, "")}`}>{marca.suporte.telefone}</a></p>}
@@ -258,6 +275,12 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           </div>
           <button type="button" className="botao-m perigo" disabled={!motivo || ocupado} onClick={() => void cancelar()}>{c.status === "a_caminho" ? "DESISTIR DA CORRIDA" : "CANCELAR CORRIDA"}</button>
           <button type="button" className="link-m" onClick={() => { setFolha(""); setMotivo(""); }}>Voltar</button>
+        </Folha>
+      )}
+      {folha === "problema" && (
+        <Folha titulo="Avisar um problema" fechar={() => setFolha("")}>
+          <p className="dica">Escolha o que aconteceu. A central recebe com o número da OS e responde no chat de suporte.</p>
+          {PROBLEMAS.map((p) => <button key={p} type="button" className="opcao-folha" onClick={() => void avisarProblema(p)}>{p}</button>)}
         </Folha>
       )}
       {folha === "sos" && <Dialogo icone={ShieldAlert} perigo titulo="Pedir ajuda?" texto="A central recebe um alerta agora, com a sua posição. Se for grave, ligue 190." cancelar={() => setFolha("")} confirmar={() => void sos()} rotulo="Avisar a central" />}

@@ -427,6 +427,16 @@ rotasV2Central.get("/aprovacoes", ok((req, res) => {
   res.json({ motoristas: listar(e, cadastroPorId("motoristas")!).filter((m) => m.status === "Aguardando aprovação").map((m) => cartaoDoMotorista(e, m)) });
 }));
 
+// Mesma pessoa, dois papéis: dado um telefone, devolve a ficha de passageiro e a de motorista (as duas ligadas), para o painel mostrar juntas.
+rotasV2Central.get("/pessoas/:telefone", ok((req, res) => {
+  const tel = soDigitos(req.params.telefone);
+  if (tel.length < 10) throw new Error("Informe o telefone com DDD.");
+  const mesmo = (r: Record<string, unknown>) => soDigitos(r.telefone) === tel;
+  const passageiro = listar(emC(req), cadastroPorId("clientes")!).find(mesmo) ?? null;
+  const motorista = listar(emC(req), cadastroPorId("motoristas")!).find(mesmo) ?? null;
+  res.json({ telefone: tel, passageiro, motorista, doisPapeis: !!passageiro && !!motorista });
+}));
+
 // Gravações das corridas: só cargo alto (admin); cada vez que alguém abre uma gravação fica registrado.
 rotasV2Central.get("/gravacoes", exigirPapel("admin"), ok((req, res) => res.json({ gravacoes: listarGravacoes(emC(req), req.query.corrida ? String(req.query.corrida) : undefined), config: configGravacao(emC(req)) })));
 rotasV2Central.get("/gravacoes/:corrida/:parte", exigirPapel("admin"), ok((req, res) => {

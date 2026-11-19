@@ -262,3 +262,11 @@ test("gravação da corrida: o motorista envia, o passageiro vê o aviso, só a 
   assert.ok(limparGravacoes(E.id, Date.now() + 400 * 86_400_000) >= 1, "passado o prazo, apaga");
   assert.equal((await chamar("GET", "/api/apps-central/gravacoes", undefined, undefined, cookie)).corpo.gravacoes.some((x: any) => x.corridaId === id), false);
 });
+
+test("painel acha as duas fichas (passageiro e motorista) pelo mesmo telefone", async () => {
+  const cookie = await cookieDoPainel();
+  const r = (await chamar("GET", "/api/apps-central/pessoas/11955554444", undefined, undefined, cookie)).corpo; // criado no teste de cadastro dos dois papéis
+  assert.ok(r.passageiro && r.motorista, JSON.stringify(r));
+  assert.equal(r.doisPapeis, true);
+  assert.equal((await chamar("GET", "/api/apps-central/pessoas/123", undefined, undefined, cookie)).status, 400);
+});
