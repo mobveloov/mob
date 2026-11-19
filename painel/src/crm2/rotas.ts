@@ -12,6 +12,7 @@ import { anotar, auditarRotas, listarAuditoria } from "./auditoria.ts";
 import { salvarConfig2 } from "./base.ts";
 import * as C from "./contatos.ts";
 import { resumoDeGovernanca } from "./governanca.ts";
+import { listarRecompensas, resumoRecompensas } from "./fidelidade.ts";
 import { atualizarMapa, lerMapa, mapaJaGerado } from "./mapa.ts";
 import { criarCupom, descontoDosUltimos30Dias, listarCupons, removerCupom, resumoDeCupons } from "./recompensas.ts";
 import { atualizarRfm, contatosParaCsv, criarSegmentoRfm, resumoRfm } from "./rfm.ts";
@@ -147,7 +148,7 @@ rotasCrm2.get("/recompensas", ok(async (req, res) => {
   const hoje = agoraBr().toISOString().slice(0, 10);
   const origem = txt(req.query.origem, 12) || "all";
   const todos = listarCupons(e, corridas, hoje, origem);
-  res.json({ cupons: todos.slice(0, 300), resumo: resumoDeCupons(todos), desconto30: descontoDosUltimos30Dias(corridas) });
+  res.json({ cupons: todos.slice(0, 300), resumo: resumoDeCupons(todos), desconto30: descontoDosUltimos30Dias(corridas), ganhos: listarRecompensas(e, 100), ganhosResumo: resumoRecompensas(e) });
 }));
 
 rotasCrm2.post("/recompensas/atualizar", gestor, ok((req, res) => { limparCachePublico(emp(req)); res.json({ ok: true }); }));

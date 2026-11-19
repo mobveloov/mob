@@ -21,6 +21,21 @@ export interface JogoPremio {
   kind: "roleta" | "raspadinha"; rotulo: string; saved: boolean; config: ConfigJogoPremio; odds: { coupon: number; nothing: number };
   stats: { today: number; played_today: number; coupons_today: number; failed_today: number; total: number; played: number };
 }
+export interface CartaoFidelidade { name: string; rides_needed: number; reward_type: "percent" | "fixed"; reward_value: number; once: boolean; active: boolean; title: string; message: string }
+export interface PremioPontos { name: string; points: number; type: "pickup" | "percent" | "fixed"; value: number }
+export interface ConfigPontos {
+  enabled: boolean; points_per_ride: number; point_value: number; min_points: number; points_expire_days: number; coupon_valid_days: number;
+  prizes: PremioPontos[]; whatsapp: string; schedule_enabled: boolean; days: number[]; send_time: string; title: string; message: string;
+}
+export interface DadosFidelidade {
+  empresa: string; modelos: CartaoFidelidade[];
+  cartoes: Array<{ id: string; config: CartaoFidelidade; activated_at: number | null; members: number; delivered: number }>;
+  pontos: {
+    saved: boolean; config: ConfigPontos; money_value: number; stats: { passengers: number; circulating: number; redeemed: number };
+    top: Array<{ phone: string; balance: number }>;
+    pickups: Array<{ id: string; phone: string; prize: { name?: string } | null; pickup_code: string; pickup_done_at: number | null; created_at: number }>;
+  };
+}
 export interface ConexaoZap { situacao: "conectado" | "aguardando_qr" | "desconectado" | "nao_configurado" | "erro"; qr?: string; codigo?: string; detalhe?: string; modo?: string; instancia?: string | null }
 export interface VersaoApk { id: string; nome: string; codigo: number; url: string; tamanho: number | null; notas: string; ativa: boolean; criadaEm: string }
 export type Grupo = "aberta" | "finalizada" | "cancelada" | "nao_atendida";
@@ -117,6 +132,11 @@ export const apiCentral = {
   salvarPremio: (kind: string, config: ConfigJogoPremio) => pedir(`/api/totem/premios/${kind}`, { method: "PUT", body: JSON.stringify({ config }) }),
   enviarPremiosAgora: (kind: string) => pedir<{ enviados: number; falhas: number; criados: number }>(`/api/totem/premios/${kind}/enviar-agora`, post({})),
   convidarPremio: (kind: string, telefone: string) => pedir<{ link: string }>(`/api/totem/premios/${kind}/convite`, post({ telefone })),
+  fidelidade: () => pedir<DadosFidelidade>("/api/totem/fidelidade"),
+  salvarCartao: (id: string | null, config: CartaoFidelidade) => pedir<{ id: string }>("/api/totem/fidelidade/cartoes", { method: "PUT", body: JSON.stringify({ id, config }) }),
+  excluirCartao: (id: string) => pedir(`/api/totem/fidelidade/cartoes/${id}`, { method: "DELETE" }),
+  salvarPontos: (config: ConfigPontos) => pedir("/api/totem/fidelidade/pontos", { method: "PUT", body: JSON.stringify({ config }) }),
+  retiradaEntregue: (id: string) => pedir(`/api/totem/fidelidade/pontos/retirada/${id}`, post({})),
   apk: () => pedir<{ versao: VersaoApk | null }>("/api/totem/apk"),
   apkVersoes: () => pedir<{ versoes: VersaoApk[] }>("/api/totem/apk/versoes"),
   publicarApk: (d: Record<string, unknown>) => pedir<{ versao: VersaoApk }>("/api/totem/apk/versoes", post(d)),

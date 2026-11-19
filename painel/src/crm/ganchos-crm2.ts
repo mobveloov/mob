@@ -2,6 +2,8 @@
 
 import { registrarEntidadeAuditada } from "../crm2/auditoria.ts";
 import { registrarFonteDeEnvios, type Envio } from "../crm2/conversao.ts";
+import { registrarRecompensa } from "../crm2/fidelidade.ts";
+import { definirGanchoPremio } from "../totem/premios.ts";
 import { banco } from "../servidor/banco.ts";
 import { gatilhos } from "./gatilhos.ts";
 import { segmentos } from "./segmentos.ts";
@@ -18,3 +20,9 @@ registrarFonteDeEnvios((empresa, desde): Envio[] => {
 
 registrarEntidadeAuditada("/gatilhos", "gatilho", (e) => gatilhos(e) as unknown as Array<Record<string, unknown>>, "is_active");
 registrarEntidadeAuditada("/segmentos", "segmento", (e) => segmentos(e).map((x) => ({ ...x, nome: x.name })) as unknown as Array<Record<string, unknown>>);
+
+// Prêmios dos jogos do totem (Roleta e Raspadinha) entram na aba Recompensas do CRM. Quem não ganhou nada não aparece.
+definirGanchoPremio((g) => {
+  if (g.premio.type === "none") return;
+  registrarRecompensa(g.empresaId, { origem: g.jogo, telefone: g.telefone, nome: g.nome, premio: g.premio.label, cupom: g.cupom });
+});

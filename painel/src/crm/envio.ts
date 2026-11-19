@@ -15,6 +15,7 @@ import { WA_OPTOUT_SKIP } from "./optout.ts";
 import { descadastrado, ligarEventos, processarAtrasados, rodarGatilhosDeTempo } from "./gatilhos.ts";
 import { voltaComportamento } from "./comportamento.ts";
 import { voltaRegua } from "./regua.ts";
+import { rodarFidelidade } from "../crm2/fidelidade.ts";
 import { rodarAgendaDePremios } from "../totem/premios.ts";
 import { dentroDaJanela, enviadosHoje, pausaGeral, tetoHoje } from "./limites.ts";
 import { registrar, type OrigemEnvio } from "./registro.ts";
@@ -275,6 +276,7 @@ export async function volta(empresaId: string) {
   try { await processarAtrasados(empresaId); } catch (e) { console.error("[crm] gatilhos", empresaId, e instanceof Error ? e.message : e); }
   try { await rodarGatilhosDeTempo(empresaId); } catch (e) { console.error("[crm] gatilhos de tempo", empresaId, e instanceof Error ? e.message : e); }
   try { await voltaComportamento(empresaId); } catch (e) { console.error("[crm] comportamental", empresaId, e instanceof Error ? e.message : e); }
+  try { await rodarFidelidade(empresaId); } catch (e) { console.error("[crm] fidelidade", empresaId, e instanceof Error ? e.message : e); }
   try { await rodarAgendaDePremios(empresaId); } catch (e) { console.error("[crm] agenda dos prêmios", empresaId, e instanceof Error ? e.message : e); }
   try { await voltaRegua(empresaId); } catch (e) { console.error("[crm] régua", empresaId, e instanceof Error ? e.message : e); }
 }
