@@ -5,20 +5,20 @@ Escrito em português do Brasil. Cada sessão pega a sua parte, faz commits pequ
 
 ## Sessão do PAINEL (src/web, painel/src/servidor, config)
 
-- [ ] **Taxas da central**: faltam as telas para configurar as taxas pagas por motoristas e por passageiros
+- [x] **Taxas da central**: faltam as telas para configurar as taxas pagas por motoristas e por passageiros
       (referência: capturas `Up Corridas - Taxas Bandeira (14_11_2026 09：14：30 / 09：15：06 / 09：15：16 / 09：15：28).html`
       em `J:\Usuarios\Rafael\Downloads`). Compare com a Machine e deixe igual.
-- [ ] **Carteira de crédito**: tela para editar (creditar/debitar, com motivo e histórico) a carteira de motoristas e
+- [x] **Carteira de crédito**: tela para editar (creditar/debitar, com motivo e histórico) a carteira de motoristas e
       de passageiros. O app lê o mesmo saldo.
-- [ ] **Menu lateral igual ao do arquivo** `J:\Usuarios\Rafael\Downloads\MobVeloov (14_11_2026 10：56：04).html`:
+- [x] **Menu lateral igual ao do arquivo** `J:\Usuarios\Rafael\Downloads\MobVeloov (14_11_2026 10：56：04).html`:
       mesmo estilo e separação por cores.
-- [ ] **Foto da empresa** nas configurações da empresa (perfil), igual à da UP Corridas nesse arquivo.
-- [ ] **Cargos como na Machine**: ADMIN Mestre, ADMIN, Gestor e Operador, com funções limitadas por cargo. Pesquise
+- [x] **Foto da empresa** nas configurações da empresa (perfil), igual à da UP Corridas nesse arquivo.
+- [x] **Cargos como na Machine**: ADMIN Mestre, ADMIN, Gestor e Operador, com funções limitadas por cargo. Pesquise
       na Machine o que cada cargo pode e aplique no painel E no servidor (a API também tem que recusar).
-- [ ] **Filiais** cadastradas dentro do painel de cada empresa.
-- [ ] **Superadmin** (dono da plataforma): lista de empresas (criar, suspender, entrar como a empresa), planos e
+- [x] **Filiais** cadastradas dentro do painel de cada empresa.
+- [x] **Superadmin** (dono da plataforma): lista de empresas (criar, suspender, entrar como a empresa), planos e
       recursos, marca e domínio, uso e faturamento, centrais/franquias.
-- [ ] **CRM, Bot e Totem**: copiar EXATAMENTE como está no mobveloov (repo `D:\mobveloov-git`, é o que funciona),
+- [~] **CRM, Bot e Totem** (parcial: ver "O que ainda falta" em ESTADO_PAINEL.md): copiar EXATAMENTE como está no mobveloov (repo `D:\mobveloov-git`, é o que funciona),
       tirando só a integração com a Machine, que no `mob` já é nativa.
 - [x] **Barra de cima em qualquer zoom** (100%, 90%, 80%; 1920 a 1024) e título "Corridas" legível; remover o "NOVO".
 - [x] **Segurança do painel** (ver bloco abaixo, tarefas 2 e 3). Feito no branch `seguranca-painel`; resumo e pendências em docs/SEGURANCA.md.
@@ -147,3 +147,7 @@ Prints do teste: motorista "a caminho" (1,5 km, "Siga até local de embarque") e
 - [ ] CRM, Bot e Totem copiados do mobveloov: agente retomado depois do limite de 5h.
 - [ ] Depois: suíte completa, teste de telas no navegador, Docker, push, revisão final (Fable 5.2) e tabela "tela | igual à Machine? | diferença".
 - Suíte no main antes do CRM/Bot/Totem: 364 de 364 testes.
+
+## Push parcial feito (15/11)
+- main publicado (6ad8110) e Docker refeito (up.veloov.com 200). Revisão final feita com Sonnet 5.5 (o Fable 5.2 pediu créditos de uso); 8 achados corrigidos.
+- Pendências de CRM/Bot/Totem/Painel: ver seção "O que ainda falta" em docs/ESTADO_PAINEL.md; agentes Sonnet portando.
