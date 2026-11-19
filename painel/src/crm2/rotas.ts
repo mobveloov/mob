@@ -110,7 +110,7 @@ rotasCrm2.post("/rfm/atualizar", gestor, ok(async (req, res) => {
 rotasCrm2.post("/rfm/segmento", gestor, ok((req, res) => {
   const e = emp(req);
   const s = criarSegmentoRfm(e, txt(req.body?.segmento, 40));
-  anotar(e, quem(req), { entidade: "segmento", entidade_id: s.id, entidade_nome: s.nome, acao: "criou", campos: [], antigo: null, novo: { id: s.id, nome: s.nome, modo: "fixa", pessoas: s.total } });
+  anotar(e, quem(req), { entidade: "segmento", entidade_id: s.id, entidade_nome: s.nome, acao: "criou", campos: [], antigo: null, novo: { id: s.id, nome: s.nome, modo: "dinamica", pessoas: s.total } });
   res.json(s);
 }));
 
@@ -126,16 +126,17 @@ rotasCrm2.get("/conversao", ok(async (req, res) => {
 
 // ------------------------------------------------------------------ mapa de calor
 
-rotasCrm2.get("/mapa", ok((req, res) => {
+rotasCrm2.get("/mapa", ok(async (req, res) => {
   const e = emp(req);
   // Primeira vez sem nenhum dado: gera sozinho a partir das corridas.
-  if (!mapaJaGerado(e)) atualizarMapa(e);
+  if (!mapaJaGerado(e)) atualizarMapa(e, (await corridasDoPublico(e)).corridas);
   res.json({ celulas: lerMapa(e), cidades: listarCidades(e) });
 }));
 
-rotasCrm2.post("/mapa/atualizar", gestor, ok((req, res) => {
+rotasCrm2.post("/mapa/atualizar", gestor, ok(async (req, res) => {
   const e = emp(req);
-  res.json({ zonas: atualizarMapa(e), celulas: lerMapa(e), cidades: listarCidades(e) });
+  limparCachePublico(e);
+  res.json({ zonas: atualizarMapa(e, (await corridasDoPublico(e)).corridas), celulas: lerMapa(e), cidades: listarCidades(e) });
 }));
 
 // ------------------------------------------------------------------ recompensas (cupons)

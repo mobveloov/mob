@@ -376,11 +376,12 @@ interno.put("/tarifas-cidade-espera", admin, ok((req, res) => { TC.definirEspera
 interno.get("/premios", admin, ok((req, res) => { res.json({ jogos: PR.painelDosJogos(emp(req)), empresa: emp(req) }); }));
 interno.put("/premios/:kind", admin, ok((req, res) => {
   if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
-  const cfg = PR.salvarConfigDoJogo(emp(req), req.params.kind, req.body?.config);
+  const cfg = PR.salvarConfigDoJogo(emp(req), req.params.kind, req.body?.config, baseDaRequisicao(req));
   res.json({ ok: true, config: cfg });
 }));
 interno.post("/premios/:kind/enviar-agora", admin, ok(async (req, res) => {
   if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
+  PR.guardarBase(emp(req), baseDaRequisicao(req));
   res.json({ ok: true, ...(await PR.enviarAgora(emp(req), req.params.kind, baseDaRequisicao(req))) });
 }));
 interno.post("/premios/:kind/convite", admin, ok(async (req, res) => {

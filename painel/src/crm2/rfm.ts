@@ -81,13 +81,16 @@ export function contatosParaCsv(empresa: string) {
   return bd().prepare("SELECT nome, telefone, rfm_segmento AS segmento, rfm_r AS r, rfm_f AS f, rfm_m AS m, total_corridas AS corridas, total_gasto AS gasto, ultima_corrida AS ultima FROM crm_contatos WHERE empresa = ? ORDER BY rfm_pontos DESC, chave").all(empresa) as Array<{ nome: string; telefone: string; segmento: string | null; r: number | null; f: number | null; m: number | null; corridas: number; gasto: number; ultima: number | null }>;
 }
 
-/** "Criar segmento": guarda as pessoas do segmento RFM como uma lista fixa (o público do CRM usa listas de chaves). */
+/** "Criar segmento": segmento dinâmico. Guarda só a regra (RFM = este segmento); a lista é reavaliada a cada uso, com a análise mais recente. */
 export function criarSegmentoRfm(empresa: string, segmento: string) {
   const info = RFM_SEGMENTOS[segmento];
   if (!info || segmento === "sem_analise") throw new Error("Segmento inválido.");
-  const chaves = (bd().prepare("SELECT chave FROM crm_contatos WHERE empresa = ? AND rfm_segmento = ? ORDER BY chave").all(empresa, segmento) as Array<{ chave: string }>).map((r) => r.chave);
+  const total = (bd().prepare("SELECT COUNT(*) AS n FROM crm_contatos WHERE empresa = ? AND rfm_segmento = ?").get(empresa, segmento) as { n: number }).n;
   const agora = new Date().toISOString();
-  const lista = { id: A.novoId(), nome: `RFM: ${info.label}`, modo: "fixa" as const, regras: { tipo: "passageiro" as const }, chaves, criadaEm: agora, atualizadaEm: agora };
+  const nome = `RFM: ${info.label}`;
+  const existente = A.listas(empresa).find((l) => l.modo === "dinamica" && l.regras.rfmSegmento === segmento);
+  if (existente) return { id: existente.id, nome: existente.nome, total, jaExistia: true };
+  const lista = { id: A.novoId(), nome, modo: "dinamica" as const, regras: { tipo: "passageiro" as const, rfmSegmento: segmento }, chaves: [], criadaEm: agora, atualizadaEm: agora };
   A.salvarListas(empresa, [...A.listas(empresa), lista]);
-  return { id: lista.id, nome: lista.nome, total: chaves.length };
+  return { id: lista.id, nome: lista.nome, total, jaExistia: false };
 }

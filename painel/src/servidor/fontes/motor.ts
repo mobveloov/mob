@@ -36,7 +36,7 @@ export const CAMPOS: Record<TipoMotor, Array<{ chave: string; rotulo: string; se
 // ------------------------------------------------------------------ o que o painel usa do contrato (v2)
 
 interface PessoaM { nome?: string; telefone?: string }
-interface EnderecoM { texto?: string; cidade?: string }
+interface EnderecoM { texto?: string; cidade?: string; lat?: number; lng?: number }
 /** Corrida do motor (só os campos que o painel lê). */
 export interface CorridaMotor {
   idOriginal: string; grupo: GrupoStatus; statusTexto?: string;
@@ -92,6 +92,8 @@ const CANAL: Record<string, string> = { app: "App", macaneta: "Ponto fixo", cent
 const QUEM: Record<string, string> = { passageiro: "Passageiro", motorista: "Motorista", central: "Central" };
 
 /** Corrida do motor -> corrida do painel. */
+const temPonto = (e: { lat?: number; lng?: number } | undefined): e is { lat: number; lng: number } => !!e && Number.isFinite(e.lat) && Number.isFinite(e.lng);
+
 export function corridaDoMotor(c: CorridaMotor, origem: string, origemNome: string): CorridaPainel {
   return {
     ...corridaVazia({ id: `${origem}:${c.idOriginal}`, origem, origemNome, os: String(c.idOriginal), grupo: c.grupo, statusTexto: c.statusTexto || "Sem status" }),
@@ -107,6 +109,8 @@ export function corridaDoMotor(c: CorridaMotor, origem: string, origemNome: stri
     cupom: c.cupom ?? "", tarifa: c.tarifa ?? "", distanciaMotoristaKm: c.distanciaMotoristaKm ?? null,
     avaliacao: c.avaliacao?.nota ?? null, fatorDinamico: c.dinamica?.ativa ? c.dinamica.fator ?? null : null, programada: !!c.programada,
     distanciaKm: c.distanciaKm ?? null,
+    ...(temPonto(c.partida) ? { embarquePonto: { lat: c.partida.lat, lng: c.partida.lng } } : {}),
+    ...(c.destino && temPonto(c.destino) ? { destinoPonto: { lat: c.destino.lat, lng: c.destino.lng } } : {}),
     canceladaPor: c.canceladaPor ? QUEM[c.canceladaPor] ?? c.canceladaPor : "", motivoCancelamento: c.motivoCancelamento ?? "",
   };
 }

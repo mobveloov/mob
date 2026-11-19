@@ -57,7 +57,7 @@ export const crm2 = {
   excluirContato: (chave: string) => pedir(`/contatos/${encodeURIComponent(chave)}`, "DELETE"),
   rfm: () => pedir<{ linhas: LinhaRfm[]; total: number; ltv: number }>("/rfm"),
   atualizarRfm: () => pedir<{ analisados: number }>("/rfm/atualizar", "POST", {}),
-  segmentoRfm: (segmento: string) => pedir<{ id: string; nome: string; total: number }>("/rfm/segmento", "POST", { segmento }),
+  segmentoRfm: (segmento: string) => pedir<{ id: string; nome: string; total: number; jaExistia?: boolean }>("/rfm/segmento", "POST", { segmento }),
   rfmContatos: () => pedir<{ contatos: Array<{ nome: string; telefone: string; segmento: string | null; r: number | null; f: number | null; m: number | null; corridas: number; gasto: number; ultima: number | null }> }>("/rfm/contatos"),
   conversao: (dias: number) => pedir<{ horas: number; linhas: LinhaConversao[] }>(`/conversao?dias=${dias}`),
   mapa: () => pedir<{ celulas: Celula[]; cidades: Cidade[] }>("/mapa"),

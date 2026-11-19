@@ -1,7 +1,8 @@
 // CRM › Análises › Mapa de Calor (portado de crm_refresh_heatmap do sistema de referência).
 // Conta embarques e desembarques por quadrado de 3 casas decimais (cerca de 110 m). Só corridas com coordenada
-// dentro do Brasil entram (corridas antigas gravavam 0,0). Lê as corridas próprias do painel, que têm o ponto no mapa.
+// dentro do Brasil entram (corridas antigas gravavam 0,0). Lê as corridas próprias do painel e as das integrações que informam coordenada.
 
+import type { CorridaPainel } from "../comum/corrida.ts";
 import { listarProprias } from "../corridas/index.ts";
 import { bd, realDe } from "./base.ts";
 
@@ -31,9 +32,14 @@ export function gradeDeCalor(corridas: Array<{ embarque?: Ponto; destino?: Ponto
   return [...m.values()];
 }
 
-/** Recalcula o mapa da empresa (apaga o anterior e grava o novo). Devolve quantos quadrados ficaram. */
-export function atualizarMapa(empresa: string): number {
-  const celulas = gradeDeCalor(listarProprias(empresa));
+/** Corridas das integrações que trouxeram coordenada (as sem coordenada, só com texto de endereço, ficam de fora). */
+export function deIntegracaoComPonto(corridas: CorridaPainel[]): Array<{ embarque?: Ponto; destino?: Ponto; solicitadaEm: string | null }> {
+  return corridas.filter((c) => c.origem !== "propria" && (c.embarquePonto || c.destinoPonto)).map((c) => ({ embarque: c.embarquePonto, destino: c.destinoPonto, solicitadaEm: c.solicitadaEm }));
+}
+
+/** Recalcula o mapa da empresa (apaga o anterior e grava o novo). `integracao` = corridas das integrações (as com coordenada entram). Devolve quantos quadrados ficaram. */
+export function atualizarMapa(empresa: string, integracao: CorridaPainel[] = []): number {
+  const celulas = gradeDeCalor([...listarProprias(empresa), ...deIntegracaoComPonto(integracao)]);
   const db = bd();
   const agora = Date.now();
   db.exec("SAVEPOINT mapa");
