@@ -11,6 +11,12 @@ import path from "node:path";
 import { provedorDe } from "../bot/fluxo.ts";
 import { listar, criar } from "../cadastros/armazem.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
+import * as CRM from "../crm/armazem.ts";
+import { descadastrado } from "../crm/gatilhos.ts";
+import { brAgora, dentroDaJanela, enviadosHoje, pausaGeral, tetoHoje } from "../crm/limites.ts";
+import { WA_OPTOUT_SKIP } from "../crm/optout.ts";
+import { registrar } from "../crm/registro.ts";
+import { reservar } from "../crm/ritmo.ts";
 import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
 import {
@@ -152,12 +158,43 @@ function atualizar(e: string, token: string, fn: (c: Convite) => void): Convite 
 }
 export const conviteDoToken = (e: string, token: unknown): Convite | null => (/^[0-9a-f]{40}$/.test(String(token ?? "")) ? ler(e).convites.find((c) => c.token === token) ?? null : null);
 
-/** Manda o link do jogo pelo WhatsApp da empresa. Sem servidor de WhatsApp configurado (simulado) a mensagem fica na caixa simulada. */
-export async function enviarLink(e: string, base: string, c: Convite): Promise<{ ok: boolean; erro?: string }> {
+export interface Trava { erro: string; /** Vale para todos (pausa, horário, teto, ritmo): quem envia em lote para de enviar. Falso = só esta pessoa (descadastro). */ geral: boolean }
+
+/**
+ * As mesmas travas do CRM para qualquer mensagem de prêmio: descadastro do WhatsApp, pausa geral, janela de horário da
+ * Governança, teto diário e ritmo (lote e pausa entre lotes). Horário, teto e ritmo só valem para o WhatsApp de verdade
+ * (o simulado não manda nada). Devolve null quando pode enviar; consumir=true gasta uma vaga do ritmo.
+ */
+export function travasDoCrm(e: string, tel: string, o: { real?: boolean; agora?: number; consumir?: boolean } = {}): Trava | null {
+  const agora = o.agora ?? Date.now();
+  const real = o.real ?? provedorDe(e).tipo !== "simulado";
+  if (descadastrado(e, tel)) return { erro: WA_OPTOUT_SKIP, geral: false };
+  if (pausaGeral(e).pausado) return { erro: "Envios do CRM pausados pelo painel.", geral: true };
+  if (!real) return null;
+  if (!dentroDaJanela(e, brAgora(new Date(agora - 3 * 3600_000)).hhmm)) return { erro: "Fora da janela de horário de envio.", geral: true };
+  if (enviadosHoje(e, agora) >= tetoHoje(e, agora)) return { erro: "Teto diário de WhatsApp atingido.", geral: true };
+  const res = reservar(CRM.config(e), CRM.ritmo(e), agora);
+  if (!res.ok) return { erro: "WhatsApp em pausa entre lotes ou no limite por minuto.", geral: true };
+  if (o.consumir) CRM.salvarRitmo(e, res.estado);
+  return null;
+}
+
+/**
+ * Manda o link do jogo pelo WhatsApp da empresa, passando pelas travas do CRM. Sem servidor de WhatsApp configurado
+ * (simulado) a mensagem fica na caixa simulada. `adiado`: travou por pausa, horário, teto ou ritmo; o convite fica para depois.
+ */
+export async function enviarLink(e: string, base: string, c: Convite): Promise<{ ok: boolean; erro?: string; adiado?: boolean }> {
   const cfg = configDoJogo(e, c.jogo);
   const texto = `${cfg.title}\n${cfg.message}\n\n${cfg.button_text}: ${base}/p/${e}/${c.token}`;
+  const trava = travasDoCrm(e, c.telefone, { consumir: true });
+  if (trava) {
+    if (!trava.geral) atualizar(e, c.token, (y) => { y.erroEnvio = trava.erro; });
+    return { ok: false, erro: trava.erro, adiado: trava.geral };
+  }
   try {
-    await provedorDe(e).enviarTexto(c.telefone, texto);
+    const provedor = provedorDe(e);
+    await provedor.enviarTexto(c.telefone, texto);
+    if (provedor.tipo !== "simulado") registrar(e, { origem: "manual", origem_id: `premio:${c.jogo}`, estado: "sent", telefone: c.telefone, nome: c.nome, titulo: cfg.title, previa: texto });
     atualizar(e, c.token, (x) => { x.enviadoEm = new Date().toISOString(); x.erroEnvio = null; });
     return { ok: true };
   } catch (x) {
@@ -174,12 +211,17 @@ export async function enviarAgora(e: string, kind: JogoTipo, base: string): Prom
   const todos = passageiros(e);
   let criados = 0, enviados = 0, falhas = 0, tentados = 0;
   for (const p of todos) {
+    if (tentados >= 500) break;
+    // Trava geral (pausa, horário, teto, ritmo): para o lote sem criar convite que ficaria sem envio. Descadastrado: pula só ele.
+    const antes = travasDoCrm(e, p.telefone);
+    if (antes) { if (antes.geral) break; continue; }
     const { convite, novo } = convidar(e, kind, p.telefone, p.nome, "agora");
-    if (!novo) continue;
-    criados++;
-    if (tentados++ >= 500) break;
+    // Convite que já saiu, já foi jogado ou falhou de verdade não se repete; o que ficou adiado (sem envio nem erro) sai agora.
+    if (!novo && (convite.enviadoEm || convite.jogadoEm || convite.erroEnvio)) continue;
+    if (novo) criados++;
+    tentados++;
     const r = await enviarLink(e, base, convite);
-    if (r.ok) enviados++; else falhas++;
+    if (r.ok) enviados++; else if (r.adiado) break; else falhas++;
   }
   return { criados, enviados, falhas, restam: Math.max(0, criados - enviados - falhas) };
 }
@@ -220,7 +262,7 @@ export async function jogar(e: string, token: unknown, base: string): Promise<{ 
   if (premio.type !== "none") {
     ({ codigo, erro } = criarCupom(e, c.jogo, c.telefone, c.nome, premio, cfg.coupon_valid_days));
     atualizar(e, c.token, (x) => { x.cupom = codigo; x.erroCupom = erro; });
-    if (codigo) {
+    if (codigo && !descadastrado(e, c.telefone)) {
       // Cupom também pelo WhatsApp (não segura a resposta do jogo)
       void provedorDe(e).enviarTexto(c.telefone, textoDoCupom(null, { nome: c.nome, premio: premio.label, cupom: codigo, validDays: cfg.coupon_valid_days, origem: c.jogo })).catch(() => undefined);
     }
@@ -236,12 +278,15 @@ export async function abrirPeloTelefone(e: string, kind: JogoTipo, telefone: unk
   if (tel.length < 10 || tel.length > 11) return { status: 400, corpo: { erro: "Digite o telefone com DDD." } };
   const cfg = configDoJogo(e, kind);
   if (!cfg.public_open) return { status: 403, corpo: { erro: "Este jogo não está aberto agora." } };
+  // A resposta é SEMPRE a mesma (telefone desconhecido, bloqueado, já jogou, reenvio recente ou falha no envio): quem
+  // digita um número não descobre se ele é cadastrado.
+  const IGUAL = { status: 200, corpo: { sent: true } };
   const p = achaPassageiro(e, tel);
-  if (!p) return { status: 404, corpo: { erro: "Não encontramos esse telefone. Use o mesmo número cadastrado no aplicativo." } };
+  if (!p) return IGUAL;
   const { convite, novo } = convidar(e, kind, tel, p.nome, "link");
-  if (convite.jogadoEm) return { status: 200, corpo: { played: true } };
+  if (convite.jogadoEm) return IGUAL;
   // Reenvio do mesmo convite: no máximo 1 a cada 10 min (evita encher o WhatsApp de alguém de avisos)
-  if (!novo && convite.enviadoEm && Date.now() - Date.parse(convite.enviadoEm) < REENVIO_MS) return { status: 200, corpo: { sent: true, recent: true } };
-  const r = await enviarLink(e, base, convite);
-  return r.ok ? { status: 200, corpo: { sent: true } } : { status: 502, corpo: { erro: "Não foi possível enviar o link agora. Tente de novo em instantes." } };
+  if (!novo && convite.enviadoEm && Date.now() - Date.parse(convite.enviadoEm) < REENVIO_MS) return IGUAL;
+  await enviarLink(e, base, convite);
+  return IGUAL;
 }

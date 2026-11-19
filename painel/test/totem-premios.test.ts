@@ -130,10 +130,11 @@ test("link aberto: o telefone precisa ser de passageiro ativo; o link vai pelo W
   PR.definirGanchoPremio((g) => ganhos.push({ jogo: g.jogo, cupom: g.cupom }));
   assert.equal((await pub(A.id, "abrir", { kind: "roleta", telefone: "123" })).status, 400);
   assert.equal((await pub(A.id, "abrir", { kind: "xx", telefone: "11988887777" })).status, 400);
-  assert.equal((await pub(A.id, "abrir", { kind: "roleta", telefone: "(11) 95555-4444" })).status, 404);
-  assert.equal((await pub(A.id, "abrir", { kind: "roleta", telefone: "11977776666" })).status, 404); // bloqueado
-  assert.equal((await pub("nao-existe", "abrir", { kind: "roleta", telefone: "11988887777" })).status, 404);
-  assert.equal((await pub(B.id, "abrir", { kind: "roleta", telefone: "11988887777" })).status, 404); // passageiro é da outra empresa
+  const IGUAL = { status: 200, corpo: { sent: true } };
+  for (const tel of ["(11) 95555-4444", "11977776666"]) { const x = await pub(A.id, "abrir", { kind: "roleta", telefone: tel }); assert.deepEqual({ status: x.status, corpo: x.corpo }, IGUAL, "desconhecido ou bloqueado: mesma resposta"); }
+  assert.equal((await pub("nao-existe", "abrir", { kind: "roleta", telefone: "11988887777" })).status, 404); // empresa inexistente
+  assert.deepEqual((await pub(B.id, "abrir", { kind: "roleta", telefone: "11988887777" })).corpo, { sent: true }); // passageiro é da outra empresa: mesma resposta, nada enviado
+  assert.ok(!caixaSimulada(B.id).length, "nada saiu pela outra empresa");
   const r = await pub(A.id, "abrir", { kind: "roleta", telefone: "(11) 98888-7777" });
   assert.equal(r.status, 200, r.texto);
   assert.deepEqual(r.corpo, { sent: true });
@@ -141,7 +142,7 @@ test("link aberto: o telefone precisa ser de passageiro ativo; o link vai pelo W
   const msg = caixaSimulada(A.id).find((m) => m.telefone === "11988887777");
   assert.ok(msg, "o link tem que sair pelo WhatsApp");
   assert.match(msg!.texto, new RegExp(`/p/${A.id}/[0-9a-f]{40}`));
-  assert.deepEqual((await pub(A.id, "abrir", { kind: "roleta", telefone: "11988887777" })).corpo, { sent: true, recent: true });
+  assert.deepEqual((await pub(A.id, "abrir", { kind: "roleta", telefone: "11988887777" })).corpo, { sent: true }); // reenvio recente: mesma resposta
 });
 
 let token = "";
@@ -174,7 +175,7 @@ test("jogar: info sem as chances, sorteia uma vez só, cria o cupom do passageir
   assert.ok(caixaSimulada(A.id).some((m) => m.texto.includes(codigo)), "o cupom também sai pelo WhatsApp");
   // Depois de jogar: mostra o mesmo resultado e o link aberto diz que já jogou.
   assert.equal((await pub(A.id, "info", { token })).corpo.result.code, codigo);
-  assert.deepEqual((await pub(A.id, "abrir", { kind: "roleta", telefone: "11988887777" })).corpo, { played: true });
+  assert.deepEqual((await pub(A.id, "abrir", { kind: "roleta", telefone: "11988887777" })).corpo, { sent: true }); // já jogou: mesma resposta
 });
 
 test("convite vencido não joga; 'Não foi dessa vez' não cria cupom; convite manual e enviar agora", async () => {
@@ -203,4 +204,29 @@ test("convite vencido não joga; 'Não foi dessa vez' não cria cupom; convite m
   assert.equal(e.corpo.enviados, 1); // Maria já tinha convite hoje; o bloqueado não recebe
   assert.ok(caixaSimulada(A.id).some((x) => x.telefone === "11966665555"));
   assert.equal((await pedir("/totem/premios/raspadinha/enviar-agora", { corpo: {}, cookie: ca })).corpo.enviados, 0);
+});
+
+test("travas do CRM: descadastrado não recebe; pausa geral segura; fora da janela e teto (WhatsApp de verdade) param o lote", async () => {
+  const L = await import("../src/crm/limites.ts");
+  const T = await import("../src/crm/templates.ts");
+  const C = D.criarEmpresa("Travas Premio");
+  criar(C.id, cadastroPorId("clientes")!, { nome: "Saiu", telefone: "11911110001", status: "Ativo" }, "teste");
+  criar(C.id, cadastroPorId("clientes")!, { nome: "Fica", telefone: "11911110002", status: "Ativo" }, "teste");
+  PR.salvarConfigDoJogo(C.id, "roleta", { ...J.configPadrao("roleta"), invites_enabled: true });
+  T.descadastrar(C.id, { telefone: "11911110001", origem: "teste" });
+  // Pausa geral: ninguém recebe e nenhum convite fica "preso" (volta a valer quando continuar)
+  L.definirPausaGeral(C.id, true, "t");
+  const parado = await PR.enviarAgora(C.id, "roleta", "http://x");
+  assert.equal(parado.enviados, 0);
+  L.definirPausaGeral(C.id, false, "t");
+  const r = await PR.enviarAgora(C.id, "roleta", "http://x");
+  assert.equal(r.enviados, 1, "só quem não saiu da lista");
+  assert.ok(!caixaSimulada(C.id).some((m) => m.telefone === "11911110001"));
+  assert.ok(caixaSimulada(C.id).some((m) => m.telefone === "11911110002"));
+  // Travas de WhatsApp de verdade (a função pura): fora da janela
+  L.salvarGovernanca(C.id, { janelaInicio: "08:00", janelaFim: "21:00" });
+  const madrugada = Date.UTC(2026, 10, 10, 6, 0); // 03:00 em Brasília
+  assert.match(PR.travasDoCrm(C.id, "11911110002", { real: true, agora: madrugada })?.erro ?? "", /janela/i);
+  assert.equal(PR.travasDoCrm(C.id, "11911110002", { real: false, agora: madrugada }), null, "o simulado não segue horário");
+  assert.match(PR.travasDoCrm(C.id, "11911110001", { real: false })?.erro ?? "", /Descadastrado/);
 });

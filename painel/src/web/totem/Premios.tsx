@@ -81,10 +81,10 @@ function PorTelefone({ empresa, jogo }: { empresa: string; jogo: string }) {
   const [feito, setFeito] = useState<string | null>(null);
   const enviar = async () => {
     setOcupado(true); setErro(null);
-    const r = await chamar<{ sent?: boolean; played?: boolean }>(empresa, "abrir", { kind: jogo, telefone: tel });
+    const r = await chamar<{ sent?: boolean }>(empresa, "abrir", { kind: jogo, telefone: tel });
     setOcupado(false);
     if (r.error || !r.data) return setErro(r.error ?? "Não foi possível abrir.");
-    setFeito(r.data.played ? "Você já jogou. O resultado está na mensagem que você recebeu." : "Pronto! Enviamos o link para o seu WhatsApp. Abra a mensagem para jogar.");
+    setFeito("Pronto! Se este número estiver cadastrado, o link do jogo chegou ao seu WhatsApp. Abra a mensagem para jogar.");
   };
   if (feito) return <Aviso icone="presente" texto={feito} />;
   return (
