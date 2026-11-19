@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { Copy, Gift, Loader2, Plus, Save, Send, Trash2 } from "lucide-react";
 import { Cartao, Titulo, useCarregar } from "../componentes/ui";
+import Fidelidade from "./FidelidadeAdmin";
 import { apiCentral, type JogoPremio, type PremioConfig } from "./api";
 
 const TIPOS: Array<[PremioConfig["type"], string]> = [["percent", "Desconto em %"], ["fixed", "Desconto em R$"], ["none", "Não ganha nada"]];
@@ -17,6 +18,7 @@ export default function PremiosAdmin() {
       <Titulo titulo="Jogos de recompensa" sub="Roleta de Cupom e Raspadinha: o passageiro joga pelo link e ganha um cupom" />
       {erro && <div className="aviso erro">{erro}</div>}
       {!dados ? <div className="vazio"><Loader2 className="gira" /></div> : dados.jogos.map((j) => <Jogo key={j.kind} j={j} empresa={dados.empresa} aoSalvar={recarregar} />)}
+      {dados && <Fidelidade empresa={dados.empresa} />}
     </>
   );
 }
@@ -75,7 +77,7 @@ function Jogo({ j, empresa, aoSalvar }: { j: JogoPremio; empresa: string; aoSalv
             <label>Vezes por dia (6 h entre elas)<input type="number" min="1" max="3" value={c.times_per_day} onChange={(e) => mudar("times_per_day", Number(e.target.value))} /></label>
             <label>Um convite a cada (dias)<input type="number" min="1" max="30" value={c.every_n_days} onChange={(e) => mudar("every_n_days", Number(e.target.value))} /></label>
           </div>
-          <small>O envio automático por horário ainda depende do agendador do CRM (gancho pronto). O "Enviar agora" funciona já.</small>
+          <small>O agendador do CRM manda o convite no 1º horário e um lembrete a quem ainda não jogou nos outros, respeitando a pausa, a janela de horário, o teto diário e o descadastro do CRM. Salve o jogo uma vez por este painel para o agendador saber o endereço do link.</small>
         </fieldset>
 
         {msg && <div className={msg.erro ? "aviso erro" : "aviso ok"}>{msg.texto}</div>}

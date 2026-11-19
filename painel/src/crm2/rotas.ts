@@ -12,6 +12,7 @@ import { anotar, auditarRotas, listarAuditoria } from "./auditoria.ts";
 import { salvarConfig2 } from "./base.ts";
 import * as C from "./contatos.ts";
 import { resumoDeGovernanca } from "./governanca.ts";
+import { listarRecompensas, resumoRecompensas } from "./fidelidade.ts";
 import { atualizarMapa, lerMapa, mapaJaGerado } from "./mapa.ts";
 import { criarCupom, descontoDosUltimos30Dias, listarCupons, removerCupom, resumoDeCupons } from "./recompensas.ts";
 import { atualizarRfm, contatosParaCsv, criarSegmentoRfm, resumoRfm } from "./rfm.ts";
@@ -110,7 +111,7 @@ rotasCrm2.post("/rfm/atualizar", gestor, ok(async (req, res) => {
 rotasCrm2.post("/rfm/segmento", gestor, ok((req, res) => {
   const e = emp(req);
   const s = criarSegmentoRfm(e, txt(req.body?.segmento, 40));
-  anotar(e, quem(req), { entidade: "segmento", entidade_id: s.id, entidade_nome: s.nome, acao: "criou", campos: [], antigo: null, novo: { id: s.id, nome: s.nome, modo: "fixa", pessoas: s.total } });
+  anotar(e, quem(req), { entidade: "segmento", entidade_id: s.id, entidade_nome: s.nome, acao: "criou", campos: [], antigo: null, novo: { id: s.id, nome: s.nome, modo: "dinamica", pessoas: s.total } });
   res.json(s);
 }));
 
@@ -126,16 +127,17 @@ rotasCrm2.get("/conversao", ok(async (req, res) => {
 
 // ------------------------------------------------------------------ mapa de calor
 
-rotasCrm2.get("/mapa", ok((req, res) => {
+rotasCrm2.get("/mapa", ok(async (req, res) => {
   const e = emp(req);
   // Primeira vez sem nenhum dado: gera sozinho a partir das corridas.
-  if (!mapaJaGerado(e)) atualizarMapa(e);
+  if (!mapaJaGerado(e)) atualizarMapa(e, (await corridasDoPublico(e)).corridas);
   res.json({ celulas: lerMapa(e), cidades: listarCidades(e) });
 }));
 
-rotasCrm2.post("/mapa/atualizar", gestor, ok((req, res) => {
+rotasCrm2.post("/mapa/atualizar", gestor, ok(async (req, res) => {
   const e = emp(req);
-  res.json({ zonas: atualizarMapa(e), celulas: lerMapa(e), cidades: listarCidades(e) });
+  limparCachePublico(e);
+  res.json({ zonas: atualizarMapa(e, (await corridasDoPublico(e)).corridas), celulas: lerMapa(e), cidades: listarCidades(e) });
 }));
 
 // ------------------------------------------------------------------ recompensas (cupons)
@@ -146,7 +148,7 @@ rotasCrm2.get("/recompensas", ok(async (req, res) => {
   const hoje = agoraBr().toISOString().slice(0, 10);
   const origem = txt(req.query.origem, 12) || "all";
   const todos = listarCupons(e, corridas, hoje, origem);
-  res.json({ cupons: todos.slice(0, 300), resumo: resumoDeCupons(todos), desconto30: descontoDosUltimos30Dias(corridas) });
+  res.json({ cupons: todos.slice(0, 300), resumo: resumoDeCupons(todos), desconto30: descontoDosUltimos30Dias(corridas), ganhos: listarRecompensas(e, 100), ganhosResumo: resumoRecompensas(e) });
 }));
 
 rotasCrm2.post("/recompensas/atualizar", gestor, ok((req, res) => { limparCachePublico(emp(req)); res.json({ ok: true }); }));

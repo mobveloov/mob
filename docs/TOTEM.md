@@ -201,9 +201,11 @@ identificador gerado no aparelho; versões do APK guardam só o endereço do arq
   pelo WhatsApp (o link nunca volta na resposta). O sorteio é no servidor, uma jogada por convite; o prêmio vira um cupom do cadastro Cupons (uso único,
   só para aquele telefone) e também sai pelo WhatsApp. Admin: prêmios e chances, cores e textos, "Enviar agora", convite para um telefone, copiar o link.
   Código: `src/totem/premios-jogos.ts` (regras), `premios.ts` (convites, jogo, cupom), teste `test/totem-premios.test.ts`.
-- **Gancho para o CRM**: `definirGanchoPremio(fn)` em `premios.ts` recebe cada prêmio ganho. Quando a aba Recompensas do CRM entrar no main, ela registra a função
-  por essa interface, sem editar este módulo. Cartão fidelidade e pontos ficam com o CRM.
+- **Gancho para o CRM**: `definirGanchoPremio(fn)` em `premios.ts` recebe cada prêmio ganho; `crm/ganchos-crm2.ts` registra a função e grava o prêmio na aba
+  Recompensas do CRM (lista "Prêmios ganhos"). Cartão Fidelidade e Pontos de Troca (`crm2/fidelidade*.ts`) aparecem na mesma tela de jogos.
+- **Agenda**: `rodarAgendaDePremios` (premios.ts) é chamada pela volta do trabalhador do CRM (`crm/envio.ts`). No horário vencido (`horarioVencido`) chama
+  `enviarAgora` (1º horário) ou manda de novo o link a quem não jogou (2º e 3º). Usa as travas do CRM (`travasDoCrm`); parou por trava geral, o horário
+  não fica como feito e tenta de novo dentro dos 30 minutos. O endereço do link vem de `PUBLICO_URL` ou do último salvamento pelo painel. Teste: `test/totem-agenda.test.ts`.
 
 **Pendente:** senha de fechamento nativa do app Android (a ponte do app guarda a senha em SharedPreferences; exige build nativo e aparelho para testar);
-envio automático dos convites por horário (os dias, horários e a regra `horarioVencido` já estão prontos; falta o agendador do CRM chamar `enviarAgora`);
 resposta do bot à pergunta de preço usando a tabela de Preços por cidade (área do Bot).

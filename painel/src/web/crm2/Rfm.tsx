@@ -18,7 +18,7 @@ export default function Rfm() {
     setAtualizando(false);
     recarregar();
   };
-  const criar = (segmento: string) => tentar(() => crm2.segmentoRfm(segmento), (r) => `Segmento "${r.nome}" criado com ${r.total} pessoas. Use em campanhas e jornadas.`);
+  const criar = (segmento: string) => tentar(() => crm2.segmentoRfm(segmento), (r) => (r.jaExistia ? `O segmento "${r.nome}" já existe (${r.total} pessoas agora).` : `Segmento "${r.nome}" criado (${r.total} pessoas agora). Ele se atualiza sozinho a cada análise; use em campanhas e jornadas.`));
   const exportar = async () => {
     const r = await tentar(() => crm2.rfmContatos());
     if (r) baixarCsv("rfm-passageiros.csv", ["Nome", "Telefone", "Segmento", "R", "F", "M", "Corridas", "Gasto", "Última corrida"],

@@ -40,6 +40,21 @@ export function bd() {
         empresa TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, embarques INTEGER NOT NULL DEFAULT 0, desembarques INTEGER NOT NULL DEFAULT 0,
         ultima INTEGER, atualizado_em INTEGER NOT NULL, PRIMARY KEY (empresa, lat, lng));
       CREATE TABLE IF NOT EXISTS crm_config2 (empresa TEXT NOT NULL, chave TEXT NOT NULL, valor TEXT NOT NULL, PRIMARY KEY (empresa, chave));
+      CREATE TABLE IF NOT EXISTS crm_fid_cartoes (empresa TEXT NOT NULL, id TEXT NOT NULL, config TEXT NOT NULL, ativado_em INTEGER, criado_em INTEGER NOT NULL, PRIMARY KEY (empresa, id));
+      CREATE TABLE IF NOT EXISTS crm_fid_progresso (
+        empresa TEXT NOT NULL, cartao_id TEXT NOT NULL, telefone TEXT NOT NULL, corridas INTEGER NOT NULL DEFAULT 0, premiados INTEGER NOT NULL DEFAULT 0,
+        ultimo_cupom TEXT, ultimo_erro TEXT, atualizado_em INTEGER NOT NULL, PRIMARY KEY (empresa, cartao_id, telefone));
+      CREATE TABLE IF NOT EXISTS crm_pontos_programa (empresa TEXT NOT NULL PRIMARY KEY, config TEXT NOT NULL, ultimo_slot TEXT, atualizado_em INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS crm_pontos_lancamentos (
+        empresa TEXT NOT NULL, id TEXT NOT NULL, telefone TEXT NOT NULL, tipo TEXT NOT NULL, pontos INTEGER NOT NULL, restante INTEGER NOT NULL DEFAULT 0,
+        corrida_ref TEXT, vence_em INTEGER, premio TEXT, cupom TEXT, retirada TEXT, retirada_feita_em INTEGER, criado_em INTEGER NOT NULL, PRIMARY KEY (empresa, id));
+      CREATE INDEX IF NOT EXISTS crm_pontos_tel ON crm_pontos_lancamentos (empresa, telefone, tipo);
+      CREATE TABLE IF NOT EXISTS crm_pontos_links (empresa TEXT NOT NULL, telefone TEXT NOT NULL, token TEXT NOT NULL UNIQUE, PRIMARY KEY (empresa, telefone));
+      CREATE TABLE IF NOT EXISTS crm_corridas_vistas (empresa TEXT NOT NULL, evento_id TEXT NOT NULL, em INTEGER NOT NULL, PRIMARY KEY (empresa, evento_id));
+      CREATE TABLE IF NOT EXISTS crm_recompensas_ganhas (
+        empresa TEXT NOT NULL, id TEXT NOT NULL, origem TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', premio TEXT NOT NULL DEFAULT '',
+        cupom TEXT, em INTEGER NOT NULL, PRIMARY KEY (empresa, id));
+      CREATE INDEX IF NOT EXISTS crm_recompensas_em ON crm_recompensas_ganhas (empresa, em);
     `);
     prontas.add(arq);
   }

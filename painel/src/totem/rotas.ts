@@ -21,6 +21,8 @@ import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import { buscarEndereco } from "../enderecos/index.ts";
 import * as A from "./apk.ts";
 import * as PR from "./premios.ts";
+import * as FID from "../crm2/fidelidade.ts";
+import { CARD_TEMPLATES } from "../crm2/fidelidade-regras.ts";
 import * as TC from "./tarifas-cidade.ts";
 import * as T from "./dados.ts";
 import { esquecerWhatsapp, instanciaDoTotem, provedorDoTotem, whatsappPronto } from "./whatsapp.ts";
@@ -154,6 +156,15 @@ rotasTotem.post("/premios/publico/:empresa/info", premioPublico((req, e) => {
   return i ? { status: 200, corpo: i } : { status: 404, corpo: { erro: "Convite não encontrado." } };
 }));
 rotasTotem.post("/premios/publico/:empresa/play", premioPublico((req, e) => PR.jogar(e, req.body?.token, baseDaRequisicao(req))));
+// Pontos de Troca (página do passageiro): /pontos/<empresa>/<token> (link do aviso: troca) ou /pontos/<empresa> (telefone: só o saldo).
+rotasTotem.post("/pontos/publico/:empresa/info", premioPublico((req, e) => {
+  if (!req.body?.token && !podeAbrirPremio(`pontos|${req.ip}|${e}`)) return { status: 429, corpo: { erro: "Muitas tentativas. Espere alguns minutos e tente de novo." } };
+  return FID.pontosInfo(e, req.body ?? {});
+}));
+rotasTotem.post("/pontos/publico/:empresa/trocar", premioPublico((req, e) => {
+  if (!podeAbrirPremio(`trocar|${req.ip}|${e}`)) return { status: 429, corpo: { erro: "Muitas tentativas. Espere alguns minutos e tente de novo." } };
+  return FID.pontosTrocar(e, req.body ?? {});
+}));
 rotasTotem.post("/premios/publico/:empresa/abrir", premioPublico((req, e) => {
   const kind = req.body?.kind;
   if (!PR.ehJogo(kind)) return { status: 400, corpo: { erro: "Link inválido." } };
@@ -376,13 +387,30 @@ interno.put("/tarifas-cidade-espera", admin, ok((req, res) => { TC.definirEspera
 interno.get("/premios", admin, ok((req, res) => { res.json({ jogos: PR.painelDosJogos(emp(req)), empresa: emp(req) }); }));
 interno.put("/premios/:kind", admin, ok((req, res) => {
   if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
-  const cfg = PR.salvarConfigDoJogo(emp(req), req.params.kind, req.body?.config);
+  const cfg = PR.salvarConfigDoJogo(emp(req), req.params.kind, req.body?.config, baseDaRequisicao(req));
   res.json({ ok: true, config: cfg });
 }));
 interno.post("/premios/:kind/enviar-agora", admin, ok(async (req, res) => {
   if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
+  PR.guardarBase(emp(req), baseDaRequisicao(req));
   res.json({ ok: true, ...(await PR.enviarAgora(emp(req), req.params.kind, baseDaRequisicao(req))) });
 }));
+/** Cartão Fidelidade e Pontos de Troca (só admin), na mesma tela dos jogos. */
+interno.get("/fidelidade", admin, ok((req, res) => {
+  res.json({ empresa: emp(req), cartoes: FID.listarCartoes(emp(req)), modelos: CARD_TEMPLATES, pontos: FID.resumoDePontos(emp(req)) });
+}));
+interno.put("/fidelidade/cartoes", admin, ok((req, res) => {
+  PR.guardarBase(emp(req), baseDaRequisicao(req));
+  const id = req.body?.id == null || req.body.id === "" ? null : String(req.body.id);
+  res.json({ ok: true, id: FID.salvarCartao(emp(req), id, req.body?.config) });
+}));
+interno.delete("/fidelidade/cartoes/:id", admin, ok((req, res) => { FID.excluirCartao(emp(req), req.params.id); res.json({ ok: true }); }));
+interno.put("/fidelidade/pontos", admin, ok((req, res) => {
+  PR.guardarBase(emp(req), baseDaRequisicao(req));
+  res.json({ ok: true, config: FID.salvarPontos(emp(req), req.body?.config) });
+}));
+interno.post("/fidelidade/pontos/retirada/:id", admin, ok((req, res) => { FID.marcarRetiradaEntregue(emp(req), req.params.id); res.json({ ok: true }); }));
+
 interno.post("/premios/:kind/convite", admin, ok(async (req, res) => {
   if (!PR.ehJogo(req.params.kind)) throw new Error("Jogo inválido.");
   const tel = PR.soNumeros(req.body?.telefone);

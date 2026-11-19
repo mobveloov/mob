@@ -6,6 +6,7 @@ import { useGestor, useRetorno } from "../crm/comum";
 import { crm2, dinheiroBr } from "./api";
 
 const ORIGEM: Record<string, string> = { manual: "Manual", automatico: "Automático" };
+const ORIGEM_GANHO: Record<string, string> = { roleta: "Roleta", raspadinha: "Raspadinha", fidelidade: "Cartão Fidelidade", pontos: "Pontos de Troca" };
 const dia = (s: string) => (s ? s.split("-").reverse().join("/") : "");
 
 /** CRM › Recompensas: cupons da central (os mesmos do cadastro de Cupons) com usos e desconto dado. */
@@ -44,6 +45,24 @@ export default function Recompensas() {
       )}
       {caixa}
       {erro && <div className="aviso erro">{erro}</div>}
+      {dados && (
+        <Cartao>
+          <div className="linha-filtro">
+            <strong><Sparkles size={14} /> Prêmios ganhos</strong>
+            <small className="sub">{dados.ganhosResumo.total} no total · {Object.entries(ORIGEM_GANHO).map(([k, n]) => `${n}: ${dados.ganhosResumo.por[k] ?? 0}`).join(" · ")}</small>
+          </div>
+          {!dados.ganhos.length ? <p className="vazio">Ninguém ganhou prêmio ainda. Roleta, Raspadinha, Cartão Fidelidade e Pontos de Troca aparecem aqui (configure em Totens &amp; Preços › Jogos de recompensa).</p> : (
+            <div className="pilha">
+              {dados.ganhos.slice(0, 20).map((g) => (
+                <div key={g.id} className="linha-filtro">
+                  <span><span className="selo">{ORIGEM_GANHO[g.origem] ?? g.origem}</span> <strong>{g.nome || g.telefone}</strong> ganhou {g.premio}{g.cupom ? <> · cupom <span className="crm2-codigo">{g.cupom}</span></> : null}</span>
+                  <small className="sub">{new Date(g.em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</small>
+                </div>
+              ))}
+            </div>
+          )}
+        </Cartao>
+      )}
       {!dados ? <p className="vazio">Carregando...</p> : !dados.cupons.length ? <Cartao><p className="vazio"><Ticket size={16} /> Nenhum cupom. Crie um aqui.</p></Cartao> : (
         <div className="pilha">
           {dados.cupons.map((c) => (

@@ -44,6 +44,9 @@ export interface CorridaPainel {
   motivoCancelamento: string;
   operador: string;
   programada: boolean;
+  /** Coordenadas, quando a integração as informa (a maioria só traz o texto do endereço). Usadas no Mapa de Calor do CRM. */
+  embarquePonto?: { lat: number; lng: number };
+  destinoPonto?: { lat: number; lng: number };
 }
 
 export interface Filtro {

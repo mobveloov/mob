@@ -18,9 +18,10 @@ import { WA_OPTOUT_SKIP } from "../crm/optout.ts";
 import { registrar } from "../crm/registro.ts";
 import { reservar } from "../crm/ritmo.ts";
 import * as D from "../servidor/dados.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { agoraBr } from "../servidor/util.ts";
 import {
-  aleatorioSeguro, codigoDoCupom, configPadrao, diasAntes, ROTULO_JOGO, normalizarConfig, novoToken, primeiroNome, resumoDasChances, sortearPremio, textoDoCupom,
+  aleatorioSeguro, codigoDoCupom, configPadrao, diasAntes, horarioVencido, ROTULO_JOGO, normalizarConfig, novoToken, primeiroNome, resumoDasChances, sortearPremio, textoDoCupom,
   type ConfigJogo, type JogoTipo, type Premio,
 } from "./premios-jogos.ts";
 
@@ -43,9 +44,12 @@ export interface Convite {
   premio: Pick<Premio, "label" | "type" | "value"> | null;
   cupom: string | null;
   erroCupom: string | null;
+  /** Quantos lembretes do dia já saíram (2º e 3º horário da agenda). */
+  lembretes?: number;
 }
 
-interface Arquivo { config: Partial<Record<JogoTipo, unknown>>; convites: Convite[] }
+/** `base`: endereço público do painel (guardado ao salvar, para a agenda enviar sem ninguém no painel). `slots`: último horário da agenda já feito por jogo ("AAAA-MM-DD#i"). */
+interface Arquivo { config: Partial<Record<JogoTipo, unknown>>; convites: Convite[]; base?: string; slots?: Partial<Record<JogoTipo, string>> }
 const MAX_CONVITES = 20000;
 const REENVIO_MS = 10 * 60_000;
 const VALIDADE_CONVITE_DIAS = 7;
@@ -55,7 +59,7 @@ const arq = (e: string) => {
   return path.join(D.raiz(), "empresas", e, "totem", "premios.json");
 };
 function ler(e: string): Arquivo {
-  try { const j = JSON.parse(fs.readFileSync(arq(e), "utf8")) as Partial<Arquivo>; return { config: j.config ?? {}, convites: j.convites ?? [] }; }
+  try { const j = JSON.parse(fs.readFileSync(arq(e), "utf8")) as Partial<Arquivo>; return { config: j.config ?? {}, convites: j.convites ?? [], ...(j.base ? { base: j.base } : {}), ...(j.slots ? { slots: j.slots } : {}) }; }
   catch { return { config: {}, convites: [] }; }
 }
 function gravar(e: string, a: Arquivo) {
@@ -79,7 +83,19 @@ export const definirGanchoPremio = (fn: ((p: PremioGanho) => void) | null) => { 
 
 export const configDoJogo = (e: string, kind: JogoTipo): ConfigJogo => normalizarConfig(kind, ler(e).config[kind] ?? configPadrao(kind));
 
-export function salvarConfigDoJogo(e: string, kind: JogoTipo, raw: unknown): ConfigJogo {
+/** Guarda o endereço público do painel (a agenda não tem requisição para descobrir). Só http(s). */
+export function guardarBase(e: string, base: string) {
+  const b = String(base ?? "").trim().replace(/\/+$/, "");
+  if (!/^https?:\/\/[^\s/]+$/i.test(b)) return;
+  const a = ler(e);
+  if (a.base === b) return;
+  a.base = b;
+  gravar(e, a);
+}
+export const baseGuardada = (e: string): string => (process.env.PUBLICO_URL ?? "").trim().replace(/\/+$/, "") || ler(e).base || "";
+
+export function salvarConfigDoJogo(e: string, kind: JogoTipo, raw: unknown, base?: string): ConfigJogo {
+  if (base) guardarBase(e, base);
   const a = ler(e);
   const cfg = normalizarConfig(kind, raw);
   a.config[kind] = cfg;
@@ -205,25 +221,68 @@ export async function enviarLink(e: string, base: string, c: Convite): Promise<{
 }
 
 /** "Enviar agora": convite para os passageiros do cadastro que ainda não receberam (até 500 por vez). */
-export async function enviarAgora(e: string, kind: JogoTipo, base: string): Promise<{ criados: number; enviados: number; falhas: number; restam: number }> {
+export async function enviarAgora(e: string, kind: JogoTipo, base: string): Promise<{ criados: number; enviados: number; falhas: number; restam: number; /** Parou por trava geral do CRM (pausa, horário, teto, ritmo): dá para tentar de novo depois. */ adiado: boolean }> {
   const cfg = configDoJogo(e, kind);
   if (!cfg.invites_enabled) throw new Error('Ligue "Disparar convites" e salve antes de enviar.');
   const todos = passageiros(e);
-  let criados = 0, enviados = 0, falhas = 0, tentados = 0;
+  let criados = 0, enviados = 0, falhas = 0, tentados = 0, adiado = false;
   for (const p of todos) {
     if (tentados >= 500) break;
     // Trava geral (pausa, horário, teto, ritmo): para o lote sem criar convite que ficaria sem envio. Descadastrado: pula só ele.
     const antes = travasDoCrm(e, p.telefone);
-    if (antes) { if (antes.geral) break; continue; }
+    if (antes) { if (antes.geral) { adiado = true; break; } continue; }
     const { convite, novo } = convidar(e, kind, p.telefone, p.nome, "agora");
     // Convite que já saiu, já foi jogado ou falhou de verdade não se repete; o que ficou adiado (sem envio nem erro) sai agora.
     if (!novo && (convite.enviadoEm || convite.jogadoEm || convite.erroEnvio)) continue;
     if (novo) criados++;
     tentados++;
     const r = await enviarLink(e, base, convite);
-    if (r.ok) enviados++; else if (r.adiado) break; else falhas++;
+    if (r.ok) enviados++; else if (r.adiado) { adiado = true; break; } else falhas++;
   }
-  return { criados, enviados, falhas, restam: Math.max(0, criados - enviados - falhas) };
+  return { criados, enviados, falhas, restam: Math.max(0, criados - enviados - falhas), adiado };
+}
+
+// ------------------------------------------------------------------ agenda (chamada pelo trabalhador do CRM)
+
+export interface ResultadoAgenda { jogo: JogoTipo; slot: number; tipo: "convites" | "lembretes"; enviados: number; falhas: number; adiado: boolean }
+
+/** Último horário da agenda feito por jogo (para a tela). */
+export const ultimoHorarioDaAgenda = (e: string, kind: JogoTipo): string | null => ler(e).slots?.[kind] ?? null;
+
+/**
+ * Agenda dos jogos: no horário configurado (dias, hora, até 3 vezes por dia) chama "Enviar agora" (1º horário) ou manda de
+ * novo o link a quem ainda não jogou (2º e 3º horários). Passa pelas mesmas travas do CRM (pausa, janela, teto, ritmo,
+ * descadastro). Parou por trava geral: o horário não fica como feito e tenta de novo na janela de 30 min.
+ * `agora` em milissegundos reais.
+ */
+export async function rodarAgendaDePremios(e: string, agora = Date.now()): Promise<ResultadoAgenda[]> {
+  if (!moduloLigado(e, "totem")) return []; // recurso desligado também vale para a agenda
+  const br = new Date(agora - 3 * 3600_000);
+  const dia = br.toISOString().slice(0, 10), hhmm = br.toISOString().slice(11, 16), semana = br.getUTCDay();
+  const saida: ResultadoAgenda[] = [];
+  for (const jogo of JOGOS) {
+    const cfg = configDoJogo(e, jogo);
+    const slot = horarioVencido(cfg, dia, semana, hhmm, ler(e).slots?.[jogo] ?? null);
+    if (slot === null) continue;
+    const base = baseGuardada(e);
+    if (!base) continue; // sem endereço público não há link para mandar: salve o jogo uma vez pelo painel
+    let enviados = 0, falhas = 0, adiado = false;
+    if (slot === 0) {
+      ({ enviados, falhas, adiado } = await enviarAgora(e, jogo, base));
+    } else {
+      const pendentes = ler(e).convites.filter((c) => c.jogo === jogo && c.dataLocal === hoje() && c.enviadoEm && !c.jogadoEm && (c.lembretes ?? 0) < slot);
+      for (const c of pendentes.slice(0, 500)) {
+        const trava = travasDoCrm(e, c.telefone);
+        if (trava) { if (trava.geral) { adiado = true; break; } continue; }
+        const r = await enviarLink(e, base, c);
+        if (r.adiado) { adiado = true; break; }
+        if (r.ok) { enviados++; atualizar(e, c.token, (x) => { x.lembretes = slot; }); } else falhas++;
+      }
+    }
+    if (!adiado) { const a = ler(e); a.slots = { ...(a.slots ?? {}), [jogo]: `${dia}#${slot}` }; gravar(e, a); }
+    saida.push({ jogo, slot, tipo: slot === 0 ? "convites" : "lembretes", enviados, falhas, adiado });
+  }
+  return saida;
 }
 
 // ------------------------------------------------------------------ público (sem login)

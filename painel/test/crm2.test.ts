@@ -346,7 +346,7 @@ test("rotas: contatos, tags, opt-out, importação, exclusão, cidades, cupons, 
     const seg = await pedir("/api/crm/rfm/segmento", cG, "POST", { segmento: "sem_corrida" });
     assert.equal(seg.status, 200);
     assert.equal(seg.corpo.nome, "RFM: Sem corrida");
-    assert.ok(A.listas(um).some((l) => l.nome === "RFM: Sem corrida" && l.modo === "fixa"));
+    assert.ok(A.listas(um).some((l) => l.nome === "RFM: Sem corrida" && l.modo === "dinamica" && l.regras.rfmSegmento === "sem_corrida"));
     assert.equal((await pedir("/api/crm/rfm", cO)).status, 200);
 
     // Conversão e mapa.

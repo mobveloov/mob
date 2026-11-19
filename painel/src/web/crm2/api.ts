@@ -6,11 +6,12 @@ import type { LinhaAuditoria } from "../../crm2/auditoria.ts";
 import type { Cidade } from "../../crm2/cidades.ts";
 import type { Celula } from "../../crm2/mapa.ts";
 import type { CupomLinha } from "../../crm2/recompensas.ts";
+import type { RecompensaGanha } from "../../crm2/fidelidade.ts";
 import type { LinhaRfm } from "../../crm2/rfm.ts";
 import type { LinhaConversao } from "../../crm2/conversao.ts";
 import type { Config2 } from "../../crm2/base.ts";
 
-export type { Cidade, Celula, ContatoCrm, CupomLinha, LinhaAuditoria, LinhaConversao, LinhaRfm, Config2 };
+export type { RecompensaGanha, Cidade, Celula, ContatoCrm, CupomLinha, LinhaAuditoria, LinhaConversao, LinhaRfm, Config2 };
 
 export class ErroCrm2 extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
@@ -57,12 +58,12 @@ export const crm2 = {
   excluirContato: (chave: string) => pedir(`/contatos/${encodeURIComponent(chave)}`, "DELETE"),
   rfm: () => pedir<{ linhas: LinhaRfm[]; total: number; ltv: number }>("/rfm"),
   atualizarRfm: () => pedir<{ analisados: number }>("/rfm/atualizar", "POST", {}),
-  segmentoRfm: (segmento: string) => pedir<{ id: string; nome: string; total: number }>("/rfm/segmento", "POST", { segmento }),
+  segmentoRfm: (segmento: string) => pedir<{ id: string; nome: string; total: number; jaExistia?: boolean }>("/rfm/segmento", "POST", { segmento }),
   rfmContatos: () => pedir<{ contatos: Array<{ nome: string; telefone: string; segmento: string | null; r: number | null; f: number | null; m: number | null; corridas: number; gasto: number; ultima: number | null }> }>("/rfm/contatos"),
   conversao: (dias: number) => pedir<{ horas: number; linhas: LinhaConversao[] }>(`/conversao?dias=${dias}`),
   mapa: () => pedir<{ celulas: Celula[]; cidades: Cidade[] }>("/mapa"),
   atualizarMapa: () => pedir<{ zonas: number; celulas: Celula[]; cidades: Cidade[] }>("/mapa/atualizar", "POST", {}),
-  recompensas: (origem: string) => pedir<{ cupons: CupomLinha[]; resumo: { total: number; used: number; active: number }; desconto30: { total: number; corridas: number } }>(`/recompensas${q({ origem })}`),
+  recompensas: (origem: string) => pedir<{ cupons: CupomLinha[]; resumo: { total: number; used: number; active: number }; desconto30: { total: number; corridas: number }; ganhos: RecompensaGanha[]; ganhosResumo: { total: number; por: Record<string, number> } }>(`/recompensas${q({ origem })}`),
   atualizarUsos: () => pedir("/recompensas/atualizar", "POST", {}),
   criarCupom: (c: Record<string, unknown>) => pedir<{ id: string }>("/recompensas/cupons", "POST", c),
   apagarCupom: (id: string) => pedir(`/recompensas/cupons/${id}`, "DELETE"),
