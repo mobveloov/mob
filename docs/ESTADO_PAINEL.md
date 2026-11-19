@@ -226,10 +226,10 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
 | CRM › Público › Comportamentos, Segmentos | Sim | Análise de hora e dias preferidos dos últimos 180 dias (diária às 05:20); segmentos sobre a base de Contatos, com os 8 prontos. |
 | CRM › Público › Contatos | Sim | Base 360° no banco (etapa, tags, opt-out, CSV, linha do tempo, LGPD). Sem id de push da Machine; "Atualizar Métricas" lê o cadastro e as corridas do painel. |
-| CRM › Análises › RFM | Sim | "Criar segmento" grava uma lista fixa (o público do CRM usa listas de pessoas). |
+| CRM › Análises › RFM | Sim | "Criar segmento" cria segmento dinâmico (regra "RFM = este segmento"): a lista é reavaliada a cada uso, com a análise RFM mais recente (diária às 03:15). Não duplica o segmento. |
 | CRM › Análises › Conversão | Sim | Conta as corridas do painel; a janela de atribuição fica na Governança (a aba Machine saiu). |
-| CRM › Análises › Mapa de Calor | Sim | Usa as corridas próprias, que têm coordenada. |
-| CRM › Recompensas | Sim | Cupons do cadastro de Cupons (sem gerador/área da Machine; "cidade" no lugar da área). Cartão fidelidade/roleta não existem no painel. |
+| CRM › Análises › Mapa de Calor | Sim | Usa as corridas próprias e as das integrações que informam coordenada (`embarquePonto`/`destinoPonto` da corrida; as só com texto de endereço seguem de fora). |
+| CRM › Recompensas | Sim | Cupons do cadastro de Cupons (sem gerador/área da Machine; "cidade" no lugar da área) e lista "Prêmios ganhos" (roleta, raspadinha, cartão fidelidade e pontos). Cartão Fidelidade e Pontos de Troca (`src/crm2/fidelidade*.ts`, página pública `/pontos/<empresa>/<token>`) ficam na tela Totens & Preços › Jogos de recompensa, como na tela Prêmios do original; o aviso sai pelo WhatsApp (sem app/push) e o cupom vai para o cadastro Cupons. Sem Meu Link, sem gerador/área da Machine. |
 | CRM › Configurações › Cidades, Governança, Auditoria | Sim | Janela de horário e opt-in da Governança valem na fila (só depois que a empresa salva). Auditoria anota campanhas, jornadas, templates e segmentos. A aba Machine foi retirada de propósito. |
 | CRM › Emojis nas mensagens | Sim | |
 | SpinText `{a|b}` e variáveis `{{x}}` | Sim | Variáveis antigas `{x}` continuam valendo. |
@@ -248,7 +248,7 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
 | Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
-| Totem: jogos de recompensa (roleta e raspadinha, página pública /p/… e /premios/…) | Sim | Módulo do totem (`src/totem/premios*.ts`) com gancho `definirGanchoPremio` para o CRM › Recompensas. Falta o envio automático por horário (depende do agendador do CRM) e cartão fidelidade/pontos (CRM). |
+| Totem: jogos de recompensa (roleta e raspadinha, página pública /p/… e /premios/…) | Sim | Módulo do totem (`src/totem/premios*.ts`) com gancho `definirGanchoPremio` para o CRM › Recompensas. O agendador do CRM (`rodarAgendaDePremios`, chamado na volta do trabalhador) manda o convite no dia/horário e lembretes no 2º e 3º horário, com as travas do CRM; o gancho alimenta a aba Recompensas do CRM. |
 | Totem: Preços por cidade (dentro da cidade, locais, entre cidades, noturno, domingo, feriado, pedágio) | Sim | `src/totem/tarifas-cidade.ts`. A resposta do bot à pergunta de preço com esta tabela fica para a área do Bot. |
 | Totem: busca de endereço com sugestões no destino | Sim | Usa a base de endereços da empresa (`src/enderecos`). |
 | Totens & Preços (Totens & Locais, Preços por totem, Preços por cidade, Jogos de recompensa) | Sim | Senha só como hash. |
@@ -270,15 +270,13 @@ Nenhuma parte do CRM, Bot ou Totem está 100% copiada do mobveloov: o que veio e
 - Texto padrão do menu do bot mantém nome da empresa e do assistente (diferença do original).
 
 **CRM**
-- Cartão fidelidade e pontos.
-- "Criar segmento" no RFM grava lista fixa, não segmento dinâmico.
 - Canais push e in-app (eram da Machine: ficam de fora de propósito).
-- Mapa de Calor só com corridas próprias (as de integração não têm coordenada).
+- Mapa de Calor: as integrações só entram se o motor informar latitude/longitude (hoje a maioria só traz o texto do endereço).
+- Cartão fidelidade e pontos: falta o "Meu Link" (página única com tudo) e o aviso no app/push (era da Machine).
+- Agenda dos jogos do totem: precisa do endereço público do painel (variável `PUBLICO_URL` ou salvar o jogo/pontos uma vez pelo painel).
 
 **Totem**
 - Senha de fechamento nativa do app Android (precisa de build nativo e aparelho).
-- Envio automático dos convites dos jogos por horário (falta o agendador do CRM chamar "enviar agora").
-- Gancho dos prêmios para a aba Recompensas do CRM (hoje ela lê os cupons que o prêmio gera).
 
 **Painel (Machine)**
 - Config › Gerais: abas Motorista, Passageiro, Financeiro, Filtros, Formas de pagamento e Recursos Premium; e, em Integrações, Saque Automático e Marketplace de Integradores (faltam páginas salvas da Machine).
