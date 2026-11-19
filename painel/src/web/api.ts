@@ -1,15 +1,18 @@
 // Conversa com o servidor (/api). O painel não sabe de qual sistema veio cada corrida: só a etiqueta de origem.
 
 import type { CorridaPainel, Filtro, GrupoStatus } from "../comum/corrida.ts";
+import type { Cargo } from "../comum/cargos.ts";
 import type { Marca } from "../comum/marca.ts";
 
 export type { CorridaPainel, Filtro, GrupoStatus, Marca };
 
 export interface Sessao {
-  usuario: { id: string; nome: string; email: string; telefone?: string; papel: "plataforma" | "admin" | "operador" };
+  usuario: { id: string; nome: string; email: string; telefone?: string; papel: Cargo; cargo?: string };
   empresa: { id: string; nome: string };
   marca: Marca;
   empresas?: Array<{ id: string; nome: string }>;
+  /** Módulos que o dono da plataforma desligou para esta empresa (somem do menu). */
+  recursosDesligados?: string[];
 }
 
 export interface RespostaCorridas {
@@ -89,6 +92,8 @@ export const api = {
   perguntar: (filtro: Filtro, pergunta: string) => pedir<{ resposta: string }>("/api/perguntar", json("POST", { filtro, pergunta })),
   salvarMarca: (m: Marca) => pedir<{ marca: Marca }>("/api/marca", json("PUT", m)),
   enviarImagem: (tipo: string, arq: File) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }),
+  enviarFotoEmpresa: (arq: File) => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }),
+  apagarFotoEmpresa: () => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "DELETE" }),
   apagarImagem: (tipo: string) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "DELETE" }),
   integracoes: () => pedir<Integracoes>("/api/integracoes"),
   novaIntegracao: (tipo: string) => pedir("/api/integracoes", json("POST", { tipo })),

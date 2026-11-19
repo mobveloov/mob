@@ -225,13 +225,13 @@ export const punicoes = (empresaId: string) => lerG<Punicao[]>(empresaId, "punic
 const emVigor = (p: Punicao, agora = Date.now()) => !p.liberadaEm && Date.parse(p.fim) > agora;
 export const punicoesEmVigor = (empresaId: string) => punicoes(empresaId).filter((p) => emVigor(p));
 
-export function punir(empresaId: string, motoristaId: string, tempo: number, unidade: "horas" | "dias", motivo: string, por: string): Punicao {
+export function punir(empresaId: string, motoristaId: string, tempo: number, unidade: "minutos" | "horas" | "dias", motivo: string, por: string): Punicao {
   if (!listar(empresaId, cadastroPorId("motoristas")!).some((m) => m.id === motoristaId)) throw new Error("Escolha o motorista.");
-  if (!Number.isFinite(tempo) || tempo <= 0 || tempo > (unidade === "dias" ? 3650 : 24 * 3650)) throw new Error("Tempo inválido.");
+  if (!Number.isFinite(tempo) || tempo <= 0 || tempo > (unidade === "dias" ? 3650 : unidade === "horas" ? 24 * 3650 : 60 * 24 * 3650)) throw new Error("Tempo inválido.");
   const m = motivo.replace(/[<>]/g, "").trim().slice(0, 300);
-  if (!m) throw new Error("Escreva o motivo.");
+  // O motivo é opcional (como na Machine); sem texto, fica registrado que não foi informado.
   const inicio = new Date();
-  const p: Punicao = { id: crypto.randomUUID(), motoristaId, motivo: m, inicio: inicio.toISOString(), fim: new Date(inicio.getTime() + tempo * (unidade === "dias" ? 86_400_000 : 3_600_000)).toISOString(), por, liberadaEm: null, liberadaPor: "" };
+  const p: Punicao = { id: crypto.randomUUID(), motoristaId, motivo: m || "Motivo não informado", inicio: inicio.toISOString(), fim: new Date(inicio.getTime() + tempo * (unidade === "dias" ? 86_400_000 : unidade === "horas" ? 3_600_000 : 60_000)).toISOString(), por, liberadaEm: null, liberadaPor: "" };
   gravarG(empresaId, "punicoes", [...punicoes(empresaId), p]);
   return p;
 }

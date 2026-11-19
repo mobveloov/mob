@@ -92,6 +92,7 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
           <div><Users size={18} /><strong>{c.viagens ?? 0}</strong><small>viagens</small></div>
         </div>
 
+        {c.obsEmpresa && <div className="chamada-obs">Empresa: {c.obsEmpresa}</div>}
         {c.observacao && <div className="chamada-obs">{c.observacao}</div>}
 
         <div className="trajeto">

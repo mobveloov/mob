@@ -244,3 +244,20 @@ test("CSV das transações: injeção de fórmula neutralizada nos textos", asyn
   for (const linha of r.texto.split("\r\n").slice(1)) for (const cel of linha.split(";")) assert.ok(!/^[=+@]/.test(cel) && !/^-[^0-9]/.test(cel), `célula perigosa: ${cel}`);
   assert.ok(r.texto.includes("-50"), "valor negativo continua número");
 });
+
+test("Relatório de faturamento: indicadores, filtro por status, busca por OS, paginação e CSV seguro", async () => {
+  const nova = await corridaPaga("Dinheiro", 40, "11911110111", "=HYPERLINK(\"x\")");
+  const r = (await api(cookieAdm, "GET", "/relatorio-faturamento?periodo=hoje")).corpo;
+  assert.ok(r.total >= 1 && r.itens.length <= 10 && r.porPagina === 10);
+  assert.ok(r.brutoTotal >= 40 && r.ticketMedio > 0);
+  assert.deepEqual([...r.status], ["Finalizada", "Cancelada", "Não atendida"]);
+  const achada = (await api(cookieAdm, "GET", `/relatorio-faturamento?periodo=hoje&busca=${nova.os}`)).corpo;
+  assert.equal(achada.total, 1);
+  assert.equal(achada.itens[0].os, nova.os);
+  assert.equal((await api(cookieAdm, "GET", "/relatorio-faturamento?periodo=hoje&status=Cancelada")).corpo.itens.length, 0);
+  const csv = await api(cookieOp, "GET", "/relatorio-faturamento/csv?periodo=hoje"); // operador lê, como no resto do financeiro
+  assert.equal(csv.status, 200);
+  assert.ok(csv.texto.includes("Ordem de serviço") && csv.texto.includes("Taxa da central"));
+  assert.equal((await api(cookieAdm, "GET", "/extrato-central/csv?periodo=hoje")).status, 200);
+  assert.equal(periodo("ultimos_14").inicio < hoje, true);
+});

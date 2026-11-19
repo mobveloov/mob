@@ -15,18 +15,19 @@
 //   GET  /monitoramento, /mapa, /ocorrencias, /programadas, /objetos, /recuperacao, /passageiro, /motoristas
 //   POST /solicitar                    nova solicitação (com paradas, agendamento, motorista e valor manual)
 
+import { filialDe, filialForcada, listarFiliais } from "../filiais/filiais.ts";
 import fs from "node:fs";
 import { Router, type Request, type Response } from "express";
-import { arquivoDoAudio } from "../apps/chat.ts";
-import { aposCancelar } from "../apps/extras.ts";
-import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
+import { arquivoDaMidia, arquivoDoAudio } from "../apps/chat.ts";
+import { aposCancelar, aposFinalizar } from "../apps/extras.ts";
+import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { alterarCampos, listar } from "../cadastros/armazem.ts";
 import { alertas } from "../apps/despacho.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
-import { agoraBr, normal } from "../servidor/util.ts";
+import { agoraBr, celulaCsv, normal } from "../servidor/util.ts";
 import { ehVoucher, nomesConveniadas, validarVoucher } from "../relatorios/vouchers.ts";
 import "./ondas.ts"; // liga o registro das ofertas do despacho
 import { ABAS_RADAR, radar, registrarContato, type AbaRadar } from "./radar.ts";
@@ -35,6 +36,7 @@ import { periodo } from "../config/financeiro.ts";
 import { ABAS_TAXAS, csvPendencias, csvTaxas, listarPendencias, listarTaxas, mudarPendencia, registrarPendencia, type AcaoPendencia, type FiltroPendencias, type FiltroTaxas } from "./pendencias.ts";
 import { csvPix, listarPix, marcarPix, type FiltroPix } from "./pix.ts";
 import { categoriasDaEmpresa, pagamentosDaEmpresa } from "../gestao/empresas.ts";
+import { PAGAMENTO_MACHINE_PARA_CORRIDA } from "../corridas/empresa-conveniada.ts";
 
 export const rotasOperacao = Router();
 const hojeBr = () => agoraBr().toISOString().slice(0, 10);
@@ -69,6 +71,8 @@ const filtrosHistorico = (req: Request): S.FiltroHistorico => ({
   endereco: q(req, "endereco"), nomePax: q(req, "nomePax"), cpfPax: q(req, "cpfPax", 20), telPax: q(req, "telPax", 20), motorista: q(req, "motorista"),
   dataIni: dataOk(q(req, "dataIni")), dataFim: dataOk(q(req, "dataFim")), horaIni: horaOk(q(req, "horaIni")), horaFim: horaOk(q(req, "horaFim")),
   pagamento: q(req, "pagamento"), origem: q(req, "origem"), status: q(req, "status"), fonte: q(req, "fonte", 60),
+  // Operador e Gestor ligados a uma filial só veem as corridas dela; os demais podem escolher.
+  filial: filialForcada(emp(req), req.ctx!.usuario) ?? (q(req, "filial", 60) || undefined),
   urgencia: q(req, "urgencia", 2), via: q(req, "via", 10), cashback: q(req, "cashback", 2) === "1",
 });
 const nomeDaCentral = (req: Request) => D.empresa(emp(req))?.nome ?? "";
@@ -78,6 +82,7 @@ const soProprias = (req: Request, f: S.FiltroHistorico) => f.fonte === "propria"
 const OPCOES_FIXAS = (req: Request) => ({
   pagamentos: PAGAMENTOS_LISTA, urgencias: Object.entries(URGENCIAS).map(([id, nome]) => ({ id, nome })), vias: Object.entries(VIAS).map(([id, nome]) => ({ id, nome })),
   centrais: [nomeDaCentral(req)].filter(Boolean),
+  filiais: listarFiliais(emp(req)).filter((f) => f.ativa).map((f) => ({ id: f.id, nome: f.nome })),
   empresas: listar(emp(req), cadastroPorId("conveniadas")!).map((e) => String(e.nome ?? "")).filter(Boolean).sort(),
 });
 
@@ -102,7 +107,7 @@ rotasOperacao.get("/historico", ok(async (req, res) => {
   const itens = r.corridas.slice((pagina - 1) * porPagina, pagina * porPagina);
   const empresas = empresasPorTelefone(emp(req));
   res.json({
-    avisos: [...r.avisos, ...(f.osExterna || f.centralChamada || f.centralCorrida || f.empresa || f.urgencia || f.via || f.cashback ? ["Os filtros de nº externo, central, empresa, urgência, via e cashback valem só para as corridas próprias."] : [])],
+    avisos: [...r.avisos, ...(f.osExterna || f.centralChamada || f.centralCorrida || f.empresa || f.urgencia || f.via || f.cashback || f.filial ? ["Os filtros de nº externo, central, empresa, urgência, via, cashback e filial valem só para as corridas próprias."] : [])],
     stats: r.stats, opcoes: { ...r.opcoes, ...OPCOES_FIXAS(req) }, filtroBase: r.filtroBase, pagina, paginas, total: r.corridas.length,
     corridas: itens.map((c) => ({ ...c, osExterna: "", empresa: empresas.get(c.telefonePassageiro.replace(/\D/g, "")) ?? "", alerta: r.alerta(c) })), status: S.STATUS_FILTRO,
   });
@@ -126,6 +131,15 @@ rotasOperacao.get("/corridas/:id/chat/audio/:audio", ok((req, res) => {
   const c = S.acharPropria(emp(req), req.params.id);
   const a = arquivoDoAudio(emp(req), c.id, req.params.audio);
   if (!a) return res.status(404).json({ erro: "Áudio não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.send(fs.readFileSync(a.caminho));
+}));
+
+rotasOperacao.get("/corridas/:id/chat/midia/:midia", ok((req, res) => {
+  const c = S.acharPropria(emp(req), req.params.id);
+  const a = arquivoDaMidia(emp(req), c.id, req.params.midia);
+  if (!a) return res.status(404).json({ erro: "Arquivo não encontrado." });
   res.setHeader("Content-Type", a.mime);
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.send(fs.readFileSync(a.caminho));
@@ -164,28 +178,52 @@ rotasOperacao.put("/corridas/:id", central, ok(async (req, res) => {
   if ("valorInicial" in b) e.valorInicial = num(b.valorInicial) ?? null;
   if ("valorFinal" in b) e.valorFinal = num(b.valorFinal) ?? null;
   if (typeof b.pagamento === "string") e.pagamento = b.pagamento;
-  const c = await editarCorridaPropria(emp(req), S.acharPropria(emp(req), req.params.id).id, e, quem(req));
+  const antes = S.acharPropria(emp(req), req.params.id);
+  exigirOsAlteravel(antes, e);
+  const c = await editarCorridaPropria(emp(req), antes.id, e, quem(req));
+  // Virou finalizada ou mudou o valor, o pagamento ou o motorista de uma finalizada: aplica as taxas e a carteira (idempotente: só lança a diferença).
+  if (c.status === "finalizada" && (antes.status !== "finalizada" || antes.valor !== c.valor || antes.pagamento !== c.pagamento || antes.motoristaId !== c.motoristaId)) {
+    try { aposFinalizar(emp(req), c); } catch (x) { console.error("[operacao] após editar OS:", x instanceof Error ? x.message : x); }
+  }
   res.json({ corrida: { id: c.id, os: c.os, status: c.status } });
 }));
 
 // ------------------------------------------------------------------ telas
 
-rotasOperacao.get("/monitoramento", ok((req, res) => res.json(S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20) }))));
-rotasOperacao.get("/mapa", ok((req, res) => res.json(S.mapa(emp(req)))));
+/** Filial da consulta: Operador/Gestor ligados a uma filial ficam presos a ela; os demais escolhem (ou deixam vazio = todas). */
+const filialPedida = (req: Request) => filialForcada(emp(req), req.ctx!.usuario) ?? (q(req, "filial", 60) || undefined);
+const listaFiliais = (req: Request) => (filialForcada(emp(req), req.ctx!.usuario) ? [] : OPCOES_FIXAS(req).filiais);
+rotasOperacao.get("/monitoramento", ok((req, res) => res.json({ ...S.monitoramento(emp(req), { passageiro: q(req, "passageiro"), telefone: q(req, "telefone", 20), motorista: q(req, "motorista", 80), endereco: q(req, "endereco", 120), empresa: q(req, "empresa", 80), filial: filialPedida(req) }), filiais: listaFiliais(req) })));
+rotasOperacao.get("/mapa", ok((req, res) => res.json({ ...S.mapa(emp(req), filialPedida(req)), filiais: listaFiliais(req) })));
 rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   const h = Number(req.query.horas);
   res.json(await S.ocorrencias(emp(req), h > 0 && h <= 72 ? h : 1, pag(req)));
 }));
 
-const FILTROS_PROG: S.FiltroProgramadas[] = ["hoje", "amanha", "futuras", "todas"];
+const filtroProg = (req: Request): S.FiltroProgramadas => ({
+  centralChamada: q(req, "centralChamada", 60), empresa: q(req, "empresa", 80), os: q(req, "os", 30), categoria: q(req, "categoria", 60),
+  passageiro: q(req, "passageiro", 80), motorista: q(req, "motorista", 80), dataIni: dataOk(q(req, "dataIni")) || undefined, dataFim: dataOk(q(req, "dataFim")) || undefined,
+  pagamento: q(req, "pagamento", 40), situacao: S.SITUACOES_DISPARO[q(req, "situacao")] ? q(req, "situacao") : undefined, filial: filialPedida(req),
+});
 rotasOperacao.get("/programadas", ok((req, res) => {
-  const f = FILTROS_PROG.includes(q(req, "filtro") as S.FiltroProgramadas) ? (q(req, "filtro") as S.FiltroProgramadas) : "futuras";
-  res.json(S.programadas(emp(req), f, q(req, "busca"), pag(req)));
+  res.json({
+    ...S.programadasFiltradas(emp(req), filtroProg(req), pag(req), false, empresasPorTelefone(emp(req))),
+    opcoes: { ...OPCOES_FIXAS(req), filiais: listaFiliais(req), categorias: S.opcoesRapidas(emp(req)).categorias, situacoes: Object.entries(S.SITUACOES_DISPARO).map(([id, nome]) => ({ id, nome })) },
+  });
+}));
+/** Exportar (CSV com proteção contra fórmula). */
+rotasOperacao.get("/programadas/exportar", ok((req, res) => {
+  const r = S.programadasFiltradas(emp(req), filtroProg(req), 1, true, empresasPorTelefone(emp(req)));
+  const cab = ["Nº OS programada", "Data", "Hora", "Antecedência (minutos)", "Nome do passageiro", "Empresa", "Situação do disparo"];
+  const dia = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}`;
+  const linhas = [cab.map(celulaCsv).join(";"), ...r.itens.map((c) => [c.os, dia(c.agendadaPara!), c.agendadaPara!.slice(11, 16), c.antecedencia, c.passageiro, c.empresa || "---", c.situacaoTexto].map(celulaCsv).join(";"))];
+  baixarCsv(res, "corridas-programadas", "﻿" + linhas.join("\n"));
 }));
 rotasOperacao.put("/programadas/:id", central, ok(async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   const c = S.acharPropria(emp(req), req.params.id);
   if (!c.agendadaPara) throw new Error("Esta corrida não é programada.");
+  exigirOsAlteravel(c);
   const e: EdicaoCorrida = {};
   if (typeof b.dataHora === "string" && b.dataHora && b.dataHora.slice(0, 16) !== c.agendadaPara.slice(0, 16)) e.agendadaPara = b.dataHora;
   if ("valor" in b) { const v = num(b.valor) ?? null; if (v !== c.estimativa.valor) e.valorInicial = v; }
@@ -208,7 +246,7 @@ const baixarCsv = (res: Response, nome: string, csv: string) => {
   res.send(csv);
 };
 // Leitura para quem está logado; só o administrador muda situação ou registra (financeiro).
-rotasOperacao.get("/pendencias", ok((req, res) => res.json(listarPendencias(emp(req), filtroPendencias(req), pag(req)))));
+rotasOperacao.get("/pendencias", ok((req, res) => res.json({ ...listarPendencias(emp(req), filtroPendencias(req), pag(req)), periodo: faixa(req) })));
 rotasOperacao.get("/pendencias/exportar", ok((req, res) => baixarCsv(res, "pendencias-de-pagamentos", csvPendencias(emp(req), filtroPendencias(req)))));
 rotasOperacao.post("/pendencias", exigirPapel("admin"), ok((req, res) => res.status(201).json({ pendencia: registrarPendencia(emp(req), (req.body ?? {}) as Record<string, unknown>, quem(req)) })));
 rotasOperacao.post("/pendencias/:id/:acao", exigirPapel("admin"), ok((req, res) => {
@@ -218,7 +256,7 @@ rotasOperacao.post("/pendencias/:id/:acao", exigirPapel("admin"), ok((req, res) 
 }));
 
 const filtroTaxas = (req: Request): FiltroTaxas => ({ ...faixa(req), aba: ABAS_TAXAS.find((a) => a === q(req, "aba")) ?? "todos", os: q(req, "os", 30), motorista: q(req, "motorista", 80), cliente: q(req, "cliente", 80) });
-rotasOperacao.get("/taxas-cancelamento", ok((req, res) => res.json(listarTaxas(emp(req), filtroTaxas(req), pag(req)))));
+rotasOperacao.get("/taxas-cancelamento", ok((req, res) => res.json({ ...listarTaxas(emp(req), filtroTaxas(req), pag(req)), periodo: faixa(req) })));
 rotasOperacao.get("/taxas-cancelamento/exportar", ok((req, res) => baixarCsv(res, "taxas-de-cancelamento", csvTaxas(emp(req), filtroTaxas(req)))));
 
 const filtroPix = (req: Request): FiltroPix => ({ ...faixa(req), os: q(req, "os", 30) || q(req, "busca", 30), motorista: q(req, "motorista", 80), situacao: q(req, "situacao") });
@@ -228,7 +266,8 @@ rotasOperacao.post("/pix/:id/situacao", exigirPapel("admin"), ok((req, res) => r
 
 rotasOperacao.get("/objetos", ok((req, res) => {
   const s = ["todos", "pendente", "resolvido"].includes(q(req, "status")) ? (q(req, "status") as "todos") : "todos";
-  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req)));
+  const d = (k: string) => (dataOk(q(req, k)) || undefined);
+  res.json(S.objetos(emp(req), s, q(req, "busca"), pag(req), { dataIni: d("dataIni"), dataFim: d("dataFim"), os: q(req, "os").slice(0, 30), motorista: q(req, "motorista").slice(0, 80), passageiro: q(req, "passageiro").slice(0, 80) }));
 }));
 rotasOperacao.post("/objetos/:id/status", central, ok((req, res) => res.json({ registro: S.alternarObjeto(emp(req), req.params.id, quem(req)) })));
 rotasOperacao.delete("/objetos/:id", central, ok((req, res) => { S.apagarObjeto(emp(req), req.params.id); res.json({ ok: true }); }));
@@ -246,9 +285,6 @@ rotasOperacao.post("/recuperacao/contato", central, ok((req, res) => res.json({ 
 rotasOperacao.get("/passageiro", ok((req, res) => res.json(S.buscarPassageiro(emp(req), { telefone: q(req, "telefone", 20), cpf: q(req, "cpf", 20) }))));
 rotasOperacao.get("/motoristas", ok((req, res) => res.json({ motoristas: S.opcoesMotoristas(emp(req)) })));
 
-const PAGAMENTO_MACHINE_PARA_CORRIDA: Record<string, string[]> = {
-  Dinheiro: ["Dinheiro"], "Maquininha de Débito": ["Cartão na Maquininha", "Débito (máquina)"], "Maquininha de Crédito": ["Cartão na Maquininha", "Crédito (máquina)"], "Cartão no app": ["Cartão no App"], Pix: ["Pix", "Pix no app"],
-};
 
 /** Empresa conveniada, centro de custo e voucher da solicitação. Voucher exige empresa e um número dentro de uma faixa dela, ainda não usado. */
 function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
@@ -301,6 +337,7 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
     categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
     cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
     osExterna: b.osExterna ? String(b.osExterna) : undefined,
+    filialId: filialDe(emp(req), "operador", req.ctx!.usuario.id) ?? undefined,
     infoAntes: limpar(b.infoAntes, 300), infoDepois: limpar(b.infoDepois, 300), infoInterna: limpar(b.infoInterna, 500),
     telefoneContato: contato || undefined, enviarVariosCarros: b.enviarVariosCarros === true,
     valorFinal: { modo: modoFinal, ...(modoFinal === "prefixado" ? { valor: prefixado! } : {}) },
@@ -325,7 +362,7 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
   if (typeof b.motoristaId === "string" && b.motoristaId) {
     try { await atribuirMotorista(emp(req), c.id, b.motoristaId, quem(req)); } catch (e) { avisos.push(`Motorista não atribuído: ${e instanceof Error ? e.message : e}`); }
   }
-  res.json({ corrida: { id: c.id, os: c.os, valor: valor ?? c.estimativa.valor }, avisos });
+  res.json({ corrida: { id: c.id, os: c.os, valor: valor ?? c.estimativa.valor, ...(c.descontoEmpresa ? { descontoEmpresa: c.descontoEmpresa } : {}) }, avisos });
 }));
 
 rotasOperacao.use((_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }));

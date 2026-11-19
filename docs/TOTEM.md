@@ -153,3 +153,59 @@ totem acompanha em até 5 segundos.
 - Busca de endereço com sugestões e coordenadas (hoje o destino é texto; com latitude e longitude no local e no
   destino o preço já sai pela distância).
 - Vínculo do aparelho (um aparelho por local) e senha para fechar o app.
+
+## O que veio do sistema de referência (14/11/2026)
+
+A tela do totem agora segue a do sistema de referência (com endereço fixo de embarque):
+
+1. **Primeira tela:** nome completo, telefone, destino (opcional) e forma de pagamento, botão **Solicitar corrida**.
+   Mensagens de erro iguais: "Digite seu nome completo", "Digite um telefone válido com DDD", "Selecione a forma de pagamento.".
+2. **Escolha sua viagem:** origem e destino ("A definir pelo motorista"), categorias disponíveis (uma só: botão direto) e a forma de pagamento escolhida.
+3. **Acompanhamento** (já existia).
+4. **Totem bloqueado:** fechar ou recarregar a página pede a senha do local ("Digite a senha para fechar o aplicativo", "Senha incorreta", "Cancelar e continuar usando").
+5. **Tela sempre acesa** (wake lock) e recarregar remoto só com a primeira tela vazia.
+
+Diferenças: o preço aparece como estimativa (o painel calcula pelas tarifas); sem a ponte do app Android (senha de fechamento nativa).
+Arquivos: `web/totem/Totem.tsx` (reescrito), `web/totem/Bloqueio.tsx` (novo).
+
+## Totens & Preços, App do Totem e aparelho vinculado (14/11/2026, segunda leva)
+
+- **Tela Totens & Preços** (Bot & Totem): abas "Totens & Locais" e "Preços" (só admin). O local ganhou endereço (slug) escolhido na criação,
+  cidade e UF, imagem do topo e do rodapé (quadro 18:5, até 2 MB, PNG/JPG/WEBP), modo WhatsApp (individual ou compartilhado),
+  ativar/desativar, excluir (apaga as imagens), copiar link, abrir, recarregar e "Baixar app".
+- **Preços por totem**: tabela própria (taxa base, por km, por minuto, corrida mínima, tempo de espera, ordem, ativa), multiplicador (surge) e
+  "Copiar para todos os totens". O nome da categoria precisa existir em Categorias e tarifas. Com tabela, o totem mostra a dela e a corrida
+  nasce com o valor prefixado (com distância quando há coordenadas; sem destino no mapa vale a corrida mínima). Sem tabela, valem as tarifas da empresa.
+- **Aparelho vinculado**: o primeiro aparelho que digita a senha fica com o link; outro vê "Acesso Negado". O admin libera em "Limpar Dispositivo".
+- **WhatsApp do totem**: individual usa uma instância só dele (nome do bot + local) no servidor do bot; conectar por QR na lista de locais.
+  Sem WhatsApp conectado o totem mostra "Totem indisponível no momento" e volta sozinho. Sem servidor configurado (simulado) tudo funciona sem chave.
+  Antes de pedir, o totem confere se o telefone tem WhatsApp ("Esse número não foi encontrado no WhatsApp. Confira o telefone."); se não der para conferir, segue.
+- **App do Totem**: baixa a versão ativa mais nova do APK. O dono da plataforma publica o endereço (https) das versões nessa mesma tela.
+- Rotas novas: `/locais/:id/imagem/:tipo`, `/locais/:id/aparelho`, `/locais/:id/precos`, `/locais/:id/whatsapp[/conectar|/desconectar]`,
+  `/apk`, `/apk/versoes`, `POST /publico/:empresa/:local/whatsapp/existe`, `POST /webhook/:empresa/:local` (aceita e ignora).
+- Testes: `painel/test/totem-extras.test.ts`.
+
+Diferenças em relação ao sistema de referência: a senha do totem fica só como hash (a tela não mostra a senha atual); o vínculo usa um
+identificador gerado no aparelho; versões do APK guardam só o endereço do arquivo.
+
+## Terceira leva: preços por cidade, endereços e prêmios (14/11/2026)
+
+- **Preços por cidade** (Totens & Preços › Preços › Preços por cidade): três abas (dentro da cidade, locais, entre cidades), valor de dia, noite
+  (com janela), faixas extras de horário, domingo, feriado e pedágio (por passagem, ida e volta ×2). Feriados nacionais calculados; os da empresa
+  entram na lista. Hora de espera. Tarifa repetida é recusada (entre cidades vale nos dois sentidos). No totem, o destino digitado que cita um local
+  da tabela ou uma cidade da tabela (a partir da cidade do local) vai com o valor fixo do horário + pedágio; a tela de escolha da viagem mostra esse
+  preço (`POST .../cotacao`). Código: `src/totem/tarifas-cidade.ts`, teste `test/totem-tarifas-cidade.test.ts`.
+- **Sugestões de endereço no destino**: botões grandes embaixo do campo; o endereço escolhido leva o ponto no mapa (`GET .../enderecos?q=`, só com a chave do aparelho, com limite).
+- **Jogos de recompensa** (Totens & Preços › Jogos de recompensa): Roleta e Raspadinha. O passageiro recebe o link no WhatsApp da empresa e joga em
+  `/p/<empresa>/<token>`; o link aberto `/premios/<empresa>/<roleta|raspadinha>` pede o telefone (só passageiro ativo do cadastro) e manda o link do jogo
+  pelo WhatsApp (o link nunca volta na resposta). O sorteio é no servidor, uma jogada por convite; o prêmio vira um cupom do cadastro Cupons (uso único,
+  só para aquele telefone) e também sai pelo WhatsApp. Admin: prêmios e chances, cores e textos, "Enviar agora", convite para um telefone, copiar o link.
+  Código: `src/totem/premios-jogos.ts` (regras), `premios.ts` (convites, jogo, cupom), teste `test/totem-premios.test.ts`.
+- **Gancho para o CRM**: `definirGanchoPremio(fn)` em `premios.ts` recebe cada prêmio ganho; `crm/ganchos-crm2.ts` registra a função e grava o prêmio na aba
+  Recompensas do CRM (lista "Prêmios ganhos"). Cartão Fidelidade e Pontos de Troca (`crm2/fidelidade*.ts`) aparecem na mesma tela de jogos.
+- **Agenda**: `rodarAgendaDePremios` (premios.ts) é chamada pela volta do trabalhador do CRM (`crm/envio.ts`). No horário vencido (`horarioVencido`) chama
+  `enviarAgora` (1º horário) ou manda de novo o link a quem não jogou (2º e 3º). Usa as travas do CRM (`travasDoCrm`); parou por trava geral, o horário
+  não fica como feito e tenta de novo dentro dos 30 minutos. O endereço do link vem de `PUBLICO_URL` ou do último salvamento pelo painel. Teste: `test/totem-agenda.test.ts`.
+
+**Pendente:** senha de fechamento nativa do app Android (a ponte do app guarda a senha em SharedPreferences; exige build nativo e aparelho para testar);
+resposta do bot à pergunta de preço usando a tabela de Preços por cidade (área do Bot).

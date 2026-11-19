@@ -101,3 +101,41 @@ No `.env.example`: `WHATSAPP_EVOLUTION_URL=`, `WHATSAPP_EVOLUTION_TOKEN=`, `BOT_
 - Áudio (transcrição com o caso "voz"), endereços salvos, agendamento.
 - Conversa entre passageiro e motorista pelo número do bot.
 - Mover conversas para o banco quando a fase 1.4 chegar (tabelas `bot_*` com `empresa_id`).
+
+## O que veio do sistema de referência (14/11/2026)
+
+Tela **Bot de WhatsApp › Ajustes do bot** (só admin muda) e regras do bot de referência, sem a Machine (a corrida é nativa).
+
+| Parte | Situação |
+|---|---|
+| Etapas do fluxo (menu de boas-vindas, pedir destino, permitir "não informar", confirmar endereços, pedir categoria, pedir pagamento) | Veio. Sem pagamento perguntado, a corrida vai como Dinheiro (a corrida própria exige uma forma). Sem "Preço fixo": o preço já vem das categorias e tarifas. |
+| Destino obrigatório (`destSkip`) | Veio, com os dois textos de aviso. |
+| Mensagens do Bot (textos editáveis) | Veio, com os mesmos grupos e chaves. Ficaram de fora as perguntas de cidade e "não quer corrida" (não existem neste fluxo). O texto padrão do menu continua com a marca (assistente e empresa); o texto editado vale no lugar. |
+| Saudação com imagem (no máximo uma a cada 12 h) | Veio. Só endereço `https`. |
+| Respostas prontas (base de conhecimento) | Veio. No começo vale qualquer pergunta; no meio do pedido só com "?" e o bot volta à pergunta. |
+| Comandos da central (`#bloquear`, `#desbloquear`, `#pausar`, `#voltar`, com ou sem número) | Veio, também pelos botões em Conversas. Bloqueado ou pausado: o bot fica quieto e a conversa fica no painel. |
+| Mensagens de status | Veio: textos padrão do sistema de referência, editáveis com `{passageiro}`, `{motorista}`, `{empresa}`; aceite e troca de motorista levam os dados do carro. |
+| Grupos de WhatsApp | Já ignorados (`@g.us`). |
+| Falta | Várias conexões por empresa e outros provedores (Z-API, Z-Pro, Meta), cidades ativas, voz do bot, áudio, endereços aprendidos, agendamento pelo bot, descadastro por resposta (PARAR/SAIR) ligado ao CRM. |
+
+Arquivos novos: `bot/textos-editaveis.ts`, `bot/mensagens-status.ts`, `bot/controle.ts`, `bot/destino.ts`, `web/bot/Ajustes.tsx`.
+Testes: `test/bot-fluxo-avancado.test.ts` e `test/bot-regras-*.test.ts`.
+
+## Conexões, provedores e áudio (14/11/2026)
+
+- **Várias conexões:** cada empresa tem a conexão principal e até 10 extras (tela Conexões do Bot). Cada uma tem provedor, instância e segredos próprios (`bot-whatsapp` e `bot-whatsapp-<id>`). O webhook da extra é `/api/bot/webhook/:empresa/:segredo/:conexao`. A conversa guarda o número e as respostas saem por ele.
+- **Provedores:** Evolution, Z-API, Z-Pro e Meta atrás de `ProvedorWhatsApp` (`provedores.ts`, `provedores-api.ts`), mais o simulado. Meta: cadastre no painel da Meta o endereço e a senha de verificação mostrados na conexão; com o App Secret salvo, avisos sem assinatura são recusados; mensagens com mais de 10 min são ignoradas.
+- **Áudio:** `audio.ts` baixa o áudio pelo provedor e transcreve com Groq ou OpenAI (`GROQ_API_KEYS`, `OPENAI_API_KEY`, da empresa ou da plataforma). Sem chave, o bot pede para escrever. No Testar conversa dá para simular um áudio digitando o que foi falado.
+- **Regras de endereço copiadas do mobveloov:** embarque vago ("estou em casa"), rua sem número (pede e junta o número), pedido urgente, link de mapa, coordenadas coladas, endereços salvos (usados 2 vezes ou mais) e fim do suporte.
+- **Sugestões de endereço:** aba no Bot (`sugestoes-cadastro.ts`, rotas `/api/bot/sugestoes`). O apelido vira o ponto cadastrado no embarque e no destino.
+- **Agendamento:** menu 1 pedir, 2 agendar, 3 suporte (desligável em Ajustes). Frases como "amanhã 7h" ou "me pega na Rua X às 10:45"; "meus agendamentos" e "cancelar agendamento". Avisos 15 e 5 min antes (`status.ts`).
+- **Cidade ativa:** `cidades.ts`, uma cidade atendida por conexão.
+- **Voz:** `voz.ts` (Gemini, OpenAI de reserva), `voz-texto.ts` e `voz-gemini.ts` copiados do mobveloov. Só para quem mandou áudio.
+- **Repasse:** `repasse.ts`. Com o motorista a caminho, o que o passageiro manda vai ao chat da corrida; o que o motorista manda no chat sai pelo WhatsApp.
+- **Descadastro:** `descadastro.ts` liga PARAR/SAIR/NÃO QUERO MAIS ao opt-out do CRM (regras de `crm/optout.ts`).
+- **Foto e vídeo:** o chat da corrida (`apps/chat.ts`) aceita foto (JPG, PNG, WEBP até 5 MB, `APPS_FOTO_MAX_KB`) e vídeo (MP4, 3GP, MOV, WEBM até 16 MB, `APPS_VIDEO_MAX_MB`), com o tipo conferido pelo começo do arquivo e até 40 por corrida. Rotas `/api/apps/:empresa/corridas/:id/midia` (enviar e baixar), clipe nos apps do motorista e do passageiro e auditoria na central. O bot repassa nos dois sentidos; fora do limite o passageiro recebe o motivo. Sem motorista a caminho o bot só explica.
+- **Escolha da rua:** `lista-ruas.ts`. Endereço que serve para mais de uma rua do CNEFE vira lista numerada (etapas `selecao_rua` e `selecao_rua_destino`).
+- **Pergunta de preço:** `pergunta-preco.ts` responde com a tabela Preços por cidade do totem.
+- **Preferências da corrida:** `opcoes-pedido.ts` (cópia de `rideOptions.ts`), ligada em Ajustes › Opções do pedido; etapas `opcoes` e `opcao_detalhe`, depois do pagamento.
+- **Menu padrão:** textos do original ("Olá! Sou um assistente 🤖 inteligente..."), sem nome da empresa e do assistente.
+- **Falta:** foto da fachada como embarque; despacho por preferência (hoje só anotada); testes com conta real dos provedores.

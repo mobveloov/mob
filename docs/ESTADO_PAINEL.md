@@ -53,12 +53,12 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Sem gateway:** nada é cobrado; valores dos planos são exemplos nossos. API em `/api/centrais` (`painel/src/centrais/rotas.ts`). Teste: `painel/test/centrais.test.ts`.
 
 ## O que a revisão final apontou e ainda falta (pequeno e independente)
-- **Comissão da central** nunca é debitada da carteira; os relatórios mostram receita só prevista (`config/comissao.ts`).
+- **Comissão da central**: passou a ser debitada da carteira do motorista ao finalizar (ver "Pendências do painel fechadas").
 - **Saldo mínimo** existe em duas configurações (Regras de Crédito e gestão do motorista); só a da gestão vale no despacho.
 - **Operador** ainda mexe em punições e veículos; nos cadastros genéricos isso é só de admin (`gestao/motoristas.ts`).
 - **Saque:** `pedirSaque` ignora o bloqueio de saque do motorista e as regras de Integrações (`apps/extras.ts`).
 - **Desafios** automáticos ignoram hora, faixa de corridas e situação definidas no painel.
-- **Editar OS** finaliza ou cancela sem os efeitos da carteira e apaga a coordenada ao trocar o endereço.
+- **Editar OS** apaga a coordenada ao trocar o endereço (finalizar pela edição já aplica taxas e carteira).
 - **Fila virtual** ordena pela hora em que o motorista ficou online, não por "livre desde".
 - **Notificação agendada** pode sair duas vezes; **disparo para todos** segura o pedido por minutos.
 - **Financeiro** soma só os 2.000 lançamentos mais recentes do período (`config/financeiro.ts`).
@@ -104,4 +104,209 @@ Também é preciso trazer as **casas** (endereços) do banco do mobveloov que n�
 - **Tudo no main:** todas as 15 prioridades do pente fino, telas de centrais, Plantão/Ruas/Áreas, Funil de Clientes, Mapa de Bairros, cadastros de motorista, empresa, categoria e solicitação, Painel inicial e Mapa de engajamento no formato da Machine, casas corrigidas (`npm run importar-casas`).
 - **Carga corrigida:** 500 corridas em 31 a 43 s, 0 erros (antes 85 a 122 s e até 288 erros). Números em `docs/AUDITORIA_COMPLETA.md`. 253 testes passando.
 - **Docker refeito** com o main; `up.veloov.com` responde.
-- **Falta:** comparar mais telas lado a lado com a Machine (imagem), "Enviar mais de um carro" no despacho, desconto da empresa por forma de pagamento no preço, observação da empresa para o motorista no app, passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
+- **Falta:** comparar mais telas lado a lado com a Machine (imagem), passos 2 a 5 do cadastro do motorista no app (sessão dos apps), teste dos APKs em aparelho, arquivo completo das casas (exportar do servidor), valores reais dos planos das centrais.
+
+## Menu lateral e foto da empresa (branch worktree-agent-a4657717dc85a0595, 14/11/2026)
+- **Menu lateral** é o menu principal (como no painel de referência do dono): 240 px, recolhe para só ícones (preferência em `localStorage` `menuLateral`), 6 grupos coloridos (Operação laranja, Bot & Totem azul, Clientes verde, Gestão roxo, Configuração rosa, Ajuda lima), item ativo destacado, claro e escuro. Abaixo de 1024 px vira a gaveta do celular, com o mesmo menu. As abas do topo saíram: o topo tem só empresa, central, sino, tema e perfil.
+- Arranjo dos itens em `painel/src/comum/menu-lateral.ts` (ids e rotas continuam os de `funcoes.ts`; blocos recolhíveis Corridas, Frota, Financeiro, Cobrança e Regras e integrações). Tela em `painel/src/web/menu/MenuLateral.tsx`. Teste: `painel/test/menu-lateral.test.ts`.
+- **Foto da empresa:** Marca e aparência > Foto da empresa (enviar, trocar, remover). Servidor `painel/src/servidor/foto-empresa.ts` (`/api/empresa/foto`, só admin, PNG/JPG/WEBP até 2 MB, confere a assinatura do arquivo), guardada em `marca.arquivos.fotoEmpresa`. Aparece no menu lateral, no topo e na barra do celular. Teste: `painel/test/foto-empresa.test.ts`.
+## Comparação tela a tela com a Machine (14/11/2026)
+
+Cada tela da Machine foi lida e comparada com a nossa, com banco de teste próprio. Detalhe completo (inclusive "o que ainda difere") em `docs/comparacao/GRUPO_A.md` a `GRUPO_E.md`. "quase" = igual com diferença pequena listada. Também: barra do topo igual nos temas claro e escuro (gaveta do celular segue o tema, cor de destaque legível no claro, troca sem piscar) e a etiqueta NOVO foi removida de todo lugar.
+
+| Grupo | Tela | Igual? | O que corrigi (resumo) |
+|---|---|---|---|
+| A | Consultar corridas | quase | Título "Consultar corridas"; botão "Filtro"; "Exportar relatório" (planilha); texto "Atualizando automaticamente" / "Atualização automática… |
+| A | Corrida por motorista | sim | Nada a mudar: filtros (data inicial, data final, nome do motorista, Filtrar, Limpar filtros), Imprimir e colunas OS, Voucher, Data, Viatura,… |
+| A | Corridas programadas | quase | Tela refeita: filtros Central chamada, Empresa, Nº OS, Categoria, nome do passageiro, Nome/VTR do motorista, data inicial e final, forma de… |
+| A | Solicitar corrida | quase | Título "Solicitar nova corrida"; formulário numa coluna na ordem da Machine: buscar cliente via Telefone/CPF, telefone de cadastro, telefone para… |
+| A | Operação (Acompanhamento) | quase | Título "Acompanhamento" e subtítulo "Corridas Pendentes de Atendimento"; filtros Nome do passageiro, Telefone, Nome/VTR do motorista, Endereço de… |
+| A | Chat | quase | Abas Motoristas e Empresas; "Criar conversa" (escolhe a pessoa e abre a conversa); item "Mensagem Geral" no topo da lista (envia aviso a todos);… |
+| A | Objetos perdidos | quase | Abas Abertos e Finalizados; período (Hoje, Ontem, Últimos 7 e 30 dias, todos, personalizado); "Mais filtros" (motorista, OS, passageiro); colunas… |
+| A | Mapa de motoristas | quase | Título "Mapa de motoristas" com "Atualizando automaticamente"; Cadastros ativos, Conectados agora e Desconectados com %; Livres, A caminho,… |
+| A | Cliente | quase | Título "Clientes"; botões Criar Estabelecimento, Criar Cliente e Exportar (CSV seguro); filtros Nome, Telefone, CPF, E-mail, período de… |
+| A | CadastroPassageiro Cliente | quase | Janela "Cadastro de passageiro": Informações gerais (Bandeira, Tipo, Status), Dados pessoais (Nome, Telefone, CPF), "Campos com * são… |
+| A | Notificações | quase | Tela "Notificações app" com o texto da Machine, botão "Nova notificação", filtros Destinatário (Todos, Clientes App, Motoristas), datas, Título,… |
+| A | Leme (Painel inicial) | sim | Conferido no navegador: Indicadores, Estatísticas da operação, Corridas solicitadas, origem das finalizadas, Ganhos gerais, Ticket médio,… |
+| A | Motorista (lista) | quase | Título "Motoristas"; botões Criar e Exportar; abas Todos, Ativos, Suspensos, Em análise, Fila de espera, Rejeitados, Inativos, Deletados (com… |
+| A | Alterando Motorista | quase | Conferido item a item (feito antes pelo ramo machine-cadmot): versão do app, taxa de aceitação, total de corridas, Geral e Cerca eletrônica,… |
+| A | Empresa (lista) | quase | Botões Criar Empresa e Exportar relatório na ordem da Machine; sem subtítulo extra; colunas Nome fantasia, CPF/CNPJ, Status da empresa primeiro;… |
+| A | Create Empresa | quase | Conferido: Bandeira, CPF/CNPJ com troca, Número do contrato, Razão social, Nome fantasia, endereço, UF, Cidade, Bairro, CEP, Status e última… |
+| B | tela | igual? | o que corrigi |
+| B | Visão geral do financeiro | quase | Textos das dicas dos cartões iguais aos da Machine; dicas também nos títulos dos gráficos; "Total do próximo repasse" foi para o fim (depois da… |
+| B | Extrato da central | quase | Nome da central logo abaixo do título; botão "Mais ações" com Exportar CSV (rota nova `/extrato-central/csv`); título "Movimentações" com o dia ou… |
+| B | Extrato de transações online | quase | Período padrão Hoje; botão "Mais filtros" abre tipo, status e data de repasse; busca por ID da transação acima da tabela; "Ver detalhes" em… |
+| B | Demonstrativo Mensal | sim | Nada a mudar: Bandeira, Competência, Dias ativos, Exportar, tabela Descrição/Quantidade/Valor unitário/Débitos/Créditos, Total a pagar,… |
+| B | Faturamento de centro de custo | sim | Só o botão Imprimir no topo (sem Exportar), datas sem asterisco, rótulo "Filtros", texto "Nenhum resultado encontrado." |
+| B | Faturamento por empresa | quase | Botões Exportar e Imprimir, asteriscos em Data inicial, Data final e Empresa, rótulo "Filtros", vazio como na Machine |
+| B | Faturamento por período | sim | Só o botão Exportar no topo, datas sem asterisco, "Gerar", rótulo "Filtros" |
+| B | Relatório de faturamento | sim (tela nova) | Não existia. Criada: 5 indicadores (bruto, taxa da central, ticket médio, não atendidas, canceladas), período, Mais filtros (status e forma de… |
+| B | Relatório de Km rodados | sim | Só o botão Exportar, datas sem asterisco, rótulo "Filtros" |
+| B | Gestão de pendências de pagamentos | quase | Período padrão Hoje (como a Machine); lista de períodos da Machine; linha "Filtrando por" sempre visível (Todos e o período) |
+| B | Gestão de taxas de cancelamento | quase | Data no formato "dd/mm/aaaa - hh:mm"; "Passageiro" acima do nome; linha "Filtrando por: Período: ... até ..."; lista de períodos da Machine |
+| B | Transação com Pix | quase | Período padrão Hoje com a lista da Machine (inclui Últimos 14 dias, novo no servidor); "Nome/VTR do motorista" busca também pela viatura; rótulo… |
+| B | Controle financeiro de centrais | quase | Nada: colunas, dicas e opções já batiam |
+| B | Meus planos | quase | Nada: Plano, categoria de bonificação, tarifa, cobrança fixa, taxas, incluso, serviços adicionais já batiam |
+| B | Vouchers e tickets por motoristas | sim | Exportar e Imprimir, datas sem asterisco, rótulo "Filtros" |
+| B | Entrega de voucher | sim | Nada: VTR/Nome, OS Compradas, Obter OS Pendentes, Limpar filtros, tabela e Registrar Entrega já batiam |
+| B | FaixaVoucherEmpresa (Faixas de Vouchers) | sim | Filtro "Empresa *" com asterisco |
+| B | Create FaixaVoucherEmpresa (Criando Faixa de Vouchers) | sim | Campo "Bandeira *" antes de Empresa (lista com o nome da central) |
+| B | Cupons | quase | Tela refeita no formato da Machine: botão "Criar cupom", filtro de tipo (Resgatável, Automático, Todos), Exportar (Impressão e Planilha CSV, rota… |
+| C | Tarifa Categoria | Config › Tarifas e categorias | quase |
+| C | Dinamica TarifaCategoria | Config › Tarifas dinâmicas | quase |
+| C | EditarTarifaExtra TarifaCategoria | Tarifas e categorias › Tarifa › Editar tarifa | sim |
+| C | Create Categoria | Tarifas e categorias › Criar categoria | quase |
+| C | Descontos | Config › Descontos | quase |
+| C | Alterando Desconto | Descontos › Alterar | sim |
+| C | AlteraValor (Alteração de dados da OS) | Corridas › Alteração de dados da OS (nova) | quase |
+| C | Alterando Bandeira (Gerais) | Config › Gerais do App › aba Despacho (nova) | parcial |
+| C | Integracoes Bandeira | Config › Integrações › Transações Financeiras | quase |
+| C | DespachoBandeira Bandeira | Config › Despacho | sim |
+| C | DespachoBandeirasParceiras Bandeira (Transbordo) | Config › Transbordos | quase |
+| C | TermosUso Bandeira | Config › Termos de uso | quase |
+| C | Personalização | Config › Personalização app passageiro (nova) | parcial |
+| C | Up Corridas | Painel (Indicadores) | quase |
+| C | Punicao Qrt | Cadastro › Punições › Gerenciar Punição | sim |
+| C | Recompensas Indicacao | Financeiro › Estatísticas › Recompensas por indicação (nova) | quase |
+| D | Area (lista de Áreas) | quase | Título "Áreas" e o texto da Machine; botões "Criar Área" e "Visão Geral" (antes eram abas); filtro na lateral ("Filtros", Nome, Filtrar, Limpar… |
+| D | Create Area (Criando Área) | quase | Título "Criando Área" (na edição, "Alterando Área"); "Campos com * são obrigatórios."; faixa "Clique na área para entrar ou sair do modo de… |
+| D | VisaoGeral Area | quase | Virou uma tela própria ("Visão Geral") aberta pelo botão; Mapa/Satélite; botões Voltar e Gravar no rodapé, como na Machine. |
+| D | Plantao (lista) | sim | Título e texto da Machine (inclusive "tem prioridade nas filas"); botão "Criar Plantão"; filtros Data Inicial, Hora Inicial, Data Final, Hora… |
+| D | Create Plantao | sim | "Criando Plantão" com Data Inicial *, Hora Inicial, Data Final *, Hora Final, Voltar e Criar; a ação Editar abre a mesma tela como "Alterando… |
+| D | GerenciaPlantao Plantao | sim | Datas e horas só para ler (como na Machine; para mudar usa-se Editar); "Vtr / Motorista" (busca com 2+ letras), "Adicionar Motorista", Voltar;… |
+| D | Ruas | quase | Sem regras: tela com "O que são regras de via?", o texto da Machine (tirei a frase a mais) e o botão "Criar nova regra". Com regras: lista e botão… |
+| D | Mapa de engajamento | sim (já estava) | Nada: já foi comparado e igualado antes (ver docs/COMPARACAO_PAINEL_INICIAL.md, parte B). |
+| D | Alerta (lista) | sim | Filtros na lateral: Empresa, Conteúdo do alerta, Tipo de alerta (Urgente, Atenção, Aviso em caixas de marcar), Status (Ativo marcado de início,… |
+| D | Create Alerta | sim | Já era igual; só ajustei o limite de "Exibir alerta por" a 750 e tirei o rótulo "Unidade" (a Machine só tem o número e Horas/Dias/Semanas). |
+| D | CentralNotificacoes Alerta | sim (já estava) | Nada novo: sino com "Central de notificações", Todos, "Somente não lidas", seleção e "Tudo em dia!" já existiam. |
+| D | Create Notificacao | quase | Nova tela "Criando Notificação" (botão "Nova notificação" em Comunicação › Notificações Push): "Para agora" / "Agendar" (data e hora de envio e o… |
+| D | ConfiguracaoNPS Avaliacao | quase | Título "Configurações NPS" com dois blocos, "NPS para passageiros" e "NPS para motoristas": "Ativar pesquisa de NPS ...", o texto da Machine,… |
+| D | NPS Avaliacao | quase | Título "Net Promoter Score"; abas Passageiros e Motoristas (nessa ordem, no alto); período e tipo na barra; "Mais filtros" abre "Filtro de… |
+| D | Desafios | sim | Tela vazia com "Comece a criar desafios agora mesmo" e "Clique em "Novo desafio" abaixo para começar." com o botão verde. |
+| D | Desafios dos motoristas | quase | Título "Desafios"; botão verde "Novo desafio"; abas Motoristas e Clientes; barra com Período, Status (Todos, Ativos, Aguardando, Cancelados,… |
+| E | Estatística por bairro | igual, com adaptação | Filtros numa coluna à esquerda (Data inicial, Data final, Filtrar, Limpar filtros) e tabela à direita. Título sem texto de apoio. "Exibindo 1-10… |
+| E | Estatística por empresa | igual, com adaptação | Mesmo formato da tela acima. Colunas Empresa, Corridas, Valor, Porcentagem. Valor em reais |
+| E | Estatística por forma de pagamento | igual, com adaptação | Mesmo formato. Colunas Forma de pagamento, Corridas, Porcentagem. Asterisco (*) nas datas só nesta tela, como na Machine |
+| E | Estatísticas por motorista | igual, com adaptação | Mesmo formato. Colunas ID ("viatura - nome"), Corridas, Porcentagem, ordenadas do maior para o menor |
+| E | Estatísticas por operador | igual, com adaptação | Mesmo formato. Botões Exportar (CSV) e Imprimir. Colunas Operador, FINALIZADAS, CANC PASS, CANC MOTORISTA, CANC OPE, N/ATEND, TOTAIS. Tirei a… |
+| E | Relatorio (índice de Relatórios) | igual, com adaptação | "Relatórios padrão" em cartões numerados de 1 a 9, na ordem e com os nomes da Machine (o 1 abre Motoristas; os outros abrem em outra aba, como… |
+| E | Página inicial (Painel) | igual, com adaptação | Nada novo: já estava igual (ver `docs/COMPARACAO_PAINEL_INICIAL.md`). Conferi de novo no navegador: aviso de atenção, períodos, corridas… |
+| E | Menu do topo | igual, com adaptação | Grupos na ordem: Painel, Cadastro, Corridas, Financeiro, Comunicação, Configurações (era "Config"), Avaliações, Ajuda. Submenus como na Machine:… |
+| E | Menu do usuário | igual, com adaptação | "Alterar Senha" virou "Trocar senha" e "Sair do Sistema" virou "Sair" (menu do topo e menu do celular). Sino de notificações antes do nome, como… |
+
+## Barra do topo em qualquer zoom (14/11/2026)
+- A barra mede o espaço e manda os grupos que não cabem para o menu "Mais" (sem quebrar linha nem sobrepor); logo, sino, tema e perfil ficam inteiros à direita. Conferido em 1920, 1536, 1366, 1280, 1100 e 1024, nos temas claro e escuro.
+- As telas de Corridas seguiam um tema escuro fixo (título sumia no claro); agora seguem o tema do painel.
+- Teste de navegador das telas: 82 telas, 1 aviso (`/bot` sem título no teste; conferir).
+- Em andamento (agentes, 14/11): taxas da central e carteira; cargos, filiais e superadmin; menu lateral e foto da empresa; segurança; CRM/Bot/Totem do mobveloov.
+
+## Taxas da central e ajuste de carteira (branch worktree-agent-a538efdd5eef532ee, 14/11/2026)
+- **Taxas da central** (Config › Taxas da central, aba "Taxa por corrida", igual às capturas da Machine): nome (aparece no extrato), até 10 faixas de valor (porcentagem ou valor fixo), quem paga (motorista ou passageiro), categorias, formas de pagamento e simulador. Só admin grava; cada central (empresa) tem as suas. Aba "Automações" ainda sem conteúdo (a captura não mostra). Código: `comum/taxas.ts` (conta, também usada no simulador), `config/taxas.ts`, rotas `/api/config/taxas`, tela `web/telas/demais/TaxasCentral.tsx`.
+- **Efeito:** com ao menos uma taxa do motorista, elas substituem a comissão da categoria em `calcularComissao` (motorista Personalizado ou Isento continua valendo). Ao finalizar a corrida (app do motorista) a taxa do motorista é debitada da carteira dele, com o nome da taxa no extrato. A do passageiro: sai da carteira dele se pagou com saldo, do motorista se recebeu em dinheiro, máquina ou Pix, e de ninguém no cartão no app. `estimarPreco` devolve `taxaServico`. O "Editar OS" do painel também aplica (ver "Pendências do painel fechadas").
+- **Carteiras:** ajuste manual (`ajustarCarteira`, em `apps/extras.ts`) com motivo obrigatório (5 letras ou mais), chave única por clique (clique duplo não lança duas vezes), só admin, valor até R$ 10.000, débito não deixa saldo negativo, pessoa precisa existir. As duas rotas (`/api/config/carteiras/:papel/:chave/ajuste` e `/api/apps-central/carteiras/lancar`) usam a mesma função. O histórico mostra quem e quando. O app lê o mesmo saldo. Teste: `painel/test/taxas-carteira.test.ts`.
+
+## Cargos, filiais e painel do dono (branch worktree-agent-a1a2562b7d9420c54)
+- **Cargos:** ADMIN Mestre (`plataforma`), ADMIN, Gestor (novo) e Operador, como na Machine. Menu e servidor (403 com requisição forjada) seguem o cargo mínimo de cada função. Matriz em `docs/CARGOS.md`. Operadores antigos passam a ter menos acesso (sem financeiro, regras e equipe).
+- **Filiais:** Cadastro > Gestão > Filiais. Motorista e usuário ligados a uma filial; corrida guarda a filial; Histórico e relatórios filtram por filial; Operador e Gestor ligados a uma filial só veem as corridas dela (Histórico e relatórios). Monitoramento, Mapa e Programadas também filtram por filial (feito em 19/11).
+- **Painel do dono:** Mais > Painel do dono (só ADMIN Mestre): empresas, suspender/reativar (suspensa não loga), entrar como a empresa, planos e recursos, marca e domínio, uso e faturamento, centrais. Pendente: cobrança real (hoje o valor a pagar é calculado, sem gateway).
+
+## CRM, Bot e Totem copiados do sistema de referência (14/11/2026)
+
+Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é nativa).
+
+| Tela/função do sistema de referência | Portada? | Diferença |
+|---|---|---|
+| CRM › Visão Geral | Sim | Sem "receita recuperada" e "viraram corrida" (dependem da conversão) e sem eventos da Machine. |
+| CRM › Automação › Jornadas | Já existia | Só os gatilhos "sem corrida" e "cancelou". |
+| CRM › Automação › Gatilhos, Fila de Dispatches, Régua, Templates Comportamentais | Sim | Eventos vêm das corridas, do cadastro e da estimativa de preço dos apps (sem Machine); só WhatsApp (push e in-app eram da Machine). A régua usa lotes de 10 no WhatsApp de verdade. |
+| CRM › Comunicação › Campanhas, WhatsApp | Já existiam | Só o canal WhatsApp. |
+| CRM › Comunicação › Templates | Sim | Título/imagem/botão ficam guardados, mas só o texto sai pelo WhatsApp. |
+| CRM › Comunicação › Descadastros | Sim | A resposta "NÃO QUERO MAIS" no WhatsApp ainda não descadastra sozinha (as regras de texto estão prontas em `crm/optout.ts`). |
+| CRM › Comunicação › Notificações, Histórico de Disparos | Sim | Histórico com as 3 visões (comportamentais, automações por gatilho, pausas e retomadas). Pausa geral, horário (da Governança) e teto diário valem para tudo. |
+| CRM › Público › Passageiros, Motoristas | Já existiam | Tela Público. |
+| CRM › Público › Comportamentos, Segmentos | Sim | Análise de hora e dias preferidos dos últimos 180 dias (diária às 05:20); segmentos sobre a base de Contatos, com os 8 prontos. |
+| CRM › Público › Contatos | Sim | Base 360° no banco (etapa, tags, opt-out, CSV, linha do tempo, LGPD). Sem id de push da Machine; "Atualizar Métricas" lê o cadastro e as corridas do painel. |
+| CRM › Análises › RFM | Sim | "Criar segmento" cria segmento dinâmico (regra "RFM = este segmento"): a lista é reavaliada a cada uso, com a análise RFM mais recente (diária às 03:15). Não duplica o segmento. |
+| CRM › Análises › Conversão | Sim | Conta as corridas do painel; a janela de atribuição fica na Governança (a aba Machine saiu). |
+| CRM › Análises › Mapa de Calor | Sim | Usa as corridas próprias e as das integrações que informam coordenada (`embarquePonto`/`destinoPonto` da corrida; as só com texto de endereço seguem de fora). |
+| CRM › Recompensas | Sim | Cupons do cadastro de Cupons (sem gerador/área da Machine; "cidade" no lugar da área) e lista "Prêmios ganhos" (roleta, raspadinha, cartão fidelidade e pontos). Cartão Fidelidade e Pontos de Troca (`src/crm2/fidelidade*.ts`, página pública `/pontos/<empresa>/<token>`) ficam na tela Totens & Preços › Jogos de recompensa, como na tela Prêmios do original; o aviso sai pelo WhatsApp (sem app/push) e o cupom vai para o cadastro Cupons. Sem Meu Link, sem gerador/área da Machine. |
+| CRM › Configurações › Cidades, Governança, Auditoria | Sim | Janela de horário e opt-in da Governança valem na fila (só depois que a empresa salva). Auditoria anota campanhas, jornadas, templates e segmentos. A aba Machine foi retirada de propósito. |
+| CRM › Emojis nas mensagens | Sim | |
+| SpinText `{a|b}` e variáveis `{{x}}` | Sim | Variáveis antigas `{x}` continuam valendo. |
+| Bot › Ajustes (fluxo, textos, saudação, respostas prontas, comandos, status) | Sim | Ver docs/BOT.md. |
+| Bot › Conversas: bloquear e pausar o bot | Sim | |
+| Bot › várias conexões por empresa (até 10, cada uma com instância e segredos próprios) | Sim | Tela "Conexões do Bot". O passageiro é respondido pelo número em que escreveu. |
+| Bot › provedores Z-API, Z-Pro, Meta e Evolution (modo simulado sem chaves) | Sim | Mesma interface. Meta confere assinatura e senha de verificação. Falta testar com contas reais. |
+| Bot › áudio do passageiro (transcrição) | Sim | Groq ou OpenAI, só com chave. Sem chave o bot pede para escrever. |
+| Bot › cidades ativas | Sim | Cada número escolhe uma cidade atendida; o endereço sai com ", Cidade - UF" se o passageiro não citou outra. |
+| Bot › voz do bot (resposta em áudio) | Sim | Só quando o passageiro manda áudio, com chave Gemini ou OpenAI; sem chave, só texto. Ligar em Ajustes do bot. |
+| Bot › Sugestões de Endereço (apelidos) | Sim | Aba nova no Bot; cadastro por apelido com ponto do Google Maps ou endereço; vale no embarque e no destino. |
+| Bot › agendamento (menu, "amanhã 7h", lista, cancelar, avisos 15 e 5 min) | Sim | A corrida nasce agendada no painel e não prende a conversa. Até 3 por passageiro, 15 min a 7 dias. |
+| Bot › repasse passageiro e motorista | Sim | Passageiro: texto, áudio, foto, vídeo e localização vão ao chat da corrida. Motorista: texto, áudio, foto e vídeo do chat vão ao WhatsApp. Foto JPG, PNG ou WEBP até 5 MB; vídeo MP4, 3GP, MOV ou WEBM até 16 MB (tipo conferido pelo começo do arquivo); fora do limite o passageiro recebe o motivo. Sem corrida em andamento o bot explica que só encaminha ao motorista. |
+| Bot › descadastro por resposta (PARAR, SAIR, NÃO QUERO MAIS) | Sim | Grava o opt-out no CRM (Contatos) e confirma ao passageiro. |
+| Bot › escolha da rua por lista (CNEFE) | Sim | Embarque ou destino que serve para mais de uma rua (mesmo nome em dois bairros) vira lista numerada; responde o número, o nome do bairro ou "a primeira". Textos do original. Só com a base de endereços (CNEFE) configurada. O original também lista lugares das Sugestões quando vários combinam: aqui a Sugestão com maior nota vence (`bot/lista-ruas.ts`). |
+| Bot › pergunta de preço por cidade | Sim | "Quanto custa?", "qual o valor", "vocês fazem corrida pra X?" respondem com a tabela Preços por cidade do totem (dentro da cidade, locais ou o valor da cidade citada, todos os horários, pedágio e hora de espera). Rota sem valor: avisa e passa a conversa ao atendente (o original também avisa o WhatsApp de suporte; aqui o atendente responde pelo painel). No meio do pedido só responde a pergunta sozinha e lembra a etapa (`bot/pergunta-preco.ts`). |
+| Bot › pesquisa de preferências da corrida | Sim | Depois do pagamento: "Alguma preferência para esta corrida?" com as opções ligadas em Bot › Ajustes › Opções do pedido (motorista mulher, animal, porta-malas, cadeirante, encomenda, carro à disposição, 6 filtros da central, ida e volta, parada, cupom, motorista de confiança e recado). Cupom, parada e recado vão nos campos da corrida; o resto na observação. Pedido urgente não pergunta. Não há despacho por preferência (sem Machine) e o "motorista de confiança" só fica anotado (`bot/opcoes-pedido.ts`). |
+| Bot › menu padrão | Sim | Boas-vindas do original ("Olá! Sou um assistente 🤖 inteligente...", "Sou a 🤖 IA da central...") com as opções Solicitar corrida, Agendar e Suporte, numeradas (o original usa botões/enquete; sem botão o WhatsApp mostra a lista). Sem nome da empresa e do assistente. |
+| whatsapp-webhook (11 mil linhas) | Quase | Fluxo completo e as regras dos módulos copiados com os testes originais, mais a lista de ruas, o preço por cidade e a pesquisa de preferências. Ficam de fora só pontos sem equivalente no painel (foto da fachada como embarque, enquete do WhatsApp, chamar o WhatsApp de suporte da empresa). |
+| Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
+| Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
+| Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
+| Totem: jogos de recompensa (roleta e raspadinha, página pública /p/… e /premios/…) | Sim | Módulo do totem (`src/totem/premios*.ts`) com gancho `definirGanchoPremio` para o CRM › Recompensas. O agendador do CRM (`rodarAgendaDePremios`, chamado na volta do trabalhador) manda o convite no dia/horário e lembretes no 2º e 3º horário, com as travas do CRM; o gancho alimenta a aba Recompensas do CRM. |
+| Totem: Preços por cidade (dentro da cidade, locais, entre cidades, noturno, domingo, feriado, pedágio) | Sim | `src/totem/tarifas-cidade.ts`. A resposta do bot à pergunta de preço com esta tabela fica para a área do Bot. |
+| Totem: busca de endereço com sugestões no destino | Sim | Usa a base de endereços da empresa (`src/enderecos`). |
+| Totens & Preços (Totens & Locais, Preços por totem, Preços por cidade, Jogos de recompensa) | Sim | Senha só como hash. |
+| App do Totem (baixar APK; dono publica versões) | Sim | Senha de fechamento nativa do app Android: pendente de aparelho/build nativo. |
+
+Conferência no navegador: CRM (Visão Geral, Templates com modelos prontos) e o totem (ativação por senha e primeira tela). O sistema de referência
+não foi aberto lado a lado: a comparação foi feita pelo código das telas.
+
+## O que ainda falta (15/11/2026, depois do push parcial)
+
+Nenhuma parte do CRM, Bot ou Totem está 100% copiada do mobveloov: o que veio está na tabela "tela/função do mobveloov | portada? | diferença" (seção "CRM, Bot e Totem copiados do sistema de referência"). Lista do que falta, uma linha cada:
+
+**Bot de WhatsApp**
+- Z-API, Z-Pro, Meta e Evolution testados só com respostas simuladas, nunca com conta real (vale também para foto e vídeo recebidos).
+- Foto da fachada como embarque e enquete/botões do WhatsApp (o menu vai numerado).
+- Preferências da corrida só ficam anotadas: o despacho não filtra motorista por elas.
+
+**CRM**
+- Canais push e in-app (eram da Machine: ficam de fora de propósito).
+- Mapa de Calor: as integrações só entram se o motor informar latitude/longitude (hoje a maioria só traz o texto do endereço).
+- Cartão fidelidade e pontos: falta o "Meu Link" (página única com tudo) e o aviso no app/push (era da Machine).
+- Agenda dos jogos do totem: precisa do endereço público do painel (variável `PUBLICO_URL` ou salvar o jogo/pontos uma vez pelo painel).
+
+**Totem**
+- Senha de fechamento nativa do app Android (precisa de build nativo e aparelho).
+
+**Painel (Machine)**
+- Config › Gerais: abas Motorista, Passageiro, Financeiro, Filtros, Formas de pagamento e Recursos Premium; e, em Integrações, Saque Automático e Marketplace de Integradores (faltam páginas salvas da Machine).
+- O motor de despacho ainda não lê os campos novos de Gerais › Despacho; o Transbordo não repassa corrida entre centrais.
+- Os apps ainda não leem a Personalização do app do passageiro nem escondem os termos no modo "Não mostrar".
+- Quatro status de corrida da Machine que não existem no nosso fluxo; filtros de cartão e limite de crédito com a plataforma; coluna "Tipo de operação" da empresa; mapa sem Satélite/Google.
+- Notas do NPS de 1 a 5 (a Machine usa 0 a 10).
+- Valores dos planos das centrais são exemplos.
+- Documentos do veículo ficam por motorista; "Negociação" por categoria nos apps.
+- Editar OS que troca o motorista de uma OS já finalizada não estorna os lançamentos do motorista antigo; nem desfaz taxas se a OS deixar de ser finalizada.
+- O desconto da empresa é calculado na criação da corrida; corrigir o valor ou a forma de pagamento depois não recalcula o desconto.
+- A taxa do passageiro aparece no app web do passageiro (estimativa, corrida); nos APKs só depois de gerar de novo o pacote web (a API já entrega `taxaServico`). A estimativa do app não envia a forma de pagamento, então mostra a taxa que vale para todas as formas.
+- Feito em 19/11 (branch deste agente): filtro por filial em Monitoramento, Mapa e Programadas; "Enviar mais de um carro" no despacho; desconto da empresa no preço; observação da empresa no app do motorista; trava de OS paga e carteira/taxas no "Editar OS"; comissão da categoria na carteira; item "Carteiras de crédito" em Configurações (mesma tela de Carteiras, rota `/carteiras-credito`); teste `consulta-nps` sem depender da hora. Detalhes na seção "Pendências do painel fechadas".
+- Decisão do dono: taxa do passageiro em dinheiro/Pix/máquina sai da carteira do motorista (confirmar a regra); 30 erros de login com um e-mail bloqueiam essa conta por 10 min de qualquer IP.
+- Arquivo completo das casas precisa ser exportado do servidor do mobveloov pelo dono.
+- Teste `consulta-nps` falha entre 0h e 2h30 (usa "hoje" e recua uma corrida 2,5 h): ajustar o teste.
+
+**Apps (sessão dos apps, PR #18)**
+- Passos 2 a 5 do cadastro do motorista no app; teste dos APKs em aparelho; push, WhatsApp real e pagamento dependem de chaves e aparelhos do dono.
+
+## Pendências do painel fechadas (19/11/2026, branch worktree-agent-a95e7f3608c94146f)
+- **Filtro por filial:** Acompanhamento, Mapa de motoristas e Programadas ganharam o seletor "Filial" (só aparece para quem pode escolher). Operador e Gestor presos a uma filial ficam nela, mesmo forjando `?filial=`. A corrida vale pela filial gravada; sem ela, pela do motorista. Teste em `test/filiais.test.ts`.
+- **Enviar mais de um carro:** a corrida marcada recebe a oferta de até `CARROS_SIMULTANEOS` (3, limitado pelo "limite de motoristas" do Despacho) motoristas ao mesmo tempo, os mais bem colocados pela regra de sempre. Recusa ou vencimento completam com o próximo; o primeiro que aceita leva e os outros perdem a chamada na hora (auditoria "Outro motorista aceitou"). Sem a marcação, continua uma oferta por vez. `apps/despacho.ts`; teste `test/despacho-varios-carros.test.ts`.
+- **Desconto da empresa por forma de pagamento:** ao criar a corrida (painel, bot, totem e apps), o percentual do cadastro da empresa para a forma de pagamento soma ao cupom em `desconto`, e o detalhe fica em `descontoEmpresa {pct, valor}`. `corridas/empresa-conveniada.ts`. Não recalcula se o valor ou a forma de pagamento forem corrigidos depois.
+- **Observação da empresa para o motorista:** o campo `obsEmpresa` vem na corrida e na chamada do app do motorista (tela de chamada e da corrida mostram). O passageiro não recebe.
+- **Trava de OS paga:** "Cartão no App" e "Carteira" não podem ser editadas, no servidor (`PUT /api/operacao/corridas/:id` e `/programadas/:id`), valendo para o Editar OS do Histórico e para Alteração de dados da OS.
+- **Editar OS aplica taxas e carteira:** ao virar finalizada ou ao mudar valor, pagamento ou motorista de uma finalizada, roda `aposFinalizar`, agora idempotente por diferença: sem mudança não lança nada; valor novo lança só a diferença ("... (ajuste)").
+- **Comissão da categoria na carteira:** `aposFinalizar` debita "Comissão da central · OS n" do motorista (percentual, valor fixo, faixas de Regras de Crédito ou regra própria Personalizado/Isento). Com taxas do motorista ligadas elas substituem a comissão (uma cobrança só). Também corrigido: as taxas e a comissão contam sobre o valor pago (`c.valor` já vem com o desconto), não descontando duas vezes.
+- **Taxa do passageiro:** `taxaServico` vem em `/estimativa`, na corrida do app do passageiro e no recibo (que passa a mostrar "Taxa de serviço" e o total com ela). O app web do passageiro mostra na estimativa e nos dados da corrida; o APK precisa do pacote web novo.
+- **Carteiras de crédito:** novo item em Configurações > Regras e integrações (rota `/carteiras-credito`), abre a mesma tela de Carteiras; "Carteiras" segue em Financeiro.
+- **Teste `consulta-nps`:** o esperado acompanha o dia da corrida recuada 2,5 h; confere também com o relógio fixado à 1h.
+- Testes novos: `test/painel-pendencias.test.ts` (desconto, observação, trava, Editar OS, comissão, taxa) e `test/despacho-varios-carros.test.ts`.

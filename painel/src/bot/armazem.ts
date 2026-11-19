@@ -4,12 +4,18 @@
 // URL e token do provedor e o segredo do webhook ficam nos segredos da empresa (segredos.json),
 // na chave "bot-whatsapp". Nunca vão para o navegador.
 
+import { moduloLigado } from "../superadmin/recursos.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { banco, migrarUmaVez } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
-import type { ConfigBot, Conversa } from "./tipos.ts";
+import { normalizeBotControl } from "./controle.ts";
+import { normalizeBotTexts, normalizeFaq, normalizeGreeting } from "./textos-editaveis.ts";
+import { limparVoz, VOZ_PADRAO } from "./voz.ts";
+import { normalizeStatusMessages } from "./mensagens-status.ts";
+import { normalizeRideOptionsConfig } from "./opcoes-pedido.ts";
+import { FLUXO_PADRAO, ID_PRINCIPAL, TIPOS_PROVEDOR, type ConexaoBot, type ConfigBot, type Conversa, type FluxoBot, type TipoProvedor } from "./tipos.ts";
 
 export const CHAVE_SEGREDOS = "bot-whatsapp";
 const MAX_MENSAGENS = 300;
@@ -34,7 +40,19 @@ function gravar(arq: string, valor: unknown) {
 export const instanciaPadrao = (empresaId: string) => `bot-${empresaId}`;
 
 export function configPadrao(empresaId: string): ConfigBot {
-  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId) };
+  return { ativo: false, provedor: "simulado", instancia: instanciaPadrao(empresaId), conexoes: [], cidades: {}, ...avancadaPadrao() };
+}
+
+const avancadaPadrao = () => ({
+  fluxo: { ...FLUXO_PADRAO }, textos: {}, saudacao: normalizeGreeting(null), faq: [], controle: normalizeBotControl(null), textosStatus: {}, voz: { ligada: false, nome: VOZ_PADRAO }, agendar: true, opcoes: normalizeRideOptionsConfig(null),
+});
+
+/** Confere as configurações avançadas (fluxo, textos, saudação, respostas prontas, comandos, status). */
+export function sanearAvancada(c: Partial<ConfigBot>): Pick<ConfigBot, "fluxo" | "textos" | "saudacao" | "faq" | "controle" | "textosStatus" | "voz" | "agendar" | "opcoes"> {
+  const f = (c.fluxo ?? {}) as Partial<FluxoBot>;
+  const fluxo = { ...FLUXO_PADRAO };
+  for (const k of Object.keys(FLUXO_PADRAO) as Array<keyof FluxoBot>) if (typeof f[k] === "boolean") fluxo[k] = f[k]!;
+  return { fluxo, textos: normalizeBotTexts(c.textos), saudacao: normalizeGreeting(c.saudacao), faq: normalizeFaq(c.faq), controle: normalizeBotControl(c.controle), textosStatus: normalizeStatusMessages(c.textosStatus), voz: { ligada: c.voz?.ligada === true, nome: limparVoz(c.voz?.nome) }, agendar: c.agendar !== false, opcoes: normalizeRideOptionsConfig(c.opcoes) };
 }
 
 export function config(empresaId: string): ConfigBot {
@@ -42,23 +60,100 @@ export function config(empresaId: string): ConfigBot {
   const p = configPadrao(empresaId);
   return {
     ativo: c.ativo ?? p.ativo,
-    provedor: c.provedor === "evolution" ? "evolution" : "simulado",
+    provedor: TIPOS_PROVEDOR.includes(c.provedor as TipoProvedor) ? (c.provedor as TipoProvedor) : "simulado",
     instancia: typeof c.instancia === "string" && c.instancia ? c.instancia : p.instancia,
+    conexoes: sanearConexoes(c.conexoes),
+    cidades: Object.fromEntries(Object.entries(c.cidades && typeof c.cidades === "object" ? c.cidades : {}).filter(([k, v]) => typeof v === "string" && /^\d{4,8}$/.test(v) && (k === ID_PRINCIPAL || /^[a-z0-9-]{2,24}$/.test(k)))),
+    ...sanearAvancada(c),
   };
 }
 
-export const salvarConfig = (empresaId: string, c: ConfigBot) => gravar(path.join(pasta(empresaId), "config.json"), c);
+// ------------------------------------------------------------------ várias conexões (números) por empresa
 
-/** Segredos do bot da empresa: urlApi e token (só se a empresa usa servidor próprio) e segredoWebhook. */
-export function segredosBot(empresaId: string): Record<string, string> {
-  return D.segredos(empresaId).integracoes[CHAVE_SEGREDOS] ?? {};
+export const MAX_CONEXOES = 10;
+const ID_CONEXAO = /^[a-z0-9][a-z0-9-]{1,23}$/;
+
+/** Confere a lista de conexões extras (a principal fica nos campos do topo da config). */
+export function sanearConexoes(lista: unknown): ConexaoBot[] {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set<string>([ID_PRINCIPAL]);
+  const out: ConexaoBot[] = [];
+  for (const x of lista as Array<Partial<ConexaoBot>>) {
+    const id = String(x?.id ?? "");
+    if (!ID_CONEXAO.test(id) || vistos.has(id)) continue;
+    vistos.add(id);
+    out.push({
+      id, nome: String(x.nome ?? "").trim().slice(0, 60) || id, ativa: x.ativa !== false,
+      provedor: TIPOS_PROVEDOR.includes(x.provedor as TipoProvedor) ? (x.provedor as TipoProvedor) : "simulado",
+      instancia: String(x.instancia ?? "").trim().slice(0, 40) || `bot-${id}`,
+      ...(x.phoneId ? { phoneId: String(x.phoneId).trim().slice(0, 40) } : {}),
+    });
+    if (out.length >= MAX_CONEXOES) break;
+  }
+  return out;
 }
 
-export function salvarSegredosBot(empresaId: string, novos: Record<string, string | undefined>) {
+/** Todas as conexões da empresa, a principal primeiro. */
+export function conexoesDe(empresaId: string): ConexaoBot[] {
+  const c = config(empresaId);
+  return [{ id: ID_PRINCIPAL, nome: "Principal", ativa: true, provedor: c.provedor, instancia: c.instancia }, ...c.conexoes];
+}
+
+export function conexao(empresaId: string, id: string = ID_PRINCIPAL): ConexaoBot | null {
+  return conexoesDe(empresaId).find((x) => x.id === id) ?? null;
+}
+
+/** Cria ou muda uma conexão extra. O id é sorteado na criação. */
+export function salvarConexao(empresaId: string, dados: Partial<ConexaoBot> & { id?: string }): ConexaoBot {
+  const c = config(empresaId);
+  const lista = [...c.conexoes];
+  const i = dados.id ? lista.findIndex((x) => x.id === dados.id) : -1;
+  if (dados.id && i < 0) throw new Error("Conexão não encontrada.");
+  if (i < 0 && lista.length >= MAX_CONEXOES) throw new Error(`No máximo ${MAX_CONEXOES} conexões por empresa.`);
+  const id = i >= 0 ? lista[i].id : `n${crypto.randomBytes(4).toString("hex")}`;
+  const nova = sanearConexoes([{ ...(i >= 0 ? lista[i] : {}), ...dados, id }])[0];
+  if (!nova) throw new Error("Conexão inválida.");
+  if (instanciaEmUso(empresaId, nova.instancia, nova.id)) throw new Error("Já existe uma conexão com este nome de instância.");
+  if (i >= 0) lista[i] = nova; else lista.push(nova);
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, conexoes: lista });
+  return nova;
+}
+
+export function removerConexao(empresaId: string, id: string) {
+  if (id === ID_PRINCIPAL) throw new Error("A conexão principal não pode ser removida.");
+  const c = config(empresaId);
+  if (!c.conexoes.some((x) => x.id === id)) throw new Error("Conexão não encontrada.");
+  const { [id]: _c, ...cidades } = c.cidades;
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, conexoes: c.conexoes.filter((x) => x.id !== id), cidades });
   const s = D.segredos(empresaId);
-  const atual = { ...(s.integracoes[CHAVE_SEGREDOS] ?? {}) };
+  const { [`${CHAVE_SEGREDOS}-${id}`]: _fora, ...resto } = s.integracoes;
+  D.salvarSegredos(empresaId, { ...s, integracoes: resto });
+}
+
+/** Duas conexões da mesma empresa não podem usar a mesma instância. */
+function instanciaEmUso(empresaId: string, instancia: string, exceto: string) {
+  return conexoesDe(empresaId).some((x) => x.id !== exceto && x.instancia.toLowerCase() === instancia.toLowerCase());
+}
+
+/** Grava a config. Campos que não vierem ficam como estão (as configurações avançadas não somem ao mudar só a conexão). */
+export function salvarConfig(empresaId: string, c: Pick<ConfigBot, "ativo" | "provedor" | "instancia"> & Partial<ConfigBot>) {
+  const arq = path.join(pasta(empresaId), "config.json");
+  gravar(arq, { ...ler<Record<string, unknown>>(arq, {}), ...c });
+}
+
+/** Segredos do bot da empresa: urlApi e token (só se a empresa usa servidor próprio) e segredoWebhook. */
+const chaveDe = (conexaoId: string) => (conexaoId === ID_PRINCIPAL ? CHAVE_SEGREDOS : `${CHAVE_SEGREDOS}-${conexaoId}`);
+
+export function segredosBot(empresaId: string, conexaoId: string = ID_PRINCIPAL): Record<string, string> {
+  return D.segredos(empresaId).integracoes[chaveDe(conexaoId)] ?? {};
+}
+
+export function salvarSegredosBot(empresaId: string, novos: Record<string, string | undefined>, conexaoId: string = ID_PRINCIPAL) {
+  const s = D.segredos(empresaId);
+  const chave = chaveDe(conexaoId);
+  const atual = { ...(s.integracoes[chave] ?? {}) };
   for (const [k, v] of Object.entries(novos)) if (v !== undefined) { if (v === "") delete atual[k]; else atual[k] = v; }
-  D.salvarSegredos(empresaId, { ...s, integracoes: { ...s.integracoes, [CHAVE_SEGREDOS]: atual } });
+  D.salvarSegredos(empresaId, { ...s, integracoes: { ...s.integracoes, [chave]: atual } });
 }
 
 /** Segredo da URL do webhook. Criado na primeira vez. */
@@ -158,4 +253,14 @@ export async function aguardarFilas() {
 }
 
 /** Empresas com o bot ligado. */
-export const empresasComBot = () => D.listarEmpresas().filter((e) => e.ativa && config(e.id).ativo).map((e) => e.id);
+export const empresasComBot = () => D.listarEmpresas().filter((e) => e.ativa && moduloLigado(e.id, "bot") && config(e.id).ativo).map((e) => e.id);
+
+/** Cidade ativa de uma conexão (código do município) ou null. */
+export const cidadeDaConexao = (empresaId: string, conexaoId: string = ID_PRINCIPAL): string | null => config(empresaId).cidades[conexaoId] ?? null;
+
+export function definirCidade(empresaId: string, conexaoId: string, codigo: string) {
+  const c = config(empresaId);
+  const cidades = { ...c.cidades };
+  if (codigo) cidades[conexaoId] = codigo; else delete cidades[conexaoId];
+  salvarConfig(empresaId, { ativo: c.ativo, provedor: c.provedor, instancia: c.instancia, cidades });
+}

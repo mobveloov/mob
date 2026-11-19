@@ -16,6 +16,9 @@ export function FaixasVouchers() {
   const d = useCarregar(() => pedirRel<any>(`/vouchers/faixas?${qs}`), [qs]);
   const { msg, salvar } = useSalvar();
   const x = d.dados;
+  const sessao = useCarregar(() => fetch("/api/sessao", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null), []);
+  const bandeira = String(sessao.dados?.empresa?.nome ?? "");
+  const [band, setBand] = useState("");
 
   if (criando) {
     return (
@@ -23,6 +26,7 @@ export function FaixasVouchers() {
         <Cab titulo="Criando Faixa de Vouchers" sub="Campos com * são obrigatórios." />
         <Aviso erro={msg?.erro} />
         <form className="dm-cartao dm-filtros" onSubmit={async (e) => { e.preventDefault(); const r = await salvar(async () => { await pedirRel("/vouchers/faixas", "POST", n); return true; }); if (r) { setCriando(false); setN({ empresa: "", serie: "", inicial: "", final: "" }); d.recarregar(); } }}>
+          <Campo rotulo="Bandeira *"><select required value={band} onChange={(e) => setBand(e.target.value)}><option value="">Selecione</option>{bandeira && <option>{bandeira}</option>}</select></Campo>
           <Campo rotulo="Empresa *"><select required value={n.empresa} onChange={(e) => setN({ ...n, empresa: e.target.value })}><option value="">Selecione</option>{x?.empresas.map((e: string) => <option key={e}>{e}</option>)}</select></Campo>
           <Campo rotulo="Série"><input value={n.serie} maxLength={20} onChange={(e) => setN({ ...n, serie: e.target.value })} /></Campo>
           <Campo rotulo="Número inicial *"><input required inputMode="numeric" pattern="\d+" value={n.inicial} onChange={(e) => setN({ ...n, inicial: e.target.value })} /></Campo>
@@ -40,7 +44,7 @@ export function FaixasVouchers() {
       </Cab>
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setAplicado(f); }}>
-        <Campo rotulo="Empresa"><select value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}><option value="">Selecione</option>{x?.empresas.map((e: string) => <option key={e}>{e}</option>)}</select></Campo>
+        <Campo rotulo="Empresa *"><select value={f.empresa} onChange={(e) => setF({ ...f, empresa: e.target.value })}><option value="">Selecione</option>{x?.empresas.map((e: string) => <option key={e}>{e}</option>)}</select></Campo>
         <Campo rotulo="Série"><input value={f.serie} onChange={(e) => setF({ ...f, serie: e.target.value })} /></Campo>
         <Campo rotulo="Número inicial"><input inputMode="numeric" value={f.inicial} onChange={(e) => setF({ ...f, inicial: e.target.value })} /></Campo>
         <Campo rotulo="Número final"><input inputMode="numeric" value={f.final} onChange={(e) => setF({ ...f, final: e.target.value })} /></Campo>

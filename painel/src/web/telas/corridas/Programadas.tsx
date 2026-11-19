@@ -1,39 +1,70 @@
 // Programadas: corridas agendadas (Hoje, Amanhã, Próximas, Todas), com janela de agendamento (cancelar e editar).
-import { useEffect, useState } from "react";
-import { Ban, Edit3, Loader2 } from "lucide-react";
-import { Aviso, Janela, Paginacao, Selo, Vazio, dhAno, msgErro, op, qs, reais, useDados, fone } from "./comum";
+import { useState } from "react";
+import { Ban, Edit3, FileDown, Loader2 } from "lucide-react";
+import { Aviso, Janela, Paginacao, Selo, Vazio, dia, dhAno, msgErro, op, qs, reais, useDados, fone } from "./comum";
 import "./corridas.css";
 
-const FILTROS: Array<[string, string]> = [["hoje", "Hoje"], ["amanha", "Amanhã"], ["futuras", "Próximas"], ["todas", "Todas"]];
 const TOM: Record<string, string> = { procurando: "alerta", a_caminho: "info", no_local: "info", em_andamento: "info", finalizada: "ok", cancelada: "ruim", nao_atendida: "alerta" };
+const TOM_SIT: Record<string, string> = { distribuida: "ok", aguardando: "alerta", cancelada: "ruim", erro: "ruim" };
+const VAZIO = { centralChamada: "", empresa: "", os: "", categoria: "", passageiro: "", motorista: "", dataIni: "", dataFim: "", pagamento: "", situacao: "", filial: "" };
+type Filtros = typeof VAZIO;
 
 export default function Programadas() {
-  const [filtro, setFiltro] = useState("futuras");
-  const [busca, setBusca] = useState("");
-  const [b, setB] = useState("");
+  const [f, setF] = useState<Filtros>(VAZIO);
+  const [rasc, setRasc] = useState<Filtros>(VAZIO);
   const [pagina, setPagina] = useState(1);
   const [sel, setSel] = useState<any>(null);
-  useEffect(() => { const t = setTimeout(() => { setB(busca); setPagina(1); }, 350); return () => clearTimeout(t); }, [busca]);
-  const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/programadas${qs({ filtro, busca: b, pagina })}`), [filtro, b, pagina], 30_000);
+  const [erroEx, setErroEx] = useState<string | null>(null);
+  const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/programadas${qs({ ...f, pagina })}`), [JSON.stringify(f), pagina], 30_000);
+  const o = dados?.opcoes;
+  const lista = (k: keyof Filtros, r: string, itens: Array<string | { id: string; nome: string }> = []) => (
+    <label className="oc-l">{r}<select value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })}><option value="">Selecione</option>
+      {itens.map((x) => typeof x === "string" ? <option key={x} value={x}>{x}</option> : <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
+  );
+  const campo = (k: keyof Filtros, r: string, tipo = "text") => <label className="oc-l">{r}<input type={tipo} value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })} /></label>;
+  const filtrar = () => { setF(rasc); setPagina(1); };
+  const limpar = () => { setRasc(VAZIO); setF(VAZIO); setPagina(1); };
+  async function exportar() {
+    setErroEx(null);
+    try {
+      const r = await fetch(`/api/operacao/programadas/exportar${qs(f)}`, { credentials: "same-origin" });
+      if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erro?: string }).erro || `Erro ${r.status}`);
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a"); a.href = url; a.download = "corridas-programadas.csv"; a.click(); URL.revokeObjectURL(url);
+    } catch (e) { setErroEx(msgErro(e)); }
+  }
   return (
     <div className="oc">
       <div className="oc-topo">
-        <h1>Corridas Programadas</h1>
-        <div className="oc-fila">
-          {FILTROS.map(([k, r]) => <button key={k} className={`oc-chip ${filtro === k ? "on" : ""}`} onClick={() => { setFiltro(k); setPagina(1); }}>{r}</button>)}
-          <input style={{ width: 220 }} placeholder="Buscar passageiro..." value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar passageiro" />
-        </div>
+        <h1>Corridas programadas</h1>
+        <div className="oc-fila"><button className="oc-btn" onClick={exportar} disabled={!dados?.total}><FileDown size={16} /> Exportar</button></div>
       </div>
       <Aviso texto={erro} erro />
+      <Aviso texto={erroEx} erro />
+      <form className="oc-card" onSubmit={(e) => { e.preventDefault(); filtrar(); }}>
+        <h3 style={{ marginTop: 0 }}>Filtros</h3>
+        <div className="oc-grid3">
+          {lista("centralChamada", "Central chamada", o?.centrais)}{lista("empresa", "Empresa", o?.empresas)}{campo("os", "Nº OS")}
+          {lista("categoria", "Categoria", o?.categorias)}{campo("passageiro", "Nome do passageiro")}{campo("motorista", "Nome/VTR do motorista")}
+          {campo("dataIni", "Data inicial", "date")}{campo("dataFim", "Data final", "date")}{lista("pagamento", "Forma de pagamento", o?.pagamentos)}
+          {lista("situacao", "Situação do disparo", o?.situacoes)}{!!o?.filiais?.length && lista("filial", "Filial", o.filiais)}
+        </div>
+        <div className="oc-fila" style={{ marginTop: 12 }}>
+          <button className="oc-btn pri" type="submit">Filtrar</button>
+          <button className="oc-btn" type="button" onClick={limpar}>Limpar filtros</button>
+        </div>
+      </form>
       <div className="oc-card">
         {carregando && !dados && <Vazio>Carregando...</Vazio>}
-        {dados && !dados.total && <Vazio>Nenhuma corrida programada neste filtro.</Vazio>}
+        {dados && !dados.total && <Vazio>Nenhum resultado encontrado.</Vazio>}
         {!!dados?.total && <>
-          <div className="oc-rola"><table><thead><tr><th>Agendada Para</th><th>ID</th><th>Passageiro</th><th>Origem</th><th>Motorista</th><th>Status</th></tr></thead>
+          <p className="suave" style={{ marginTop: 0 }}>Exibindo {(dados.pagina - 1) * 10 + 1}-{(dados.pagina - 1) * 10 + dados.itens.length} de {dados.total} {dados.total === 1 ? "resultado" : "resultados"}.</p>
+          <div className="oc-rola"><table><thead><tr><th>Nº OS programada</th><th>Data</th><th>Hora</th><th>Antecedência (minutos)</th><th>Nome do passageiro</th><th>Empresa</th><th>Situação do disparo</th></tr></thead>
             <tbody>{dados.itens.map((c: any) => (
               <tr key={c.id} className="clic" onClick={() => setSel(c)}>
-                <td className="forte">{dhAno(c.agendadaPara)}</td><td>{c.os}</td><td>{c.passageiro}<br /><small>{fone(c.telefone)}</small></td><td className="corta">{c.origem}</td><td>{c.motorista || "—"}</td>
-                <td><Selo tom={TOM[c.status]}>{c.statusTexto}</Selo></td></tr>))}</tbody></table></div>
+                <td className="forte">{c.os}</td><td>{dia(c.agendadaPara)}</td><td>{c.agendadaPara.slice(11, 16)}</td><td>{c.antecedencia}</td>
+                <td>{c.passageiro}<br /><small className="suave">{c.origem}</small></td><td>{c.empresa || "---"}</td>
+                <td><Selo tom={TOM_SIT[c.situacao]}>{c.situacaoTexto}</Selo></td></tr>))}</tbody></table></div>
           <Paginacao pagina={dados.pagina} paginas={dados.paginas} total={dados.total} onMudar={setPagina} rotulo="agendamentos" />
         </>}
       </div>

@@ -17,7 +17,25 @@ export const PAGAMENTOS_PADRAO = ["Dinheiro", "Pix", "Cartão na maquininha"];
 
 export interface Ponto { texto: string; lat?: number; lng?: number }
 
+/** Categoria do totem (Totens e Preços › Preços): preço próprio deste local. */
+export interface CategoriaLocal {
+  nome: string;
+  descricao: string;
+  taxaBase: number;
+  porKm: number;
+  porMin: number;
+  /** Corrida mínima. */
+  minima: number;
+  /** Tempo de espera mostrado (min). */
+  espera: number;
+  ordem: number;
+  ativa: boolean;
+}
+
+export type ModoWhatsapp = "individual" | "compartilhado";
+
 export interface Local {
+  /** É o "slug" do link do totem: /totem/<empresa>/<id>. */
   id: string;
   nome: string;
   /** Endereço fixo de embarque. */
@@ -26,6 +44,18 @@ export interface Local {
   categorias: string[];
   pagamentos: string[];
   senhaHash: string;
+  cidade: string;
+  uf: string;
+  /** Imagem do topo e do rodapé (nome do arquivo em empresas/<id>/arquivos). Vazio = sem imagem. */
+  logo: string;
+  rodape: string;
+  modoWhatsapp: ModoWhatsapp;
+  /** Aparelho vinculado (identificador gerado no aparelho). Vazio = ainda sem aparelho. */
+  aparelho: string;
+  /** Preços deste local. Vazio = vale a tabela de "Categorias e tarifas" da empresa. */
+  tabela: CategoriaLocal[];
+  /** Multiplicador de demanda sobre a tabela do local (1 = preço normal). */
+  surge: number;
   /** Sobe quando o admin salva ou manda recarregar: o totem recarrega sozinho. */
   versao: number;
   ativo: boolean;
@@ -64,12 +94,23 @@ export function lerPonto(v: unknown): Ponto {
 
 // ------------------------------------------------------------------ locais
 
-export const listarLocais = (empresaId: string) => ler<Local[]>(path.join(pasta(empresaId), "locais.json"), []);
+/** Local gravado antes dos campos novos: completa o que falta. */
+function completar(l: Partial<Local>): Local {
+  return {
+    ...(l as Local), cidade: l.cidade ?? "", uf: l.uf ?? "", logo: l.logo ?? "", rodape: l.rodape ?? "",
+    modoWhatsapp: l.modoWhatsapp === "compartilhado" ? "compartilhado" : "individual", aparelho: l.aparelho ?? "",
+    tabela: Array.isArray(l.tabela) ? l.tabela : [], surge: typeof l.surge === "number" && l.surge > 0 ? l.surge : 1,
+  };
+}
+export const listarLocais = (empresaId: string) => ler<Local[]>(path.join(pasta(empresaId), "locais.json"), []).map(completar);
 export const local = (empresaId: string, id: string) => (D.idValido(id) ? listarLocais(empresaId).find((l) => l.id === id) ?? null : null);
 const salvarLocais = (empresaId: string, l: Local[]) => gravar(path.join(pasta(empresaId), "locais.json"), l);
 
 /** Local sem o hash da senha (o que o painel pode ver). */
 export const localPublico = ({ senhaHash, ...l }: Local) => ({ ...l, temSenha: !!senhaHash });
+
+/** Texto -> slug do link (letras minúsculas, números e hífen). */
+export const slugDe = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
 
 function criarIdLocal(nome: string, existentes: Local[]): string {
   const base = nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "local";
@@ -98,8 +139,22 @@ export function salvarLocal(empresaId: string, entrada: Record<string, unknown>,
     senhaHash = D.hashSenha(entrada.senha);
   }
   if (!senhaHash) throw new Error("Defina a senha do totem.");
+  let novoId = atual?.id;
+  if (!novoId) {
+    const pedido = typeof entrada.slug === "string" ? slugDe(entrada.slug) : "";
+    if (pedido) {
+      if (pedido.length < 2) throw new Error("O endereço do totem precisa de pelo menos 2 letras ou números.");
+      if (lista.some((l) => l.id === pedido)) throw new Error("Já existe um local com este endereço (slug).");
+      novoId = pedido;
+    } else novoId = criarIdLocal(nome, lista);
+  }
   const novo: Local = {
-    id: atual?.id ?? criarIdLocal(nome, lista), nome, endereco, categorias, pagamentos, senhaHash,
+    id: novoId!, nome, endereco, categorias, pagamentos, senhaHash,
+    cidade: entrada.cidade !== undefined ? txt(entrada.cidade, 60) : atual?.cidade ?? "",
+    uf: entrada.uf !== undefined ? txt(entrada.uf, 2).toUpperCase() : atual?.uf ?? "",
+    logo: atual?.logo ?? "", rodape: atual?.rodape ?? "", aparelho: atual?.aparelho ?? "",
+    modoWhatsapp: entrada.modoWhatsapp === "compartilhado" ? "compartilhado" : entrada.modoWhatsapp === "individual" ? "individual" : atual?.modoWhatsapp ?? "individual",
+    tabela: atual?.tabela ?? [], surge: atual?.surge ?? 1,
     versao: (atual?.versao ?? 0) + 1,
     ativo: typeof entrada.ativo === "boolean" ? entrada.ativo : atual?.ativo ?? true,
     criadoEm: atual?.criadoEm ?? new Date().toISOString(),
@@ -109,7 +164,101 @@ export function salvarLocal(empresaId: string, entrada: Record<string, unknown>,
 }
 
 export function removerLocal(empresaId: string, id: string) {
-  salvarLocais(empresaId, listarLocais(empresaId).filter((l) => l.id !== id));
+  const l = local(empresaId, id);
+  salvarLocais(empresaId, listarLocais(empresaId).filter((x) => x.id !== id));
+  // As imagens do local não servem para mais nada.
+  if (l?.logo) D.apagarImagem(empresaId, l.logo);
+  if (l?.rodape) D.apagarImagem(empresaId, l.rodape);
+}
+
+/** Imagem do topo ("logo") ou do rodapé ("rodape") do totem. Nome do arquivo = totem-<local>-<tipo>.<ext>. */
+export function definirImagem(empresaId: string, id: string, tipo: "logo" | "rodape", mime: string, bytes: Uint8Array): Local {
+  const lista = listarLocais(empresaId);
+  const l = lista.find((x) => x.id === id);
+  if (!l) throw new Error("Local não encontrado.");
+  if (!/^image\/(png|jpeg|webp)$/.test(mime)) throw new Error("Envie a imagem em PNG, JPG ou WEBP.");
+  if (bytes.length > 2 * 1024 * 1024) throw new Error("A imagem pode ter no máximo 2 MB.");
+  const nome = D.salvarImagem(empresaId, `totem-${id}-${tipo}`, mime, bytes);
+  l[tipo] = nome;
+  l.versao++;
+  salvarLocais(empresaId, lista);
+  return l;
+}
+export function tirarImagem(empresaId: string, id: string, tipo: "logo" | "rodape"): Local {
+  const lista = listarLocais(empresaId);
+  const l = lista.find((x) => x.id === id);
+  if (!l) throw new Error("Local não encontrado.");
+  if (l[tipo]) D.apagarImagem(empresaId, l[tipo]);
+  l[tipo] = "";
+  l.versao++;
+  salvarLocais(empresaId, lista);
+  return l;
+}
+
+/** Aparelho vinculado: o primeiro que entra com a senha fica com o link; outro aparelho é barrado. */
+export function vincularAparelho(empresaId: string, id: string, aparelho: string): "ok" | "outro" {
+  const lista = listarLocais(empresaId);
+  const l = lista.find((x) => x.id === id);
+  if (!l) throw new Error("Local não encontrado.");
+  if (l.aparelho && l.aparelho !== aparelho) return "outro";
+  if (!l.aparelho) { l.aparelho = aparelho; salvarLocais(empresaId, lista); }
+  return "ok";
+}
+export function limparAparelho(empresaId: string, id: string): Local {
+  const lista = listarLocais(empresaId);
+  const l = lista.find((x) => x.id === id);
+  if (!l) throw new Error("Local não encontrado.");
+  l.aparelho = "";
+  l.versao++;
+  salvarLocais(empresaId, lista);
+  return l;
+}
+
+// ------------------------------------------------------------------ preços do local (Totens e Preços › Preços)
+
+const dinheiro = (v: unknown, max = 100000) => { const n = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? Math.min(max, Math.max(0, Math.round(n * 100) / 100)) : 0; };
+
+/** Tabela de preços vinda da tela: confere e limpa cada categoria. */
+export function lerTabela(v: unknown): CategoriaLocal[] {
+  if (!Array.isArray(v)) throw new Error("Tabela de preços inválida.");
+  const vistos = new Set<string>();
+  const out: CategoriaLocal[] = [];
+  for (const c of v.slice(0, 30) as Array<Record<string, unknown>>) {
+    const nome = txt(c?.nome, 60);
+    if (!nome) throw new Error("Toda categoria precisa de um nome.");
+    if (vistos.has(nome.toLowerCase())) throw new Error(`A categoria "${nome}" aparece duas vezes.`);
+    vistos.add(nome.toLowerCase());
+    out.push({
+      nome, descricao: txt(c?.descricao, 120), taxaBase: dinheiro(c?.taxaBase), porKm: dinheiro(c?.porKm), porMin: dinheiro(c?.porMin),
+      minima: dinheiro(c?.minima), espera: Math.min(240, Math.max(0, Math.round(Number(c?.espera)) || 5)), ordem: Math.round(Number(c?.ordem)) || 0, ativa: c?.ativa !== false,
+    });
+  }
+  return out;
+}
+
+/** Grava os preços do local. Com `copiarPara` ("todos" ou ids), copia a mesma tabela para os outros. */
+export function salvarPrecos(empresaId: string, id: string, entrada: { tabela: unknown; surge?: unknown }, copiarPara: string[] | "todos" | null = null): Local {
+  const lista = listarLocais(empresaId);
+  const l = lista.find((x) => x.id === id);
+  if (!l) throw new Error("Local não encontrado.");
+  const tabela = lerTabela(entrada.tabela);
+  const surge = entrada.surge === undefined ? l.surge : Number(String(entrada.surge).replace(",", "."));
+  if (!Number.isFinite(surge) || surge < 0.5 || surge > 10) throw new Error("O multiplicador de demanda fica entre 0,5 e 10.");
+  for (const x of lista) {
+    if (x.id === id || copiarPara === "todos" || (Array.isArray(copiarPara) && copiarPara.includes(x.id))) {
+      x.tabela = tabela.map((c) => ({ ...c }));
+      x.surge = surge;
+      x.versao++;
+    }
+  }
+  salvarLocais(empresaId, lista);
+  return lista.find((x) => x.id === id)!;
+}
+
+/** Preço de uma categoria do local: taxa base + km + minutos, nunca abaixo da mínima, vezes o multiplicador. Sem distância: "a partir de". */
+export function precoDoLocal(l: Pick<Local, "surge">, c: CategoriaLocal, km: number | null, minutos: number | null): number {
+  const rodando = km != null ? c.taxaBase + c.porKm * km + c.porMin * (minutos ?? km * 2.5) : c.taxaBase;
+  return Math.round(Math.max(c.minima, rodando) * l.surge * 100) / 100;
 }
 
 /** Recarregar remoto: sobe a versão; o totem percebe em até 1 minuto. */

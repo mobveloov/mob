@@ -1,3 +1,4 @@
+import { podeCargo } from "../../comum/cargos.ts";
 import { useMemo, useState } from "react";
 import { Download, Loader2, Pencil, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { cadastroPorId, type Campo } from "../../comum/cadastros.ts";
@@ -28,7 +29,7 @@ const CLASSE_STATUS: Record<string, string> = { Ativo: "ok", Ativa: "ok", Bloque
 export default function TelaCadastro({ id }: { id: string }) {
   const cad = cadastroPorId(id)!;
   const { sessao } = useSessao();
-  const podeEditar = sessao.usuario.papel !== "operador" || !!cad.operadorEdita;
+  const podeEditar = podeCargo(sessao.usuario.papel, "gestor") || !!cad.operadorEdita;
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState<Registro | "novo" | null>(null);
   const [msg, setMsg] = useState<{ texto: string; erro?: boolean } | null>(null);

@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { BarChart3, CalendarClock, Copy, Eye, Pause, Play, Plus, Save, Send, Sparkles, Trash2, X } from "lucide-react";
+import { BarraPausa } from "./automacao-comum";
 import { Cartao, Gaveta, Kpi, Titulo, useCarregar } from "../componentes/ui";
 import { crm, quando, quandoReal, type Campanha, type CampanhaLinha } from "./api";
-import { EditorRegras, Selo, useAdmin, useRetorno, Variaveis } from "./comum";
+import { EditorRegras, Selo, useGestor, useRetorno, Variaveis } from "./comum";
 import Envio from "./Envio";
 
 const NOVA: Partial<Campanha> = { nome: "", texto: "Oi {primeiro_nome}! Sentimos sua falta. Use o cupom {cupom} na sua próxima corrida com a {empresa}.", variacoes: [], cupom: "", publico: { tipo: "passageiro", inativoMinDias: 15 }, agendadaPara: null };
@@ -14,7 +15,7 @@ export default function CrmCampanhas() {
   const [relatorio, setRelatorio] = useState<string | null>(null);
   const [aba, setAba] = useState<"campanhas" | "envio">("campanhas");
   const { tentar, caixa } = useRetorno();
-  const admin = useAdmin();
+  const admin = useGestor();
 
   const acao = (c: CampanhaLinha, a: "pausar" | "retomar" | "cancelar" | "duplicar", ok: string) => tentar(() => crm.acao(c.id, a), ok).then(recarregar);
   const disparar = async (c: CampanhaLinha) => {
@@ -33,6 +34,7 @@ export default function CrmCampanhas() {
         </div>
         {aba === "campanhas" && <button className="botao primario" onClick={() => setEditando({ ...NOVA })}><Plus size={14} /> Nova campanha</button>}
       </Titulo>
+      {aba === "campanhas" && <BarraPausa />}
       {caixa}
       {erro && <div className="aviso erro">{erro}</div>}
       {aba === "envio" ? <Envio /> : (
@@ -86,7 +88,7 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Campanha>; onSalvo: () 
   const cupons = useCarregar(() => crm.cupons(), []);
   const listas = useCarregar(() => crm.listas(), []);
   const { tentar, caixa } = useRetorno();
-  const admin = useAdmin();
+  const admin = useGestor();
   const campo = useRef<HTMLTextAreaElement>(null);
   const mudar = (p: Partial<Campanha>) => { setC({ ...c, ...p }); setPrevias(null); };
   const inserir = (v: string) => {

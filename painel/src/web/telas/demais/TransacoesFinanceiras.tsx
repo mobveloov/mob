@@ -31,12 +31,13 @@ export function TransacoesFinanceiras() {
   return (
     <>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
+      <p className="sub">Aqui você pode configurar as cobranças de cartão de crédito no aplicativo do passageiro e pix na recarga automática para o motorista diretamente do seu aplicativo, sem a necessidade de maquininhas ou outros dispositivos, fornecendo segurança e comodidade para a realização de corridas.</p>
       <section className="dm-cartao dm-secao"><h2>Condições</h2>
         <h3>Cartão no app</h3>
-        {f.planos.map((p: any, i: number) => <p key={p.id} className="sub">Opção {i + 1}: para recebimento no plano {p.nome}, a taxa é de até {pct(p.taxa)} sobre o valor das corridas.</p>)}
+        {f.planos.map((p: any, i: number) => <p key={p.id} className="sub">Opção {i + 1}: para recebimento no plano {p.nome}, a taxa é de até {Number(p.taxa).toFixed(2).replace(".", ",")}% sobre o valor das corridas.</p>)}
         <p className="sub">Você decide para onde o valor das corridas vai: direto para os motoristas, dividido entre a central e os motoristas ou direto para a conta da central. Para o cadastro ser aprovado é preciso escolher um plano, mesmo sem usar o pagamento por cartão agora.</p>
         <h3>Pix</h3>
-        <p className="sub">O valor das recargas é transferido diariamente, somando as recargas desde a última transferência. Valor mínimo de R$ {String(f.pixMinimo).replace(".", ",")} por transação.</p>
+        <p className="sub">O valor das recargas é transferido diariamente, somando as recargas desde a última transferência. Valor mínimo de R$ {Number(f.pixMinimo).toFixed(2).replace(".", ",")} por transação.</p>
         {f.taxasPix.map((t: any) => <p key={t.taxa} className="sub">Taxa de {pct(t.taxa)} por transação nos planos {t.planos.join(", ")}.</p>)}
       </section>
 
@@ -51,7 +52,9 @@ export function TransacoesFinanceiras() {
         </section>
       ) : <section className="dm-cartao dm-secao"><h2>Dados bancários</h2><p className="sub">{f.bancoPreenchido ? "Dados bancários cadastrados." : "Dados bancários ainda não cadastrados."} Só o administrador vê e altera estes dados.</p></section>}
 
-      <section className="dm-cartao dm-secao"><h2>Configurações de cartão</h2>
+      <section className="dm-cartao dm-secao"><h2>Configurações de cartão {f.plano && <span className="selo ok">Ativa</span>}</h2>
+        <h3>Cartão no app</h3>
+        <p className="sub">Escolha o plano de recebimento dos valores para transações realizadas por cartão no app. Você pode alterar seu plano a qualquer momento.</p>
         <div className="dm-grade3">
           <Campo rotulo="Plano *"><select disabled={!admin} value={f.plano} onChange={(e) => set("plano", e.target.value)}><option value="">Escolha um plano</option>{f.planos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></Campo>
           <Campo rotulo="Quem irá receber? *"><select disabled={!admin} value={f.quemRecebe} onChange={(e) => set("quemRecebe", e.target.value)}><option value="motorista">Motorista</option><option value="central">Central</option><option value="dividido">Dividido</option></select></Campo>
@@ -61,6 +64,7 @@ export function TransacoesFinanceiras() {
       </section>
 
       <section className="dm-cartao dm-secao"><h2>Configurações de Pix</h2>
+        <p className="sub">Com a integração ativa, você pode usar:</p>
         <Interruptor valor={f.pixRecargas} onChange={(v) => set("pixRecargas", v)} rotulo="Pix para recargas da carteira" descricao="O valor das recargas é transferido para a conta bancária cadastrada acima." desabilitado={!admin} />
         <Interruptor valor={f.pixPagamentos} onChange={(v) => set("pixPagamentos", v)} rotulo="Pix para pagamentos de corridas" descricao="O valor integral da corrida vai para a conta da central; o motorista recebe na carteira, já descontada a taxa da central." desabilitado={!admin} />
       </section>
@@ -69,7 +73,7 @@ export function TransacoesFinanceiras() {
         <p className="sub">Situação: <span className={`selo ${f.cadastro.situacao === "em_analise" ? "ok" : "alerta"}`}>{SITUACAO[f.cadastro.situacao]}</span>{f.cadastro.atualizadoEm && ` · atualizado em ${new Date(f.cadastro.atualizadoEm).toLocaleString("pt-BR")}`}</p>
       </section>
 
-      {admin ? <div className="dm-salvar"><button className="botao" disabled={salvando} onClick={atualizar}>Atualizar cadastro</button><button className="botao primario" disabled={salvando} onClick={gravar}>SALVAR</button></div> : <p className="sub">Só o administrador altera as integrações.</p>}
+      {admin ? <div className="dm-salvar"><button className="botao" onClick={() => aplicar(structuredClone(d.dados))}>Voltar</button><button className="botao" disabled={salvando} onClick={atualizar}>Atualizar cadastro</button><button className="botao primario" disabled={salvando} onClick={gravar}>SALVAR</button></div> : <p className="sub">Só o administrador altera as integrações.</p>}
     </>
   );
 }

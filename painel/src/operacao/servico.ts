@@ -6,9 +6,10 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { GRUPO_TEXTO, type CorridaPainel, type Filtro } from "../comum/corrida.ts";
 import { sanearMarca } from "../comum/marca.ts";
 import { listar, atualizar, remover } from "../cadastros/armazem.ts";
+import { corridaDaFilial, pessoasDaFilial } from "../filiais/filiais.ts";
 import { alertas, estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
 import { mensagens } from "../apps/chat.ts";
-import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
+import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
 import { linhaReta } from "../enderecos/index.ts";
 import * as D from "../servidor/dados.ts";
 import { buscarCorridas } from "../servidor/fontes/index.ts";
@@ -40,7 +41,7 @@ export function acharPropria(empresaId: string, id: string): CorridaPropria {
 // ====================================================================== histórico (consultar corridas)
 
 export { RAPIDOS, STATUS_FILTRO, type StatusFiltro } from "./consulta.ts";
-import { RAPIDOS, STATUS_FILTRO, type FiltroConsulta, type StatusFiltro } from "./consulta.ts";
+import { RAPIDOS, STATUS_FILTRO, empresasPorTelefone, type FiltroConsulta, type StatusFiltro } from "./consulta.ts";
 
 export interface FiltroHistorico extends FiltroConsulta { cidade?: string; fonte?: string }
 
@@ -176,7 +177,7 @@ export function detalhe(empresaId: string, id: string) {
 // ====================================================================== auditoria (raio-x)
 
 const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
-const FIM_TEXTO: Record<Onda["fim"], string> = { oferecida: "Sem resposta", aceitou: "Aceitou", recusou: "Recusou", expirou: "Deixou passar", saiu: "Ficou offline" };
+const FIM_TEXTO: Record<Onda["fim"], string> = { oferecida: "Sem resposta", aceitou: "Aceitou", recusou: "Recusou", expirou: "Deixou passar", saiu: "Ficou offline", perdeu: "Outro motorista aceitou" };
 
 export function raioX(empresaId: string, id: string) {
   const c = acharPropria(empresaId, id);
@@ -232,6 +233,8 @@ export function recibo(empresaId: string, id: string): string {
   const mot = c.motoristaId ? motoristasCad(empresaId).find((x) => x.id === c.motoristaId) : undefined;
   const linha = (r: string, v: string) => `<tr><td>${esc(r)}</td><td>${esc(v)}</td></tr>`;
   const valor = c.valor ?? c.estimativa.valor;
+  const taxa = taxaServicoDaCorrida(empresaId, c); // taxa de serviço do passageiro (Config › Taxas da central), cobrada à parte
+  const total = valor != null ? arred(valor + taxa) : null;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Recibo OS ${esc(c.os)}</title>
 <style>body{font-family:system-ui,sans-serif;color:#1c2434;max-width:640px;margin:24px auto;padding:0 16px}h1{margin:0;color:${esc(m.cores.primaria)}}
 table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:8px 4px;border-bottom:1px solid #e3e8f0}td:last-child{text-align:right;font-weight:600}
@@ -241,8 +244,9 @@ table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:8px 4px;bor
 ${linha("Embarque", c.embarque.texto)}${(c.paradas ?? []).map((p, i) => linha(`Parada ${i + 1}`, p.texto)).join("")}${linha("Destino", c.destino?.texto ?? "Sem destino")}
 ${linha("Distância", c.estimativa.distanciaKm != null ? `${String(c.estimativa.distanciaKm).replace(".", ",")} km` : "—")}${linha("Categoria", c.categoria)}
 ${linha("Motorista", c.motorista || "—")}${linha("Veículo", [mot?.veiculo, mot?.placa].filter(Boolean).join(" · ") || "—")}${linha("Pagamento", c.pagamento)}
-${c.desconto ? linha("Desconto", reais(c.desconto)) : ""}</table>
-<p class="total">Total: ${esc(reais(valor))}</p><p class="sub">Emitido em ${esc(dataHoraBr(agoraBr().toISOString()))}</p>
+${c.descontoEmpresa ? linha(`Desconto da empresa (${String(c.descontoEmpresa.pct).replace(".", ",")}%)`, reais(c.descontoEmpresa.valor)) : ""}${c.desconto && c.desconto !== (c.descontoEmpresa?.valor ?? 0) ? linha(c.descontoEmpresa ? "Desconto total" : "Desconto", reais(c.desconto)) : ""}
+${taxa > 0 ? linha("Valor da corrida", reais(valor)) + linha("Taxa de serviço", reais(taxa)) : ""}</table>
+<p class="total">Total: ${esc(reais(total))}</p><p class="sub">Emitido em ${esc(dataHoraBr(agoraBr().toISOString()))}</p>
 <button onclick="print()">Imprimir</button></body></html>`;
 }
 
@@ -252,19 +256,26 @@ export function chat(empresaId: string, id: string) {
   const c = acharPropria(empresaId, id);
   const l = mensagens(empresaId, c.id);
   marcarChatLido(empresaId, c.id);
-  return l.map((m) => ({ id: m.id, de: m.de, nome: m.nome, texto: m.texto ?? "", audio: m.audio ? { id: m.audio.id, segundos: m.audio.segundos } : null, em: m.em }));
+  return l.map((m) => ({ id: m.id, de: m.de, nome: m.nome, texto: m.texto ?? "", audio: m.audio ? { id: m.audio.id, segundos: m.audio.segundos } : null, midia: m.midia ? { id: m.midia.id, tipo: m.midia.tipo, legenda: m.midia.legenda ?? "" } : null, em: m.em }));
 }
 
 // ====================================================================== monitoramento (acompanhamento)
 
-export function monitoramento(empresaId: string, f: { passageiro?: string; telefone?: string }) {
+export function monitoramento(empresaId: string, f: { passageiro?: string; telefone?: string; motorista?: string; endereco?: string; empresa?: string; filial?: string }) {
+  const empresas = empresasPorTelefone(empresaId);
+  const empDe = (c: CorridaPropria) => c.empresaConveniada || empresas.get(soDigitos(c.passageiro.telefone)) || "";
   const agora = agoraBr().getTime();
   const lista = listarProprias(empresaId);
   const cid = (c: CorridaPropria) => c.motoristaId ? String(motoristasCad(empresaId).find((m) => m.id === c.motoristaId)?.cidade ?? "") : "";
+  const daFilial = f.filial ? new Set(pessoasDaFilial(empresaId, f.filial, "motorista")) : null;
   let corridas = lista.filter((c) => ABERTA.has(c.status) || agora - Date.parse(c.solicitadaEm) <= 10 * 60_000);
+  if (f.filial) corridas = corridas.filter((c) => corridaDaFilial(c, f.filial!, daFilial!));
   if (f.passageiro) corridas = corridas.filter((c) => normal(c.passageiro.nome).includes(normal(f.passageiro)));
   if (f.telefone) { const t = soDigitos(f.telefone); corridas = corridas.filter((c) => c.passageiro.telefone.includes(t)); }
-  const chats = lista.filter((c) => ABERTA.has(c.status) || agora - Date.parse(c.solicitadaEm) <= 6 * 3600_000).flatMap((c) => {
+  if (f.motorista) corridas = corridas.filter((c) => normal(c.motorista).includes(normal(f.motorista)));
+  if (f.endereco) corridas = corridas.filter((c) => normal(c.embarque.texto).includes(normal(f.endereco)));
+  if (f.empresa) corridas = corridas.filter((c) => normal(empDe(c)) === normal(f.empresa));
+  const chats = lista.filter((c) => (!f.filial || corridaDaFilial(c, f.filial, daFilial!)) && (ABERTA.has(c.status) || agora - Date.parse(c.solicitadaEm) <= 6 * 3600_000)).flatMap((c) => {
     const n = naoLidas(empresaId, c.id);
     if (!n.length) return [];
     const u = n.at(-1)!;
@@ -273,21 +284,23 @@ export function monitoramento(empresaId: string, f: { passageiro?: string; telef
   return {
     corridas: corridas.sort((a, b) => b.solicitadaEm.localeCompare(a.solicitadaEm)).slice(0, 200).map((c) => ({
       id: c.id, os: c.os, solicitadaEm: c.solicitadaEm, passageiro: c.passageiro.nome, telefone: c.passageiro.telefone, embarque: c.embarque.texto,
-      motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, status: c.status, statusTexto: STATUS_TEXTO[c.status], cidade: cid(c), categoria: c.categoria,
+      motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, status: c.status, statusTexto: STATUS_TEXTO[c.status], cidade: cid(c), categoria: c.categoria, empresa: empDe(c),
     })),
+    empresas: [...new Set([...empresas.values()])].sort(),
     chats,
   };
 }
 
 // ====================================================================== mapa em tempo real
 
-export function mapa(empresaId: string) {
+export function mapa(empresaId: string, filial?: string) {
+  const daFilial = filial ? new Set(pessoasDaFilial(empresaId, filial, "motorista")) : null;
   const lista = listarProprias(empresaId);
   const online = new Map(motoristasOnline(empresaId).map((m) => [m.id, m]));
   const corridaDe = new Map(lista.filter((c) => c.motoristaId && COM_MOTORISTA.has(c.status)).map((c) => [c.motoristaId!, c]));
   const cad = motoristasCad(empresaId);
-  const ativos = cad.filter((m) => m.status === "Ativo");
-  const motoristas = [...ativos, ...cad.filter((m) => m.status !== "Ativo" && online.has(m.id))].map((m) => {
+  const ativos = cad.filter((m) => m.status === "Ativo" && (!daFilial || daFilial.has(m.id)));
+  const motoristas = [...ativos, ...cad.filter((m) => m.status !== "Ativo" && online.has(m.id) && (!daFilial || daFilial.has(m.id)))].map((m) => {
     const o = online.get(m.id);
     const c = corridaDe.get(m.id);
     const situacao = !o ? "offline" : c ? c.status : o.situacao === "recebendo chamada" ? "chamada" : "livre";
@@ -326,22 +339,49 @@ export async function ocorrencias(empresaId: string, horas: number, pagina: numb
 
 // ====================================================================== programadas
 
-export type FiltroProgramadas = "hoje" | "amanha" | "futuras" | "todas";
-export function programadas(empresaId: string, filtro: FiltroProgramadas, busca: string, pagina: number) {
-  const agora = agoraBr().toISOString();
+/** Filtros da tela "Consultar programadas" (Machine). */
+export interface FiltroProgramadas {
+  centralChamada?: string; empresa?: string; os?: string; categoria?: string; passageiro?: string; motorista?: string;
+  dataIni?: string; dataFim?: string; pagamento?: string; situacao?: string;
+  /** Só as programadas desta filial (a gravada na corrida manda; sem ela vale a do motorista). */
+  filial?: string;
+}
+/** Situação do disparo: o que aconteceu com a busca de motorista da corrida agendada. */
+export const SITUACOES_DISPARO: Record<string, string> = {
+  distribuida: "Distribuída", aguardando: "Aguardando distribuição", cancelada: "Cancelada", erro: "Erro na distribuição",
+};
+export function situacaoDisparo(c: CorridaPropria): keyof typeof SITUACOES_DISPARO {
+  if (c.status === "cancelada") return "cancelada";
+  if (c.status === "nao_atendida") return "erro";
+  // A busca de motorista começa 15 minutos antes do horário (ANTECEDENCIA_MIN).
+  if (c.status === "procurando" && Date.parse(c.agendadaPara!) - agoraBr().getTime() > ANTECEDENCIA_MIN * 60_000) return "aguardando";
+  return "distribuida";
+}
+export const ANTECEDENCIA_MIN = 15;
+export function programadasFiltradas(empresaId: string, f: FiltroProgramadas, pagina: number, todas = false, empresas = new Map<string, string>()) {
   let l = listarProprias(empresaId).filter((c) => c.agendadaPara);
-  if (filtro === "hoje") l = l.filter((c) => c.agendadaPara!.slice(0, 10) === hojeBr());
-  else if (filtro === "amanha") l = l.filter((c) => c.agendadaPara!.slice(0, 10) === diaBr(1));
-  else if (filtro === "futuras") l = l.filter((c) => c.agendadaPara! >= agora && ABERTA.has(c.status));
-  if (busca) l = l.filter((c) => normal(c.passageiro.nome).includes(normal(busca)) || c.passageiro.telefone.includes(soDigitos(busca) || "§") || c.os === busca.trim());
-  l = [...l].sort((a, b) => (filtro === "todas" ? b.agendadaPara!.localeCompare(a.agendadaPara!) : a.agendadaPara!.localeCompare(b.agendadaPara!)));
-  const p = paginar(l, pagina, 20);
+  if (f.filial) { const daFilial = new Set(pessoasDaFilial(empresaId, f.filial, "motorista")); l = l.filter((c) => corridaDaFilial(c, f.filial!, daFilial)); }
+  const tem = (v: unknown, b?: string) => !b || normal(v).includes(normal(b));
+  if (f.os) l = l.filter((c) => c.os.includes(soDigitos(f.os)));
+  if (f.categoria) l = l.filter((c) => normal(c.categoria) === normal(f.categoria));
+  if (f.pagamento) l = l.filter((c) => normal(c.pagamento) === normal(f.pagamento));
+  if (f.passageiro) l = l.filter((c) => tem(c.passageiro.nome, f.passageiro) || (soDigitos(f.passageiro) && c.passageiro.telefone.includes(soDigitos(f.passageiro))));
+  if (f.motorista) l = l.filter((c) => tem(c.motorista, f.motorista));
+  if (f.centralChamada) l = l.filter((c) => !c.centralChamada || normal(c.centralChamada) === normal(f.centralChamada) || normal(f.centralChamada) === normal(D.empresa(empresaId)?.nome));
+  if (f.empresa) l = l.filter((c) => normal(c.empresaConveniada || empresas.get(soDigitos(c.passageiro.telefone))) === normal(f.empresa));
+  if (f.dataIni) l = l.filter((c) => c.agendadaPara!.slice(0, 10) >= f.dataIni!);
+  if (f.dataFim) l = l.filter((c) => c.agendadaPara!.slice(0, 10) <= f.dataFim!);
+  if (f.situacao) l = l.filter((c) => situacaoDisparo(c) === f.situacao);
+  l = [...l].sort((a, b) => b.agendadaPara!.localeCompare(a.agendadaPara!));
+  const p = paginar(l, pagina, todas ? 100_000 : 10);
   return {
     ...p,
     itens: p.itens.map((c) => ({
       id: c.id, os: c.os, agendadaPara: c.agendadaPara, solicitadaEm: c.solicitadaEm, passageiro: c.passageiro.nome, telefone: c.passageiro.telefone,
       origem: c.embarque.texto, destino: c.destino?.texto ?? "", motorista: c.motorista, status: c.status, statusTexto: STATUS_TEXTO[c.status],
       valor: c.valor ?? c.estimativa.valor, pagamento: c.pagamento, observacao: c.observacao, aberta: ABERTA.has(c.status),
+      categoria: c.categoria, empresa: c.empresaConveniada || empresas.get(soDigitos(c.passageiro.telefone)) || "", antecedencia: ANTECEDENCIA_MIN,
+      situacao: situacaoDisparo(c), situacaoTexto: situacaoDisparo(c) === "aguardando" ? "Aguardando" : SITUACOES_DISPARO[situacaoDisparo(c)],
     })),
   };
 }
@@ -352,8 +392,15 @@ export function programadas(empresaId: string, filtro: FiltroProgramadas, busca:
 
 const OBJ = () => cadastroPorId("objetos")!;
 const resolvido = (r: Record<string, unknown>) => r.situacao === "Devolvido";
-export function objetos(empresaId: string, status: "todos" | "pendente" | "resolvido", busca: string, pagina: number) {
+export interface FiltroObjetos { dataIni?: string; dataFim?: string; os?: string; motorista?: string; passageiro?: string }
+export function objetos(empresaId: string, status: "todos" | "pendente" | "resolvido", busca: string, pagina: number, f: FiltroObjetos = {}) {
   let l = [...listar(empresaId, OBJ())];
+  const dataDe = (r: Record<string, unknown>) => String(r.data ?? String(r.criadoEm).slice(0, 10)).slice(0, 10);
+  if (f.dataIni) l = l.filter((r) => dataDe(r) >= f.dataIni!);
+  if (f.dataFim) l = l.filter((r) => dataDe(r) <= f.dataFim!);
+  if (f.os) l = l.filter((r) => String(r.os ?? "").includes(f.os!.trim()));
+  if (f.motorista) l = l.filter((r) => normal(r.motorista).includes(normal(f.motorista)));
+  if (f.passageiro) l = l.filter((r) => normal(r.passageiro).includes(normal(f.passageiro)));
   if (status !== "todos") l = l.filter((r) => (status === "resolvido") === resolvido(r));
   if (busca) l = l.filter((r) => [r.descricao, r.os, r.passageiro, r.motorista, r.observacao].some((v) => normal(v).includes(normal(busca))));
   l.sort((a, b) => String(b.data ?? b.criadoEm).localeCompare(String(a.data ?? a.criadoEm)) || b.criadoEm.localeCompare(a.criadoEm));

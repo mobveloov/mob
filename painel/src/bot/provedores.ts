@@ -1,20 +1,34 @@
 // Provedores de WhatsApp. O bot só conhece a interface ProvedorWhatsApp.
 // - Evolution API: instância da PRÓPRIA empresa (URL e token dela, nos segredos da empresa). Nunca compartilhada.
+// - Z-API e Z-Pro: instância + token (e token de cliente, se houver). Mesmo formato de envio.
+// - Meta (WhatsApp Cloud API): token, phone id e WABA id; sem QR, o webhook é cadastrado no painel da Meta.
 // - Simulado: guarda as mensagens enviadas na memória. Para testes e para a tela "Testar conversa".
 
-import type { Recebida, SituacaoConexao } from "./tipos.ts";
+import crypto from "node:crypto";
+import type { AudioRecebido, MidiaRecebida, Recebida, SituacaoConexao, TipoProvedor } from "./tipos.ts";
 
 export interface Conexao { situacao: SituacaoConexao; qr?: string; codigo?: string; detalhe?: string }
 
+/** Arquivo para enviar ao passageiro (voz do bot, mídia do motorista). */
+export interface MidiaSaida { tipo: "audio" | "image" | "video" | "document"; bytes: Buffer; mimetype: string; legenda?: string; nome?: string }
+
 export interface ProvedorWhatsApp {
-  readonly tipo: "evolution" | "simulado";
+  readonly tipo: TipoProvedor;
   enviarTexto(telefone: string, texto: string): Promise<void>;
+  /** Imagem de saudação (endereço https público) com legenda opcional. */
+  enviarImagem(telefone: string, url: string, legenda: string): Promise<void>;
   /** Cria/liga a instância e aponta o webhook para o painel. Devolve o QR quando falta ler. */
   conectar(webhookUrl: string): Promise<Conexao>;
   situacao(): Promise<Conexao>;
   desconectar(): Promise<void>;
+  /** O número tem WhatsApp? null = não deu para conferir (sem rede, WhatsApp fora): quem chama segue normal. */
+  existeNoWhatsApp(telefone: string): Promise<boolean | null>;
   /** Traduz o corpo do webhook do provedor em mensagens recebidas (ignora as enviadas pelo próprio número). */
   lerWebhook(corpo: unknown): Recebida[];
+  /** Envia um arquivo (áudio, imagem, vídeo, documento). Sem este método o provedor só manda texto. */
+  enviarMidia?(telefone: string, m: MidiaSaida): Promise<void>;
+  /** Baixa o arquivo de um áudio recebido (para transcrever). null quando não dá. */
+  baixarAudio?(a: AudioRecebido): Promise<{ bytes: Buffer; mimetype: string } | null>;
 }
 
 export const soDigitos = (t: unknown) => String(t ?? "").replace(/\D/g, "");
@@ -33,6 +47,13 @@ const QR_SIMULADO = `data:image/svg+xml;base64,${Buffer.from(
   }</svg>`,
 ).toString("base64")}`;
 
+/** Modo simulado/testes: { tipo: "imagem" | "video", base64, mimetype, legenda }. */
+function midiaSimulada(m: unknown): MidiaRecebida | undefined {
+  const x = (m ?? {}) as { tipo?: unknown; base64?: unknown; mimetype?: unknown; legenda?: unknown };
+  if ((x.tipo !== "imagem" && x.tipo !== "video") || typeof x.base64 !== "string") return undefined;
+  return { tipo: x.tipo, base64: x.base64, mimetype: String(x.mimetype ?? (x.tipo === "imagem" ? "image/jpeg" : "video/mp4")), ...(x.legenda ? { legenda: String(x.legenda).slice(0, 200) } : {}) };
+}
+
 export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
   return {
     tipo: "simulado",
@@ -41,9 +62,26 @@ export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
       l.push({ telefone: soDigitos(telefone), texto, em: new Date().toISOString() });
       caixas.set(empresaId, l.slice(-500));
     },
+    async enviarImagem(telefone, url, legenda) {
+      const l = caixas.get(empresaId) ?? [];
+      l.push({ telefone: soDigitos(telefone), texto: `🖼️ ${url}${legenda ? `
+${legenda}` : ""}`, em: new Date().toISOString() });
+      caixas.set(empresaId, l.slice(-500));
+    },
+    async enviarMidia(telefone, m) {
+      const l = caixas.get(empresaId) ?? [];
+      const icone = { audio: "🎤", image: "🖼️", video: "🎬", document: "📎" }[m.tipo];
+      l.push({ telefone: soDigitos(telefone), texto: `${icone} ${m.tipo} (${m.mimetype}, ${m.bytes.length} bytes)${m.legenda ? `
+${m.legenda}` : ""}`, em: new Date().toISOString() });
+      caixas.set(empresaId, l.slice(-500));
+    },
     async conectar() { return { situacao: "conectado", qr: QR_SIMULADO, detalhe: "Modo simulado: nenhuma mensagem sai de verdade." }; },
     async situacao() { return { situacao: "conectado", detalhe: "Modo simulado." }; },
     async desconectar() { /* nada */ },
+    /** Simulado: o "arquivo" já vem no corpo (base64). */
+    async baixarAudio(a) { return a.base64 ? { bytes: Buffer.from(a.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: a.mimetype } : null; },
+    /** Simulado: telefone terminado em 0000 não tem WhatsApp (mesma regra do envio do CRM). */
+    async existeNoWhatsApp(telefone) { return !soDigitos(telefone).endsWith("0000"); },
     lerWebhook(corpo) {
       const c = (corpo ?? {}) as Record<string, unknown>;
       const telefone = soDigitos(c.telefone);
@@ -53,8 +91,11 @@ export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
         id: String(c.id ?? `sim-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
         telefone, nome: c.nome ? String(c.nome).slice(0, 60) : undefined,
         texto: c.texto != null ? String(c.texto).slice(0, 1000) : undefined,
+        daCentral: c.daCentral === true,
+        audio: typeof c.transcricao === "string" && c.transcricao.trim() ? { mimetype: "audio/ogg", transcricao: c.transcricao.trim().slice(0, 1000) } : undefined,
         local: local && Number.isFinite(Number(local.lat)) && Number.isFinite(Number(local.lng))
           ? { lat: Number(local.lat), lng: Number(local.lng), texto: String(local.texto ?? "") } : undefined,
+        midia: midiaSimulada(c.midia),
       }];
     },
   };
@@ -117,6 +158,16 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
     async enviarTexto(telefone, texto) {
       await chamar("POST", `/message/sendText/${inst}`, { number: soDigitos(telefone), text: texto });
     },
+    async enviarMidia(telefone, m) {
+      const base64 = m.bytes.toString("base64");
+      if (m.tipo === "audio") { await chamar("POST", `/message/sendWhatsAppAudio/${inst}`, { number: soDigitos(telefone), audio: base64 }); return; }
+      await chamar("POST", `/message/sendMedia/${inst}`, {
+        number: soDigitos(telefone), mediatype: m.tipo, mimetype: m.mimetype, media: base64, caption: m.legenda ?? "", fileName: m.nome ?? `arquivo.${m.mimetype.split("/")[1] ?? "bin"}`,
+      });
+    },
+    async enviarImagem(telefone, url, legenda) {
+      await chamar("POST", `/message/sendMedia/${inst}`, { number: soDigitos(telefone), mediatype: "image", media: url, caption: legenda });
+    },
     async conectar(webhookUrl) {
       const webhook = { enabled: true, url: webhookUrl, byEvents: false, base64: false, events: EVENTOS };
       const s = await situacao();
@@ -134,6 +185,13 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
     },
     situacao,
     async desconectar() { await chamar("DELETE", `/instance/logout/${inst}`); },
+    async existeNoWhatsApp(telefone) {
+      try {
+        const n = soDigitos(telefone);
+        const r = await chamar<Array<{ exists?: boolean }>>("POST", `/chat/whatsappNumbers/${inst}`, { numbers: [n.length <= 11 ? `55${n}` : n] });
+        return Array.isArray(r) && typeof r[0]?.exists === "boolean" ? r[0].exists : null;
+      } catch { return null; }
+    },
     lerWebhook(corpo) {
       const c = (corpo ?? {}) as { event?: string; data?: unknown };
       const evento = String(c.event ?? "").toLowerCase().replace(/_/g, ".");
@@ -144,20 +202,37 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
         const m = (item ?? {}) as {
           key?: { remoteJid?: string; fromMe?: boolean; id?: string }; pushName?: string;
           message?: { conversation?: string; extendedTextMessage?: { text?: string };
-            locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string; address?: string } };
+            locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string; address?: string };
+            audioMessage?: { mimetype?: string; url?: string };
+            imageMessage?: { mimetype?: string; caption?: string }; videoMessage?: { mimetype?: string; caption?: string }; base64?: string };
         };
         const jid = m.key?.remoteJid ?? "";
-        if (!jid || m.key?.fromMe || !jid.endsWith("@s.whatsapp.net")) continue; // ignora grupos, status e as próprias
+        if (!jid || !jid.endsWith("@s.whatsapp.net")) continue; // ignora grupos (@g.us), status e transmissões
+        const daCentral = m.key?.fromMe === true;
         const loc = m.message?.locationMessage;
         const texto = m.message?.conversation ?? m.message?.extendedTextMessage?.text;
+        // As próprias mensagens do número só interessam se forem comandos da central (#bloquear, #pausar...).
+        if (daCentral && !String(texto ?? "").trim().startsWith("#")) continue;
+        const au = m.message?.audioMessage;
+        const idMsg = String(m.key?.id ?? `${jid}-${Date.now()}`);
+        const im = m.message?.imageMessage, vi = m.message?.videoMessage;
+        const midia: MidiaRecebida | undefined = im ? { tipo: "imagem", id: idMsg, base64: m.message?.base64, mimetype: im.mimetype ?? "image/jpeg", ...(im.caption ? { legenda: im.caption.slice(0, 200) } : {}) }
+          : vi ? { tipo: "video", id: idMsg, base64: m.message?.base64, mimetype: vi.mimetype ?? "video/mp4", ...(vi.caption ? { legenda: vi.caption.slice(0, 200) } : {}) } : undefined;
         out.push({
-          id: String(m.key?.id ?? `${jid}-${Date.now()}`), telefone: soDigitos(jid.split("@")[0]), nome: m.pushName?.slice(0, 60),
-          texto: texto ? texto.slice(0, 1000) : undefined,
+          id: idMsg, telefone: soDigitos(jid.split("@")[0]), nome: daCentral ? undefined : m.pushName?.slice(0, 60),
+          audio: au ? { id: idMsg, base64: m.message?.base64, mimetype: au.mimetype ?? "audio/ogg" } : undefined,
+          texto: texto ? texto.slice(0, 1000) : undefined, daCentral: daCentral || undefined, midia,
           local: loc && Number.isFinite(loc.degreesLatitude) && Number.isFinite(loc.degreesLongitude)
             ? { lat: loc.degreesLatitude!, lng: loc.degreesLongitude!, texto: [loc.name, loc.address].filter(Boolean).join(" - ") } : undefined,
         });
       }
-      return out.filter((r) => r.texto || r.local);
+      return out.filter((r) => r.texto || r.local || r.audio || r.midia);
+    },
+    async baixarAudio(a) {
+      if (a.base64) return { bytes: Buffer.from(a.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: a.mimetype };
+      if (!a.id) return null;
+      const j = await chamar<{ base64?: string; mimetype?: string }>("POST", `/chat/getBase64FromMediaMessage/${inst}`, { message: { key: { id: a.id } }, convertToMp4: false });
+      return j.base64 ? { bytes: Buffer.from(j.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: j.mimetype ?? a.mimetype } : null;
     },
   };
 }

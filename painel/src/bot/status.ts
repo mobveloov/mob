@@ -4,7 +4,10 @@
 import * as A from "./armazem.ts";
 import { corridasDoBot } from "./corridas.ts";
 import { enviar, fecharCorrida, provedorDe, type Dependencias } from "./fluxo.ts";
+import { repassarAoPassageiro } from "./repasse.ts";
 import { marcador, textoStatus } from "./textos.ts";
+import { avisosDevidos, textoAviso } from "./agendamento-avisos.ts";
+import { brPhoneVariants } from "./controle.ts";
 
 /** Olha a corrida aberta de uma conversa e avisa o passageiro se mudou. Devolve o texto enviado (ou null). */
 export function atualizarStatus(empresaId: string, conversaId: string, deps: Dependencias = {}): Promise<string | null> {
@@ -12,12 +15,14 @@ export function atualizarStatus(empresaId: string, conversaId: string, deps: Dep
     const c = A.conversa(empresaId, conversaId);
     const corrida = c?.corrida;
     if (!c || !corrida || corrida.grupo !== "aberta") return null;
+    // Mensagens que o motorista mandou pelo chat da corrida seguem para o WhatsApp do passageiro.
+    if (await repassarAoPassageiro(empresaId, c, deps.provedor ?? provedorDe(empresaId, c.conexao))) A.salvarConversa(empresaId, c);
     const d = await corridasDoBot().detalhar(empresaId, corrida.id);
     if (!d) return null; // corrida apagada no painel: deixa como está
     const anterior = corrida.status;
     const mudouMotorista = Boolean(d.motorista && d.motorista !== corrida.motorista && d.status === "a_caminho");
     if (d.status === anterior && !mudouMotorista) return null;
-    const texto = textoStatus(marcador(empresaId), d.status, { ...d, anterior });
+    const texto = textoStatus(marcador(empresaId), d.status, { ...d, anterior, passageiro: c.nome, motoristaTrocado: mudouMotorista && anterior === "a_caminho" }, A.config(empresaId).textosStatus);
     corrida.status = d.status;
     corrida.grupo = d.grupo;
     if (d.motorista) corrida.motorista = d.motorista;
@@ -28,9 +33,39 @@ export function atualizarStatus(empresaId: string, conversaId: string, deps: Dep
     }
     if (texto) c.mensagens.push({ de: "bot", texto, em: new Date().toISOString() });
     A.salvarConversa(empresaId, c);
-    if (texto) await enviar(empresaId, deps.provedor ?? provedorDe(empresaId), c.id, [texto]);
+    if (texto) await enviar(empresaId, deps.provedor ?? provedorDe(empresaId, c.conexao), c.id, [texto]);
     return texto;
   });
+}
+
+/** Avisos de corrida agendada: 15 e 5 minutos antes do horário, uma vez cada. Devolve quantos saíram. */
+export function enviarLembretes(empresaId: string, deps: Dependencias = {}, agora = Date.now()): Promise<number> {
+  return (async () => {
+    const lista = corridasDoBot().agendadas ? await corridasDoBot().agendadas!(empresaId) : [];
+    let enviados = 0;
+    for (const a of lista) {
+      const alvo = brPhoneVariants(a.telefone).map((t) => A.conversa(empresaId, t)).find(Boolean);
+      if (!alvo) continue; // pediu pelo painel ou totem: o bot não tem esse número em conversa
+      await A.naFila(empresaId, alvo.id, async () => {
+        const c = A.conversa(empresaId, alvo.id);
+        if (!c) return;
+        const feitos = (c.lembretes ??= {})[a.id] ??= {};
+        let mudou = false;
+        for (const d of avisosDevidos({ scheduledMs: a.quandoMs, createdMs: a.criadaMs, nowMs: agora, enviados: feitos })) {
+          feitos[d.minutos] = true; mudou = true;
+          if (!d.enviar) continue;
+          const hhmm = (ms: number) => new Date(ms - 3 * 3_600_000).toISOString().slice(11, 16); // Brasília
+          const texto = textoAviso(d.minutos, hhmm(a.quandoMs), hhmm(a.quandoMs - 10 * 60_000));
+          c.mensagens.push({ de: "bot", texto, em: new Date().toISOString() });
+          A.salvarConversa(empresaId, c);
+          await enviar(empresaId, deps.provedor ?? provedorDe(empresaId, c.conexao), c.id, [texto]);
+          enviados++;
+        }
+        if (mudou) A.salvarConversa(empresaId, c);
+      });
+    }
+    return enviados;
+  })();
 }
 
 /** Uma rodada: todas as corridas abertas das empresas com o bot ligado. */
@@ -40,6 +75,7 @@ export async function verificarTodas() {
     for (const c of abertas) {
       await atualizarStatus(empresaId, c.id).catch((e) => console.error("[bot] status", empresaId, e instanceof Error ? e.message : e));
     }
+    await enviarLembretes(empresaId).catch((e) => console.error("[bot] lembretes", empresaId, e instanceof Error ? e.message : e));
   }
 }
 

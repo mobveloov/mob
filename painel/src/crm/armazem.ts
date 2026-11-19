@@ -24,10 +24,10 @@ function pasta(empresaId: string) {
   if (!D.idValido(empresaId)) throw new Error("Empresa inválida.");
   return path.join(D.raiz(), "empresas", empresaId, "crm");
 }
-function ler<T>(empresaId: string, nome: string, padrao: T): T {
+export function ler<T>(empresaId: string, nome: string, padrao: T): T {
   try { return JSON.parse(fs.readFileSync(path.join(pasta(empresaId), nome), "utf8")) as T; } catch { return padrao; }
 }
-function gravar(empresaId: string, nome: string, valor: unknown) {
+export function gravar(empresaId: string, nome: string, valor: unknown) {
   const arq = path.join(pasta(empresaId), nome);
   fs.mkdirSync(path.dirname(arq), { recursive: true });
   const tmp = `${arq}.${process.pid}.tmp`;
@@ -135,6 +135,10 @@ export function marcarOptOut(e: string, chave: string, sair: boolean) {
   if (sair) m[chave] = new Date().toISOString(); else delete m[chave];
   gravar(e, "contatos.json", m);
 }
+
+/** "Emojis nas mensagens" (chave do painel do CRM). Desligado por padrão. */
+export const emojisLigados = (e: string) => ler<{ ligado?: boolean }>(e, "emojis.json", {}).ligado === true;
+export const ligarEmojis = (e: string, ligado: boolean) => gravar(e, "emojis.json", { ligado });
 
 export function config(e: string): ConfigEnvio {
   return sanearConfig(ler<Partial<ConfigEnvio>>(e, "config.json", {}));

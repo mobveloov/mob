@@ -9,6 +9,9 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import type { CorridaPainel } from "../comum/corrida.ts";
 import { buscarCorridas } from "../servidor/fontes/index.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
+import { bd } from "../crm2/base.ts";
+import { waOptOutKey } from "./optout.ts";
+import { chavesDescadastradas } from "./templates.ts";
 import * as A from "./armazem.ts";
 import type { Contato, Lista, Regras, TipoPublico } from "./tipos.ts";
 
@@ -99,6 +102,7 @@ export function aplicarRegras(contatos: Contato[], r: Regras, listasSalvas: List
   if (r.corridasMax != null) out = out.filter((c) => c.corridas <= r.corridasMax!);
   const b = normal(r.busca);
   if (b) { const dig = b.replace(/\D/g, ""); out = out.filter((c) => normal(c.nome).includes(b) || (dig.length >= 3 && c.telefone.replace(/\D/g, "").includes(dig))); }
+  if (r.rfmSegmento) out = out.filter((c) => c.rfmSegmento === r.rfmSegmento);
   if (r.listaId) {
     const l = listasSalvas.find((x) => x.id === r.listaId);
     if (!l) return [];
@@ -133,6 +137,7 @@ export function sanearRegras(o: unknown): Regras {
   if (cat?.length) out.categorias = cat;
   if (can?.length) out.canais = can;
   for (const k of ["inativoMinDias", "inativoMaxDias", "corridasMin", "corridasMax"] as const) { const n = num(r[k]); if (n !== undefined) out[k] = n; }
+  if (typeof r.rfmSegmento === "string" && /^[a-z_]{1,40}$/.test(r.rfmSegmento)) out.rfmSegmento = r.rfmSegmento;
   if (typeof r.listaId === "string" && /^[\w-]{1,40}$/.test(r.listaId)) out.listaId = r.listaId;
   if (typeof r.busca === "string" && r.busca.trim()) out.busca = r.busca.trim().slice(0, 80);
   return out;
@@ -164,7 +169,15 @@ export async function publico(empresaId: string, tipo: TipoPublico): Promise<{ c
   const r = await corridasDoPublico(empresaId);
   const cad = cadastroPorId(tipo === "passageiro" ? "clientes" : "motoristas");
   const registros = cad ? Cad.listar(empresaId, cad) : [];
-  return { contatos: montarContatos(r.corridas, tipo, agoraBr(), A.optOuts(empresaId), registros), avisos: r.avisos };
+  const contatos = montarContatos(r.corridas, tipo, agoraBr(), A.optOuts(empresaId), registros);
+  if (tipo === "passageiro") {
+    // Segmento RFM de cada pessoa (da última análise): é o que faz o segmento dinâmico "reavaliar" a lista a cada uso.
+    const notas = new Map((bd().prepare("SELECT chave, rfm_segmento AS seg FROM crm_contatos WHERE empresa = ? AND rfm_segmento IS NOT NULL").all(empresaId) as Array<{ chave: string; seg: string }>).map((x) => [x.chave, x.seg]));
+    if (notas.size) for (const c of contatos) { const s = notas.get(c.chave); if (s) c.rfmSegmento = s; }
+  }
+  const descad = chavesDescadastradas(empresaId);
+  if (descad.size) for (const c of contatos) if (!c.optOut && descad.has(waOptOutKey(c.telefone))) c.optOut = true;
+  return { contatos, avisos: r.avisos };
 }
 
 /** Público já filtrado pelas regras. */

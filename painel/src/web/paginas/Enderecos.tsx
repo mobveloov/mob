@@ -1,3 +1,4 @@
+import { podeCargo } from "../../comum/cargos.ts";
 import { useEffect, useState } from "react";
 import { Loader2, Plus, RefreshCw, X } from "lucide-react";
 import { useSessao } from "../App";
@@ -17,7 +18,7 @@ const pedir = async <T,>(url: string, init?: RequestInit): Promise<T> => {
 /** Endereços: cidades atendidas na base pública de endereços (CNEFE) e teste da busca. */
 export default function Enderecos() {
   const { sessao } = useSessao();
-  const admin = sessao.usuario.papel !== "operador";
+  const admin = podeCargo(sessao.usuario.papel, "admin");
   const sit = useCarregar(() => pedir<Situacao>("/api/enderecos/situacao"), []);
   const [busca, setBusca] = useState("");
   const [achados, setAchados] = useState<Municipio[]>([]);

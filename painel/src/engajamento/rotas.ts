@@ -8,6 +8,7 @@
 //   POST /acao                                      { papel, indicador, faixa, tipo, titulo?, texto?, status? } sobre a faixa
 //   GET  /historico                                 ações já feitas pelo mapa
 
+import { podeCargo } from "../comum/cargos.ts";
 import { Router, type Request, type Response } from "express";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { atualizar, listar } from "../cadastros/armazem.ts";
@@ -65,7 +66,7 @@ rotasEngajamento.post("/acao", ok(async (req, res) => {
   let enviados = 0;
   if (tipo === "status") {
     const novo = String(b.status ?? "");
-    if (req.ctx!.usuario.papel !== "admin") throw new Error("Só o administrador altera a situação.");
+    if (!podeCargo(req.ctx!.usuario.papel, "admin")) throw new Error("Só o administrador altera a situação.");
     if (!["Ativo", "Bloqueado", "Inativo", "Em análise", "Fila de espera"].includes(novo)) throw new Error("Escolha a nova situação.");
     const cad = cadastroPorId("motoristas")!;
     const registros = new Map(listar(emp(req), cad).map((r) => [r.id, r]));

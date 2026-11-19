@@ -12,10 +12,10 @@ export interface Detalhe {
 const STATUS_EDITAR: Array<[string, string]> = [["procurando", "Aguardando"], ["a_caminho", "A Caminho"], ["no_local", "Chegou"], ["em_andamento", "Em Viagem"], ["finalizada", "Finalizada"], ["cancelada", "Cancelada"], ["nao_atendida", "Não Atendida"]];
 const PAGAMENTOS_EDITAR = ["Dinheiro", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App"];
 
-export function JanelaCorrida({ id, onFechar, onMudou }: { id: string; onFechar: () => void; onMudou?: () => void }) {
+export function JanelaCorrida({ id, onFechar, onMudou, editarDireto }: { id: string; onFechar: () => void; onMudou?: () => void; editarDireto?: boolean }) {
   const { dados: d, erro, carregando, recarregar } = useDados<Detalhe>(() => op(`/corridas/${encodeURIComponent(id)}`), [id]);
   const [menu, setMenu] = useState(false);
-  const [sub, setSub] = useState<"" | "raiox" | "rastreio" | "editar" | "chat" | "cancelar" | "legenda" | "lances">("");
+  const [sub, setSub] = useState<"" | "raiox" | "rastreio" | "editar" | "chat" | "cancelar" | "legenda" | "lances">(editarDireto ? "editar" : "");
   const [msg, setMsg] = useState<{ t: string; erro?: boolean } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const mudou = () => { recarregar(); onMudou?.(); };
@@ -297,7 +297,14 @@ function Chat({ id, os, onFechar }: { id: string; os: string; onFechar: () => vo
         {dados?.mensagens.map((m) => (
           <div key={m.id} className={`oc-bolha ${m.de === "motorista" ? "mot" : ""}`}>
             <small>{m.nome || (m.de === "motorista" ? "Motorista" : "Passageiro")} · {dh(m.em)}</small>
-            {m.audio ? <audio controls src={`/api/operacao/corridas/${id}/chat/audio/${m.audio.id}`} style={{ maxWidth: 220 }} /> : m.texto}
+            {m.audio ? <audio controls src={`/api/operacao/corridas/${id}/chat/audio/${m.audio.id}`} style={{ maxWidth: 220 }} /> : m.midia ? (
+              <figure style={{ margin: 0 }}>
+                {m.midia.tipo === "video"
+                  ? <video controls preload="metadata" src={`/api/operacao/corridas/${id}/chat/midia/${m.midia.id}`} style={{ maxWidth: 220, maxHeight: 220, display: "block" }} />
+                  : <a href={`/api/operacao/corridas/${id}/chat/midia/${m.midia.id}`} target="_blank" rel="noreferrer"><img src={`/api/operacao/corridas/${id}/chat/midia/${m.midia.id}`} alt="Foto do chat" style={{ maxWidth: 220, maxHeight: 220, display: "block", borderRadius: 6 }} /></a>}
+                {m.midia.legenda && <figcaption>{m.midia.legenda}</figcaption>}
+              </figure>
+            ) : m.texto}
           </div>
         ))}
         <p style={{ color: "#667", textAlign: "center", fontSize: 11, marginTop: "auto" }}>Visualização de Auditoria</p>

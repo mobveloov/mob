@@ -141,9 +141,62 @@ export function banco(): Banco {
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, hash TEXT NOT NULL, expira INTEGER NOT NULL, dados TEXT NOT NULL,
       UNIQUE (empresa, hash));
     CREATE INDEX IF NOT EXISTS app_sessoes_expira ON app_sessoes (empresa, expira);
+    CREATE TABLE IF NOT EXISTS crm_templates (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL,
+      UNIQUE (empresa, id));
+    CREATE TABLE IF NOT EXISTS crm_descadastros (
+      empresa TEXT NOT NULL, chave TEXT NOT NULL, estado TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '',
+      origem TEXT NOT NULL DEFAULT '', texto TEXT NOT NULL DEFAULT '', em TEXT NOT NULL, por TEXT NOT NULL DEFAULT '',
+      autorizacao TEXT NOT NULL DEFAULT '', reativado_em TEXT, reativado_por TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (empresa, chave));
+    CREATE TABLE IF NOT EXISTS crm_gatilhos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, tipo TEXT NOT NULL, ativo INTEGER NOT NULL DEFAULT 1, dados TEXT NOT NULL,
+      UNIQUE (empresa, id));
+    CREATE TABLE IF NOT EXISTS crm_gatilho_fila (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, gatilho_id TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '',
+      estado TEXT NOT NULL, sai_em INTEGER, criado_em INTEGER NOT NULL, tomado_em INTEGER, mensagem TEXT NOT NULL DEFAULT '', erro TEXT NOT NULL DEFAULT '', carga TEXT NOT NULL DEFAULT '{}',
+      UNIQUE (empresa, id));
+    CREATE INDEX IF NOT EXISTS crm_gatilho_fila_sai ON crm_gatilho_fila (empresa, estado, sai_em);
+    CREATE INDEX IF NOT EXISTS crm_gatilho_fila_gatilho ON crm_gatilho_fila (empresa, gatilho_id, telefone);
+    CREATE TABLE IF NOT EXISTS crm_envios (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, origem TEXT NOT NULL, origem_id TEXT NOT NULL DEFAULT '', canal TEXT NOT NULL DEFAULT 'whatsapp',
+      estado TEXT NOT NULL, em INTEGER NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', titulo TEXT NOT NULL DEFAULT '', previa TEXT NOT NULL DEFAULT '',
+      erro TEXT NOT NULL DEFAULT '', variante TEXT NOT NULL DEFAULT '', faixa INTEGER,
+      UNIQUE (empresa, id));
+    CREATE INDEX IF NOT EXISTS crm_envios_em ON crm_envios (empresa, em);
+    CREATE INDEX IF NOT EXISTS crm_envios_origem ON crm_envios (empresa, origem, origem_id);
+    CREATE TABLE IF NOT EXISTS crm_segmentos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL, UNIQUE (empresa, id));
+    CREATE TABLE IF NOT EXISTS crm_simulacoes (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', em INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS crm_simulacoes_tel ON crm_simulacoes (empresa, telefone, em);
+    CREATE TABLE IF NOT EXISTS crm_comportamento (
+      empresa TEXT NOT NULL, chave TEXT NOT NULL, telefone TEXT NOT NULL DEFAULT '', nome TEXT NOT NULL DEFAULT '', hora INTEGER, dias TEXT NOT NULL DEFAULT '[]',
+      amostras INTEGER NOT NULL DEFAULT 0, corridas INTEGER NOT NULL DEFAULT 0, canceladas INTEGER NOT NULL DEFAULT 0, gasto REAL NOT NULL DEFAULT 0,
+      ultima INTEGER, estagio TEXT NOT NULL DEFAULT 'novo', atualizado_em INTEGER NOT NULL, PRIMARY KEY (empresa, chave));
+    CREATE INDEX IF NOT EXISTS crm_comportamento_hora ON crm_comportamento (empresa, hora);
+    CREATE TABLE IF NOT EXISTS crm_comport_templates (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL, UNIQUE (empresa, id));
+    CREATE TABLE IF NOT EXISTS crm_comport_disparos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, template_id TEXT NOT NULL, telefone TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '',
+      fase TEXT NOT NULL, estado TEXT NOT NULL, hora_pref INTEGER, agendado_para INTEGER NOT NULL, enviado_em INTEGER, erro TEXT NOT NULL DEFAULT '', dia TEXT NOT NULL, criado_em INTEGER NOT NULL,
+      UNIQUE (empresa, template_id, telefone, dia, fase));
+    CREATE INDEX IF NOT EXISTS crm_comport_disparos_em ON crm_comport_disparos (empresa, criado_em);
+    CREATE TABLE IF NOT EXISTS crm_regua_envios (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, telefone TEXT NOT NULL, faixa INTEGER NOT NULL, estado TEXT NOT NULL, em INTEGER NOT NULL,
+      instancia TEXT NOT NULL DEFAULT '', erro TEXT NOT NULL DEFAULT '');
+    CREATE INDEX IF NOT EXISTS crm_regua_envios_tel ON crm_regua_envios (empresa, telefone);
+    CREATE INDEX IF NOT EXISTS crm_regua_envios_em ON crm_regua_envios (empresa, em);
     CREATE TABLE IF NOT EXISTS cadastros_itens (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, cadastro TEXT NOT NULL, id TEXT NOT NULL, dados TEXT NOT NULL,
       UNIQUE (empresa, cadastro, id));
+    CREATE TABLE IF NOT EXISTS filiais (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, nome TEXT NOT NULL, cidade TEXT NOT NULL DEFAULT '', endereco TEXT NOT NULL DEFAULT '',
+      responsavel TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '', ativa INTEGER NOT NULL DEFAULT 1,
+      criada_em TEXT NOT NULL, por TEXT NOT NULL, PRIMARY KEY (empresa, id));
+    CREATE TABLE IF NOT EXISTS filiais_vinculos (
+      empresa TEXT NOT NULL, tipo TEXT NOT NULL, chave TEXT NOT NULL, filial_id TEXT NOT NULL, PRIMARY KEY (empresa, tipo, chave));
+    CREATE INDEX IF NOT EXISTS filiais_vinculos_filial ON filiais_vinculos (empresa, filial_id, tipo);
   `);
   aberto = { arquivo, db };
   db.exec("BEGIN");

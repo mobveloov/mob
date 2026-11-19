@@ -1,7 +1,7 @@
 // Gestão de taxas de cancelamento: Taxas, Pendentes, Repassados, Resolvidos e Abonados, com filtros por OS, motorista, cliente e período.
 import { useEffect, useState } from "react";
-import { Aviso, Paginacao, Selo, Vazio, dh, msgErro, op, qs, useDados } from "./comum";
-import { BotaoExportar, PERIODO_30, SeletorPeriodo, brl, paramsPeriodo, useAdmin, type PeriodoPag } from "./pagamentos-comum";
+import { Aviso, Paginacao, Selo, Vazio, dhAno, msgErro, op, qs, useDados } from "./comum";
+import { BotaoExportar, PERIODOS_CURTOS, PERIODO_30, SeletorPeriodo, brl, dataBrIso, paramsPeriodo, useAdmin, type PeriodoPag } from "./pagamentos-comum";
 import { BaixarTaxa } from "./Pendentes";
 import "./corridas.css";
 
@@ -34,10 +34,11 @@ export default function Taxas() {
         <input style={{ maxWidth: 150 }} placeholder="Buscar OS" value={os} onChange={(e) => setOs(e.target.value)} aria-label="Buscar OS" />
         <input style={{ maxWidth: 200 }} placeholder="Buscar motorista" value={motorista} onChange={(e) => setMotorista(e.target.value)} aria-label="Buscar motorista" />
         <input style={{ maxWidth: 200 }} placeholder="Buscar cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} aria-label="Buscar cliente" />
-        <SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} />
+        <SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} opcoes={PERIODOS_CURTOS} />
         <BotaoExportar caminho={`/taxas-cancelamento/exportar${qs(filtro)}`} nome="taxas-de-cancelamento.csv" onErro={setErroAcao} />
         <button className="oc-btn" onClick={() => { setOs(""); setMotorista(""); setCliente(""); setPer(PERIODO_30); setPagina(1); }}>Limpar filtro</button>
       </div>
+      <p className="suave" style={{ margin: "0 0 8px" }}>Filtrando por: {dados?.periodo?.inicio ? `Período: ${dataBrIso(dados.periodo.inicio)} até ${dataBrIso(dados.periodo.fim)}` : "Todos"}</p>
       <div className="oc-kpis">
         {ABAS.map(([k, nome, chave]) => (
           <button key={k} className={`oc-kpi ${TOM_ABA[k]}`} style={{ textAlign: "left", cursor: "pointer", outline: aba === k ? "2px solid var(--oc-pri)" : "none" }} onClick={() => { setAba(k); setPagina(1); }} aria-pressed={aba === k}>
@@ -52,7 +53,7 @@ export default function Taxas() {
         {!!dados?.total && <>
           <div className="oc-rola"><table><thead><tr><th>Data</th><th>Corrida de origem</th><th>Passageiro</th><th>Taxa</th><th>Motorista a receber</th><th>Motorista de coleta</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>{dados.itens.map((p: any) => (
-              <tr key={p.id}><td>{dh(p.data)}</td><td className="forte">OS {p.os}</td><td>{p.passageiro}</td><td className="forte">{brl(p.valor)}</td>
+              <tr key={p.id}><td>{dhAno(p.data).replace(" ", " - ")}</td><td className="forte">OS {p.os}</td><td><small>Passageiro</small><br />{p.passageiro}</td><td className="forte">{brl(p.valor)}</td>
                 <td>{p.motorista || "—"}{p.motorista && <><br /><small>Créditos ativados</small></>}</td>
                 <td>{p.motoristaColeta || "—"}</td>
                 <td><Selo tom={TOM[p.situacao]}>{NOME[p.situacao]}</Selo>

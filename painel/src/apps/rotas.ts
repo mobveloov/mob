@@ -17,13 +17,14 @@ import express, { type NextFunction, type Request, type Response } from "express
 import fs from "node:fs";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
+import { emitirEventoCrm } from "../crm/eventos.ts";
 import { alterarCorrida, avaliar, cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, mudarStatus, type CorridaPropria } from "../corridas/index.ts";
 import { buscarEndereco, casasPerto, enderecoDoPonto, rota } from "../enderecos/index.ts";
 import { buscarFora, caminhoPelasRuas, navegarPelasRuas, pontoFora } from "../enderecos/externo.ts";
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
-import { arquivoDoAudio, enviarAudio, enviarTexto, maxAudioBytes, mensagens } from "./chat.ts";
+import { arquivoDaMidia, arquivoDoAudio, enviarAudio, enviarMidia, enviarTexto, maxAudioBytes, maxMidiaBytes, mensagens, resumoDaMensagem } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { ajustes } from "./ajustes.ts";
@@ -241,7 +242,13 @@ r.get("/estimativa", ok(async (req, res) => {
   km ??= distanciaEstimada({ texto: "", ...a } as never, { texto: "", ...b } as never);
   const est = estimarPreco(ctx(req).empresaId, { categoria: txt(q.categoria, 60), distanciaKm: km, minutos, embarque: { texto: "", ...a }, destino: { texto: txt(q.destinoTexto, 200), ...b }, paradas: Math.min(3, Math.max(0, Math.round(num(q.paradas) ?? 0))), pagamento: txt(q.pagamento, 40), canal: "app" });
   // Radar de intenções (Recuperação de Vendas): guarda a cotação do passageiro para ver quem cotou e não pediu.
-  if (ctx(req).sessao.papel === "passageiro") registrarCotacao(ctx(req).empresaId, ctx(req).sessao.chave, { embarque: a, destino: b, categoria: est.categoria ?? txt(q.categoria, 60), valor: est.valor, distanciaKm: est.distanciaKm });
+  if (ctx(req).sessao.papel === "passageiro") {
+    registrarCotacao(ctx(req).empresaId, ctx(req).sessao.chave, { embarque: a, destino: b, categoria: est.categoria ?? txt(q.categoria, 60), valor: est.valor, distanciaKm: est.distanciaKm });
+    // Gatilhos do CRM: "Simulou" (toda estimativa) e "Simulou e não pediu" (sai depois do atraso se ele não pedir).
+    const vars = { valor: est.valor != null ? est.valor.toFixed(2).replace(".", ",") : "" };
+    emitirEventoCrm({ empresaId: ctx(req).empresaId, tipo: "simulated", telefone: ctx(req).sessao.chave, vars });
+    emitirEventoCrm({ empresaId: ctx(req).empresaId, tipo: "simulated_no_request", telefone: ctx(req).sessao.chave, vars });
+  }
   res.json(est);
 }));
 
@@ -282,7 +289,9 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
         km = 0;
         for (let i = 1; i < pontos.length; i++) km += (await rota({ lat: pontos[i - 1].lat!, lng: pontos[i - 1].lng! }, { lat: pontos[i].lat!, lng: pontos[i].lng! })).distanciaKm;
       }
-      conferirPagamento(empresaId, sessao.telefone, pagamento, estimarPreco(empresaId, { categoria: txt(b.categoria, 60), distanciaKm: km }).valor);
+      const est = estimarPreco(empresaId, { categoria: txt(b.categoria, 60), distanciaKm: km, pagamento });
+      // Pago com saldo, o passageiro também paga a taxa de serviço: o saldo cobre valor + taxa.
+      conferirPagamento(empresaId, sessao.telefone, pagamento, est.valor, "taxaServico" in est ? est.taxaServico : 0);
     }
     return criarCorridaPropria(empresaId, {
       passageiro: { nome, telefone: sessao.telefone }, embarque: ponto(b.embarque), destino: b.destino ? ponto(b.destino) : undefined,
@@ -353,7 +362,8 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   // Maçaneta em taxímetro: o valor sai da distância e do tempo reais, pela tarifa da categoria.
   if (novo === "finalizada") { const taxi = P.valorDoTaximetro(empresaId, c); if (taxi != null) valor = taxi; }
   const feita = await mudarStatus(empresaId, c.id, novo as never, { valor }, "app do motorista");
-  aposFinalizar(empresaId, feita); // pago com saldo: passa da carteira do passageiro para a do motorista
+  // pago com saldo: passa da carteira do passageiro para a do motorista. Se falhar, a corrida já está finalizada: não devolve erro.
+  try { aposFinalizar(empresaId, feita); } catch (e) { console.error("[apps] após finalizar:", e instanceof Error ? e.message : e); }
   P.vigiar(empresaId);
   res.json({ corrida: P.corridaParaApp(empresaId, feita, "motorista") });
 }));
@@ -388,7 +398,7 @@ function aposMensagem(req: Request, c: CorridaPropria, m: ReturnType<typeof envi
   const o = outro(c, sessao.papel);
   if (o) {
     emitir(empresaId, o, "chat", dados);
-    void avisar(empresaId, o, { titulo: m.nome, texto: m.texto ?? "Mensagem de áudio", dados: { tipo: "chat", corridaId: c.id }, canal: "chat" });
+    void avisar(empresaId, o, { titulo: m.nome, texto: resumoDaMensagem(m), dados: { tipo: "chat", corridaId: c.id }, canal: "chat" });
   }
 }
 
@@ -417,6 +427,35 @@ r.post("/corridas/:id/audio", (req, res, next) => {
   const m = enviarAudio(empresaId, c.id, sessao.papel, nomeDe(req), String(req.headers["content-type"] ?? ""), corpo, num(req.headers["x-segundos"]));
   aposMensagem(req, c, m);
   res.json({ mensagem: m });
+}));
+
+// Foto ou vídeo: corpo cru com o Content-Type do arquivo (image/jpeg, video/mp4...). Legenda opcional no cabeçalho X-Legenda (texto codificado).
+r.post("/corridas/:id/midia", (req, res, next) => {
+  const max = maxMidiaBytes();
+  const erro = () => res.status(413).json({ erro: `Arquivo grande demais (máximo ${Math.round(max / 1024 / 1024)} MB).` });
+  if (Number(req.headers["content-length"] ?? 0) > max) return erro();
+  express.raw({ type: () => true, limit: max })(req, res, (err?: unknown) => (err ? erro() : next()));
+}, ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
+  chatAberto(c);
+  const corpo = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  let legenda = "";
+  try { legenda = decodeURIComponent(String(req.headers["x-legenda"] ?? "")); } catch { /* cabeçalho torto: sem legenda */ }
+  const m = enviarMidia(empresaId, c.id, sessao.papel, nomeDe(req), String(req.headers["content-type"] ?? ""), corpo, legenda);
+  aposMensagem(req, c, m);
+  res.json({ mensagem: m });
+}));
+
+r.get("/corridas/:id/midia/:midia", ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
+  const a = arquivoDaMidia(empresaId, c.id, req.params.midia);
+  if (!a) return res.status(404).json({ erro: "Arquivo não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  fs.createReadStream(a.caminho).pipe(res);
 }));
 
 r.get("/corridas/:id/audio/:audio", ok((req, res) => {

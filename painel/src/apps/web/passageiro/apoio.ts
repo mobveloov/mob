@@ -10,7 +10,7 @@ export interface MotoristaDaCorrida {
 }
 export interface Corrida {
   id: string; os: string; status: string; statusTexto: string; aberta: boolean; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string;
-  estimativa: { valor: number | null; distanciaKm: number | null; minutos: number | null }; valor: number | null; desconto: number | null; avaliacao: number | null;
+  estimativa: { valor: number | null; distanciaKm: number | null; minutos: number | null }; valor: number | null; desconto: number | null; avaliacao: number | null; taxaServico?: number;
   solicitadaEm: string; iniciadaEm?: string | null; finalizadaEm?: string | null; canceladaPor?: string | null;
   motorista: MotoristaDaCorrida | null;
   paradas?: Ponto[]; agendadaPara?: string | null; comentario?: string; taxaCancelamento?: number | null; compartilhar?: string | null; motoristaId?: string | null;
@@ -210,7 +210,7 @@ export interface Contatos { whatsapp: string; telefone: string; site: string; te
 
 // ------------------------------------------------------------------ preço
 
-interface Est { valor: number | null; distanciaKm: number | null; minutos: number | null }
+interface Est { valor: number | null; distanciaKm: number | null; minutos: number | null; /** Taxa de serviço do passageiro (Taxas da central), cobrada à parte. */ taxaServico?: number }
 export const estimar = (categoria: string, a: Ponto, b: Ponto) =>
   api<Est>(`/estimativa?categoria=${encodeURIComponent(categoria)}&latEmbarque=${a.lat}&lngEmbarque=${a.lng}&latDestino=${b.lat}&lngDestino=${b.lng}`);
 
@@ -235,7 +235,7 @@ export async function estimarComParadas(categoria: string, pontos: Ponto[], piso
   if (pares.length >= 2 && pares[pares.length - 1].km - pares[0].km >= 0.3) porKm = (pares[pares.length - 1].valor - pares[0].valor) / (pares[pares.length - 1].km - pares[0].km);
   else if (pares.length) porKm = (pares[pares.length - 1].valor - (piso ?? 0)) / pares[pares.length - 1].km;
   const valor = direto.valor + Math.max(0, porKm) * Math.max(0, kmTotal - direto.distanciaKm);
-  return { valor: Math.round(Math.min(Math.max(valor, direto.valor), Math.max(soma, direto.valor)) * 100) / 100, distanciaKm: Math.round(kmTotal * 10) / 10, minutos };
+  return { valor: Math.round(Math.min(Math.max(valor, direto.valor), Math.max(soma, direto.valor)) * 100) / 100, distanciaKm: Math.round(kmTotal * 10) / 10, minutos, taxaServico: direto.taxaServico };
 }
 
 /** Passo do − e + no preço oferecido. */

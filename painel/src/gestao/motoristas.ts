@@ -3,6 +3,7 @@
 // Lista com filtros e contadores por situação, janela do motorista (Geral, Veículos, Financeiro, Documentos,
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
+import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request as Req, type Router } from "express";
 import { PAGAMENTOS_MACHINE, SITUACOES_MOTORISTA } from "../comum/cadastros.ts";
 import { atualizar, criar, remover, type Registro } from "../cadastros/armazem.ts";
@@ -96,7 +97,7 @@ export function listarMotoristas(empresaId: string, q: Record<string, unknown>) 
   for (const a of Object.keys(ABAS_MOTORISTA)) contadores[a] = filtrados.filter((m) => m.aba === a).length;
   const aba = s("aba") || "todos";
   const daAba = filtrados.filter((m) => (aba === "todos" ? m.aba !== "lixeira" : m.aba === aba)).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  const p = paginar(daAba, q.pagina);
+  const p = paginar(daAba, q.pagina, 10);
   return { motoristas: p.itens, paginacao: p.paginacao, contadores, ...(q.completo === true ? { todos: daAba } : {}) };
 }
 
@@ -187,7 +188,7 @@ export function rotasMotoristas(r: Router) {
   r.get("/motoristas-busca", ok((req, res) => {
     const b = texto(req.query.q, 60);
     res.json({ motoristas: registros(emp(req), "motoristas").filter((m) => m.status !== "Lixeira" && (contem(m.nome, b) || (digitos(b) && String(m.cpf ?? "").includes(digitos(b)))))
-      .slice(0, 30).map((m) => ({ id: m.id, nome: String(m.nome ?? ""), email: String(m.email ?? ""), cpf: String(m.cpf ?? ""), status: String(m.status ?? "") })) });
+      .slice(0, 30).map((m) => ({ id: m.id, nome: String(m.nome ?? ""), email: String(m.email ?? ""), cpf: String(m.cpf ?? ""), status: String(m.status ?? ""), telefone: String(m.telefone ?? ""), cidade: String(m.cidade ?? "") })) });
   }));
 
   r.get("/motoristas/:id", ok((req, res) => {
@@ -236,7 +237,7 @@ export function rotasMotoristas(r: Router) {
   }));
 
   // Taxa, saldo mínimo, saque e regra de cobrança do motorista: só administrador (operador não grava, nem sem querer).
-  const ehAdmin = (req: Req) => ["admin", "plataforma"].includes(req.ctx!.usuario.papel);
+  const ehAdmin = (req: Req) => podeCargo(req.ctx!.usuario.papel, "admin");
   const semFinanceiro = (req: Req, d: Record<string, unknown>) => (ehAdmin(req) ? d : Object.fromEntries(Object.entries(d).filter(([k]) => !k.startsWith("cobranca") && !CAMPOS_SENSIVEIS.includes(k))));
 
   /** Confere o CPF contra os outros motoristas da empresa (cada pessoa só aparece uma vez). */
@@ -422,7 +423,13 @@ export function rotasMotoristas(r: Router) {
   }));
   r.post("/punicoes", ok((req, res) => {
     const b = req.body ?? {};
-    res.json({ punicao: punir(emp(req), String(b.motoristaId ?? ""), Number(b.tempo), b.unidade === "dias" ? "dias" : "horas", String(b.motivo ?? ""), quem(req)) });
+    res.json({ punicao: punir(emp(req), String(b.motoristaId ?? ""), Number(b.tempo), b.unidade === "dias" ? "dias" : b.unidade === "minutos" ? "minutos" : "horas", String(b.motivo ?? ""), quem(req)) });
+  }));
+  r.get("/punicoes-historico/:motoristaId", ok((req, res) => {
+    const e = emp(req), agora = Date.now();
+    const l = punicoes(e).filter((p) => p.motoristaId === req.params.motoristaId).sort((a, b) => b.inicio.localeCompare(a.inicio))
+      .map((p) => ({ id: p.id, motivo: p.motivo, inicio: p.inicio, fim: p.fim, por: p.por, liberadaEm: p.liberadaEm, emVigor: !p.liberadaEm && Date.parse(p.fim) > agora }));
+    res.json({ punicoes: l });
   }));
   r.delete("/punicoes/:id", ok((req, res) => res.json({ punicao: liberarPunicao(emp(req), req.params.id, quem(req)) })));
 

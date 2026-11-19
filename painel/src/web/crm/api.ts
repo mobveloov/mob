@@ -32,7 +32,31 @@ async function pedir<T>(url: string, metodo = "GET", corpo?: unknown): Promise<T
   return b as T;
 }
 
+export interface TemplateCrm {
+  id: string; name: string; category: string; title: string | null; content: string; variables: string[]; is_active: boolean;
+  image_url: string | null; button_text: string | null; button_link: string | null; variant_b_content: string | null; ab_split_ratio: number; wa_optout_footer: boolean; created_at: string;
+}
+export interface DescadastroCrm { chave: string; estado: "descadastrado" | "autorizado"; nome: string; telefone: string; origem: string; texto: string; em: string; por: string; autorizacao: string; reativado_em: string | null; reativado_por: string }
+export interface VisaoCrm {
+  dias: number; enviadas: number; falhas: number; puladas: number; pessoasNotificadas: number; porOrigem: Record<string, number>;
+  porDia: Array<{ dia: string; enviadas: number; falhas: number }>; campanhas: { total: number; enviando: number; agendadas: number };
+  jornadasLigadas: number; templates: number; descadastrados: number;
+}
+
 export const crm = {
+  templates: () => pedir<{ templates: TemplateCrm[] }>("/templates"),
+  salvarTemplate: (id: string | null, t: Partial<TemplateCrm>) => pedir<{ template: TemplateCrm }>(id ? `/templates/${id}` : "/templates", id ? "PUT" : "POST", t),
+  ligarTemplate: (id: string) => pedir<{ template: TemplateCrm }>(`/templates/${id}/ligar`, "POST", {}),
+  apagarTemplate: (id: string) => pedir(`/templates/${id}`, "DELETE"),
+  modelosProntos: () => pedir<{ adicionados: number; aviso: string }>("/templates-modelos", "POST", {}),
+  previaTemplate: (t: { content: string; title?: string; wa_optout_footer?: boolean }) => pedir<{ previa: string }>("/templates-previa", "POST", t),
+  spintextIa: (content: string) => pedir<{ spintext: string }>("/templates-spintext", "POST", { content }),
+  descadastros: () => pedir<{ descadastros: DescadastroCrm[] }>("/descadastros"),
+  descadastrar: (telefone: string) => pedir("/descadastros", "POST", { telefone, origem: "atendente" }),
+  reativar: (telefone: string, autorizacao: string) => pedir("/descadastros/reativar", "POST", { telefone, autorizacao }),
+  emojis: () => pedir<{ ligado: boolean }>("/emojis"),
+  ligarEmojis: (ligado: boolean) => pedir<{ ligado: boolean }>("/emojis", "PUT", { ligado }),
+  visao: (dias: number) => pedir<VisaoCrm>("/visao", "POST", { dias }),
   publico: (regras: Regras) => pedir<RespPublico>("/publico", "POST", { regras }),
   contar: (regras: Regras) => pedir<{ total: number; destinatarios: number; avisos: string[] }>("/publico/contar", "POST", { regras }),
   optOut: (chave: string, sair: boolean) => pedir("/publico/optout", "POST", { chave, sair }),

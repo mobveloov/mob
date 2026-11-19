@@ -125,6 +125,16 @@ test("rastreio, recibo só de corrida concluída e chat", async () => {
   assert.equal(r.corpo.aberta, true);
   assert.equal(r.corpo.motorista.placa, "ABC1D23");
   assert.equal((await pedir(`/corridas/${c1}/chat`, { cookie: co })).status, 200);
+  // Foto do chat: aparece na auditoria da central e o arquivo só abre para a empresa dona.
+  const Chat = await import("../src/apps/chat.ts");
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]);
+  const msg = Chat.enviarMidia(A.id, c1, "passageiro", "Rui", "image/jpeg", jpg, "Portão azul");
+  const chat = await pedir(`/corridas/${c1}/chat`, { cookie: co });
+  assert.deepEqual(chat.corpo.mensagens.at(-1).midia, { id: msg.midia!.id, tipo: "imagem", legenda: "Portão azul" });
+  const arq = await fetch(`${base}/api/operacao/corridas/${c1}/chat/midia/${msg.midia!.id}`, { headers: { cookie: co } });
+  assert.equal(arq.status, 200);
+  assert.equal(arq.headers.get("content-type"), "image/jpeg");
+  assert.equal((await fetch(`${base}/api/operacao/corridas/${c1}/chat/midia/00000000-0000-4000-8000-000000000000`, { headers: { cookie: co } })).status, 404);
   // Corrida ainda aberta já tem recibo (vale o estimado); cancelada, não.
   const rec = await pedir(`/corridas/${c1}/recibo`, { cookie: co });
   assert.equal(rec.status, 200);
@@ -219,17 +229,19 @@ test("programadas: agenda, edita e filtra", async () => {
   const dia = new Date(Date.now() - 3 * 3600_000 + 2 * 86_400_000).toISOString().slice(0, 10);
   const r = await pedir("/solicitar", { cookie: co, corpo: { ...PEDIDO("Sara Agenda", "11944443333"), agendadaPara: `${dia}T10:30` } });
   assert.equal(r.status, 200, r.texto);
-  const p = await pedir("/programadas?filtro=futuras", { cookie: co });
+  const p = await pedir("/programadas", { cookie: co });
   assert.equal(p.corpo.total, 1);
-  assert.equal((await pedir("/programadas?filtro=hoje", { cookie: co })).corpo.total, 0);
-  assert.equal((await pedir("/programadas?filtro=todas&busca=sara", { cookie: co })).corpo.total, 1);
+  assert.equal((await pedir(`/programadas?dataIni=${dia.slice(0, 8)}01&dataFim=${new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10)}`, { cookie: co })).corpo.total, 0);
+  assert.equal((await pedir("/programadas?situacao=aguardando", { cookie: co })).corpo.total, 1);
+  assert.equal((await pedir("/programadas?situacao=cancelada", { cookie: co })).corpo.total, 0);
+  assert.equal((await pedir("/programadas?passageiro=sara", { cookie: co })).corpo.total, 1);
   const e = await pedir(`/programadas/${r.corpo.corrida.id}`, { metodo: "PUT", corpo: { dataHora: `${dia}T11:45`, valor: "40,00", observacao: "Bagagem" }, cookie: co });
   assert.equal(e.status, 200, e.texto);
-  const q = (await pedir("/programadas?filtro=futuras", { cookie: co })).corpo.itens[0];
+  const q = (await pedir("/programadas", { cookie: co })).corpo.itens[0];
   assert.match(q.agendadaPara, /T11:45/);
   assert.equal(q.valor, 40);
   assert.equal(q.observacao, "Bagagem");
-  assert.equal((await pedir("/programadas?filtro=todas", { cookie: cb })).corpo.total, 0);
+  assert.equal((await pedir("/programadas", { cookie: cb })).corpo.total, 0);
 });
 
 test("pagamentos pendentes: taxa de cancelamento, baixar uma vez e abonar", async () => {

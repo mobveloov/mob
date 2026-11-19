@@ -79,7 +79,7 @@ const diaDoSaque = (s: SaqueLinha) => diaDe(s.resolvidoEm ?? s.em);
 function totaisDoPeriodo(empresaId: string, p: Per, saques: SaqueLinha[]) {
   const corridas = corridasFinalizadas(empresaId, p.inicio, p.fim);
   const faturamento = cent(corridas.reduce((s, c) => s + c.valor!, 0));
-  const ganhos = cent(corridas.filter((c) => c.motoristaId).reduce((s, c) => s + calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!).taxaCentral, 0));
+  const ganhos = cent(corridas.filter((c) => c.motoristaId).reduce((s, c) => s + calcularComissao(empresaId, c.categoria, c.valor!, c.motoristaId!, c.pagamento).taxaCentral, 0));
   const pix = recargasPix(empresaId, p.inicio, p.fim);
   const recargas = cent(pix.reduce((s, x) => s + x.valor, 0));
   const app = corridas.filter((c) => ehPix(c.pagamento) || ehCartaoApp(c.pagamento));
@@ -167,7 +167,7 @@ function movimentosDaCentral(empresaId: string, ate: string): Movimento[] {
   for (const c of listarProprias(empresaId)) {
     const dia = diaDe(c.finalizadaEm ?? c.solicitadaEm);
     if (c.status !== "finalizada" || !c.valor || !c.motoristaId || !dia || dia > ate) continue;
-    const t = calcularComissao(empresaId, c.categoria, c.valor, c.motoristaId).taxaCentral;
+    const t = calcularComissao(empresaId, c.categoria, c.valor, c.motoristaId, c.pagamento).taxaCentral;
     if (t <= 0) continue;
     const g = porDia.get(dia) ?? { qtd: 0, valor: 0 };
     g.qtd++; g.valor += t; porDia.set(dia, g);
@@ -201,6 +201,13 @@ export function extratoDaCentral(empresaId: string, p: Per) {
     dias: dias.reverse(),
     pedidos, aguardando: cent(pedidos.filter((x) => x.situacao === "Solicitado").reduce((s, x) => s + x.valor, 0)),
   };
+}
+
+export function csvExtratoCentral(empresaId: string, p: Per): string {
+  const x = extratoDaCentral(empresaId, p), br = (d: string) => d.split("-").reverse().join("/");
+  const linhas: unknown[][] = [];
+  for (const dia of [...x.dias].reverse()) for (const m of dia.movimentos) linhas.push([br(dia.dia), m.em.slice(11, 16), m.tipo === "entrada" ? "Entrada" : "Saída", m.descricao, m.detalhe, m.tipo === "entrada" ? m.valor : -m.valor]);
+  return montarCsv(["Dia", "Hora", "Tipo", "Descrição", "Detalhe", "Valor"], linhas);
 }
 
 // ------------------------------------------------------------------ Extrato de transações online
@@ -276,4 +283,50 @@ export function marcarTransacao(empresaId: string, id: string, status: string, m
   if (status === "Pago") banco().prepare("DELETE FROM transacoes_marcas WHERE empresa = ? AND id = ?").run(empresaId, id);
   else banco().prepare("INSERT OR REPLACE INTO transacoes_marcas (empresa, id, status, motivo, em, por) VALUES (?, ?, ?, ?, ?, ?)").run(empresaId, id, status, String(motivo ?? "").replace(/[<>]/g, "").slice(0, 200), agoraBr().toISOString(), por.slice(0, 80));
   return { id, status };
+}
+
+// ------------------------------------------------------------------ Relatório de faturamento (uma linha por OS)
+
+export const STATUS_FATURAMENTO = ["Finalizada", "Cancelada", "Não atendida"] as const;
+export interface FiltroFaturamento { status?: string; pagamento?: string; busca?: string }
+export interface LinhaFaturamento { id: string; em: string; os: string; pagamento: string; valor: number; taxa: number; status: (typeof STATUS_FATURAMENTO)[number] }
+
+function linhasFaturamento(empresaId: string, p: Per): LinhaFaturamento[] {
+  const l: LinhaFaturamento[] = [];
+  for (const c of listarProprias(empresaId)) {
+    const status = c.status === "finalizada" ? "Finalizada" : c.status === "cancelada" ? "Cancelada" : c.status === "nao_atendida" ? "Não atendida" : null;
+    if (!status) continue;
+    const em = c.finalizadaEm ?? c.solicitadaEm;
+    if (!em || diaDe(em) < p.inicio || diaDe(em) > p.fim) continue;
+    if (status === "Finalizada" && !(c.valor != null && c.valor >= 0)) continue;
+    const valor = cent(c.valor ?? c.estimativa.valor ?? 0);
+    const taxa = status === "Finalizada" && c.motoristaId && valor > 0 ? cent(calcularComissao(empresaId, c.categoria, valor, c.motoristaId, c.pagamento).taxaCentral) : 0;
+    l.push({ id: c.id, em, os: c.os, pagamento: c.pagamento, valor, taxa, status });
+  }
+  return l.sort((a, b) => b.em.localeCompare(a.em));
+}
+
+function filtrarFaturamento(todas: LinhaFaturamento[], f: FiltroFaturamento) {
+  const busca = (f.busca ?? "").replace(/\D/g, ""), forma = normal(f.pagamento ?? "");
+  return todas.filter((x) => (!f.status || f.status === "todos" || x.status === f.status) && (!busca || x.os.includes(busca))
+    && (!forma || normal(x.pagamento) === forma || normal(x.pagamento).includes(forma) || (forma.includes("debito") && normal(x.pagamento).includes("debito")) || (forma.includes("credito") && normal(x.pagamento).includes("credito"))));
+}
+
+export function relatorioFaturamento(empresaId: string, p: Per, f: FiltroFaturamento = {}, pagina = 1) {
+  const todas = linhasFaturamento(empresaId, p), itens = filtrarFaturamento(todas, f);
+  const fin = itens.filter((x) => x.status === "Finalizada");
+  const soma = (l: LinhaFaturamento[], k: "valor" | "taxa") => cent(l.reduce((s, x) => s + x[k], 0));
+  const por = 10, paginas = Math.max(1, Math.ceil(itens.length / por)), pg = Math.min(paginas, Math.max(1, Math.floor(pagina) || 1));
+  return {
+    periodo: p, status: STATUS_FATURAMENTO,
+    brutoTotal: soma(fin, "valor"), taxaCentral: soma(fin, "taxa"), ticketMedio: fin.length ? cent(soma(fin, "valor") / fin.length) : 0,
+    naoAtendidas: soma(itens.filter((x) => x.status === "Não atendida"), "valor"), canceladas: soma(itens.filter((x) => x.status === "Cancelada"), "valor"),
+    total: itens.length, pagina: pg, paginas, porPagina: por, itens: itens.slice((pg - 1) * por, pg * por),
+  };
+}
+
+export function csvRelatorioFaturamento(empresaId: string, p: Per, f: FiltroFaturamento = {}): string {
+  const br = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)} ${s.slice(11, 19)}`;
+  return montarCsv(["Data e hora", "Ordem de serviço", "Forma de pagamento", "Valor", "Taxa da central", "Status"],
+    filtrarFaturamento(linhasFaturamento(empresaId, p), f).slice(0, 50_000).map((x) => [br(x.em), x.os, x.pagamento, x.valor, x.taxa, x.status]));
 }

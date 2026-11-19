@@ -10,7 +10,8 @@
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
 import { ajustes } from "./ajustes.ts";
 import { calcularComissao } from "../config/comissao.ts";
@@ -40,6 +41,12 @@ const POSICAO_MS = 10 * 60_000; // o app reenvia a cada 30 s; em segundo plano o
 /** Depois de recusar ou deixar passar, o motorista só recebe de novo a mesma corrida depois disso. */
 const REOFERTA_MS = 2 * 60_000;
 
+/**
+ * "Enviar mais de um carro" (marcação da corrida na tela Solicitar): a oferta vai a vários motoristas ao mesmo tempo e vale o
+ * primeiro que aceitar. Quantos ao mesmo tempo: este número, limitado pelo "limite de motoristas" do Despacho.
+ */
+export const CARROS_SIMULTANEOS = 3;
+
 const ABERTA_COM_MOTORISTA = new Set(["a_caminho", "no_local", "em_andamento"]);
 const ABERTA = new Set(["procurando", "a_caminho", "no_local", "em_andamento"]);
 
@@ -59,7 +66,7 @@ export function marcarVisto(empresaId: string, motoristaId: string) {
 export interface Oferta { id: string; corridaId: string; motoristaId: string; expira: number; distanciaKm: number | null }
 
 /** O que aconteceu com uma oferta (para a auditoria "ondas de envio" da central, em src/operacao). */
-export type FimOferta = "oferecida" | "aceitou" | "recusou" | "expirou" | "saiu";
+export type FimOferta = "oferecida" | "aceitou" | "recusou" | "expirou" | "saiu" | "perdeu";
 type OuvinteOferta = (empresaId: string, o: Oferta, fim: FimOferta) => void;
 const ouvintesOferta: OuvinteOferta[] = [];
 /** Registra quem quer saber de cada oferta (criada, aceita, recusada, vencida). */
@@ -131,7 +138,9 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
       nome: c.passageiro.nome, telefone: aberta && papel === "motorista" ? c.passageiro.telefone : "",
       ...(papel === "motorista" ? { foto: urlDaFoto(empresaId, "passageiro", c.passageiro.telefone), nota: estatisticas(empresaId, "passageiro", c.passageiro.telefone).nota, corridas: estatisticas(empresaId, "passageiro", c.passageiro.telefone).viagens } : {}),
     },
-    ...(papel === "motorista" ? { infoAntes: c.infoAntes ?? "", infoDepois: c.motoristaId ? c.infoDepois ?? "" : "" } : {}),
+    ...(papel === "motorista" ? { infoAntes: c.infoAntes ?? "", infoDepois: c.motoristaId ? c.infoDepois ?? "" : "", obsEmpresa: observacaoDaEmpresa(empresaId, c.empresaConveniada) } : {}),
+    // Taxa de serviço do passageiro (vem à parte do valor da corrida; o app do passageiro mostra na estimativa e no recibo).
+    ...(papel === "passageiro" ? { taxaServico: taxaServicoDaCorrida(empresaId, c) } : {}),
     canal: c.canal, valorOferecido: c.valorOferecido ?? null, opcionais: c.opcionais ?? [], etiquetas: c.etiquetas ?? [],
     modo: c.macaneta?.modo, distanciaPercorridaKm: c.macaneta ? c.macaneta.km : undefined,
     ...(papel === "passageiro" ? { ...aproximacao(empresaId, c), mensagensNaoLidas: aberta ? naoLidas(empresaId, c.id, "passageiro") : 0 } : {}),
@@ -251,7 +260,7 @@ export function ofertaDoMotorista(empresaId: string, motoristaId: string) {
 export function valoresDaCorrida(empresaId: string, c: CorridaPropria, motoristaId?: string) {
   const base = c.valorOferecido ?? c.estimativa.valor;
   if (base == null) return { valorBruto: null as number | null, taxaCentral: null as number | null, valorLiquido: null as number | null, ganhoPorKm: null as number | null };
-  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(base - (c.desconto ?? 0))), motoristaId);
+  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(base - (c.desconto ?? 0))), motoristaId, c.pagamento);
   const km = c.estimativa.distanciaKm;
   return { valorBruto: co.valorBruto, taxaCentral: co.taxaCentral, valorLiquido: co.valorLiquido, ganhoPorKm: km && km > 0 ? arred(co.valorLiquido / km) : null };
 }
@@ -268,7 +277,7 @@ function tabelaLiquido(empresaId: string, c: CorridaPropria, motoristaId?: strin
   for (let k = -5; k <= 10; k++) {
     const v = arred(base + k);
     if (v < Math.max(1, minimo)) continue;
-    const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(v - (c.desconto ?? 0))), motoristaId);
+    const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(v - (c.desconto ?? 0))), motoristaId, c.pagamento);
     l.push({ valor: v, bruto: co.valorBruto, taxa: co.taxaCentral, liquido: co.valorLiquido });
   }
   return l;
@@ -279,6 +288,7 @@ function extrasDaChamada(empresaId: string, c: CorridaPropria, motoristaId: stri
   const est = estatisticas(empresaId, "passageiro", c.passageiro.telefone);
   const nomes = new Map(ajustes(empresaId).opcionais.map((o) => [o.id, o.nome]));
   return {
+    obsEmpresa: observacaoDaEmpresa(empresaId, c.empresaConveniada),
     valorOferecido: c.valorOferecido ?? null, opcionais: (c.opcionais ?? []).map((id) => nomes.get(id) ?? id),
     nota: est.nota, viagens: est.viagens,
     minutosAteEmbarque: distanciaKm != null ? Math.max(1, Math.round(distanciaKm * 2.5)) : null,
@@ -314,7 +324,9 @@ export function despachar(empresaId: string) {
   const cadastro = new Map(motoristas(empresaId).map((m) => [m.id, m]));
   const agora = Date.now();
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
-  const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
+  const ofertasDaCorrida = new Map<string, number>();
+  for (const o of e.ofertas.values()) ofertasDaCorrida.set(o.corridaId, (ofertasDaCorrida.get(o.corridaId) ?? 0) + 1);
+  const carrosDaCorrida = (c: CorridaPropria) => (c.enviarVariosCarros ? Math.max(1, Math.min(CARROS_SIMULTANEOS, regrasDespacho(empresaId).limiteMotoristas)) : 1);
   const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
   // "Aceitar próxima": motorista em viagem a menos de "distância" metros do destino final também recebe chamada.
   const emViagemPorMotorista = new Map(lista.filter((x) => x.status === "em_andamento" && x.motoristaId).map((x) => [x.motoristaId!, x]));
@@ -335,7 +347,7 @@ export function despachar(empresaId: string) {
   const areasEmpresa = fotoDeAreas(empresaId); // Cadastro › Áreas: bloqueio e prioridade
   const emPlantao = motoristasEmPlantao(empresaId); // Cadastro › Plantão: escalados têm prioridade nas filas
   let n = 0;
-  for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
+  for (const c of lista.filter((x) => x.status === "procurando" && (ofertasDaCorrida.get(x.id) ?? 0) < carrosDaCorrida(x) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     if (areasEmpresa.bloqueando(c.embarque.lat, c.embarque.lng)) continue; // embarque em área de risco/bloqueio: ninguém é chamado
     const areaDaCorrida = areasEmpresa.principal(c.embarque.lat, c.embarque.lng);
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
@@ -372,7 +384,7 @@ export function despachar(empresaId: string) {
     candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0));
     // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
     // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
-    const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras) : candidatos.slice(0, 1);
+    const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras) : candidatos.slice(0, Math.max(1, carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0))); // corrida marcada "enviar mais de um carro" completa as ofertas abertas
     // Tentativas: depois de "máx. tentativas" rodadas sem aceite a corrida fica em pendência por "tempo em pendência" minutos; passada a pendência, tenta de novo uma vez; sem aceite, não atendida.
     const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
     if (rod.pausaAte > agora) continue;

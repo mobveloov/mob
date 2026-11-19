@@ -14,7 +14,14 @@ import type { CategoriaBot, Local } from "./tipos.ts";
 export interface NovaCorridaBot {
   passageiro: { nome: string; telefone: string };
   embarque: Local; destino?: Local; categoria: string; pagamento: string; observacao?: string;
+  /** Corrida agendada: "AAAA-MM-DDTHH:MM" no horário de Brasília. */
+  agendadaPara?: string;
+  /** Pesquisa de preferências: cupom, parada no caminho e recado que o motorista vê depois de aceitar. */
+  cupom?: string; parada?: Local; infoDepois?: string;
 }
+
+/** Corrida agendada que ainda não começou a procurar motorista. */
+export interface Agendada { id: string; os: string; telefone: string; quandoMs: number; criadaMs: number; embarque: string; destino?: string }
 export interface DetalheBot {
   status: StatusProprio; grupo: "aberta" | "finalizada" | "cancelada" | "nao_atendida";
   motorista?: string; veiculo?: string; valor?: number; canceladaPor?: string;
@@ -27,6 +34,8 @@ export interface CorridasBot {
   detalhar(empresaId: string, id: string): Promise<DetalheBot | null>;
   cancelar(empresaId: string, id: string): Promise<void>;
   avaliar(empresaId: string, id: string, nota: number): Promise<void>;
+  /** Corridas agendadas de um passageiro (ou de todos) que ainda não começaram. */
+  agendadas?(empresaId: string, telefone?: string): Promise<Agendada[]>;
 }
 
 const GRUPO: Record<StatusProprio, DetalheBot["grupo"]> = {
@@ -47,7 +56,7 @@ export function clienteDoTelefone(empresaId: string, telefone: string) {
   const c = listar(empresaId, cadastroPorId("clientes")!).find((r) => mesmoTelefone(String(r.telefone ?? ""), telefone));
   if (!c) return null;
   const status = String(c.status ?? "");
-  return { nome: String(c.nome ?? ""), status, bloqueado: status === "Bloqueado" || status === "Suspenso", telefone: String(c.telefone ?? "") };
+  return { nome: String(c.nome ?? ""), status, bloqueado: ["Bloqueado", "Suspenso", "Suspenso por nota", "Deletado"].includes(status), telefone: String(c.telefone ?? "") };
 }
 
 function veiculoDe(empresaId: string, motoristaId: string | null) {
@@ -83,13 +92,22 @@ export const corridasProprias: CorridasBot = {
   async criar(empresaId, n) {
     const c = await criarCorridaPropria(empresaId, {
       passageiro: n.passageiro, embarque: n.embarque, destino: n.destino, categoria: n.categoria,
-      pagamento: n.pagamento, canal: "bot", observacao: n.observacao,
+      pagamento: n.pagamento, canal: "bot", observacao: n.observacao, agendadaPara: n.agendadaPara,
+      ...(n.cupom ? { cupom: n.cupom } : {}), ...(n.parada ? { paradas: [n.parada] } : {}), ...(n.infoDepois ? { infoDepois: n.infoDepois } : {}),
     }, "bot");
     return { id: c.id, os: c.os, valor: c.estimativa.valor ?? undefined };
   },
   async detalhar(empresaId, id) {
     const c = listarProprias(empresaId).find((x) => x.id === id);
     return c ? detalheDe(empresaId, c) : null;
+  },
+  async agendadas(empresaId, telefone) {
+    const agora = Date.now();
+    return listarProprias(empresaId)
+      .filter((c) => c.status === "procurando" && c.agendadaPara && (!telefone || mesmoTelefone(c.passageiro.telefone, telefone)))
+      .map((c) => ({ id: c.id, os: c.os, telefone: c.passageiro.telefone, quandoMs: Date.parse(c.agendadaPara!) + 3 * 3_600_000, criadaMs: Date.parse(c.solicitadaEm) + 3 * 3_600_000, embarque: c.embarque.texto, destino: c.destino?.texto }))
+      .filter((a) => a.quandoMs > agora)
+      .sort((a, b) => a.quandoMs - b.quandoMs);
   },
   async cancelar(empresaId, id) { await cancelarCorrida(empresaId, id, "Passageiro", "Cancelada pelo passageiro no WhatsApp", "bot"); },
   async avaliar(empresaId, id, nota) { await avaliar(empresaId, id, nota, "bot"); },

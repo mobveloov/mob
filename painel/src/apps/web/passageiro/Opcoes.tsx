@@ -31,7 +31,7 @@ export function pontosDaRota(r: { embarque: { texto: string; lat?: number; lng?:
 export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: () => void; pediu: (c: Corrida) => void; agendou: (c: Corrida) => void }) {
   const [quando, setQuando] = useState<"agora" | "agendar">("agora");
   const [opcoes, setOpcoes] = useState<{ categorias: Categoria[]; pagamentos: string[] } | null>(null);
-  const [estimativas, setEstimativas] = useState<Record<string, { valor: number | null; distanciaKm: number | null; minutos: number | null }>>({});
+  const [estimativas, setEstimativas] = useState<Record<string, { valor: number | null; distanciaKm: number | null; minutos: number | null; taxaServico?: number }>>({});
   const [ofertas, setOfertas] = useState<Record<string, number>>({});
   const [categoria, setCategoria] = useState("");
   const [pagamento, setPagamento] = useState("");
@@ -142,6 +142,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
         {valor != null && atual && base(atual) != null && Math.abs(valor - base(atual)!) > 0.001 && (
           <p className="dica">Você está oferecendo {reais(valor)}. O valor sugerido é {reais(base(atual))}.</p>
         )}
+        {!!atual && !!rota.destino && !!estimativas[atual.nome]?.taxaServico && <p className="dica">Taxa de serviço: {reais(estimativas[atual.nome].taxaServico!)}, cobrada à parte do valor da corrida (pode mudar conforme a forma de pagamento).</p>}
         <Aviso texto={erro} />
         <div className="rodape-pedido">
           <div className="rodape-linha">

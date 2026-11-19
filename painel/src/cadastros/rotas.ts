@@ -1,6 +1,7 @@
 // Rotas dos cadastros: /api/cadastros/:cadastro (listar, criar, editar, excluir, importar).
 // A empresa vem sempre do usuário logado (req.ctx). Operador edita só os cadastros marcados com operadorEdita.
 
+import { podeCargo } from "../comum/cargos.ts";
 import { Router, type Request, type Response } from "express";
 import { cadastroPorId, CADASTROS, type Cadastro } from "../comum/cadastros.ts";
 import * as D from "../servidor/dados.ts";
@@ -22,11 +23,19 @@ function cad(req: Request): Cadastro {
   return c;
 }
 function podeEditar(req: Request, c: Cadastro) {
-  const p = ctx(req).usuario.papel;
-  if (p === "plataforma" || p === "admin" || c.operadorEdita) return;
+  if (podeCargo(ctx(req).usuario.papel, "gestor") || c.operadorEdita) return;
   throw new Error("Seu usuário só pode consultar este cadastro.");
 }
 const quem = (req: Request) => ctx(req).usuario.email;
+
+/** Campos financeiros (soGestor): abaixo de Gestor, o valor que veio no pedido é ignorado e fica o que já existe
+ *  (ao criar, fica em branco). Assim o Operador não se isenta nem muda a cobrança de ninguém. */
+function protegerFinanceiro(req: Request, c: Cadastro, dados: Record<string, unknown>, antes: Record<string, unknown> | null): Record<string, unknown> {
+  if (podeCargo(ctx(req).usuario.papel, "gestor")) return dados;
+  const out = { ...dados };
+  for (const f of c.campos) if (f.soGestor) { if (antes && antes[f.chave] !== undefined) out[f.chave] = antes[f.chave]; else delete out[f.chave]; }
+  return out;
+}
 
 rotasCadastros.get("/", (_req, res) => res.json({ cadastros: CADASTROS }));
 
@@ -41,14 +50,15 @@ rotasCadastros.get("/:cadastro", ok((req, res) => {
 rotasCadastros.post("/:cadastro", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
   const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, null, false) : (req.body ?? {});
-  res.json({ registro: criar(ctx(req).empresaId, c, dados, quem(req)) });
+  res.json({ registro: criar(ctx(req).empresaId, c, protegerFinanceiro(req, c, dados, null), quem(req)) });
 }));
 
 rotasCadastros.put("/:cadastro/:id", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
   const antes = c.id === "conveniadas" ? listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null : null;
   const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, antes, false) : (req.body ?? {});
-  res.json({ registro: atualizar(ctx(req).empresaId, c, String(req.params.id), dados, quem(req)) });
+  const atual = listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null;
+  res.json({ registro: atualizar(ctx(req).empresaId, c, String(req.params.id), protegerFinanceiro(req, c, dados, atual), quem(req)) });
 }));
 
 rotasCadastros.delete("/:cadastro/:id", ok((req, res) => {

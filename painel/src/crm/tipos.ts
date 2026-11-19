@@ -26,6 +26,8 @@ export interface Contato {
   origens: string[];
   /** Não quer receber mensagens. */
   optOut: boolean;
+  /** Segmento RFM atual (só passageiros; vem da última análise RFM). */
+  rfmSegmento?: string;
 }
 
 /** Regras de um segmento. Campo vazio = não filtra. */
@@ -40,6 +42,8 @@ export interface Regras {
   corridasMax?: number;
   categorias?: string[];
   canais?: string[];
+  /** Só quem está neste segmento RFM no momento do uso (segmento dinâmico; a análise RFM roda todo dia). */
+  rfmSegmento?: string;
   /** Só quem está nesta lista. */
   listaId?: string;
   busca?: string;

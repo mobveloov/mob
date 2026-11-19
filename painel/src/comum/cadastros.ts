@@ -13,6 +13,8 @@ export interface Campo {
   /** Preenchido pelo painel (ex.: total de corridas): aparece, mas não se edita. */
   calculado?: boolean;
   dica?: string;
+  /** Campo financeiro: só Gestor ou acima muda. Operador mantém o valor que já existe (e não define ao criar). */
+  soGestor?: boolean;
 }
 
 export interface Cadastro {
@@ -59,9 +61,9 @@ export const CADASTROS: Cadastro[] = [
       { chave: "nivel", rotulo: "Prioridade de toque", tipo: "selecao", opcoes: NIVEIS_MOTORISTA },
       { chave: "cnhNumero", rotulo: "CNH Nº", tipo: "texto" },
       { chave: "fantasma", rotulo: "Modo fantasma (oculto no mapa)", tipo: "booleano" },
-      { chave: "cobranca", rotulo: "Cobrança da central", tipo: "selecao", opcoes: ["Padrão", "Personalizado", "Isento"], dica: "Padrão = comissão da categoria; Isento = não paga; Personalizado = vale no lugar da comissão da categoria." },
-      { chave: "cobrancaTipo", rotulo: "Modelo de cobrança", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"] },
-      { chave: "cobrancaValor", rotulo: "Valor da cobrança", tipo: "numero" },
+      { soGestor: true, chave: "cobranca", rotulo: "Cobrança da central", tipo: "selecao", opcoes: ["Padrão", "Personalizado", "Isento"], dica: "Padrão = comissão da categoria; Isento = não paga; Personalizado = vale no lugar da comissão da categoria." },
+      { soGestor: true, chave: "cobrancaTipo", rotulo: "Modelo de cobrança", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"] },
+      { soGestor: true, chave: "cobrancaValor", rotulo: "Valor da cobrança", tipo: "numero" },
       { chave: "categorias", rotulo: "Categorias habilitadas", tipo: "texto", dica: "Separe por vírgula." },
       { chave: "veiculo", rotulo: "Veículo (modelo e cor)", tipo: "texto" },
       { chave: "placa", rotulo: "Placa", tipo: "texto" },
@@ -116,10 +118,11 @@ export const CADASTROS: Cadastro[] = [
       { chave: "telefone", rotulo: "Telefone", tipo: "telefone", obrigatorio: true },
       { chave: "cpf", rotulo: "CPF", tipo: "cpf" },
       { chave: "email", rotulo: "E-mail", tipo: "email" },
-      { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Inativo", "Bloqueado", "Suspenso"], obrigatorio: true },
+      { chave: "status", rotulo: "Situação", tipo: "selecao", opcoes: ["Ativo", "Inativo", "Suspenso", "Aguardando Ativação", "Aguardando Deleção", "Deletado", "Suspenso por nota", "Bloqueado"], obrigatorio: true },
+      { chave: "nascimento", rotulo: "Data de nascimento", tipo: "data" },
       { chave: "genero", rotulo: "Gênero", tipo: "selecao", opcoes: GENEROS },
       { chave: "dispositivo", rotulo: "Dispositivo", tipo: "selecao", opcoes: ["Android", "iOS", "Não identificado"] },
-      { chave: "origemCadastro", rotulo: "Origem", tipo: "selecao", opcoes: ["App", "Painel", "Motorista"] },
+      { chave: "origemCadastro", rotulo: "Origem", tipo: "selecao", opcoes: ["App", "Painel", "Motorista", "Estabelecimento"] },
       { chave: "motoristaOrigem", rotulo: "Motorista (origem)", tipo: "texto", dica: "Id do motorista que cadastrou (origem Motorista)." },
       { chave: "avaliouApp", rotulo: "Avaliou o app?", tipo: "selecao", opcoes: ["Pendente", "Avaliou", "Não quis avaliar", "Adiou"] },
       { chave: "notaApp", rotulo: "Nota para o app", tipo: "numero" },
@@ -235,6 +238,7 @@ export const CADASTROS: Cadastro[] = [
       { chave: "limiteUsos", rotulo: "Limite de usos", tipo: "numero" },
       { chave: "usoPorPassageiro", rotulo: "Usos por passageiro", tipo: "numero" },
       { chave: "categorias", rotulo: "Só nas categorias", tipo: "texto", dica: "Vazio = todas. Separe por vírgula." },
+      { chave: "automatico", rotulo: "Cupom automático", tipo: "booleano", dica: "PRIMEIRA CORRIDA e DE VOLTA valem sozinhos, sem o passageiro digitar o código." },
       { chave: "ativo", rotulo: "Ativo", tipo: "booleano" },
     ],
     colunas: ["codigo", "tipoDesconto", "valor", "inicio", "fim", "limiteUsos", "ativo"],

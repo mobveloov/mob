@@ -183,6 +183,39 @@ export async function urlDoAudio(corridaId: string, audioId: string): Promise<st
   return u;
 }
 
+// ------------------------------------------------------------------ foto e vídeo do chat
+
+/** Limites do chat (os mesmos do servidor, para avisar antes de enviar): foto até 5 MB, vídeo até 16 MB. */
+export const LIMITE_FOTO = 5 * 1024 * 1024;
+export const LIMITE_VIDEO = 16 * 1024 * 1024;
+export const ACEITA_MIDIA = "image/jpeg,image/png,image/webp,video/mp4,video/3gpp,video/quicktime,video/webm";
+
+/** Confere o arquivo escolhido (tipo e tamanho). Devolve o motivo se não der para enviar. */
+export function problemaDaMidia(f: File): string | null {
+  const t = f.type.toLowerCase();
+  const foto = ["image/jpeg", "image/png", "image/webp"].includes(t), video = ["video/mp4", "video/3gpp", "video/quicktime", "video/webm"].includes(t);
+  if (!foto && !video) return "Escolha uma foto (JPG, PNG ou WEBP) ou um vídeo (MP4, 3GP, MOV ou WEBM).";
+  if (foto && f.size > LIMITE_FOTO) return "Foto grande demais (máximo 5 MB).";
+  if (video && f.size > LIMITE_VIDEO) return "Vídeo grande demais (máximo 16 MB).";
+  return null;
+}
+
+const midias = new Map<string, string>();
+/** Baixa a foto ou o vídeo com o token e devolve um endereço local para mostrar. */
+export async function urlDaMidia(corridaId: string, midiaId: string): Promise<string> {
+  const ja = midias.get(midiaId);
+  if (ja) return ja;
+  const r = await fetch(urlApi(`/corridas/${corridaId}/midia/${midiaId}`), { headers: { authorization: `Bearer ${token() ?? ""}` } });
+  if (!r.ok) throw new Error("Não deu para baixar o arquivo.");
+  const u = URL.createObjectURL(await r.blob());
+  midias.set(midiaId, u);
+  return u;
+}
+
+/** Envia a foto ou o vídeo ao chat da corrida. */
+export const enviarMidiaDoChat = (corridaId: string, f: File, legenda?: string) =>
+  api(`/corridas/${corridaId}/midia`, { bruto: f, cabecalhos: legenda ? { "x-legenda": encodeURIComponent(legenda) } : {} });
+
 // ------------------------------------------------------------------ GPS
 
 export interface Posicao { lat: number; lng: number }

@@ -1,17 +1,19 @@
 // Nova Solicitação: a central pede a corrida pelo passageiro (telefone ou CPF), com rota, paradas, agendamento, motorista e valor manual.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Edit3, Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowDown, ArrowUp, CheckCircle2, Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { api } from "../../api";
 import { pedirConfig } from "../demais/comum";
 import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEndereco";
-import { Aviso, L, fone, hojeBr, msgErro, op, pino, reais, soDig, useDados, useMapa } from "./comum";
+import { Aviso, L, fone, msgErro, op, pino, reais, soDig, useDados, useMapa } from "./comum";
 import "./corridas.css";
 
-const PAGAMENTOS = ["Dinheiro", "Crédito", "Débito", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App", "Voucher"];
+const PAGAMENTOS = ["Dinheiro", "Crédito", "Débito", "Pix"];
 const EXIGENCIAS = ["Porta-malas grande", "Aceita encomendas", "Adaptado para cadeirante", "Ficar à disposição do passageiro"];
 const P0: PontoEscolhido = { texto: "" };
 
 export default function Solicitar() {
+  const navegar = useNavigate();
   const [tipo, setTipo] = useState<"tel" | "cpf">("tel");
   const [busca, setBusca] = useState("");
   const [buscando, setBuscando] = useState(false);
@@ -76,7 +78,7 @@ export default function Solicitar() {
     return () => { vivo = false; };
   }, [chave]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const valor = manual != null ? Number(manual.replace(",", ".")) : est?.valor ?? null;
+  const valor = manual != null ? (manual.trim() ? Number(manual.replace(",", ".")) : null) : est?.valor ?? null;
 
   // Mapa com os carros online e os pontos da rota.
   const { ref, mapa: m } = useMapa([-15.78, -47.93], 12);
@@ -124,109 +126,88 @@ export default function Solicitar() {
     } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
   }
 
+  const valorTexto = manual != null ? manual : est?.valor != null ? String(est.valor).replace(".", ",") : "";
+  const pagamentos = [...PAGAMENTOS, ...(conveniadas.length ? ["Voucher"] : [])];
   return (
     <div className="oc">
-      <div className="oc-topo"><h1>Nova Solicitação <small>{hojeBr().split("-").reverse().join("/")}</small></h1></div>
+      <div className="oc-topo"><h1>Solicitar nova corrida</h1></div>
       <Aviso texto={erro} erro />
       {ok && <div className="oc-aviso" style={{ color: "var(--oc-ok)", borderColor: "#34d39940", background: "#34d39918" }}><CheckCircle2 size={14} /> {ok}</div>}
-      <div className="oc-solic">
-        <div>
-          <div className="oc-card">
-            <h3>1. Passageiro</h3>
-            <div className="oc-fila" style={{ marginBottom: 10 }}>
-              {(["tel", "cpf"] as const).map((t) => <label key={t} className={`oc-chip ${tipo === t ? "on" : ""}`} style={{ cursor: "pointer" }}><input type="radio" name="busca_tipo" checked={tipo === t} onChange={() => { setTipo(t); setBusca(""); }} style={{ display: "none" }} />{t === "tel" ? "Telefone" : "CPF"}</label>)}
-            </div>
-            <label className="oc-l">{tipo === "tel" ? "Telefone de cadastro *" : "CPF do cliente *"}
-              <span className="oc-fila" style={{ flexWrap: "nowrap" }}>
-                <input value={busca} onChange={(e) => setBusca(e.target.value)} onBlur={buscar} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscar())} placeholder={tipo === "tel" ? "(00) 00000-0000" : "000.000.000-00"} inputMode="numeric" />
-                <button className="oc-btn" type="button" onClick={buscar} aria-label="Buscar passageiro">{buscando ? <Loader2 size={16} className="gira" /> : <Search size={16} />}</button>
-              </span>
-            </label>
-            {recentes.length > 0 && (
-              <div className="oc-recentes" style={{ marginTop: 10 }}><span className="suave" style={{ fontWeight: 800, fontSize: 11 }}>FAVORITOS</span>
-                {recentes.map((e, i) => <button key={i} type="button" onClick={() => setOrigem(e)} title="Usar como origem">{e.texto}</button>)}</div>
-            )}
-            <div className="oc-grid2" style={{ marginTop: 10 }}>
-              <label className="oc-l">Nome Passageiro *<input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Digite o nome do passageiro" maxLength={80} /></label>
-              <label className="oc-l">Contato (Manual)<input value={contato} onChange={(e) => setContato(e.target.value)} placeholder="Auto" inputMode="tel" />{telCadastro && !contato && <small className="suave" style={{ textTransform: "none" }}>{fone(telCadastro)}</small>}</label>
-            </div>
-            <label className="oc-l" style={{ marginTop: 10 }}>CPF (opcional)<input value={cpf} onChange={(e) => setCpf(e.target.value)} inputMode="numeric" placeholder="000.000.000-00" maxLength={14} /></label>
+      <div className="oc-card" style={{ maxWidth: 820 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="oc-fila"><span className="oc-l">Buscar cliente via:</span>
+            {(["tel", "cpf"] as const).map((t) => <label key={t} className={`oc-chip ${tipo === t ? "on" : ""}`} style={{ cursor: "pointer" }}><input type="radio" name="busca_tipo" checked={tipo === t} onChange={() => { setTipo(t); setBusca(""); }} style={{ display: "none" }} />{t === "tel" ? "Telefone" : "CPF"}</label>)}
           </div>
-
-          <div className="oc-card">
-            <h3>2. Rota</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <CampoEndereco rotulo="Origem" valor={origem} onChange={setOrigem} />
-              <label className="oc-sw"><input type="checkbox" checked={favOrigem} onChange={(e) => setFavOrigem(e.target.checked)} /> Favoritar endereço de partida</label>
-              <input placeholder="Sala/Bloco/Apart (Opcional)" value={complemento} onChange={(e) => setComplemento(e.target.value)} maxLength={80} />
-              {paradas.map((p, i) => (
-                <div key={i} className="oc-fila" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
-                  <div style={{ flex: 1 }}><CampoEndereco rotulo={`Parada ${i + 1}`} valor={p} onChange={(v) => setParadas(paradas.map((x, j) => (j === i ? v : x)))} /></div>
-                  <button className="oc-btn" type="button" onClick={() => setParadas(paradas.filter((_, j) => j !== i))} aria-label="Remover parada"><Trash2 size={16} /></button>
-                </div>
-              ))}
-              {!semDestino && (
-                <div className="oc-fila" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
-                  <div style={{ flex: 1 }}><CampoEndereco rotulo="Destino" valor={destino} onChange={setDestino} /></div>
-                  <button className="oc-btn" type="button" disabled={paradas.length >= 3} onClick={() => setParadas([...paradas, P0])} aria-label="Adicionar parada" title="Adicionar parada (até 3)"><Plus size={16} /></button>
-                </div>
-              )}
-              <input placeholder="Referência (Portão, Cor...)" value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} />
-              {!semDestino && <label className="oc-sw"><input type="checkbox" checked={favDestino} onChange={(e) => setFavDestino(e.target.checked)} /> Favoritar endereço de destino</label>}
-              <label className="oc-sw"><input type="checkbox" checked={semDestino} onChange={(e) => setSemDestino(e.target.checked)} /> Sem Destino</label>
+          <label className="oc-l">{tipo === "tel" ? "Telefone de cadastro *" : "CPF do cliente *"}
+            <span className="oc-fila" style={{ flexWrap: "nowrap" }}>
+              <input value={busca} onChange={(e) => setBusca(e.target.value)} onBlur={buscar} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscar())} placeholder={tipo === "tel" ? "+55" : ""} inputMode="numeric" />
+              <button className="oc-btn" type="button" onClick={buscar} aria-label="Buscar passageiro">{buscando ? <Loader2 size={16} className="gira" /> : <Search size={16} />}</button>
+            </span>
+          </label>
+          {recentes.length > 0 && (
+            <div className="oc-recentes"><span className="suave" style={{ fontWeight: 800, fontSize: 11 }}>FAVORITOS</span>
+              {recentes.map((e, i) => <button key={i} type="button" onClick={() => setOrigem(e)} title="Usar como partida">{e.texto}</button>)}</div>
+          )}
+          <label className="oc-l">Telefone para contato<input value={contato} onChange={(e) => setContato(e.target.value)} placeholder="+55" inputMode="tel" />{telCadastro && !contato && <small className="suave" style={{ textTransform: "none" }}>{fone(telCadastro)}</small>}</label>
+          <label className="oc-l">Nome *<input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} /></label>
+          <label className="oc-sw"><input type="checkbox" checked={agendar} onChange={(e) => setAgendar(e.target.checked)} /> Agendar corrida</label>
+          {agendar && <input type="datetime-local" value={quando} min={minimo} onChange={(e) => setQuando(e.target.value)} aria-label="Data e hora do agendamento" />}
+          <label className="oc-l">Informação antes do aceite<textarea value={infoAntes} onChange={(e) => setInfoAntes(e.target.value)} maxLength={300} /></label>
+          <label className="oc-l">Informação após o aceite<textarea value={infoDepois} onChange={(e) => setInfoDepois(e.target.value)} maxLength={300} /></label>
+          <label className="oc-l">Informação interna<textarea value={infoInterna} onChange={(e) => setInfoInterna(e.target.value)} maxLength={500} /></label>
+          <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Forma de pagamento *</span>
+            <div className="oc-pagto">{pagamentos.map((p) => <label key={p} className={pagamento === p ? "on" : ""}><input type="radio" name="forma_pagamento" checked={pagamento === p} onChange={() => setPagamento(p)} />{p}</label>)}</div></div>
+          {conveniadas.length > 0 && (
+            <div className="oc-grid2">
+              <label className="oc-l">Empresa conveniada<select value={empresaConv} onChange={(e) => { setEmpresaConv(e.target.value); setCentroCusto(""); }}><option value="">Nenhuma</option>{conveniadas.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
+              {centros.length > 0 && <label className="oc-l">Centro de custo<select value={centroCusto} onChange={(e) => setCentroCusto(e.target.value)}><option value="">Nenhum</option>{centros.map((c) => <option key={c}>{c}</option>)}</select></label>}
             </div>
-            <div className="oc-mapa-solic"><div ref={ref} className="oc-mapa" /></div>
-            <button className="oc-btn peq" type="button" style={{ marginTop: 8 }} onClick={mapa.recarregar}><RefreshCw size={14} /> Atualizar Carros</button>
+          )}
+          {pagamento === "Voucher" && <label className="oc-l">Número do voucher<input value={voucher} maxLength={30} onChange={(e) => setVoucher(e.target.value)} /></label>}
+          <label className="oc-l">Categoria<select value={categoria} onChange={(e) => setCategoria(e.target.value)}>{categorias.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
+          <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Exigências</span>
+            <div className="oc-pagto">{EXIGENCIAS.map((x) => <label key={x} className={exigencias.includes(x) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x] : exigencias.filter((y) => y !== x))} />{x}</label>)}</div></div>
+          <label className="oc-sw"><input type="checkbox" checked={variosCarros} onChange={(e) => setVariosCarros(e.target.checked)} /> Enviar mais de um carro</label>
+          <label className="oc-l">Corridas apenas para o motorista:
+            <select value={motoristaId} onChange={(e) => setMotoristaId(e.target.value)}>
+              <option value="">Todos</option>
+              {(mots.dados?.motoristas ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+            </select>
+          </label>
+          <CampoEndereco rotulo="Endereço de partida (com número) *" valor={origem} onChange={setOrigem} />
+          <input placeholder="Sala/Bloco/Apart" value={complemento} onChange={(e) => setComplemento(e.target.value)} maxLength={80} />
+          <label className="oc-sw"><input type="checkbox" checked={favOrigem} onChange={(e) => setFavOrigem(e.target.checked)} /> Favoritar</label>
+          {!semDestino && (
+            <div className="oc-fila" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}><CampoEndereco rotulo="Endereço de destino (com número)" valor={destino} onChange={setDestino} /></div>
+              <button className="oc-btn" type="button" disabled={paradas.length >= 3} onClick={() => setParadas([...paradas, P0])} aria-label="Adicionar parada" title="Adicionar parada (até 3)"><Plus size={16} /></button>
+            </div>
+          )}
+          {paradas.map((p, i) => (
+            <div key={i} className="oc-fila" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
+              <div style={{ flex: 1 }}><CampoEndereco rotulo={`Parada ${i + 1}`} valor={p} onChange={(v) => setParadas(paradas.map((x, j) => (j === i ? v : x)))} /></div>
+              <button className="oc-btn" type="button" disabled={i === 0} onClick={() => setParadas(paradas.map((x, j) => (j === i - 1 ? paradas[i] : j === i ? paradas[i - 1] : x)))} aria-label="Subir parada"><ArrowUp size={16} /></button>
+              <button className="oc-btn" type="button" disabled={i === paradas.length - 1} onClick={() => setParadas(paradas.map((x, j) => (j === i + 1 ? paradas[i] : j === i ? paradas[i + 1] : x)))} aria-label="Descer parada"><ArrowDown size={16} /></button>
+              <button className="oc-btn" type="button" onClick={() => setParadas(paradas.filter((_, j) => j !== i))} aria-label="Remover parada"><Trash2 size={16} /></button>
+            </div>
+          ))}
+          {!semDestino && <label className="oc-sw"><input type="checkbox" checked={favDestino} onChange={(e) => setFavDestino(e.target.checked)} /> Favoritar</label>}
+          <label className="oc-sw"><input type="checkbox" checked={semDestino} onChange={(e) => setSemDestino(e.target.checked)} /> Sem destino</label>
+          <label className="oc-l">Referência do endereço de partida<input value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} /></label>
+          <label className="oc-l">Valor estimado (R$)<input value={valorTexto} onChange={(e) => setManual(e.target.value)} inputMode="decimal" aria-label="Valor estimado" />
+            {est?.distanciaKm != null && <small className="suave" style={{ textTransform: "none" }}>{est.distanciaKm.toLocaleString("pt-BR")} km</small>}</label>
+          <div className="oc-pagto">
+            <label className={finalModo === "livre" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "livre"} onChange={() => setFinalModo("livre")} />Valor final livre</label>
+            <label className={finalModo === "prefixado" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "prefixado"} onChange={() => setFinalModo("prefixado")} />Valor final prefixado em:</label>
           </div>
-        </div>
-
-        <div>
-          <div className="oc-card">
-            <h3>3. Opções</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <label className="oc-l">Direcionar para Motorista
-                <select value={motoristaId} onChange={(e) => setMotoristaId(e.target.value)}>
-                  <option value="">Qualquer um (Fila Automática)</option>
-                  {(mots.dados?.motoristas ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome} ({m.online ? "Online" : "Offline"})</option>)}
-                </select>
-                <small className="suave" style={{ textTransform: "none", fontWeight: 400 }}>Deixe "Qualquer um" para o sistema distribuir.</small>
-              </label>
-              <label className="oc-l">Categoria do Veículo<select value={categoria} onChange={(e) => setCategoria(e.target.value)}>{categorias.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
-              <div className="oc-card" style={{ background: "var(--oc-card2)", marginBottom: 0 }}>
-                <label className="oc-sw"><input type="checkbox" checked={agendar} onChange={(e) => setAgendar(e.target.checked)} /> Agendar Corrida</label>
-                {agendar && <input type="datetime-local" style={{ marginTop: 10 }} value={quando} min={minimo} onChange={(e) => setQuando(e.target.value)} aria-label="Data e hora do agendamento" />}
-              </div>
-              <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Pagamento</span>
-                <div className="oc-pagto">{PAGAMENTOS.map((p) => <label key={p} className={pagamento === p ? "on" : ""}><input type="radio" name="forma_pagamento" checked={pagamento === p} onChange={() => setPagamento(p)} />{p}</label>)}</div></div>
-              {conveniadas.length > 0 && (
-                <div className="oc-grid2">
-                  <label className="oc-l">Empresa conveniada<select value={empresaConv} onChange={(e) => { setEmpresaConv(e.target.value); setCentroCusto(""); }}><option value="">Nenhuma</option>{conveniadas.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
-                  {centros.length > 0 && <label className="oc-l">Centro de custo<select value={centroCusto} onChange={(e) => setCentroCusto(e.target.value)}><option value="">Nenhum</option>{centros.map((c) => <option key={c}>{c}</option>)}</select></label>}
-                </div>
-              )}
-              {pagamento === "Voucher" && <label className="oc-l">Número do voucher<input value={voucher} maxLength={30} onChange={(e) => setVoucher(e.target.value)} placeholder="Ex.: A-1234" /></label>}
-              <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Filtros (Opcionais)</span>
-                <div className="oc-pagto">{EXIGENCIAS.map((x) => <label key={x} className={exigencias.includes(x) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x] : exigencias.filter((y) => y !== x))} />{x}</label>)}</div></div>
-              <label className="oc-sw"><input type="checkbox" checked={variosCarros} onChange={(e) => setVariosCarros(e.target.checked)} /> Enviar mais de um carro</label>
-              <textarea placeholder="Observação para o motorista..." value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={300} />
-              <label className="oc-l">Informação antes do aceite<textarea placeholder="Será visualizada pelo motorista antes do aceite" value={infoAntes} onChange={(e) => setInfoAntes(e.target.value)} maxLength={300} /></label>
-              <label className="oc-l">Informação após o aceite<textarea placeholder="Só aparece para o motorista que aceitar" value={infoDepois} onChange={(e) => setInfoDepois(e.target.value)} maxLength={300} /></label>
-              <label className="oc-l">Informação interna<textarea placeholder="Só a central vê" value={infoInterna} onChange={(e) => setInfoInterna(e.target.value)} maxLength={500} /></label>
-            </div>
-          </div>
-          <div className="oc-estimativa">
-            <div className="oc-fila" style={{ justifyContent: "space-between" }}>
-              <span className="suave" style={{ fontWeight: 800 }}>ESTIMATIVA</span>
-              <button className="oc-btn peq" type="button" onClick={() => setManual(manual == null ? (est?.valor != null ? String(est.valor).replace(".", ",") : "") : null)}><Edit3 size={13} /> {manual == null ? "Editar valor" : "Usar estimativa"}</button>
-            </div>
-            {manual != null ? <input value={manual} onChange={(e) => setManual(e.target.value)} inputMode="decimal" style={{ margin: "8px 0", fontSize: 22 }} aria-label="Valor manual" /> : <div><strong>{valor != null ? reais(valor) : "R$ 0,00"}</strong></div>}
-            <div className="oc-pagto" style={{ margin: "8px 0" }}>
-              <label className={finalModo === "livre" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "livre"} onChange={() => setFinalModo("livre")} />Valor final livre</label>
-              <label className={finalModo === "prefixado" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "prefixado"} onChange={() => setFinalModo("prefixado")} />Valor final prefixado</label>
-            </div>
-            {finalModo === "prefixado" && <input value={prefixado} onChange={(e) => setPrefixado(e.target.value)} inputMode="decimal" placeholder="Valor da corrida (R$)" aria-label="Valor prefixado" style={{ marginBottom: 8 }} />}
-            <div className="oc-dado"><span>Distância</span><b>{est?.distanciaKm != null ? `${est.distanciaKm.toLocaleString("pt-BR")} km` : "0.0 km"}</b></div>
-            <button className="oc-btn pri" style={{ width: "100%", marginTop: 12, minHeight: 46, fontSize: 15 }} disabled={enviando} onClick={solicitar}>{enviando ? <Loader2 size={16} className="gira" /> : null} Solicitar Corrida</button>
+          {finalModo === "prefixado" && <label className="oc-l">Valor da corrida (R$)<input value={prefixado} onChange={(e) => setPrefixado(e.target.value)} inputMode="decimal" aria-label="Valor prefixado" /></label>}
+          <label className="oc-l">Tarifa<input value={categoria} readOnly /></label>
+          <small className="suave" style={{ textTransform: "none" }}>OBS: Caso a configuração do tipo de cálculo do valor final da corrida não seja "Pré-calculado Fixo", o valor pré-fixado não será considerado.</small>
+          <div><button className="oc-btn peq" type="button" onClick={mapa.recarregar}><RefreshCw size={14} /> Atualizar motoristas</button></div>
+          <div className="oc-mapa-solic"><div ref={ref} className="oc-mapa" /></div>
+          <div className="oc-fila" style={{ justifyContent: "flex-end" }}>
+            <button className="oc-btn" type="button" onClick={() => navegar(-1)}>Voltar</button>
+            <button className="oc-btn pri" disabled={enviando} onClick={solicitar}>{enviando ? <Loader2 size={16} className="gira" /> : null} Solicitar</button>
           </div>
         </div>
       </div>
