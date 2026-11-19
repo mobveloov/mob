@@ -81,7 +81,7 @@ test("Z-API: conectar aponta o webhook e devolve o QR quando falta ler", async (
 const corpoMeta = (mensagens: unknown[], phoneId = "109876543210", contatos: unknown[] = [{ wa_id: "5511977776666", profile: { name: "Maria" } }]) =>
   ({ entry: [{ changes: [{ value: { metadata: { phone_number_id: phoneId }, contacts: contatos, messages: mensagens } }] }] });
 
-test("Meta: lê texto, botão, localização e áudio; ignora outro número e mensagem atrasada", () => {
+test("Meta: lê texto, botão, localização, áudio e foto; ignora outro número e mensagem atrasada", () => {
   const agora = Date.now();
   const seg = (d = 0) => String(Math.floor((agora - d) / 1000));
   const lidas = lerWebhookMeta(corpoMeta([
@@ -92,7 +92,8 @@ test("Meta: lê texto, botão, localização e áudio; ignora outro número e me
     { from: "5511977776666", id: "wamid.5", timestamp: seg(3 * 24 * 3600_000), type: "text", text: { body: "antiga" } },
     { from: "5511977776666", id: "wamid.6", timestamp: seg(), type: "image", image: { id: "X" } },
   ]), "109876543210", agora);
-  assert.deepEqual(lidas.map((l) => l.id), ["wamid.1", "wamid.2", "wamid.3", "wamid.4"]);
+  assert.deepEqual(lidas.map((l) => l.id), ["wamid.1", "wamid.2", "wamid.3", "wamid.4", "wamid.6"]);
+  assert.equal(lidas[4].midia?.tipo, "imagem"); // foto vai ao motorista durante a corrida
   assert.equal(lidas[0].nome, "Maria");
   assert.equal(lidas[1].texto, "Pedir corrida");
   assert.equal(lidas[2].local?.lng, -46.6);

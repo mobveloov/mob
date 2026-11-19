@@ -242,9 +242,13 @@ Branch com CRM, Bot e Totem. Tela por tela, sem a parte da Machine (a corrida é
 | Bot › voz do bot (resposta em áudio) | Sim | Só quando o passageiro manda áudio, com chave Gemini ou OpenAI; sem chave, só texto. Ligar em Ajustes do bot. |
 | Bot › Sugestões de Endereço (apelidos) | Sim | Aba nova no Bot; cadastro por apelido com ponto do Google Maps ou endereço; vale no embarque e no destino. |
 | Bot › agendamento (menu, "amanhã 7h", lista, cancelar, avisos 15 e 5 min) | Sim | A corrida nasce agendada no painel e não prende a conversa. Até 3 por passageiro, 15 min a 7 dias. |
-| Bot › repasse passageiro e motorista | Sim | Passageiro: texto, áudio e localização vão ao chat da corrida. Motorista: texto e áudio do chat vão ao WhatsApp. Foto e vídeo não (o chat da corrida só tem texto e áudio). |
+| Bot › repasse passageiro e motorista | Sim | Passageiro: texto, áudio, foto, vídeo e localização vão ao chat da corrida. Motorista: texto, áudio, foto e vídeo do chat vão ao WhatsApp. Foto JPG, PNG ou WEBP até 5 MB; vídeo MP4, 3GP, MOV ou WEBM até 16 MB (tipo conferido pelo começo do arquivo); fora do limite o passageiro recebe o motivo. Sem corrida em andamento o bot explica que só encaminha ao motorista. |
 | Bot › descadastro por resposta (PARAR, SAIR, NÃO QUERO MAIS) | Sim | Grava o opt-out no CRM (Contatos) e confirma ao passageiro. |
-| whatsapp-webhook (11 mil linhas) | Quase | Fluxo completo e as regras dos módulos copiados com os testes originais. Ficaram de fora só pontos sem equivalente no painel: casas (CNEFE) escolhidas por lista de ruas, preço por cidade e pesquisa de preferências da corrida. |
+| Bot › escolha da rua por lista (CNEFE) | Sim | Embarque ou destino que serve para mais de uma rua (mesmo nome em dois bairros) vira lista numerada; responde o número, o nome do bairro ou "a primeira". Textos do original. Só com a base de endereços (CNEFE) configurada. O original também lista lugares das Sugestões quando vários combinam: aqui a Sugestão com maior nota vence (`bot/lista-ruas.ts`). |
+| Bot › pergunta de preço por cidade | Sim | "Quanto custa?", "qual o valor", "vocês fazem corrida pra X?" respondem com a tabela Preços por cidade do totem (dentro da cidade, locais ou o valor da cidade citada, todos os horários, pedágio e hora de espera). Rota sem valor: avisa e passa a conversa ao atendente (o original também avisa o WhatsApp de suporte; aqui o atendente responde pelo painel). No meio do pedido só responde a pergunta sozinha e lembra a etapa (`bot/pergunta-preco.ts`). |
+| Bot › pesquisa de preferências da corrida | Sim | Depois do pagamento: "Alguma preferência para esta corrida?" com as opções ligadas em Bot › Ajustes › Opções do pedido (motorista mulher, animal, porta-malas, cadeirante, encomenda, carro à disposição, 6 filtros da central, ida e volta, parada, cupom, motorista de confiança e recado). Cupom, parada e recado vão nos campos da corrida; o resto na observação. Pedido urgente não pergunta. Não há despacho por preferência (sem Machine) e o "motorista de confiança" só fica anotado (`bot/opcoes-pedido.ts`). |
+| Bot › menu padrão | Sim | Boas-vindas do original ("Olá! Sou um assistente 🤖 inteligente...", "Sou a 🤖 IA da central...") com as opções Solicitar corrida, Agendar e Suporte, numeradas (o original usa botões/enquete; sem botão o WhatsApp mostra a lista). Sem nome da empresa e do assistente. |
+| whatsapp-webhook (11 mil linhas) | Quase | Fluxo completo e as regras dos módulos copiados com os testes originais, mais a lista de ruas, o preço por cidade e a pesquisa de preferências. Ficam de fora só pontos sem equivalente no painel (foto da fachada como embarque, enquete do WhatsApp, chamar o WhatsApp de suporte da empresa). |
 | Totem: tela de pedido, categoria, acompanhamento | Sim | Preço como estimativa. |
 | Totem: bloqueio por senha, tela acesa, recarregar remoto | Sim | Sem a ponte do app Android. |
 | Totem: checagem do número no WhatsApp, imagem do topo e do rodapé, bloqueio sem WhatsApp, aparelho vinculado | Sim | Ver docs/TOTEM.md. |
@@ -262,12 +266,9 @@ não foi aberto lado a lado: a comparação foi feita pelo código das telas.
 Nenhuma parte do CRM, Bot ou Totem está 100% copiada do mobveloov: o que veio está na tabela "tela/função do mobveloov | portada? | diferença" (seção "CRM, Bot e Totem copiados do sistema de referência"). Lista do que falta, uma linha cada:
 
 **Bot de WhatsApp**
-- Foto e vídeo entre motorista e passageiro (o chat da corrida só tem texto e áudio).
-- Escolha de casa por lista de ruas (CNEFE) dentro da conversa.
-- Preço por cidade na resposta do bot (usar a tabela "Preços por cidade" do totem).
-- Pesquisa de preferências da corrida.
-- Z-API, Z-Pro, Meta e Evolution testados só com respostas simuladas, nunca com conta real.
-- Texto padrão do menu do bot mantém nome da empresa e do assistente (diferença do original).
+- Z-API, Z-Pro, Meta e Evolution testados só com respostas simuladas, nunca com conta real (vale também para foto e vídeo recebidos).
+- Foto da fachada como embarque e enquete/botões do WhatsApp (o menu vai numerado).
+- Preferências da corrida só ficam anotadas: o despacho não filtra motorista por elas.
 
 **CRM**
 - Cartão fidelidade e pontos.
