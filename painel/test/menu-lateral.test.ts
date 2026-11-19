@@ -27,6 +27,18 @@ test("operador não vê o que é só do administrador", () => {
   assert.deepEqual(soAdminGrupo.map((g) => g.id), ["operacao"]);
 });
 
+test("Configurações tem o item \"Carteiras de crédito\" (rota própria; \"Carteiras\" continua em Financeiro)", () => {
+  const f = FUNCOES.find((x) => x.id === "carteiras-credito");
+  assert.ok(f);
+  assert.equal(f.grupo, "Configurações");
+  assert.equal(f.nome, "Carteiras de crédito");
+  assert.notEqual(f.rota, FUNCOES.find((x) => x.id === "carteiras")!.rota);
+  assert.equal(FUNCOES.find((x) => x.id === "carteiras")!.grupo, "Financeiro");
+  const config = menuLateral(funcoesDoCargo("gestor")).find((g) => g.id === "configuracao")!;
+  assert.ok(config.blocos.some((b) => b.itens.some((i) => i.id === "carteiras-credito")));
+  assert.ok(!ids("operador").includes("carteiras-credito"));
+});
+
 test("rotas e ids continuam os de funcoes.ts", () => {
   for (const g of menuLateral(funcoesDoCargo("plataforma"))) for (const b of g.blocos) for (const f of b.itens) assert.equal(FUNCOES.find((x) => x.id === f.id)?.rota, f.rota);
 });

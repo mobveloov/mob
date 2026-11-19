@@ -29,7 +29,7 @@ const ICONES: Record<string, LucideIcon> = {
   "visao-geral": Gauge, "extrato-central": Landmark, "extrato-online": CreditCard, "transacao-pix": Zap, "indice-relatorios": BarChart3,
   "faturamento-empresa": Building2, "faturamento-centro-custo": Layers, "faturamento-periodo": CalendarClock, "vouchers-motoristas": Ticket,
   "os-motorista": Users, "os-empresa": Building2, "os-bairro": MapPin, "os-pagamento": Coins, "os-operador": UserCog, "os-percentual-motorista": Percent, "km-rodados": Route,
-  carteiras: Wallet, extrato: Receipt, saques: ArrowDownToLine, recargas: Banknote, relatorios: TrendingUp,
+  carteiras: Wallet, "carteiras-credito": Wallet, extrato: Receipt, saques: ArrowDownToLine, recargas: Banknote, relatorios: TrendingUp,
   "demonstrativo-mensal": FileText, "meus-planos": Crown, "controle-centrais": Landmark,
   marca: Settings, equipe: UserCog, "alterar-senha": KeyRound,
   "config-gerais": Settings, "regras-credito": CreditCard, categorias: Layers, "tarifas-dinamicas": TrendingUp, descontos: Percent, "regras-despacho": Target,

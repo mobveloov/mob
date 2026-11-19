@@ -41,7 +41,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   {
     id: "configuracao", nome: "Configuração", cor: "rosa", blocos: [
       { ids: ["marca", "equipe", "filiais", "superadmin", "alterar-senha"] },
-      { titulo: "Regras e integrações", ids: ["config-gerais", "personalizacao-app", "taxas-central", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app"] },
+      { titulo: "Regras e integrações", ids: ["config-gerais", "personalizacao-app", "taxas-central", "carteiras-credito", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app"] },
     ],
   },
   {

@@ -97,6 +97,7 @@ export const FUNCOES: Funcao[] = [
   { id: "integracoes", grupo: "Configurações", nome: "Integrações", rota: "/integracoes", minimo: "admin" },
   { id: "config-nps", grupo: "Configurações", nome: "NPS", rota: "/config-nps", minimo: "gestor" },
   { id: "termos-app", grupo: "Configurações", nome: "Termos de uso", rota: "/termos-app", minimo: "gestor" },
+  { id: "carteiras-credito", grupo: "Configurações", secao: EXTRA, nome: "Carteiras de crédito", rota: "/carteiras-credito", minimo: "gestor" },
   { id: "regras-credito", grupo: "Configurações", secao: EXTRA, nome: "Regras de Crédito", rota: "/regras-credito", minimo: "gestor" },
 
   { id: "avaliacoes", grupo: "Avaliações", nome: "NPS", rota: "/avaliacoes", antigas: ["/nps"] },

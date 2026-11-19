@@ -28,6 +28,7 @@ export const TELAS_DEMAIS: Record<string, JSX.Element> = {
   "transacao-pix": <TransacaoPix />,
   "alertas-empresas": <AlertasEmpresas />,
   carteiras: <Carteiras />,
+  "carteiras-credito": <Carteiras />,
   extrato: <Extrato />,
   saques: <Saques />,
   recargas: <Recargas />,
