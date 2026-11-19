@@ -6,6 +6,7 @@ import { podeCargo } from "../comum/cargos.ts";
 import express, { type Request, type Response } from "express";
 import * as D from "../servidor/dados.ts";
 import { validarUrlExterna } from "../servidor/url.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import * as A from "./armazem.ts";
 import { cidadePorCodigo } from "./cidades.ts";
@@ -62,7 +63,7 @@ rotasBot.post(["/webhook/:empresa/:segredo", "/webhook/:empresa/:segredo/:conexa
   if (!alvo) return res.status(404).json({ erro: "Não encontrado." });
   const { empresa, cx } = alvo;
   const cfg = A.config(empresa);
-  if (!cfg.ativo || !cx.ativa || !D.empresa(empresa)!.ativa) return res.json({ ok: true, ignorado: true });
+  if (!cfg.ativo || !cx.ativa || !D.empresa(empresa)!.ativa || !moduloLigado(empresa, "bot")) return res.json({ ok: true, ignorado: true });
   // Meta assina cada aviso com o App Secret do app; com o segredo salvo, aviso sem assinatura certa é recusado.
   if (cx.provedor === "meta") {
     const appSecret = A.segredosBot(empresa, cx.id).appSecret;

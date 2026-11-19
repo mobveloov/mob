@@ -16,6 +16,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { cancelarCorrida, criarCorridaPropria, distanciaEstimada, estimarPreco, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
 import * as D from "../servidor/dados.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { exigirLogin, exigirModulo, exigirPapel } from "../servidor/sessao.ts";
 import { buscarEndereco } from "../enderecos/index.ts";
 import * as A from "./apk.ts";
@@ -118,7 +119,7 @@ declare module "express-serve-static-core" { interface Request { totem?: Totem }
 
 function acharTotem(req: Request): Totem | null {
   const { empresa, local } = req.params;
-  if (!D.idValido(empresa) || !D.empresa(empresa)?.ativa) return null;
+  if (!D.idValido(empresa) || !D.empresa(empresa)?.ativa || !moduloLigado(empresa, "totem")) return null;
   const l = T.local(empresa, local);
   return l && l.ativo ? { empresaId: empresa, local: l } : null;
 }
@@ -140,7 +141,7 @@ rotasTotem.post("/webhook/:empresa/:local", (_req, res) => { res.json({ ok: true
 // Prêmios (roleta e raspadinha): páginas públicas /p/<empresa>/<token> e /premios/<empresa>/<jogo>. Sem login; o jogo
 // só abre com o token do convite (40 letras e números) e o link aberto pede o telefone (com limite de tentativas).
 const baseDaRequisicao = (req: Request) => (process.env.PUBLICO_URL ?? "").trim().replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
-const empresaDoPremio = (req: Request) => { const e = req.params.empresa; if (!D.idValido(e) || !D.empresa(e)?.ativa) throw Object.assign(new Error("Link inválido."), { status: 404 }); return e; };
+const empresaDoPremio = (req: Request) => { const e = req.params.empresa; if (!D.idValido(e) || !D.empresa(e)?.ativa || !moduloLigado(e, "totem")) throw Object.assign(new Error("Link inválido."), { status: 404 }); return e; };
 const podeAbrirPremio = limitador(20, 10 * 60_000);
 const premioPublico = (fn: (req: Request, e: string) => Promise<{ status: number; corpo: Record<string, unknown> }> | { status: number; corpo: Record<string, unknown> }) => async (req: Request, res: Response) => {
   try { const r = await fn(req, empresaDoPremio(req)); res.status(r.status).json(r.corpo); } catch (e) {

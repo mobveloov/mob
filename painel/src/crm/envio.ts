@@ -10,6 +10,7 @@ import { agoraBr } from "../servidor/util.ts";
 import { barrarEnvio } from "../crm2/governanca.ts";
 import * as A from "./armazem.ts";
 import { conferirCupom } from "./cupons.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { WA_OPTOUT_SKIP } from "./optout.ts";
 import { descadastrado, ligarEventos, processarAtrasados, rodarGatilhosDeTempo } from "./gatilhos.ts";
 import { voltaComportamento } from "./comportamento.ts";
@@ -276,6 +277,9 @@ export async function volta(empresaId: string) {
   try { await voltaRegua(empresaId); } catch (e) { console.error("[crm] régua", empresaId, e instanceof Error ? e.message : e); }
 }
 
+/** O trabalhador só roda para empresa ativa e com o recurso "CRM e campanhas" ligado. */
+export const empresaPodeRodarCrm = (empresaId: string) => !!D.empresa(empresaId)?.ativa && moduloLigado(empresaId, "crm");
+
 let relogio: NodeJS.Timeout | null = null;
 export function iniciarTrabalhador(intervaloMs = 15_000) {
   if (relogio) return;
@@ -285,7 +289,7 @@ export function iniciarTrabalhador(intervaloMs = 15_000) {
     if (ocupado) return;
     ocupado = true;
     try {
-      for (const e of D.listarEmpresas().filter((x) => x.ativa)) {
+      for (const e of D.listarEmpresas().filter((x) => empresaPodeRodarCrm(x.id))) {
         try { await volta(e.id); } catch (err) { console.error("[crm]", e.id, err instanceof Error ? err.message : err); }
       }
     } finally { ocupado = false; }

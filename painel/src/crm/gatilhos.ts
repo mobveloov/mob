@@ -11,6 +11,7 @@
 import crypto from "node:crypto";
 import * as Cad from "../cadastros/armazem.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
+import { moduloLigado } from "../superadmin/recursos.ts";
 import { banco } from "../servidor/banco.ts";
 import * as D from "../servidor/dados.ts";
 import { agoraBr } from "../servidor/util.ts";
@@ -310,6 +311,7 @@ function nomeDoCadastro(e: string, tel: string): string | null {
 /** Evento do passageiro: dispara os gatilhos ligados desse tipo (agora ou com atraso). */
 export async function tratarEvento(ev: EventoCrm): Promise<{ disparados: number; agendados: number }> {
   const e = ev.empresaId;
+  if (!moduloLigado(e, "crm")) return { disparados: 0, agendados: 0 }; // recurso desligado para a empresa
   const tel = ev.telefone.replace(/\D/g, "");
   if (tel.length < 8) return { disparados: 0, agendados: 0 };
   const quando = ev.em ?? Date.now();

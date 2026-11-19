@@ -4,6 +4,7 @@
 // URL e token do provedor e o segredo do webhook ficam nos segredos da empresa (segredos.json),
 // na chave "bot-whatsapp". Nunca vão para o navegador.
 
+import { moduloLigado } from "../superadmin/recursos.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -251,7 +252,7 @@ export async function aguardarFilas() {
 }
 
 /** Empresas com o bot ligado. */
-export const empresasComBot = () => D.listarEmpresas().filter((e) => e.ativa && config(e.id).ativo).map((e) => e.id);
+export const empresasComBot = () => D.listarEmpresas().filter((e) => e.ativa && moduloLigado(e.id, "bot") && config(e.id).ativo).map((e) => e.id);
 
 /** Cidade ativa de uma conexão (código do município) ou null. */
 export const cidadeDaConexao = (empresaId: string, conexaoId: string = ID_PRINCIPAL): string | null => config(empresaId).cidades[conexaoId] ?? null;
