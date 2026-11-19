@@ -11,11 +11,11 @@ export interface MotoristaDaCorrida {
 export interface Corrida {
   id: string; os: string; status: string; statusTexto: string; aberta: boolean; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string;
   estimativa: { valor: number | null; distanciaKm: number | null; minutos: number | null }; valor: number | null; desconto: number | null; avaliacao: number | null; taxaServico?: number;
-  solicitadaEm: string; finalizadaEm?: string | null; canceladaPor?: string | null;
+  solicitadaEm: string; iniciadaEm?: string | null; finalizadaEm?: string | null; canceladaPor?: string | null;
   motorista: MotoristaDaCorrida | null;
   paradas?: Ponto[]; agendadaPara?: string | null; comentario?: string; taxaCancelamento?: number | null; compartilhar?: string | null; motoristaId?: string | null;
   valorOferecido?: number | null; opcionais?: string[]; mensagensNaoLidas?: number;
-  distanciaMotoristaKm?: number | null; minutosMotorista?: number | null; chegando?: boolean;
+  gravada?: boolean; distanciaMotoristaKm?: number | null; minutosMotorista?: number | null; chegando?: boolean;
 }
 export interface Eu { nome: string; telefone: string; foto?: string | null; email?: string; genero?: string; cidadeId?: string | null }
 export interface Endereco { texto: string; lat: number; lng: number; rua?: string; numero?: string; bairro?: string; cidade?: string; uf?: string }
@@ -261,3 +261,9 @@ export function placaBonita(p: string) {
 }
 
 export const ehMoto = (categoria: string) => /moto/i.test(categoria);
+
+/** Duração da viagem em minutos: a real (início até o fim), ou a estimada quando não houve. */
+export function duracaoDaViagem(c: Pick<Corrida, "iniciadaEm" | "finalizadaEm" | "estimativa">): number | null {
+  if (c.iniciadaEm && c.finalizadaEm) { const m = Math.round((Date.parse(c.finalizadaEm) - Date.parse(c.iniciadaEm)) / 60000); if (Number.isFinite(m) && m >= 0) return Math.max(1, m); }
+  return c.estimativa?.minutos ?? null;
+}

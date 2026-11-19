@@ -60,6 +60,66 @@ export async function caminhoPelasRuas(pontos: Posicao[]): Promise<Caminho> {
   return reta(p);
 }
 
+// ------------------------------------------------------------------ navegação passo a passo
+
+export interface Passo { texto: string; distanciaM: number; lat: number; lng: number; tipo: string; modificador: string }
+export interface Navegacao extends Caminho { passos: Passo[] }
+
+const LADO: Record<string, string> = { left: "à esquerda", right: "à direita", "slight left": "à esquerda", "slight right": "à direita", "sharp left": "à esquerda", "sharp right": "à direita" };
+const CURVA: Record<string, string> = { "slight left": "Faça uma leve curva", "slight right": "Faça uma leve curva", "sharp left": "Faça uma curva fechada", "sharp right": "Faça uma curva fechada", left: "Vire", right: "Vire" };
+
+/** Frase em português para uma manobra do OSRM ("Vire à direita na Rua X"). */
+export function textoDaManobra(tipo: string, modificador: string, rua: string, saida?: number): string {
+  const na = rua ? ` na ${rua}` : "";
+  switch (tipo) {
+    case "depart": return rua ? `Siga em frente pela ${rua}` : "Siga em frente";
+    case "arrive": return modificador === "left" ? "Você chegou. O destino fica à esquerda" : modificador === "right" ? "Você chegou. O destino fica à direita" : "Você chegou ao destino";
+    case "roundabout": case "rotary": case "roundabout turn": return saida ? `Na rotatória, pegue a ${saida}ª saída${na}` : `Entre na rotatória${na}`;
+    case "fork": return `Mantenha-se ${LADO[modificador] ?? "em frente"}${na}`;
+    case "merge": return `Entre na pista${na}`;
+    case "on ramp": return `Pegue a entrada${na}`;
+    case "off ramp": return `Pegue a saída${na}`;
+    case "end of road": return `${CURVA[modificador] ?? "Vire"} ${LADO[modificador] ?? ""}${na}`.replace("  ", " ");
+    default:
+      if (modificador === "uturn") return "Faça o retorno";
+      if (modificador === "straight" || !modificador) return rua ? `Siga em frente pela ${rua}` : "Siga em frente";
+      return `${CURVA[modificador] ?? "Vire"} ${LADO[modificador] ?? ""}${na}`.replace("  ", " ");
+  }
+}
+
+const navegacoes = new Map<string, { em: number; v: Navegacao }>();
+
+/** Rota pelas ruas com as instruções de cada curva. Sem servidor de rotas: sem passos (o app mostra só a linha). */
+export async function navegarPelasRuas(pontos: Posicao[]): Promise<Navegacao> {
+  const p = pontos.filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180).slice(0, 6);
+  if (p.length < 2) return { ...reta(p), passos: [] };
+  const k = chave(p);
+  const ja = valido(navegacoes.get(k), 60_000);
+  if (ja) return ja.v;
+  const url = servidorOsrm();
+  if (url) {
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      try {
+        const r = await fetch(`${url}/route/v1/driving/${p.map((x) => `${x.lng},${x.lat}`).join(";")}?overview=full&geometries=geojson&steps=true`, { headers: { "user-agent": AGENTE }, signal: AbortSignal.timeout(8000) });
+        const j = (await r.json()) as { code?: string; routes?: Array<{ distance: number; duration: number; geometry?: { coordinates?: Array<[number, number]> }; legs?: Array<{ steps?: Array<{ distance: number; name?: string; maneuver: { type: string; modifier?: string; location: [number, number]; exit?: number } }> }> }> };
+        const rt = j.code === "Ok" ? j.routes?.[0] : undefined;
+        if (rt?.geometry?.coordinates?.length) {
+          const passos: Passo[] = (rt.legs ?? []).flatMap((l) => l.steps ?? []).map((st) => ({
+            texto: textoDaManobra(st.maneuver.type, st.maneuver.modifier ?? "", st.name ?? "", st.maneuver.exit), distanciaM: Math.round(st.distance),
+            lat: st.maneuver.location[1], lng: st.maneuver.location[0], tipo: st.maneuver.type, modificador: st.maneuver.modifier ?? "",
+          }));
+          return guardar(navegacoes, k, {
+            distanciaKm: Math.round(rt.distance / 10) / 100, minutos: Math.max(1, Math.round(rt.duration / 60)), pelasRuas: true,
+            caminho: rt.geometry.coordinates.map(([lng, lat]) => [lat, lng] as [number, number]), passos,
+          }, 300);
+        }
+        if (j.code === "NoRoute") break;
+      } catch { /* tenta de novo */ }
+    }
+  }
+  return { ...reta(p), passos: [] };
+}
+
 // ------------------------------------------------------------------ busca de endereço fora da base (Nominatim)
 
 function servidorNominatim(): string {

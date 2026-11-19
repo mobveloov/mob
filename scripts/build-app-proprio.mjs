@@ -147,10 +147,11 @@ if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsW
 if (papel === "motorista") {
   const pastaJava = path.join(saida, "android", "app", "src", "main", "java", ...pacote.split("."));
   fs.mkdirSync(pastaJava, { recursive: true });
-  for (const f of ["MainActivity.java", "FlutuantePlugin.java", "FlutuanteService.java"]) {
+  for (const f of ["MainActivity.java", "FlutuantePlugin.java", "FlutuanteService.java", "PosicaoService.java"]) {
     fs.writeFileSync(path.join(pastaJava, f), fs.readFileSync(path.join(RAIZ, "scripts", "nativo", f), "utf8").replaceAll("__PACOTE__", pacote));
   }
   if (!xml.includes("FlutuanteService")) xml = xml.replace("</application>", '    <service android:name=".FlutuanteService" android:exported="false" />\n    </application>');
+  if (!xml.includes("PosicaoService")) xml = xml.replace("</application>", '    <service android:name=".PosicaoService" android:exported="false" android:foregroundServiceType="location" />\n    </application>');
   if (!xml.includes("showWhenLocked")) xml = xml.replace("<activity", '<activity android:showWhenLocked="true" android:turnScreenOn="true"');
 }
 fs.writeFileSync(manifesto, xml);

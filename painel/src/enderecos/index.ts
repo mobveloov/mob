@@ -343,6 +343,25 @@ export function completarPonto<T extends { texto: string; lat?: number; lng?: nu
 // ------------------------------------------------------------------ regras de via (Cadastro › Ruas)
 // O nome da rua mostrado à central pode ser corrigido por regra dentro de um traçado no mapa.
 
+/** Casas (número e posição) da base de endereços (CNEFE) num raio em volta de um ponto, para mostrar no mapa. */
+export function casasPerto(empresaId: string, lat: number, lng: number, raioM = 120, limite = 80): Array<{ numero: number; rua: string; lat: number; lng: number }> {
+  const raio = Math.min(400, Math.max(30, raioM)), achadas: Array<{ d: number; numero: number; rua: string; lat: number; lng: number }> = [];
+  const cos = Math.cos((lat * Math.PI) / 180);
+  for (const cod of lerConfig(empresaId).municipios) {
+    const ix = indice(cod);
+    if (!ix) continue;
+    const cy = Math.floor(lat / CELULA), cx = Math.floor(lng / CELULA);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      for (const i of ix.celulas.get(`${cy + dy}:${cx + dx}`) ?? []) {
+        if (!ix.num[i]) continue;
+        const d = Math.hypot((ix.lat[i] - lat) * 111_320, (ix.lng[i] - lng) * 111_320 * cos);
+        if (d <= raio) achadas.push({ d, numero: ix.num[i], rua: ix.ruas[ix.ruaDe[i]].nome, lat: ix.lat[i], lng: ix.lng[i] });
+      }
+    }
+  }
+  return achadas.sort((a, b) => a.d - b.d).slice(0, limite).map(({ d: _d, ...c }) => c);
+}
+
 /** Endereço mais perto de um ponto, com as regras de via da empresa aplicadas. */
 export function enderecoDoPonto(empresaId: string, lat: number, lng: number): Endereco | null {
   const e = enderecoDoPontoBruto(empresaId, lat, lng);

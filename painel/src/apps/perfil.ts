@@ -105,12 +105,11 @@ function cidadeValida(empresaId: string, cidadeId: unknown): string {
   return id;
 }
 
-function conferirContato(empresaId: string, telefone: string, email: string) {
+/** Telefone e e-mail não se repetem dentro do MESMO papel; a mesma pessoa pode ser passageiro e também motorista. */
+function conferirContato(empresaId: string, papelDaConta: "passageiro" | "motorista", telefone: string, email: string) {
   if (!telefoneValido(telefone)) throw new Error("Informe o celular com DDD.");
   if (!EMAIL.test(email)) throw new Error("Informe um e-mail válido.");
-  for (const papel of ["passageiro", "motorista"] as const) {
-    if (localizar(empresaId, papel, telefone) || localizar(empresaId, papel, email)) throw new Error("Este telefone ou e-mail já tem cadastro. Entre ou use \"Esqueci a senha\".");
-  }
+  if (localizar(empresaId, papelDaConta, telefone) || localizar(empresaId, papelDaConta, email)) throw new Error("Este telefone ou e-mail já tem cadastro. Entre ou use \"Esqueci a senha\".");
 }
 
 // ------------------------------------------------------------------ criar conta
@@ -121,7 +120,7 @@ export function criarContaPassageiro(empresaId: string, d: Record<string, unknow
   const genero = String(d.genero ?? "");
   if (!GENEROS.includes(genero)) throw new Error("Escolha o gênero.");
   const telefone = soDigitos(d.telefone), email = String(d.email ?? "").trim().toLowerCase();
-  conferirContato(empresaId, telefone, email);
+  conferirContato(empresaId, "passageiro", telefone, email);
   conferirForcaDaSenha(String(d.senha ?? ""));
   const cidadeId = cidadeValida(empresaId, d.cidadeId);
   mesclar(empresaId, CLI(), [{ nome, telefone, email, genero, status: "Ativo", cidade: nomeDaCidade(empresaId, cidadeId) || null }], "app");
@@ -143,7 +142,7 @@ export function criarContaMotorista(empresaId: string, d: Record<string, unknown
   const chavePix = txt(d.chavePix, 80);
   if (!chavePix) throw new Error("Informe a chave Pix para receber.");
   const telefone = soDigitos(d.telefone), email = String(d.email ?? "").trim().toLowerCase();
-  conferirContato(empresaId, telefone, email);
+  conferirContato(empresaId, "motorista", telefone, email);
   conferirForcaDaSenha(String(d.senha ?? ""));
   const cidadeId = cidadeValida(empresaId, d.cidadeId);
   const r = criar(empresaId, MOT(), { nome, cpf, telefone, email, nascimento, genero, chavePix, status: "Aguardando aprovação", cidade: nomeDaCidade(empresaId, cidadeId) || null }, "app");

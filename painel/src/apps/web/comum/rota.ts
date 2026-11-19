@@ -14,11 +14,12 @@ export interface Rota { linha: Linha | null; km: number | null; minutos: number 
 /**
  * `pontos`: de 2 a 6, na ordem. `espera`: tempo mínimo (ms) entre uma consulta e outra, para o ponto que anda (você).
  * `casas`: casas decimais da chave (4 ≈ 11 m): só consulta de novo quando o ponto muda mais que isso.
+ * `manter`: enquanto a rota nova não chega, continua mostrando a anterior (para o ponto que anda).
  */
 export const useCaminho = (pontos: P[], espera = 0, casas = 5): Linha | null => useRota(pontos, espera, casas).linha;
 
 /** Igual ao useCaminho, e também a distância (km) e o tempo (min) da rota por rua. */
-export function useRota(pontos: P[], espera = 0, casas = 5): Rota {
+export function useRota(pontos: P[], espera = 0, casas = 5, manter = false): Rota {
   const validos = pontos.filter(ok);
   const chave = validos.length > 1 ? validos.map((p) => `${p.lat.toFixed(casas)},${p.lng.toFixed(casas)}`).join(";") : "";
   const [linha, setLinha] = useState<Linha | null>(() => (chave ? memoria.get(chave) ?? null : null));
@@ -29,7 +30,7 @@ export function useRota(pontos: P[], espera = 0, casas = 5): Rota {
     if (!chave) { setLinha(null); return; }
     const guardada = memoria.get(chave);
     if (guardada) { setLinha(guardada); return; }
-    setLinha(null);
+    if (!manter) setLinha(null); // com `manter`, a linha velha fica até a nova chegar (carro andando: sem piscar)
     let vivo = true;
     const falta = Math.max(0, ultima.current + espera - Date.now());
     const t = setTimeout(async () => {

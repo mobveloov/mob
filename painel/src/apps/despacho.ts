@@ -29,6 +29,7 @@ import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { arquivo, gravar, ler } from "./armazem.ts";
 import { emitir, empresasComOuvintes, temOuvinte, type Alvo, conectado } from "./eventos.ts";
 import { avisar } from "./push.ts";
+import { configGravacao, limparGravacoes } from "./gravacoes.ts";
 import type { PapelApp } from "./sessoes.ts";
 
 /** Quanto tempo o motorista tem para aceitar. */
@@ -70,7 +71,21 @@ type OuvinteOferta = (empresaId: string, o: Oferta, fim: FimOferta) => void;
 const ouvintesOferta: OuvinteOferta[] = [];
 /** Registra quem quer saber de cada oferta (criada, aceita, recusada, vencida). */
 export const aoMudarOferta = (f: OuvinteOferta) => { if (!ouvintesOferta.includes(f)) ouvintesOferta.push(f); };
+/** Guarda como terminou cada oferta (para a taxa de aceitação do motorista). "saiu" (ficou offline) e "perdeu" (outro aceitou antes) não contam. */
+function anotarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
+  if (fim === "oferecida" || fim === "saiu" || fim === "perdeu") return;
+  try { banco().prepare("INSERT INTO app_ofertas (empresa, motorista, resultado, em) VALUES (?, ?, ?, ?)").run(empresaId, o.motoristaId, fim, new Date().toISOString()); } catch { /* estatística: não pode travar a chamada */ }
+}
+
+/** Taxa de aceitação: das últimas 100 ofertas, quantas foram aceitas, recusadas e ignoradas (a chamada venceu). */
+export function taxaDeAceitacao(empresaId: string, motoristaId: string) {
+  const l = banco().prepare("SELECT resultado, em FROM app_ofertas WHERE empresa = ? AND motorista = ? ORDER BY seq DESC LIMIT 100").all(empresaId, motoristaId) as Array<{ resultado: string; em: string }>;
+  const aceitas = l.filter((x) => x.resultado === "aceitou").length, rejeitadas = l.filter((x) => x.resultado === "recusou").length, ignoradas = l.filter((x) => x.resultado === "expirou").length;
+  return { ofertas: l.length, aceitas, rejeitadas, ignoradas, porcentagem: l.length ? Math.round((aceitas / l.length) * 100) : 0, atualizadoEm: l[0]?.em ?? null };
+}
+
 function avisarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
+  anotarOferta(empresaId, o, fim);
   for (const f of ouvintesOferta) { try { f(empresaId, o, fim); } catch (e) { console.error("[apps] ouvinte de oferta:", e instanceof Error ? e.message : e); } }
 }
 
@@ -79,6 +94,8 @@ interface Estado {
   ofertas: Map<string, Oferta>;
   /** corridaId → (motoristaId → quando recusou/deixou passar) */
   tentados: Map<string, Map<string, number>>;
+  /** corridaId → rodadas de chamada já feitas, até quando está em pendência e quantas pendências já passou */
+  rodadas: Map<string, { n: number; pausaAte: number; pendencias: number }>;
   /** corridaId → assinatura do último estado avisado */
   vistos: Map<string, string>;
   /** Já passou a primeira volta do vigia (a primeira só anota, não avisa). */
@@ -89,7 +106,7 @@ interface Estado {
 const estados = new Map<string, Estado>();
 function estado(empresaId: string): Estado {
   let e = estados.get(empresaId);
-  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
+  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), rodadas: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
   return e;
 }
 /** Só para os testes. */
@@ -130,6 +147,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
     paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, comentario: c.comentario ?? "",
     avaliacaoPassageiro: papel === "motorista" ? c.avaliacaoPassageiro ?? null : undefined,
     taxaCancelamento: c.taxaCancelamento ?? null,
+    gravada: configGravacao(empresaId).ativa && aberta,
     compartilhar: papel === "passageiro" && c.compartilhamento ? `acompanhar/${c.compartilhamento}` : null,
     motoristaId: papel === "passageiro" ? c.motoristaId : undefined,
   };
@@ -290,6 +308,14 @@ export function ofertaParaApp(empresaId: string, o: Oferta) {
 }
 
 /** Oferece cada corrida "procurando" (sem oferta pendente) ao motorista livre mais perto. */
+/** Grupo que recebe a chamada junto no modo "primeiro a aceitar": até o limite de motoristas; com "só prioritários", apenas o primeiro nível. */
+function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: { limiteMotoristas: number; prioritarios: number; secundarios: number; reserva: number; notificarGrupo: "prioritario" | "todos" }): T[] {
+  const limite = Math.max(1, regras.limiteMotoristas);
+  if (regras.notificarGrupo === "todos") return ordenados.slice(0, limite);
+  const prioritarios = ordenados.filter((c) => c.nivel === 0);
+  return (prioritarios.length ? prioritarios : ordenados).slice(0, Math.min(limite, Math.max(1, regras.prioritarios)));
+}
+
 export function despachar(empresaId: string) {
   const e = estado(empresaId);
   if (!e.online.size) return 0;
@@ -302,6 +328,12 @@ export function despachar(empresaId: string) {
   for (const o of e.ofertas.values()) ofertasDaCorrida.set(o.corridaId, (ofertasDaCorrida.get(o.corridaId) ?? 0) + 1);
   const carrosDaCorrida = (c: CorridaPropria) => (c.enviarVariosCarros ? Math.max(1, Math.min(CARROS_SIMULTANEOS, regrasDespacho(empresaId).limiteMotoristas)) : 1);
   const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
+  // "Aceitar próxima": motorista em viagem a menos de "distância" metros do destino final também recebe chamada.
+  const emViagemPorMotorista = new Map(lista.filter((x) => x.status === "em_andamento" && x.motoristaId).map((x) => [x.motoristaId!, x]));
+  const pertoDoDestino = (id: string, p: { lat: number; lng: number }) => {
+    const v = emViagemPorMotorista.get(id), d = v?.destino;
+    return !!d && d.lat != null && d.lng != null && linhaReta({ lat: p.lat, lng: p.lng }, { lat: d.lat, lng: d.lng }) * 1000 <= regras.distanciaProxima;
+  };
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
   // Transbordo (motorista de outra cidade): o resultado só depende da cidade e da categoria, então vale por rodada.
   const transbordos = new Map<string, boolean>();
@@ -332,7 +364,7 @@ export function despachar(empresaId: string) {
       return (a.km ?? Infinity) < (b.km ?? Infinity) || (a.km == null && b.km == null && a.desde < b.desde);
     };
     for (const [id, p] of e.online) {
-      if (busy.has(id) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
+      if ((busy.has(id) && !(regras.permitirProxima && pertoDoDestino(id, p))) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
       if (!filtros.podeAtender(c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
       if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
@@ -348,9 +380,22 @@ export function despachar(empresaId: string) {
       };
       candidatos.push(cand);
     }
-    // Uma corrida comum recebe a oferta do melhor candidato; a marcada "enviar mais de um carro" completa até CARROS_SIMULTANEOS ofertas abertas.
-    const faltam = carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0);
-    for (const melhor of candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0)).slice(0, faltam)) {
+    if (!candidatos.length) continue;
+    candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0));
+    // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
+    // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
+    const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras) : candidatos.slice(0, Math.max(1, carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0))); // corrida marcada "enviar mais de um carro" completa as ofertas abertas
+    // Tentativas: depois de "máx. tentativas" rodadas sem aceite a corrida fica em pendência por "tempo em pendência" minutos; passada a pendência, tenta de novo uma vez; sem aceite, não atendida.
+    const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
+    if (rod.pausaAte > agora) continue;
+    if (rod.n >= regras.maxTentativas) {
+      if (rod.pendencias >= 1 || regras.tempoPendencia <= 0) { void mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined); e.rodadas.delete(c.id); continue; }
+      e.rodadas.set(c.id, { n: 0, pausaAte: agora + regras.tempoPendencia * 60_000, pendencias: rod.pendencias + 1 });
+      void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
+      continue;
+    }
+    e.rodadas.set(c.id, { ...rod, n: rod.n + 1 });
+    for (const melhor of escolhidos) {
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
     avisarOferta(empresaId, o, "oferecida");
@@ -383,30 +428,46 @@ export function recusar(empresaId: string, motoristaId: string, ofertaId: string
   despachar(empresaId);
 }
 
+const JA_ACEITA = "Corrida já aceita por outro motorista";
+
+/** Fecha (com aviso) as chamadas que ainda tocam em outros motoristas para esta corrida: o som para e a tela fecha. */
+function encerrarOfertasDaCorrida(empresaId: string, corridaId: string, motivo: string, exceto?: string) {
+  const e = estado(empresaId);
+  for (const o of [...e.ofertas.values()]) {
+    if (o.corridaId !== corridaId || o.id === exceto) continue;
+    e.ofertas.delete(o.id);
+    avisarOferta(empresaId, o, "perdeu"); // outro aceitou antes: não conta como ignorada nem como recusa
+    emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id, motivo });
+  }
+}
+
 export async function aceitar(empresaId: string, motoristaId: string, ofertaId: string): Promise<CorridaPropria> {
   const e = estado(empresaId);
   const o = e.ofertas.get(ofertaId);
   if (!o || o.motoristaId !== motoristaId || o.expira < Date.now()) throw new Error("Esta chamada já passou.");
   e.ofertas.delete(o.id);
   const c = listarProprias(empresaId).find((x) => x.id === o.corridaId);
-  if (!c || c.status !== "procurando") throw new Error("Esta corrida não está mais disponível.");
-  const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
-  if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
+  if (!c || c.status !== "procurando") throw new Error(c?.motoristaId ? JA_ACEITA : "Esta corrida não está mais disponível.");
+  let feita: CorridaPropria;
+  try { feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista"); }
+  catch (err) { const agora = listarProprias(empresaId).find((x) => x.id === c.id); throw new Error(agora?.motoristaId && agora.motoristaId !== motoristaId ? JA_ACEITA : err instanceof Error ? err.message : "Esta corrida não está mais disponível."); }
+  if (feita.motoristaId !== motoristaId) throw new Error(JA_ACEITA);
+  encerrarOfertasDaCorrida(empresaId, c.id, JA_ACEITA, o.id);
   avisarOferta(empresaId, o, "aceitou");
-  // "Enviar mais de um carro": quem ainda tinha a chamada desta corrida perde na hora.
-  for (const outra of [...e.ofertas.values()]) if (outra.corridaId === c.id) { e.ofertas.delete(outra.id); avisarOferta(empresaId, outra, "perdeu"); emitir(empresaId, motoristaAlvo(outra.motoristaId), "oferta_encerrada", { id: outra.id }); }
+  e.rodadas.delete(c.id);
   e.tentados.delete(c.id);
   vigiar(empresaId);
   return feita;
 }
 
 /** Motorista desiste antes de chegar: a corrida volta a procurar outro (e ele não recebe essa de novo logo). */
-export async function desistir(empresaId: string, motoristaId: string, corridaId: string) {
-  const c = await mudarStatus(empresaId, corridaId, "procurando", { nota: "Motorista desistiu pelo app" }, "app do motorista");
+export async function desistir(empresaId: string, motoristaId: string, corridaId: string, motivo = "") {
+  const c = await mudarStatus(empresaId, corridaId, "procurando", { nota: `Motorista desistiu pelo app${motivo ? `: ${motivo}` : ""}` }, "app do motorista");
   const e = estado(empresaId);
   const t = e.tentados.get(corridaId) ?? new Map<string, number>();
   t.set(motoristaId, Date.now());
   e.tentados.set(corridaId, t);
+  e.rodadas.delete(corridaId); // a corrida recomeça a procurar do zero para os outros
   emitir(empresaId, motoristaAlvo(motoristaId), "corrida", { ...corridaParaApp(empresaId, c, "motorista"), aberta: false, statusTexto: "Você desistiu da corrida" });
   vigiar(empresaId);
   despachar(empresaId);
@@ -417,7 +478,7 @@ export async function desistir(empresaId: string, motoristaId: string, corridaId
 
 const assinatura = (c: CorridaPropria) => `${c.status}|${c.motoristaId ?? ""}|${c.historico.length}|${c.avaliacao ?? ""}`;
 const TEXTO_PUSH: Partial<Record<CorridaPropria["status"], string>> = {
-  a_caminho: "Seu motorista está a caminho.", no_local: "Seu motorista chegou.", em_andamento: "Boa viagem!",
+  a_caminho: "Seu motorista está a caminho.", no_local: "Seu motorista está no local.", em_andamento: "Boa viagem!",
   finalizada: "Corrida finalizada. Avalie o motorista.", cancelada: "A corrida foi cancelada.", nao_atendida: "Não achamos motorista agora. Tente de novo.",
 };
 
@@ -431,7 +492,7 @@ export function vigiar(empresaId: string) {
   // Chamada pendente de corrida que já não procura motorista (aceita por outro, cancelada, contra-oferta aceita): some, sempre.
   if (e.ofertas.size) {
     const porId = new Map(lista.map((c) => [c.id, c]));
-    for (const o of [...e.ofertas.values()]) if (porId.get(o.corridaId)?.status !== "procurando") { e.ofertas.delete(o.id); emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id }); }
+    for (const o of [...e.ofertas.values()]) { const x = porId.get(o.corridaId); if (x?.status !== "procurando") { e.ofertas.delete(o.id); emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id, motivo: x?.motoristaId ? JA_ACEITA : "A corrida foi cancelada" }); } }
   }
   for (const c of lista) {
     if (!ABERTA.has(c.status) && Date.parse(c.solicitadaEm) < limite) continue;
@@ -447,7 +508,7 @@ export function vigiar(empresaId: string) {
     }
     const statusAntes = antes?.split("|")[0];
     if (statusAntes !== c.status && TEXTO_PUSH[c.status] && c.canal === "app") {
-      void avisar(empresaId, passageiroAlvo(c), { titulo: STATUS_TEXTO[c.status], texto: TEXTO_PUSH[c.status]!, dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
+      void avisar(empresaId, passageiroAlvo(c), { titulo: STATUS_TEXTO[c.status], texto: TEXTO_PUSH[c.status]!, dados: { tipo: "corrida", corridaId: c.id }, canal: c.status === "no_local" ? "chegada" : "corridas" });
     }
     if (c.status === "cancelada" && c.motoristaId && statusAntes && statusAntes !== "cancelada" && c.canceladaPor !== "Motorista") {
       void avisar(empresaId, motoristaAlvo(c.motoristaId), { titulo: "Corrida cancelada", texto: `OS ${c.os} foi cancelada.`, dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
@@ -475,12 +536,14 @@ function limparMemoria(empresaId: string, e: Estado, agora: number) {
 }
 
 /** Uma volta do despacho: vence ofertas, avisa mudanças e oferece corridas. O servidor chama de tempos em tempos. */
+const ultimaLimpezaGravacoes = new Map<string, number>();
 export function ciclo(empresaId: string) {
   const e = estado(empresaId);
   const agora = Date.now();
   for (const o of [...e.ofertas.values()]) if (o.expira <= agora) passarOferta(empresaId, o, "expirou");
   for (const [id, p] of e.online) if (agora - p.em > 2 * POSICAO_MS) e.online.delete(id);
   limparMemoria(empresaId, e, agora);
+  if (agora - (ultimaLimpezaGravacoes.get(empresaId) ?? 0) > 3600_000) { ultimaLimpezaGravacoes.set(empresaId, agora); try { limparGravacoes(empresaId, agora); } catch { /* sem pasta de gravações */ } }
   vigiar(empresaId);
   despachar(empresaId);
 }
@@ -645,15 +708,36 @@ export function valorDoTaximetro(empresaId: string, c: CorridaPropria): number |
 
 // ------------------------------------------------------------------ ganhos e central
 
+/** Uma corrida finalizada do ponto de vista do motorista: valor da corrida, comissão da central e valor líquido. */
+export function resumoDeGanho(empresaId: string, motoristaId: string, c: CorridaPropria) {
+  const bruto = arred(c.valor ?? 0), desconto = arred(c.desconto ?? 0);
+  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(bruto - desconto)), motoristaId);
+  const minutos = c.iniciadaEm && c.finalizadaEm ? Math.max(1, Math.round((Date.parse(c.finalizadaEm) - Date.parse(c.iniciadaEm)) / 60_000)) : c.estimativa.minutos ?? null;
+  const km = c.macaneta?.km || c.estimativa.distanciaKm || null;
+  const liquido = arred(bruto - co.taxaCentral);
+  return {
+    id: c.id, os: c.os, em: c.finalizadaEm, valor: c.valor, valorBruto: bruto, taxaCentral: co.taxaCentral, valorLiquido: liquido, desconto,
+    percentualTaxa: bruto > 0 ? arred((co.taxaCentral / bruto) * 100, 1) : 0, ganhoPorKm: km && km > 0 ? arred(liquido / km) : null,
+    categoria: c.categoria, pagamento: c.pagamento, canal: c.canal, km: km ? arred(km, 2) : null, minutos,
+    passageiro: c.passageiro.nome, embarque: c.embarque.texto, destino: c.destino?.texto ?? "", solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm,
+  };
+}
+
+const somaGanhos = (l: Array<ReturnType<typeof resumoDeGanho>>) => ({
+  corridas: l.length, bruto: arred(l.reduce((s, c) => s + c.valorBruto, 0)), taxa: arred(l.reduce((s, c) => s + c.taxaCentral, 0)), liquido: arred(l.reduce((s, c) => s + c.valorLiquido, 0)),
+});
+
 export function ganhos(empresaId: string, motoristaId: string) {
   const fin = listarProprias(empresaId).filter((c) => c.motoristaId === motoristaId && c.status === "finalizada" && c.finalizadaEm);
   const agora = agoraBr().getTime();
   const hoje = agoraBr().toISOString().slice(0, 10);
   const soma = (l: CorridaPropria[]) => ({ corridas: l.length, valor: arred(l.reduce((s, c) => s + (c.valor ?? 0), 0)), km: arred(l.reduce((s, c) => s + (c.estimativa.distanciaKm ?? 0), 0), 1) });
   const desde = (dias: number) => fin.filter((c) => Date.parse(c.finalizadaEm!) >= agora - dias * 86400_000);
+  const com = (l: CorridaPropria[]) => { const g = somaGanhos(l.map((c) => resumoDeGanho(empresaId, motoristaId, c))); return { liquido: g.liquido, taxa: g.taxa }; };
+  const dosHoje = fin.filter((c) => c.finalizadaEm!.slice(0, 10) === hoje), dosDias = desde(7), dosMes = desde(30);
   return {
-    hoje: soma(fin.filter((c) => c.finalizadaEm!.slice(0, 10) === hoje)), semana: soma(desde(7)), mes: soma(desde(30)),
-    ultimas: fin.slice(-20).reverse().map((c) => ({ id: c.id, os: c.os, valor: c.valor, pagamento: c.pagamento, finalizadaEm: c.finalizadaEm, destino: c.destino?.texto ?? "" })),
+    hoje: { ...soma(dosHoje), ...com(dosHoje) }, semana: { ...soma(dosDias), ...com(dosDias) }, mes: { ...soma(dosMes), ...com(dosMes) },
+    ultimas: fin.slice(-20).reverse().map((c) => ({ id: c.id, os: c.os, valor: c.valor, pagamento: c.pagamento, finalizadaEm: c.finalizadaEm, destino: c.destino?.texto ?? "", ...(({ taxaCentral, valorLiquido }) => ({ taxaCentral, valorLiquido }))(resumoDeGanho(empresaId, motoristaId, c)) })),
   };
 }
 
@@ -686,13 +770,40 @@ export function ganhosPeriodo(empresaId: string, motoristaId: string, periodo: "
   }
   let online = 0;
   try { online = (banco().prepare("SELECT COALESCE(SUM(segundos), 0) AS s FROM app_online WHERE empresa = ? AND motorista = ? AND dia BETWEEN ? AND ?").get(empresaId, motoristaId, de, ate) as { s: number }).s / 60; } catch { /* sem contagem */ }
-  const lista = [...fin].sort((a, b) => b.finalizadaEm!.localeCompare(a.finalizadaEm!)).map((c) => ({ id: c.id, os: c.os, em: c.finalizadaEm, valor: c.valor, passageiro: c.passageiro.nome, pagamento: c.pagamento, embarque: c.embarque.texto, destino: c.destino?.texto ?? "" }));
+  const lista = [...fin].sort((a, b) => b.finalizadaEm!.localeCompare(a.finalizadaEm!)).map((c) => resumoDeGanho(empresaId, motoristaId, c));
+  const totais = somaGanhos(lista);
+  const hojeDia = dia(hoje), segunda = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth(), hoje.getUTCDate() - ((hoje.getUTCDay() + 6) % 7)));
+  const todas = listarProprias(empresaId).filter((c) => c.motoristaId === motoristaId && c.status === "finalizada" && c.finalizadaEm).map((c) => resumoDeGanho(empresaId, motoristaId, c));
+  const kmTotal = lista.reduce((s, c) => s + (c.km ?? 0), 0);
   return {
-    periodo, de, ate, total: arred(total), viagens: fin.length, minutosOnline: Math.round(online), minutosEmViagem: Math.round(emViagem),
+    periodo, de, ate, total: arred(total), viagens: fin.length,
+    totalBruto: totais.bruto, totalTaxa: totais.taxa, totalLiquido: totais.liquido, ganhoPorKm: kmTotal > 0 ? arred(totais.liquido / kmTotal) : null,
+    hoje: somaGanhos(todas.filter((c) => c.em!.slice(0, 10) === hojeDia)), semanaAtual: somaGanhos(todas.filter((c) => c.em!.slice(0, 10) >= dia(segunda) && c.em!.slice(0, 10) <= dia(new Date(segunda.getTime() + 6 * 86_400_000)))),
+    porDiaLiquido: [...new Map(lista.map((c) => [c.em!.slice(0, 10), 0] as const))].map(([d]) => ({ dia: d, ...somaGanhos(lista.filter((c) => c.em!.slice(0, 10) === d)) })), minutosOnline: Math.round(online), minutosEmViagem: Math.round(emViagem),
     porDia: [...porDiaMapa].map(([d, valor]) => ({ dia: d, valor: arred(valor) })),
     porPagamento: [...porPag].map(([pagamento, g]) => ({ pagamento, valor: arred(g.valor), corridas: g.corridas })),
     lista, realizadas: lista,
   };
+}
+
+/**
+ * Motoristas livres e online por perto, para o passageiro ver no mapa na hora de pedir. Sem nome, placa nem identificador
+ * (só tipo e posição, com o código mudando a cada consulta). Modo fantasma e motoristas em corrida ou em chamada não aparecem.
+ */
+export function motoristasPerto(empresaId: string, lat: number, lng: number, raioKm = 6, limite = 25): Array<{ lat: number; lng: number; tipo: "carro" | "moto"; categoria: string }> {
+  const e = estado(empresaId);
+  const busy = ocupados(listarProprias(empresaId));
+  const ocultos = fantasmas(empresaId);
+  const cad = new Map(motoristas(empresaId).map((m) => [m.id, m]));
+  const emOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
+  return [...e.online.entries()]
+    .filter(([id, p]) => !ocultos.has(id) && !busy.has(id) && !emOferta.has(id) && Date.now() - p.em < 120_000 && linhaReta({ lat, lng }, p) <= raioKm)
+    .map(([id, p]) => {
+      const cats = String(cad.get(id)?.categorias ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      const moto = cats.length > 0 && cats.every((c) => /moto/i.test(c));
+      return { d: linhaReta({ lat, lng }, p), lat: arred(p.lat, 5), lng: arred(p.lng, 5), tipo: (moto ? "moto" : "carro") as "carro" | "moto", categoria: cats[0] ?? "" };
+    })
+    .sort((a, b) => a.d - b.d).slice(0, limite).map(({ d: _d, ...m }) => m);
 }
 
 /** Motoristas online (para o mapa da central). */

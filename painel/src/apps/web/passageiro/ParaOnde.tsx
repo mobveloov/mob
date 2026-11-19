@@ -189,7 +189,7 @@ function EscolherNoMapa({ inicio, voltar, escolher }: { inicio: Posicao | null; 
   const [l1, l2] = ponto ? linhasDoEndereco(ponto) : ["Buscando o endereço…", ""];
   return (
     <div className="tela-mapa">
-      <Mapa eu={inicio} aoMover={setCentro} />
+      <Mapa eu={inicio} perto={inicio} aoMover={setCentro} />
       <div className="pino-centro" aria-hidden="true"><MapPin size={42} fill="currentColor" strokeWidth={1.5} /></div>
       <Topo titulo="Escolher no mapa" sub="Arraste o mapa até o ponto" voltar={voltar} centro />
       <div className="folha aberta">

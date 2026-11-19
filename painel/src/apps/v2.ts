@@ -12,6 +12,7 @@ import { alterarCampos, listar } from "../cadastros/armazem.ts";
 import { alterarCorrida, estimarPreco, listarProprias, type Ponto } from "../corridas/index.ts";
 import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/index.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
+import { abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
 import { ajustes, contatos } from "./ajustes.ts";
 import { arquivo, ler, limitador, num, soDigitos, txt } from "./armazem.ts";
@@ -354,11 +355,23 @@ rotasV2.get("/cep/:cep", so("motorista"), ok((req, res) => {
   res.json(r);
 }));
 
+// ---------------------------------------------------------------- gravação das corridas (segurança do motorista)
+
+rotasV2.get("/gravacao/config", ok((req, res) => res.json(configGravacao(ctx(req).empresaId))));
+rotasV2.post("/corridas/:id/gravacao", so("motorista"), bruto(12 * 1024 * 1024), ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const c = P.corridaDoApp(empresaId, req.params.id, "motorista", sessao.chave);
+  const p = salvarParte(empresaId, c, sessao.chave, corpo(req), String(req.headers["content-type"] ?? ""), Number(req.headers["x-parte"]), Number(req.headers["x-segundos"]), req.headers["x-video"] === "1");
+  res.json({ ok: true, parte: p.n });
+}));
+
 rotasV2.get("/veiculos", so("motorista"), ok((req, res) => res.json({ veiculos: veiculos(ctx(req).empresaId, ctx(req).sessao.chave) })));
 rotasV2.post("/veiculos", so("motorista"), ok((req, res) => res.json({ veiculos: salvarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}) })));
 rotasV2.post("/veiculos/:id/ativar", so("motorista"), ok((req, res) => res.json({ veiculos: ativarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id/excluir", so("motorista"), ok((req, res) => res.json({ veiculos: excluirVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id", so("motorista"), ok((req, res) => res.json({ veiculos: salvarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}, req.params.id) })));
+
+rotasV2.get("/aceitacao", so("motorista"), ok((req, res) => res.json(P.taxaDeAceitacao(ctx(req).empresaId, ctx(req).sessao.chave))));
 
 /** Com ?periodo=mes|semana: ganhos completos da tela de histórico. Sem: o resumo simples (hoje, 7 e 30 dias). */
 rotasV2.get("/ganhos", so("motorista"), ok((req, res) => {
@@ -413,6 +426,24 @@ rotasV2Central.get("/aprovacoes", ok((req, res) => {
   const e = emC(req);
   res.json({ motoristas: listar(e, cadastroPorId("motoristas")!).filter((m) => m.status === "Aguardando aprovação").map((m) => cartaoDoMotorista(e, m)) });
 }));
+
+// Mesma pessoa, dois papéis: dado um telefone, devolve a ficha de passageiro e a de motorista (as duas ligadas), para o painel mostrar juntas.
+rotasV2Central.get("/pessoas/:telefone", ok((req, res) => {
+  const tel = soDigitos(req.params.telefone);
+  if (tel.length < 10) throw new Error("Informe o telefone com DDD.");
+  const mesmo = (r: Record<string, unknown>) => soDigitos(r.telefone) === tel;
+  const passageiro = listar(emC(req), cadastroPorId("clientes")!).find(mesmo) ?? null;
+  const motorista = listar(emC(req), cadastroPorId("motoristas")!).find(mesmo) ?? null;
+  res.json({ telefone: tel, passageiro, motorista, doisPapeis: !!passageiro && !!motorista });
+}));
+
+// Gravações das corridas: só cargo alto (admin); cada vez que alguém abre uma gravação fica registrado.
+rotasV2Central.get("/gravacoes", exigirPapel("admin"), ok((req, res) => res.json({ gravacoes: listarGravacoes(emC(req), req.query.corrida ? String(req.query.corrida) : undefined), config: configGravacao(emC(req)) })));
+rotasV2Central.get("/gravacoes/:corrida/:parte", exigirPapel("admin"), ok((req, res) => {
+  const a = abrirParte(emC(req), req.params.corrida, Number(req.params.parte), req.ctx!.usuario.email);
+  return enviarArquivo(res, a ? { caminho: a.caminho, mime: a.mime } : null, false);
+}));
+rotasV2Central.post("/gravacoes/:corrida/guardar", exigirPapel("admin"), ok((req, res) => res.json({ gravacao: marcarParaGuardar(emC(req), req.params.corrida, req.body?.guardar !== false) })));
 
 rotasV2Central.post("/aprovacoes/:id/aprovar", exigirPapel("admin", "operador"), ok((req, res) => {
   const e = emC(req);
