@@ -185,3 +185,22 @@ test("maiúsculas, barras duplicadas e /./ não burlam o cargo mínimo (Operador
   assert.equal(moduloDaRota("/CRM/campanhas"), "crm");
   assert.equal(moduloDaRota("//Filiais/"), "filiais");
 });
+
+test("Operador não muda a cobrança do motorista (Isento, tipo, valor), nem criando nem editando; Gestor muda", async () => {
+  const criado = await api("gestor", "POST", "/api/cadastros/motoristas", { nome: "Zé", telefone: "11988887777", status: "Ativo", cobranca: "Personalizado", cobrancaTipo: "Percentual", cobrancaValor: 7 });
+  assert.equal(criado.status, 200, JSON.stringify(criado.corpo));
+  const id = criado.corpo.registro.id as string;
+  const op = await api("operador", "PUT", `/api/cadastros/motoristas/${id}`, { nome: "Zé Silva", telefone: "11988887777", status: "Ativo", cobranca: "Isento", cobrancaTipo: "Valor fixo", cobrancaValor: 0 });
+  assert.equal(op.status, 200, JSON.stringify(op.corpo));
+  assert.equal(op.corpo.registro.nome, "Zé Silva", "o resto continua editável");
+  assert.equal(op.corpo.registro.cobranca, "Personalizado");
+  assert.equal(op.corpo.registro.cobrancaTipo, "Percentual");
+  assert.equal(op.corpo.registro.cobrancaValor, 7);
+  const op2 = await api("operador", "PUT", `/api/cadastros/motoristas/${id}`, { nome: "Zé S.", telefone: "11988887777", status: "Ativo" });
+  assert.equal(op2.corpo.registro.cobranca, "Personalizado", "sem mandar a cobrança, ela não some");
+  assert.equal(op2.corpo.registro.cobrancaValor, 7);
+  const novo = await api("operador", "POST", "/api/cadastros/motoristas", { nome: "Ana", telefone: "11977776666", status: "Ativo", cobranca: "Isento" });
+  assert.notEqual(novo.corpo.registro.cobranca, "Isento");
+  const g = await api("gestor", "PUT", `/api/cadastros/motoristas/${id}`, { nome: "Zé S.", telefone: "11988887777", status: "Ativo", cobranca: "Isento" });
+  assert.equal(g.corpo.registro.cobranca, "Isento");
+});

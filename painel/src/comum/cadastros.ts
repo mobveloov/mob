@@ -13,6 +13,8 @@ export interface Campo {
   /** Preenchido pelo painel (ex.: total de corridas): aparece, mas não se edita. */
   calculado?: boolean;
   dica?: string;
+  /** Campo financeiro: só Gestor ou acima muda. Operador mantém o valor que já existe (e não define ao criar). */
+  soGestor?: boolean;
 }
 
 export interface Cadastro {
@@ -59,9 +61,9 @@ export const CADASTROS: Cadastro[] = [
       { chave: "nivel", rotulo: "Prioridade de toque", tipo: "selecao", opcoes: NIVEIS_MOTORISTA },
       { chave: "cnhNumero", rotulo: "CNH Nº", tipo: "texto" },
       { chave: "fantasma", rotulo: "Modo fantasma (oculto no mapa)", tipo: "booleano" },
-      { chave: "cobranca", rotulo: "Cobrança da central", tipo: "selecao", opcoes: ["Padrão", "Personalizado", "Isento"], dica: "Padrão = comissão da categoria; Isento = não paga; Personalizado = vale no lugar da comissão da categoria." },
-      { chave: "cobrancaTipo", rotulo: "Modelo de cobrança", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"] },
-      { chave: "cobrancaValor", rotulo: "Valor da cobrança", tipo: "numero" },
+      { soGestor: true, chave: "cobranca", rotulo: "Cobrança da central", tipo: "selecao", opcoes: ["Padrão", "Personalizado", "Isento"], dica: "Padrão = comissão da categoria; Isento = não paga; Personalizado = vale no lugar da comissão da categoria." },
+      { soGestor: true, chave: "cobrancaTipo", rotulo: "Modelo de cobrança", tipo: "selecao", opcoes: ["Percentual", "Valor fixo"] },
+      { soGestor: true, chave: "cobrancaValor", rotulo: "Valor da cobrança", tipo: "numero" },
       { chave: "categorias", rotulo: "Categorias habilitadas", tipo: "texto", dica: "Separe por vírgula." },
       { chave: "veiculo", rotulo: "Veículo (modelo e cor)", tipo: "texto" },
       { chave: "placa", rotulo: "Placa", tipo: "texto" },
