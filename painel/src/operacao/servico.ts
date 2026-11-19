@@ -177,7 +177,7 @@ export function detalhe(empresaId: string, id: string) {
 // ====================================================================== auditoria (raio-x)
 
 const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
-const FIM_TEXTO: Record<Onda["fim"], string> = { oferecida: "Sem resposta", aceitou: "Aceitou", recusou: "Recusou", expirou: "Deixou passar", saiu: "Ficou offline" };
+const FIM_TEXTO: Record<Onda["fim"], string> = { oferecida: "Sem resposta", aceitou: "Aceitou", recusou: "Recusou", expirou: "Deixou passar", saiu: "Ficou offline", perdeu: "Outro motorista aceitou" };
 
 export function raioX(empresaId: string, id: string) {
   const c = acharPropria(empresaId, id);

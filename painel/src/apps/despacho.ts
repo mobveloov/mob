@@ -39,6 +39,12 @@ const POSICAO_MS = 10 * 60_000; // o app reenvia a cada 30 s; em segundo plano o
 /** Depois de recusar ou deixar passar, o motorista só recebe de novo a mesma corrida depois disso. */
 const REOFERTA_MS = 2 * 60_000;
 
+/**
+ * "Enviar mais de um carro" (marcação da corrida na tela Solicitar): a oferta vai a vários motoristas ao mesmo tempo e vale o
+ * primeiro que aceitar. Quantos ao mesmo tempo: este número, limitado pelo "limite de motoristas" do Despacho.
+ */
+export const CARROS_SIMULTANEOS = 3;
+
 const ABERTA_COM_MOTORISTA = new Set(["a_caminho", "no_local", "em_andamento"]);
 const ABERTA = new Set(["procurando", "a_caminho", "no_local", "em_andamento"]);
 
@@ -58,7 +64,7 @@ export function marcarVisto(empresaId: string, motoristaId: string) {
 export interface Oferta { id: string; corridaId: string; motoristaId: string; expira: number; distanciaKm: number | null }
 
 /** O que aconteceu com uma oferta (para a auditoria "ondas de envio" da central, em src/operacao). */
-export type FimOferta = "oferecida" | "aceitou" | "recusou" | "expirou" | "saiu";
+export type FimOferta = "oferecida" | "aceitou" | "recusou" | "expirou" | "saiu" | "perdeu";
 type OuvinteOferta = (empresaId: string, o: Oferta, fim: FimOferta) => void;
 const ouvintesOferta: OuvinteOferta[] = [];
 /** Registra quem quer saber de cada oferta (criada, aceita, recusada, vencida). */
@@ -288,7 +294,9 @@ export function despachar(empresaId: string) {
   const cadastro = new Map(motoristas(empresaId).map((m) => [m.id, m]));
   const agora = Date.now();
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
-  const corridasComOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
+  const ofertasDaCorrida = new Map<string, number>();
+  for (const o of e.ofertas.values()) ofertasDaCorrida.set(o.corridaId, (ofertasDaCorrida.get(o.corridaId) ?? 0) + 1);
+  const carrosDaCorrida = (c: CorridaPropria) => (c.enviarVariosCarros ? Math.max(1, Math.min(CARROS_SIMULTANEOS, regrasDespacho(empresaId).limiteMotoristas)) : 1);
   const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
   const filtros = filtrosDoDespacho(empresaId); // favoritos, bloqueios e categorias: lidos uma vez por rodada
   // Transbordo (motorista de outra cidade): o resultado só depende da cidade e da categoria, então vale por rodada.
@@ -303,12 +311,12 @@ export function despachar(empresaId: string) {
   const areasEmpresa = fotoDeAreas(empresaId); // Cadastro › Áreas: bloqueio e prioridade
   const emPlantao = motoristasEmPlantao(empresaId); // Cadastro › Plantão: escalados têm prioridade nas filas
   let n = 0;
-  for (const c of lista.filter((x) => x.status === "procurando" && !corridasComOferta.has(x.id) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
+  for (const c of lista.filter((x) => x.status === "procurando" && (ofertasDaCorrida.get(x.id) ?? 0) < carrosDaCorrida(x) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     if (areasEmpresa.bloqueando(c.embarque.lat, c.embarque.lng)) continue; // embarque em área de risco/bloqueio: ninguém é chamado
     const areaDaCorrida = areasEmpresa.principal(c.embarque.lat, c.embarque.lng);
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
     type Candidato = { id: string; km: number | null; fav: boolean; plantao: boolean; nivel: number; naArea: boolean; desde: number };
-    let melhor: Candidato | null = null;
+    const candidatos: Candidato[] = [];
     // Ordem: favorito do passageiro, plantão, nível (prioritário, secundário, reserva), mesma área do embarque; depois, com a fila
     // virtual ligada (Config › Regras de Despacho), quem está online há mais tempo; senão, o mais perto.
     const vence = (a: Candidato, b: Candidato) => {
@@ -334,9 +342,11 @@ export function despachar(empresaId: string) {
         id, km, fav: filtros.ehFavorito(c.passageiro.telefone, id), plantao: emPlantao.has(id), nivel: gestao.nivel(id),
         naArea: !!areaDaCorrida && areasEmpresa.principal(p.lat, p.lng)?.id === areaDaCorrida.id, desde: p.desde,
       };
-      if (!melhor || vence(cand, melhor)) melhor = cand;
+      candidatos.push(cand);
     }
-    if (!melhor) continue;
+    // Uma corrida comum recebe a oferta do melhor candidato; a marcada "enviar mais de um carro" completa até CARROS_SIMULTANEOS ofertas abertas.
+    const faltam = carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0);
+    for (const melhor of candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0)).slice(0, faltam)) {
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
     avisarOferta(empresaId, o, "oferecida");
@@ -347,6 +357,7 @@ export function despachar(empresaId: string) {
       dados: { tipo: "oferta", ofertaId: o.id, corridaId: c.id }, canal: "corridas",
     });
     n++;
+    }
   }
   return n;
 }
@@ -378,6 +389,8 @@ export async function aceitar(empresaId: string, motoristaId: string, ofertaId: 
   const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
   if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
   avisarOferta(empresaId, o, "aceitou");
+  // "Enviar mais de um carro": quem ainda tinha a chamada desta corrida perde na hora.
+  for (const outra of [...e.ofertas.values()]) if (outra.corridaId === c.id) { e.ofertas.delete(outra.id); avisarOferta(empresaId, outra, "perdeu"); emitir(empresaId, motoristaAlvo(outra.motoristaId), "oferta_encerrada", { id: outra.id }); }
   e.tentados.delete(c.id);
   vigiar(empresaId);
   return feita;
