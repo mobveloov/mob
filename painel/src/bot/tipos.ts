@@ -4,7 +4,7 @@ import type { InputKey, RideChoices, RideOptionsConfig } from "./opcoes-pedido.t
 
 export type Etapa =
   | "inicio" | "menu" | "embarque" | "numero_embarque" | "destino" | "numero_destino" | "agendamento" | "cancelar_agendamento" | "confirmar" | "categoria" | "pagamento"
-  | "opcoes" | "opcao_detalhe" | "criando" | "em_corrida" | "avaliacao" | "suporte";
+  | "selecao_rua" | "selecao_rua_destino" | "opcoes" | "opcao_detalhe" | "criando" | "em_corrida" | "avaliacao" | "suporte";
 
 export interface Local { texto: string; lat?: number; lng?: number }
 
@@ -49,6 +49,8 @@ export interface Rascunho {
   salvos?: Local[];
   /** Pesquisa "Alguma preferência para esta corrida?": o que a pessoa escolheu e o que ainda falta perguntar (cupom, parada...). */
   opcoes?: RideChoices;
+  /** Ruas do CNEFE oferecidas quando o endereço serve para mais de uma (na ordem das opções). */
+  opcoesRua?: Local[];
   opcoesPendentes?: InputKey[];
 }
 

@@ -27,6 +27,7 @@ import { cidadesAtendidas } from "../enderecos/index.ts";
 import { tratarDescadastro } from "./descadastro.ts";
 import { supportCloseDecision } from "./fim-suporte.ts";
 import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
+import { escolhaDaLista, listaDeDestino, listaDeEmbarque, opcaoInvalidaDestino, opcaoInvalidaEmbarque, opcoesDeRua, servePraMais } from "./lista-ruas.ts";
 import { isPriceQuestion, isPriceQuestionOnly, responderPreco, textoDeRetomada } from "./pergunta-preco.ts";
 import { applyInput, botOptionsMenu, describeChoices, enabledOptions, INPUT_PROMPTS, parseOptionsReply, sanitizeChoices, type InputKey, type RideChoices } from "./opcoes-pedido.ts";
 import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
@@ -227,7 +228,7 @@ function textoComCidade(empresaId: string, texto: string, conexaoId?: string): s
 const VIA_RE = /^(rua|r\.?|avenida|av\.?|travessa|tv\.?|alameda|al\.?|estrada|rodovia|praca|praça|largo|viela)\s/i;
 
 /** Entende o endereço digitado: link de mapa, coordenadas coladas, "estou em casa", só número, rua sem número. */
-async function entenderLocal(empresaId: string, texto: string, conexaoId?: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean }> {
+async function entenderLocal(empresaId: string, texto: string, conexaoId?: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean; opcoes?: Local[] }> {
   // Apelido cadastrado em Sugestões de Endereço ("espetinho do gui"): vai direto para o lugar cadastrado.
   const sug = localDaSugestao(empresaId, texto, /\d/.test(texto) ? 80 : 30);
   if (sug) return { local: sug };
@@ -241,6 +242,9 @@ async function entenderLocal(empresaId: string, texto: string, conexaoId?: strin
   if (looseHouseNumber(fixo) === fixo.trim()) return { recusa: T.embarqueSoNumero() };
   if (!pareceEndereco(fixo)) return {};
   const limpo = limparEndereco(fixo);
+  // Mais de uma rua serve (mesmo nome em dois bairros): a pessoa escolhe na lista.
+  const opcoes = opcoesDeRua(empresaId, limpo);
+  if (opcoes) return { opcoes };
   return { local: { texto: textoComCidade(empresaId, limpo, conexaoId) }, pedirNumero: VIA_RE.test(limpo) && !addressHasNumber(limpo) };
 }
 
@@ -400,6 +404,7 @@ async function passo(p: Passo) {
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; c.rascunho.salvos = undefined; return irPara(p, "destino"); }
       const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
       if (e.recusa) return p.dizer(e.recusa);
+      if (e.opcoes) { c.rascunho.salvos = undefined; c.rascunho.opcoesRua = e.opcoes; c.etapa = "selecao_rua"; return p.dizer(listaDeEmbarque(texto, e.opcoes)); }
       if (!e.local) return p.dizer(p.txt("address_retry", T.embarqueDeNovo()));
       c.rascunho.salvos = undefined;
       c.rascunho.embarque = e.local;
@@ -428,6 +433,7 @@ async function passo(p: Passo) {
       if (localDe(r)) { c.rascunho.destino = localDe(r)!; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
       {
         const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
+        if (e.opcoes) { c.rascunho.opcoesRua = e.opcoes; c.etapa = "selecao_rua_destino"; return p.dizer(listaDeDestino(texto, e.opcoes)); }
         if (e.local) {
           c.rascunho.destino = e.local; c.rascunho.semDestino = false;
           if (e.pedirNumero) { c.etapa = "numero_destino"; return p.dizer(T.pedirNumeroDestino(e.local.texto)); }
@@ -445,6 +451,34 @@ async function passo(p: Passo) {
       const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
       if (e.local && !e.pedirNumero) { c.rascunho.destino = e.local; return irPara(p, "confirmar"); }
       return p.dizer(T.pedirNumeroDestino(base));
+    }
+
+    case "selecao_rua": {
+      const lista = c.rascunho.opcoesRua ?? [];
+      const o = escolhaDaLista(texto, lista);
+      if (o) {
+        const escolhida = lista[o - 1];
+        c.rascunho.opcoesRua = undefined;
+        c.rascunho.embarque = escolhida;
+        if (!addressHasNumber(escolhida.texto)) { c.etapa = "numero_embarque"; return p.dizer(T.pedirNumeroEmbarque(escolhida.texto)); }
+        return irPara(p, "destino");
+      }
+      // Nome que serve para mais de uma opção: mostra a lista de novo.
+      if (servePraMais(texto, lista)) return p.dizer(`📍 Qual destas? Responda com o número.\n\n${lista.map((x, i) => `${i + 1} - ${x.texto}`).join("\n")}`);
+      // Digitou outro endereço em vez de escolher: volta a pedir o endereço de embarque.
+      if (texto && !/^[1-9]$/.test(n)) { c.rascunho.opcoesRua = undefined; c.etapa = "embarque"; return p.dizer(p.txt("address_retry", T.embarqueDeNovo())); }
+      return p.dizer(opcaoInvalidaEmbarque(lista.length));
+    }
+
+    case "selecao_rua_destino": {
+      const lista = c.rascunho.opcoesRua ?? [];
+      const o = escolhaDaLista(texto, lista);
+      if (!o) return p.dizer(opcaoInvalidaDestino(lista));
+      const escolhida = lista[o - 1];
+      c.rascunho.opcoesRua = undefined;
+      c.rascunho.destino = escolhida; c.rascunho.semDestino = false;
+      if (!addressHasNumber(escolhida.texto)) { c.etapa = "numero_destino"; return p.dizer(T.pedirNumeroDestino(escolhida.texto)); }
+      return irPara(p, "confirmar");
     }
 
     case "agendamento": {
@@ -559,7 +593,7 @@ ${botOptionsMenu(itens)}`);
   }
 }
 
-const ETAPAS_DO_PEDIDO: Array<Conversa["etapa"]> = ["embarque", "numero_embarque", "destino", "numero_destino", "agendamento", "confirmar", "categoria", "pagamento", "opcoes", "opcao_detalhe"];
+const ETAPAS_DO_PEDIDO: Array<Conversa["etapa"]> = ["embarque", "selecao_rua", "selecao_rua_destino", "numero_embarque", "destino", "numero_destino", "agendamento", "confirmar", "categoria", "pagamento", "opcoes", "opcao_detalhe"];
 
 /** "Quanto custa?": responde com a tabela de preços por cidade. Devolve true quando respondeu (a mensagem não segue o fluxo). */
 async function perguntaDePreco(p: Passo): Promise<boolean> {
