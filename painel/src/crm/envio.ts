@@ -10,7 +10,8 @@ import { agoraBr } from "../servidor/util.ts";
 import { barrarEnvio } from "../crm2/governanca.ts";
 import * as A from "./armazem.ts";
 import { conferirCupom } from "./cupons.ts";
-import { ligarEventos, processarAtrasados, rodarGatilhosDeTempo } from "./gatilhos.ts";
+import { WA_OPTOUT_SKIP } from "./optout.ts";
+import { descadastrado, ligarEventos, processarAtrasados, rodarGatilhosDeTempo } from "./gatilhos.ts";
 import { voltaComportamento } from "./comportamento.ts";
 import { voltaRegua } from "./regua.ts";
 import { dentroDaJanela, enviadosHoje, pausaGeral, tetoHoje } from "./limites.ts";
@@ -198,6 +199,11 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
     const bar = barrarEnvio(empresaId, item, new Date(t - 3 * HORA));
     if (bar.barrar === "janela") { r.motivo = "pausa"; break; }
     if (bar.barrar === "optin") { A.alterarItem(empresaId, item.id, (i) => { if (i && i.estado === "pendente") { i.estado = "cancelado"; i.erro = bar.motivo; } }); continue; }
+    // Descadastrou depois de entrar na fila (campanha ou jornada): não envia e não gasta o ritmo.
+    if (descadastrado(empresaId, item.telefone)) {
+      A.alterarItem(empresaId, item.id, (i) => { if (i && i.estado === "pendente") { i.estado = "cancelado"; i.erro = WA_OPTOUT_SKIP; } });
+      continue;
+    }
     const res = reservar(cfg, A.ritmo(empresaId), t, o.sorteio);
     if (!res.ok) {
       if (res.motivo === "limite" && res.ate - t <= esperaMax) { await dormir(res.ate - t); n--; continue; }
