@@ -151,3 +151,5 @@ Prints do teste: motorista "a caminho" (1,5 km, "Siga até local de embarque") e
 ## Push parcial feito (15/11)
 - main publicado (6ad8110) e Docker refeito (up.veloov.com 200). Revisão final feita com Sonnet 5.5 (o Fable 5.2 pediu créditos de uso); 8 achados corrigidos.
 - Pendências de CRM/Bot/Totem/Painel: ver seção "O que ainda falta" em docs/ESTADO_PAINEL.md; agentes Sonnet portando.
+
+- [x] (19/11) Tela inicial: botões "Ajustar faixas" e "Ações" na seção de engajamento, iguais ao mapa de engajamento (Ações com Ver motoristas, Lançar desafio, Enviar notificação, Enviar mensagem, Alterar status; Ajustar faixas abre a janela e só o ADMIN grava). O mapa de engajamento já tinha os dois botões.

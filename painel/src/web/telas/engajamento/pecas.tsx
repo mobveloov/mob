@@ -264,7 +264,7 @@ export function CorpoIndicador({ papel, ind, filtro, podeAgir, podeSalvar, compa
         <div className="me-secao__coluna-grafico">
           <div className="me-secao__acao-topo">
             <p className="me-secao__rotulo">Como os {papel === "motoristas" ? "motoristas" : "passageiros"} se distribuem</p>
-            {!compacta && <button type="button" className="me-btn me-btn--sm" onClick={() => setAjustando(true)}><Settings size={16} />Ajustar faixas</button>}
+            <button type="button" className="me-btn me-btn--sm" onClick={() => setAjustando(true)}><Settings size={16} />Ajustar faixas</button>
           </div>
           <Regua ind={ind} a={ind.a} b={ind.b} compacta={compacta} editavel={false} />
         </div>

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, MapPin, Car, Smartphone, DollarSign, Receipt, Gauge, BarChart3, Users, Star, Info, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { api, dinheiro, numero } from "../api";
 import { useSessao } from "../App";
+import { podeCargo } from "../../comum/cargos.ts";
 import { Avisos, Titulo, useCarregar } from "../componentes/ui";
 import { CorpoIndicador, eng, type Ind } from "../telas/engajamento/pecas";
 import pacote from "../../../package.json";
@@ -191,6 +192,8 @@ function Medidor({ titulo, d, pronto }: { titulo: string; d: Nps | undefined; pr
 
 /** Seção de engajamento da página inicial: um indicador dos motoristas por vez, com setas para trocar. */
 function SecaoEngajamento() {
+  const { sessao } = useSessao();
+  const admin = podeCargo(sessao.usuario.papel, "admin"); // só o ADMIN grava as faixas; "Ações" como no mapa de engajamento
   const [pos, setPos] = useState(0);
   const { dados } = useCarregar(() => eng<{ indicadores: Ind[] }>("/mapa?papel=motoristas").catch(() => null), []);
   const lista = dados?.indicadores ?? [];
@@ -206,7 +209,7 @@ function SecaoEngajamento() {
         <span className="me-secao__titulo">{ind.rotulo}</span>
         <Link to="/engajamento" className="me-secao__link"><ChevronRight size={16} /><p style={{ margin: 0 }}>Ver mapa de engajamento</p></Link>
       </div>
-      <CorpoIndicador papel="motoristas" ind={ind} filtro={{ situacao: "A" }} podeAgir={false} podeSalvar={false} compacta onMudou={() => undefined} />
+      <CorpoIndicador papel="motoristas" ind={ind} filtro={{ situacao: "A" }} podeAgir podeSalvar={admin} compacta onMudou={() => undefined} />
     </div>
   );
 }
