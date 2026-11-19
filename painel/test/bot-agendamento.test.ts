@@ -35,8 +35,8 @@ async function pedirAte(tel: string, embarque: string) {
 test("o menu ganha 'Agendar'; opção 2 pergunta o dia e a hora e aceita 'amanhã 7h'", async () => {
   const tel = "5511910000001";
   const m = await msg(tel, "oi");
-  assert.match(m[0], /\*2\* - Agendar uma corrida/);
-  assert.match(m[0], /\*3\* - Falar com o suporte/);
+  assert.match(m[0], /\*2\* - Agendar 📅/);
+  assert.match(m[0], /\*3\* - Suporte 💬/);
   const p = await msg(tel, "2");
   assert.match(p[0], /Para quando você quer a corrida/);
   assert.equal(A.conversa(empresa.id, tel)!.etapa, "agendamento");
@@ -123,6 +123,6 @@ test("desligar o agendamento tira a opção do menu", async () => {
   A.salvarConfig(outra.id, { ativo: true, provedor: "simulado", instancia: "bot-sem-agenda", agendar: false });
   const r = await receber(outra.id, { id: "z1", telefone: "5511910000009", nome: "Rui", texto: "oi" }, { classificar: async () => null });
   assert.doesNotMatch(r[0], /Agendar/);
-  assert.match(r[0], /\*2\* - Falar com o suporte/);
+  assert.match(r[0], /\*2\* - Suporte 💬/);
   assert.equal(horarioBrasilia(Date.UTC(2026, 10, 15, 10, 5)), "2026-11-15T07:05");
 });

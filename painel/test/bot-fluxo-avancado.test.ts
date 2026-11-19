@@ -44,7 +44,7 @@ test("textos editáveis: a empresa troca o texto; vazio volta ao padrão; chave 
   assert.deepEqual(Object.keys(A.config(empresa.id).textos).sort(), ["address_retry", "ask_address", "welcome_menu"]);
   const tel = "5511911110001";
   let r = await msg(tel, "olá");
-  assert.match(r[0], /^Fala, tudo bem\?\n\*1\* - Pedir uma corrida\n\*2\* - Falar com o suporte$/);
+  assert.match(r[0], /^Fala, tudo bem\?\n\*1\* - Solicitar corrida 🚕\n\*2\* - Suporte 💬$/);
   r = await msg(tel, "1");
   assert.equal(r[0], "📍 Manda o embarque aí!");
   r = await msg(tel, "blá");
@@ -115,7 +115,7 @@ test("imagem de saudação: antes do menu, no máximo uma vez a cada 12 horas", 
   await msg(tel, "olá");
   const caixa = caixaSimulada(empresa.id).filter((m) => m.telefone === tel);
   assert.match(caixa[0].texto, /🖼️ https:\/\/exemplo\.test\/boas-vindas\.png\nBem-vindo!/);
-  assert.match(caixa[1].texto, /Como posso ajudar/);
+  assert.match(caixa[1].texto, /Como podemos ajudar/);
   await msg(tel, "menu");
   assert.equal(caixaSimulada(empresa.id).filter((m) => m.telefone === tel && m.texto.startsWith("🖼️")).length, 1, "não repete antes de 12 h");
   assert.equal(A.sanearAvancada({ saudacao: { imageUrl: "http://inseguro.test/a.png", caption: "" } }).saudacao.imageUrl, "", "só https");

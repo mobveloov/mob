@@ -125,6 +125,16 @@ test("rastreio, recibo só de corrida concluída e chat", async () => {
   assert.equal(r.corpo.aberta, true);
   assert.equal(r.corpo.motorista.placa, "ABC1D23");
   assert.equal((await pedir(`/corridas/${c1}/chat`, { cookie: co })).status, 200);
+  // Foto do chat: aparece na auditoria da central e o arquivo só abre para a empresa dona.
+  const Chat = await import("../src/apps/chat.ts");
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]);
+  const msg = Chat.enviarMidia(A.id, c1, "passageiro", "Rui", "image/jpeg", jpg, "Portão azul");
+  const chat = await pedir(`/corridas/${c1}/chat`, { cookie: co });
+  assert.deepEqual(chat.corpo.mensagens.at(-1).midia, { id: msg.midia!.id, tipo: "imagem", legenda: "Portão azul" });
+  const arq = await fetch(`${base}/api/operacao/corridas/${c1}/chat/midia/${msg.midia!.id}`, { headers: { cookie: co } });
+  assert.equal(arq.status, 200);
+  assert.equal(arq.headers.get("content-type"), "image/jpeg");
+  assert.equal((await fetch(`${base}/api/operacao/corridas/${c1}/chat/midia/00000000-0000-4000-8000-000000000000`, { headers: { cookie: co } })).status, 404);
   // Corrida ainda aberta já tem recibo (vale o estimado); cancelada, não.
   const rec = await pedir(`/corridas/${c1}/recibo`, { cookie: co });
   assert.equal(rec.status, 200);

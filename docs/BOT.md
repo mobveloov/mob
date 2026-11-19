@@ -116,7 +116,7 @@ Tela **Bot de WhatsApp › Ajustes do bot** (só admin muda) e regras do bot de 
 | Comandos da central (`#bloquear`, `#desbloquear`, `#pausar`, `#voltar`, com ou sem número) | Veio, também pelos botões em Conversas. Bloqueado ou pausado: o bot fica quieto e a conversa fica no painel. |
 | Mensagens de status | Veio: textos padrão do sistema de referência, editáveis com `{passageiro}`, `{motorista}`, `{empresa}`; aceite e troca de motorista levam os dados do carro. |
 | Grupos de WhatsApp | Já ignorados (`@g.us`). |
-| Falta | Várias conexões por empresa e outros provedores (Z-API, Z-Pro, Meta), cidades ativas, voz do bot, áudio, endereços aprendidos, agendamento pelo bot, repasse de mídia entre motorista e passageiro, descadastro por resposta (PARAR/SAIR) ligado ao CRM. |
+| Falta | Várias conexões por empresa e outros provedores (Z-API, Z-Pro, Meta), cidades ativas, voz do bot, áudio, endereços aprendidos, agendamento pelo bot, descadastro por resposta (PARAR/SAIR) ligado ao CRM. |
 
 Arquivos novos: `bot/textos-editaveis.ts`, `bot/mensagens-status.ts`, `bot/controle.ts`, `bot/destino.ts`, `web/bot/Ajustes.tsx`.
 Testes: `test/bot-fluxo-avancado.test.ts` e `test/bot-regras-*.test.ts`.
@@ -133,4 +133,9 @@ Testes: `test/bot-fluxo-avancado.test.ts` e `test/bot-regras-*.test.ts`.
 - **Voz:** `voz.ts` (Gemini, OpenAI de reserva), `voz-texto.ts` e `voz-gemini.ts` copiados do mobveloov. Só para quem mandou áudio.
 - **Repasse:** `repasse.ts`. Com o motorista a caminho, o que o passageiro manda vai ao chat da corrida; o que o motorista manda no chat sai pelo WhatsApp.
 - **Descadastro:** `descadastro.ts` liga PARAR/SAIR/NÃO QUERO MAIS ao opt-out do CRM (regras de `crm/optout.ts`).
-- **Falta:** foto e vídeo entre motorista e passageiro (o chat da corrida só tem texto e áudio).
+- **Foto e vídeo:** o chat da corrida (`apps/chat.ts`) aceita foto (JPG, PNG, WEBP até 5 MB, `APPS_FOTO_MAX_KB`) e vídeo (MP4, 3GP, MOV, WEBM até 16 MB, `APPS_VIDEO_MAX_MB`), com o tipo conferido pelo começo do arquivo e até 40 por corrida. Rotas `/api/apps/:empresa/corridas/:id/midia` (enviar e baixar), clipe nos apps do motorista e do passageiro e auditoria na central. O bot repassa nos dois sentidos; fora do limite o passageiro recebe o motivo. Sem motorista a caminho o bot só explica.
+- **Escolha da rua:** `lista-ruas.ts`. Endereço que serve para mais de uma rua do CNEFE vira lista numerada (etapas `selecao_rua` e `selecao_rua_destino`).
+- **Pergunta de preço:** `pergunta-preco.ts` responde com a tabela Preços por cidade do totem.
+- **Preferências da corrida:** `opcoes-pedido.ts` (cópia de `rideOptions.ts`), ligada em Ajustes › Opções do pedido; etapas `opcoes` e `opcao_detalhe`, depois do pagamento.
+- **Menu padrão:** textos do original ("Olá! Sou um assistente 🤖 inteligente..."), sem nome da empresa e do assistente.
+- **Falta:** foto da fachada como embarque; despacho por preferência (hoje só anotada); testes com conta real dos provedores.

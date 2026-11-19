@@ -5,7 +5,7 @@
 // - Simulado: guarda as mensagens enviadas na memória. Para testes e para a tela "Testar conversa".
 
 import crypto from "node:crypto";
-import type { AudioRecebido, Recebida, SituacaoConexao, TipoProvedor } from "./tipos.ts";
+import type { AudioRecebido, MidiaRecebida, Recebida, SituacaoConexao, TipoProvedor } from "./tipos.ts";
 
 export interface Conexao { situacao: SituacaoConexao; qr?: string; codigo?: string; detalhe?: string }
 
@@ -47,6 +47,13 @@ const QR_SIMULADO = `data:image/svg+xml;base64,${Buffer.from(
   }</svg>`,
 ).toString("base64")}`;
 
+/** Modo simulado/testes: { tipo: "imagem" | "video", base64, mimetype, legenda }. */
+function midiaSimulada(m: unknown): MidiaRecebida | undefined {
+  const x = (m ?? {}) as { tipo?: unknown; base64?: unknown; mimetype?: unknown; legenda?: unknown };
+  if ((x.tipo !== "imagem" && x.tipo !== "video") || typeof x.base64 !== "string") return undefined;
+  return { tipo: x.tipo, base64: x.base64, mimetype: String(x.mimetype ?? (x.tipo === "imagem" ? "image/jpeg" : "video/mp4")), ...(x.legenda ? { legenda: String(x.legenda).slice(0, 200) } : {}) };
+}
+
 export function provedorSimulado(empresaId: string): ProvedorWhatsApp {
   return {
     tipo: "simulado",
@@ -71,6 +78,8 @@ ${m.legenda}` : ""}`, em: new Date().toISOString() });
     async conectar() { return { situacao: "conectado", qr: QR_SIMULADO, detalhe: "Modo simulado: nenhuma mensagem sai de verdade." }; },
     async situacao() { return { situacao: "conectado", detalhe: "Modo simulado." }; },
     async desconectar() { /* nada */ },
+    /** Simulado: o "arquivo" já vem no corpo (base64). */
+    async baixarAudio(a) { return a.base64 ? { bytes: Buffer.from(a.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: a.mimetype } : null; },
     /** Simulado: telefone terminado em 0000 não tem WhatsApp (mesma regra do envio do CRM). */
     async existeNoWhatsApp(telefone) { return !soDigitos(telefone).endsWith("0000"); },
     lerWebhook(corpo) {
@@ -86,6 +95,7 @@ ${m.legenda}` : ""}`, em: new Date().toISOString() });
         audio: typeof c.transcricao === "string" && c.transcricao.trim() ? { mimetype: "audio/ogg", transcricao: c.transcricao.trim().slice(0, 1000) } : undefined,
         local: local && Number.isFinite(Number(local.lat)) && Number.isFinite(Number(local.lng))
           ? { lat: Number(local.lat), lng: Number(local.lng), texto: String(local.texto ?? "") } : undefined,
+        midia: midiaSimulada(c.midia),
       }];
     },
   };
@@ -193,7 +203,8 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
           key?: { remoteJid?: string; fromMe?: boolean; id?: string }; pushName?: string;
           message?: { conversation?: string; extendedTextMessage?: { text?: string };
             locationMessage?: { degreesLatitude?: number; degreesLongitude?: number; name?: string; address?: string };
-            audioMessage?: { mimetype?: string; url?: string }; base64?: string };
+            audioMessage?: { mimetype?: string; url?: string };
+            imageMessage?: { mimetype?: string; caption?: string }; videoMessage?: { mimetype?: string; caption?: string }; base64?: string };
         };
         const jid = m.key?.remoteJid ?? "";
         if (!jid || !jid.endsWith("@s.whatsapp.net")) continue; // ignora grupos (@g.us), status e transmissões
@@ -204,15 +215,18 @@ export function provedorEvolution(d: DadosEvolution): ProvedorWhatsApp {
         if (daCentral && !String(texto ?? "").trim().startsWith("#")) continue;
         const au = m.message?.audioMessage;
         const idMsg = String(m.key?.id ?? `${jid}-${Date.now()}`);
+        const im = m.message?.imageMessage, vi = m.message?.videoMessage;
+        const midia: MidiaRecebida | undefined = im ? { tipo: "imagem", id: idMsg, base64: m.message?.base64, mimetype: im.mimetype ?? "image/jpeg", ...(im.caption ? { legenda: im.caption.slice(0, 200) } : {}) }
+          : vi ? { tipo: "video", id: idMsg, base64: m.message?.base64, mimetype: vi.mimetype ?? "video/mp4", ...(vi.caption ? { legenda: vi.caption.slice(0, 200) } : {}) } : undefined;
         out.push({
           id: idMsg, telefone: soDigitos(jid.split("@")[0]), nome: daCentral ? undefined : m.pushName?.slice(0, 60),
           audio: au ? { id: idMsg, base64: m.message?.base64, mimetype: au.mimetype ?? "audio/ogg" } : undefined,
-          texto: texto ? texto.slice(0, 1000) : undefined, daCentral: daCentral || undefined,
+          texto: texto ? texto.slice(0, 1000) : undefined, daCentral: daCentral || undefined, midia,
           local: loc && Number.isFinite(loc.degreesLatitude) && Number.isFinite(loc.degreesLongitude)
             ? { lat: loc.degreesLatitude!, lng: loc.degreesLongitude!, texto: [loc.name, loc.address].filter(Boolean).join(" - ") } : undefined,
         });
       }
-      return out.filter((r) => r.texto || r.local || r.audio);
+      return out.filter((r) => r.texto || r.local || r.audio || r.midia);
     },
     async baixarAudio(a) {
       if (a.base64) return { bytes: Buffer.from(a.base64.replace(/^data:[^,]*,/, ""), "base64"), mimetype: a.mimetype };

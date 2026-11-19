@@ -4,7 +4,7 @@
 import crypto from "node:crypto";
 import type { Conexao, ProvedorWhatsApp } from "./provedores.ts";
 import { soDigitos } from "./provedores.ts";
-import type { Recebida } from "./tipos.ts";
+import type { MidiaRecebida, Recebida } from "./tipos.ts";
 
 type FetchLike = typeof fetch;
 
@@ -37,14 +37,19 @@ export function lerWebhookZapi(corpo: unknown): Recebida[] {
   const loc = b.location as { latitude?: unknown; longitude?: unknown; name?: unknown; address?: unknown } | undefined;
   const lat = Number(loc?.latitude), lng = Number(loc?.longitude);
   const au = b.audio as { audioUrl?: unknown; mimeType?: unknown } | undefined;
+  const im = b.image as { imageUrl?: unknown; mimeType?: unknown; caption?: unknown } | undefined;
+  const vi = b.video as { videoUrl?: unknown; mimeType?: unknown; caption?: unknown } | undefined;
+  const midia: MidiaRecebida | undefined = im?.imageUrl ? { tipo: "imagem", url: String(im.imageUrl), mimetype: String(im.mimeType ?? "image/jpeg"), ...(im.caption ? { legenda: String(im.caption).slice(0, 200) } : {}) }
+    : vi?.videoUrl ? { tipo: "video", url: String(vi.videoUrl), mimetype: String(vi.mimeType ?? "video/mp4"), ...(vi.caption ? { legenda: String(vi.caption).slice(0, 200) } : {}) } : undefined;
   const r: Recebida = {
+    midia,
     id: String(b.messageId ?? b.id ?? `${phone}-${Date.now()}`), telefone: soDigitos(phone),
     nome: daCentral ? undefined : b.senderName ? String(b.senderName).slice(0, 60) : undefined,
     texto, daCentral: daCentral || undefined,
     local: loc && loc.latitude != null && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng, texto: [loc.name, loc.address].filter(Boolean).join(" - ") } : undefined,
     audio: au?.audioUrl ? { url: String(au.audioUrl), mimetype: String(au.mimeType ?? "audio/ogg") } : undefined,
   };
-  return r.texto || r.local || r.audio ? [r] : [];
+  return r.texto || r.local || r.audio || r.midia ? [r] : [];
 }
 
 export function provedorZapi(d: DadosZapi, tipo: "zapi" | "zpro" = "zapi"): ProvedorWhatsApp {
@@ -157,14 +162,16 @@ export function lerWebhookMeta(corpo: unknown, phoneId?: string, agora = Date.no
           : m.type === "button" ? (m.button as { text?: string } | undefined)?.text : undefined;
       const loc = m.type === "location" ? (m.location as { latitude?: number; longitude?: number; name?: string; address?: string } | undefined) : undefined;
       const au = m.type === "audio" ? (m.audio as { id?: string; mime_type?: string } | undefined) : undefined;
+      const mm = m.type === "image" || m.type === "video" ? (m[m.type as string] as { id?: string; mime_type?: string; caption?: string } | undefined) : undefined;
       const r: Recebida = {
+        midia: mm?.id ? { tipo: m.type === "image" ? "imagem" : "video", id: mm.id, mimetype: mm.mime_type ?? (m.type === "image" ? "image/jpeg" : "video/mp4"), ...(mm.caption ? { legenda: String(mm.caption).slice(0, 200) } : {}) } : undefined,
         id: String(m.id ?? `${from}-${agora}`), telefone: from, nome: nomes.get(from)?.slice(0, 60),
         texto: texto ? String(texto).slice(0, 1000) : undefined,
         local: loc && Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude)
           ? { lat: loc.latitude!, lng: loc.longitude!, texto: [loc.name, loc.address].filter(Boolean).join(" - ") } : undefined,
         audio: au?.id ? { id: au.id, mimetype: au.mime_type ?? "audio/ogg" } : undefined,
       };
-      if (r.texto || r.local || r.audio) out.push(r);
+      if (r.texto || r.local || r.audio || r.midia) out.push(r);
     }
   }
   return out;

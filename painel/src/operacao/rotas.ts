@@ -18,7 +18,7 @@
 import { filialDe, filialForcada, listarFiliais } from "../filiais/filiais.ts";
 import fs from "node:fs";
 import { Router, type Request, type Response } from "express";
-import { arquivoDoAudio } from "../apps/chat.ts";
+import { arquivoDaMidia, arquivoDoAudio } from "../apps/chat.ts";
 import { aposCancelar, aposFinalizar } from "../apps/extras.ts";
 import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
@@ -131,6 +131,15 @@ rotasOperacao.get("/corridas/:id/chat/audio/:audio", ok((req, res) => {
   const c = S.acharPropria(emp(req), req.params.id);
   const a = arquivoDoAudio(emp(req), c.id, req.params.audio);
   if (!a) return res.status(404).json({ erro: "Áudio não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.send(fs.readFileSync(a.caminho));
+}));
+
+rotasOperacao.get("/corridas/:id/chat/midia/:midia", ok((req, res) => {
+  const c = S.acharPropria(emp(req), req.params.id);
+  const a = arquivoDaMidia(emp(req), c.id, req.params.midia);
+  if (!a) return res.status(404).json({ erro: "Arquivo não encontrado." });
   res.setHeader("Content-Type", a.mime);
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.send(fs.readFileSync(a.caminho));

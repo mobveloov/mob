@@ -2,13 +2,14 @@
 // respostas rápidas em pílulas, campo de texto e microfone redondo (grava e envia áudio).
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, Mic, Phone, Send, User, Volume2 } from "lucide-react";
-import { api, Gravador, urlDoAudio } from "../comum/api";
+import { ChevronLeft, Mic, Paperclip, Phone, Send, User, Volume2 } from "lucide-react";
+import { ACEITA_MIDIA, api, enviarMidiaDoChat, Gravador, problemaDaMidia, urlDoAudio } from "../comum/api";
+import { MidiaDoChat } from "../comum/ui";
 import { mensagemDeErro, type Mensagem } from "../comum/ui";
 import { Erro, useImagem } from "./Pecas";
 import type { Corrida } from "./tipos";
 
-export interface MensagemM { id: string; meu: boolean; texto?: string; audio?: ReactNode; em: string; nome?: string }
+export interface MensagemM { id: string; meu: boolean; texto?: string; audio?: ReactNode; midia?: ReactNode; em: string; nome?: string }
 
 /** Respostas rápidas da empresa (rota /mensagens-rapidas) ou, sem elas, as de sempre. */
 const PADRAO = ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor"];
@@ -26,9 +27,9 @@ export function useRespostasRapidas() {
 const dia = (em: string, utc: boolean) => new Date(em).toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric", ...(utc ? { timeZone: "UTC" } : {}) }).replace(/ de /g, " ");
 const horaMsg = (em: string, utc: boolean) => new Date(em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", ...(utc ? { timeZone: "UTC" } : {}) });
 
-export function Conversa({ titulo, subtitulo, avatar, mensagens, utc = false, aberto = true, avisoFechado, fechar, telefone, enviarTexto, enviarAudio, direita, rapidas = true }: {
+export function Conversa({ titulo, subtitulo, avatar, mensagens, utc = false, aberto = true, avisoFechado, fechar, telefone, enviarTexto, enviarAudio, enviarMidia, direita, rapidas = true }: {
   titulo: ReactNode; subtitulo?: string; avatar: ReactNode; mensagens: MensagemM[]; utc?: boolean; aberto?: boolean; avisoFechado?: string; fechar: () => void; telefone?: string;
-  enviarTexto: (t: string) => Promise<void>; enviarAudio: (a: Blob, segundos: number) => Promise<void>; direita?: ReactNode; rapidas?: boolean;
+  enviarTexto: (t: string) => Promise<void>; enviarAudio: (a: Blob, segundos: number) => Promise<void>; /** Foto ou vídeo (só no chat da corrida). */ enviarMidia?: (f: File) => Promise<void>; direita?: ReactNode; rapidas?: boolean;
 }) {
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState("");
@@ -36,6 +37,8 @@ export function Conversa({ titulo, subtitulo, avatar, mensagens, utc = false, ab
   const [segundos, setSegundos] = useState(0);
   const gravador = useRef(new Gravador());
   const fim = useRef<HTMLDivElement>(null);
+  const campoMidia = useRef<HTMLInputElement>(null);
+  const [enviandoMidia, setEnviandoMidia] = useState(false);
   const respostas = useRespostasRapidas();
   useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth" }); }, [mensagens.length]);
   useEffect(() => () => { void gravador.current.parar(true); }, []);
@@ -60,6 +63,16 @@ export function Conversa({ titulo, subtitulo, avatar, mensagens, utc = false, ab
     try { await enviarAudio(r.audio, r.segundos); } catch (e) { setErro(mensagemDeErro(e)); }
   };
 
+  const escolherMidia = async (f: File | undefined) => {
+    if (!f || !enviarMidia) return;
+    const p = problemaDaMidia(f);
+    if (p) { setErro(p); return; }
+    setErro(""); setEnviandoMidia(true);
+    try { await enviarMidia(f); } catch (e) { setErro(mensagemDeErro(e)); }
+    setEnviandoMidia(false);
+    if (campoMidia.current) campoMidia.current.value = "";
+  };
+
   let ultimoDia = "";
   return (
     <div className="chat-m">
@@ -82,6 +95,7 @@ export function Conversa({ titulo, subtitulo, avatar, mensagens, utc = false, ab
                 {!m.meu && m.nome && <small>{m.nome}</small>}
                 {m.texto && <p>{m.texto}</p>}
                 {m.audio}
+                {m.midia}
                 <time>{horaMsg(m.em, utc)}</time>
               </div>
             </div>
@@ -101,6 +115,12 @@ export function Conversa({ titulo, subtitulo, avatar, mensagens, utc = false, ab
             </div>
           ) : (
             <form className="chat-m-entrada" onSubmit={(e) => { e.preventDefault(); void enviar(texto); }}>
+              {enviarMidia && (
+                <>
+                  <input ref={campoMidia} type="file" accept={ACEITA_MIDIA} hidden onChange={(e) => void escolherMidia(e.target.files?.[0])} />
+                  <button type="button" className="redondo clipe" aria-label="Enviar foto ou vídeo" disabled={enviandoMidia} onClick={() => campoMidia.current?.click()}><Paperclip size={20} /></button>
+                </>
+              )}
               <input placeholder="Digite uma mensagem..." value={texto} maxLength={1000} onChange={(e) => setTexto(e.target.value)} />
               {texto.trim()
                 ? <button className="redondo" aria-label="Enviar"><Send size={20} /></button>
@@ -126,11 +146,12 @@ function AudioCorrida({ corridaId, audioId }: { corridaId: string; audioId: stri
 export function ChatCorrida({ corrida, mensagens, fechar }: { corrida: Corrida; mensagens: Mensagem[]; fechar: () => void }) {
   const foto = useImagem(corrida.passageiro.foto);
   const tel = corrida.passageiro.telefone?.replace(/\D/g, "");
-  const lista: MensagemM[] = mensagens.map((m) => ({ id: m.id, meu: m.de === "motorista", texto: m.texto, em: m.em, nome: m.nome, audio: m.audio ? <AudioCorrida corridaId={corrida.id} audioId={m.audio.id} /> : undefined }));
+  const lista: MensagemM[] = mensagens.map((m) => ({ id: m.id, meu: m.de === "motorista", texto: m.texto, em: m.em, nome: m.nome, audio: m.audio ? <AudioCorrida corridaId={corrida.id} audioId={m.audio.id} /> : undefined, midia: m.midia ? <MidiaDoChat corridaId={corrida.id} m={m.midia} /> : undefined }));
   return (
     <Conversa titulo={corrida.passageiro.nome} subtitulo={corrida.aberta ? "Viagem ativa" : "Viagem encerrada"} avatar={foto ? <img src={foto} alt="" /> : <User size={22} />} telefone={tel || undefined}
       mensagens={lista} aberto={corrida.aberta} fechar={fechar}
       enviarTexto={async (texto) => { await api(`/corridas/${corrida.id}/chat`, { corpo: { texto } }); }}
+      enviarMidia={async (f) => { await enviarMidiaDoChat(corrida.id, f); }}
       enviarAudio={async (audio, segundos) => { await api(`/corridas/${corrida.id}/audio`, { bruto: audio, cabecalhos: { "x-segundos": String(segundos) } }); }} />
   );
 }

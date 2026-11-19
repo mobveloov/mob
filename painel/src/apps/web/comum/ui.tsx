@@ -1,7 +1,7 @@
 // Peças de tela comuns aos dois apps: marca da empresa, login, chat (texto e áudio), mapa simples e estrelas.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api, config, ErroApi, guardarToken, Gravador, trocarServidor, urlArquivo, urlDoAudio, type Papel, type Posicao } from "./api";
+import { ACEITA_MIDIA, api, config, enviarMidiaDoChat, ErroApi, guardarToken, Gravador, problemaDaMidia, trocarServidor, urlArquivo, urlDaMidia, urlDoAudio, type Papel, type Posicao } from "./api";
 
 export interface MarcaApp {
   empresaId: string; nome: string; nomeExibido: string; cores: { primaria: string; secundaria: string; fundo: string; texto: string };
@@ -127,7 +127,7 @@ export function Entrar({ marca, papel, aoEntrar }: { marca: MarcaApp; papel: Pap
 
 // ------------------------------------------------------------------ chat da corrida
 
-export interface Mensagem { id: string; de: Papel; nome: string; texto?: string; audio?: { id: string; mime: string; bytes: number; segundos: number | null }; em: string }
+export interface Mensagem { id: string; de: Papel; nome: string; texto?: string; audio?: { id: string; mime: string; bytes: number; segundos: number | null }; midia?: { id: string; tipo: "imagem" | "video"; mime: string; bytes: number; legenda?: string }; em: string }
 
 function TocarAudio({ corridaId, m }: { corridaId: string; m: Mensagem }) {
   const [url, setUrl] = useState("");
@@ -135,6 +135,42 @@ function TocarAudio({ corridaId, m }: { corridaId: string; m: Mensagem }) {
   useEffect(() => { urlDoAudio(corridaId, m.audio!.id).then(setUrl).catch((e) => setErro(e.message)); }, [corridaId, m.audio]);
   if (erro) return <span className="dica">{erro}</span>;
   return url ? <audio controls preload="metadata" src={url} /> : <span className="dica">Carregando áudio…</span>;
+}
+
+/** Foto ou vídeo do chat da corrida (baixado com o token). Toque na foto para abrir em tela cheia. */
+export function MidiaDoChat({ corridaId, m }: { corridaId: string; m: NonNullable<Mensagem["midia"]> }) {
+  const [url, setUrl] = useState("");
+  const [erro, setErro] = useState("");
+  useEffect(() => { urlDaMidia(corridaId, m.id).then(setUrl).catch((e) => setErro(e.message)); }, [corridaId, m.id]);
+  if (erro) return <span className="dica">{erro}</span>;
+  if (!url) return <span className="dica">Carregando {m.tipo === "video" ? "vídeo" : "foto"}…</span>;
+  return (
+    <figure className="midia-chat">
+      {m.tipo === "video" ? <video controls preload="metadata" src={url} /> : <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={m.legenda ?? "Foto enviada no chat"} /></a>}
+      {m.legenda && <figcaption>{m.legenda}</figcaption>}
+    </figure>
+  );
+}
+
+/** Botão do clipe: escolhe foto ou vídeo do aparelho e envia ao chat da corrida. */
+export function BotaoMidia({ corridaId, aoErro, classe = "botao microfone" }: { corridaId: string; aoErro: (m: string) => void; classe?: string }) {
+  const campo = useRef<HTMLInputElement>(null);
+  const [enviando, setEnviando] = useState(false);
+  const escolher = async (f: File | undefined) => {
+    if (!f) return;
+    const p = problemaDaMidia(f);
+    if (p) { aoErro(p); return; }
+    setEnviando(true);
+    try { await enviarMidiaDoChat(corridaId, f); aoErro(""); } catch (e) { aoErro((e as Error).message); }
+    setEnviando(false);
+    if (campo.current) campo.current.value = "";
+  };
+  return (
+    <>
+      <input ref={campo} type="file" accept={ACEITA_MIDIA} hidden onChange={(e) => void escolher(e.target.files?.[0])} />
+      <button type="button" className={classe} aria-label="Enviar foto ou vídeo" disabled={enviando} onClick={() => campo.current?.click()}>{enviando ? "…" : "📎"}</button>
+    </>
+  );
 }
 
 /** Voz em português do Brasil do aparelho (ou null se não houver). As vozes podem chegar depois de abrir a tela. */
@@ -215,6 +251,7 @@ export function Chat({ corridaId, papel, mensagens, aberto, fechar, titulo, avat
             {m.texto && <p>{m.texto}</p>}
             {m.texto && voz && <BotaoOuvir texto={m.texto} voz={voz} />}
             {m.audio && <TocarAudio corridaId={corridaId} m={m} />}
+            {m.midia && <MidiaDoChat corridaId={corridaId} m={m.midia} />}
             <time>{new Date(m.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</time>
           </div>
         ))}
@@ -230,6 +267,7 @@ export function Chat({ corridaId, papel, mensagens, aberto, fechar, titulo, avat
           </div>
         ) : (
           <form className="chat-entrada" onSubmit={(e) => { e.preventDefault(); void enviar(); }}>
+            <BotaoMidia corridaId={corridaId} aoErro={setErro} />
             <input placeholder="Escreva uma mensagem" value={texto} maxLength={1000} onChange={(e) => setTexto(e.target.value)} />
             {texto.trim() ? <button className="botao">Enviar</button> : <button type="button" className="botao microfone" aria-label="Gravar áudio" onClick={() => void gravar()}>🎤</button>}
           </form>

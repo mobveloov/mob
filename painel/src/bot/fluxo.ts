@@ -27,6 +27,9 @@ import { cidadesAtendidas } from "../enderecos/index.ts";
 import { tratarDescadastro } from "./descadastro.ts";
 import { supportCloseDecision } from "./fim-suporte.ts";
 import { freqLabel, uniqueFreqAddresses } from "./enderecos-frequentes.ts";
+import { escolhaDaLista, listaDeDestino, listaDeEmbarque, opcaoInvalidaDestino, opcaoInvalidaEmbarque, opcoesDeRua, servePraMais } from "./lista-ruas.ts";
+import { isPriceQuestion, isPriceQuestionOnly, responderPreco, textoDeRetomada } from "./pergunta-preco.ts";
+import { applyInput, botOptionsMenu, describeChoices, enabledOptions, INPUT_PROMPTS, parseOptionsReply, sanitizeChoices, type InputKey, type RideChoices } from "./opcoes-pedido.ts";
 import { ID_PRINCIPAL, type CategoriaBot, type ConfigBot, type Conversa, type CorridaBot, type Local, type Recebida } from "./tipos.ts";
 
 export interface Dependencias {
@@ -138,13 +141,19 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   let texto = (r.texto ?? "").trim();
   let audioFalhou = false;
   const ouviuAudio = Boolean(!r.texto && !r.local && r.audio);
+  // Foto ou vídeo sem texto: com motorista vai para o chat da corrida (passo); fora da corrida a legenda vale como texto, ou o bot explica.
+  let soMidia = false;
+  if (r.midia && !r.texto && !r.local && !r.audio) {
+    if (!comMotorista(c)) { if (r.midia.legenda) texto = r.midia.legenda.trim(); else soMidia = true; }
+  }
+  const rotuloMidia = r.midia ? `${r.midia.tipo === "video" ? "🎬 Vídeo" : "🖼️ Foto"}${r.midia.legenda ? `: ${r.midia.legenda}` : ""}` : "";
   if (!texto && !r.local && r.audio) {
     // Áudio: vira texto (quando há chave de transcrição) e segue como se tivesse sido digitado.
     const dito = await textoDoAudio(empresaId, r.audio, provedor, deps.audio);
     if (dito) texto = dito; else audioFalhou = true;
     c.mensagens.push({ de: "passageiro", texto: dito ? `🎤 Áudio: "${dito.slice(0, 900)}"` : "🎤 Áudio (não deu para transcrever)", em: agora() });
   } else {
-    c.mensagens.push({ de: "passageiro", texto: texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
+    c.mensagens.push({ de: "passageiro", texto: r.midia ? (r.texto ? `${rotuloMidia} (${r.texto})` : rotuloMidia) : texto || `📍 Localização${r.local?.texto ? `: ${r.local.texto}` : ""}`, em: agora() });
   }
   c.naoLidas++;
 
@@ -163,6 +172,13 @@ async function tratar(empresaId: string, r: Recebida, deps: Dependencias): Promi
   if (botSilencedFor({ blocked: c.bloqueado, paused_until: c.pausadoAte ?? null })) {
     A.salvarConversa(empresaId, c);
     return [];
+  }
+  if (soMidia) {
+    const aviso = c.etapa === "suporte" ? [] : [T.midiaSemMotorista()];
+    for (const t of aviso) c.mensagens.push({ de: "bot", texto: t, em: agora() });
+    A.salvarConversa(empresaId, c);
+    await enviar(empresaId, provedor, c.id, aviso);
+    return aviso;
   }
   // Áudio que não deu para ouvir: pede para repetir ou escrever (com o operador na conversa, quem responde é ele).
   if (audioFalhou && !comMotorista(c)) {
@@ -211,7 +227,7 @@ const localDe = (r: Recebida): Local | null => (r.local ? { texto: r.local.texto
 
 function textoMenu(p: Passo): string {
   const custom = customText(p.cfg.textos, p.c.historico.length ? "welcome_back" : "welcome_menu", "");
-  return custom ? `${custom}${opcoesMenu(p.cfg.agendar)}` : T.menu(p.m, p.c.nome, p.cfg.agendar);
+  return custom ? `${custom}${opcoesMenu(p.cfg.agendar)}` : T.menu(p.m, p.c.nome, p.cfg.agendar, p.c.historico.length > 0);
 }
 
 
@@ -225,7 +241,7 @@ function textoComCidade(empresaId: string, texto: string, conexaoId?: string): s
 const VIA_RE = /^(rua|r\.?|avenida|av\.?|travessa|tv\.?|alameda|al\.?|estrada|rodovia|praca|praça|largo|viela)\s/i;
 
 /** Entende o endereço digitado: link de mapa, coordenadas coladas, "estou em casa", só número, rua sem número. */
-async function entenderLocal(empresaId: string, texto: string, conexaoId?: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean }> {
+async function entenderLocal(empresaId: string, texto: string, conexaoId?: string): Promise<{ local?: Local; recusa?: string; pedirNumero?: boolean; opcoes?: Local[] }> {
   // Apelido cadastrado em Sugestões de Endereço ("espetinho do gui"): vai direto para o lugar cadastrado.
   const sug = localDaSugestao(empresaId, texto, /\d/.test(texto) ? 80 : 30);
   if (sug) return { local: sug };
@@ -239,6 +255,9 @@ async function entenderLocal(empresaId: string, texto: string, conexaoId?: strin
   if (looseHouseNumber(fixo) === fixo.trim()) return { recusa: T.embarqueSoNumero() };
   if (!pareceEndereco(fixo)) return {};
   const limpo = limparEndereco(fixo);
+  // Mais de uma rua serve (mesmo nome em dois bairros): a pessoa escolhe na lista.
+  const opcoes = opcoesDeRua(empresaId, limpo);
+  if (opcoes) return { opcoes };
   return { local: { texto: textoComCidade(empresaId, limpo, conexaoId) }, pedirNumero: VIA_RE.test(limpo) && !addressHasNumber(limpo) };
 }
 
@@ -283,7 +302,7 @@ function irPara(p: Passo, etapa: Conversa["etapa"], corrigindo = false): void | 
   }
   if (etapa === "confirmar") p.dizer(T.confirmar(c.rascunho));
   if (etapa === "pagamento") {
-    if (!cfg.fluxo.ask_payment) { c.rascunho.pagamento = PAGAMENTOS[0]; return criar(p); } // a corrida própria exige uma forma: sem perguntar, vai Dinheiro
+    if (!cfg.fluxo.ask_payment) { c.rascunho.pagamento = PAGAMENTOS[0]; return depoisDoPagamento(p); } // a corrida própria exige uma forma: sem perguntar, vai Dinheiro
     const base = p.txt("ask_payment", "");
     p.dizer(base ? `${base}\n${PAGAMENTOS.map((x, i) => `*${i + 1}* - ${x}`).join("\n")}` : T.pagamento());
   }
@@ -308,6 +327,7 @@ async function passo(p: Passo) {
       // Com o motorista a caminho ou na corrida, o que o passageiro escreve, grava ou localiza vai para o chat do motorista.
       const prov = p.deps.provedor ?? provedorDe(p.empresaId, c.conexao);
       const rep = await repassarAoMotorista(p.empresaId, c, r, texto, (a) => (prov.baixarAudio ? prov.baixarAudio(a) : Promise.resolve(null)));
+      if (rep && typeof rep === "object") return p.dizer(T.midiaRecusada(rep.recusada));
       if (rep) { if (!c.corrida!.avisouRepasse) { c.corrida!.avisouRepasse = true; p.dizer(T.repassado()); } return; }
     }
     return p.dizer(T.jaTemCorrida(NOME_STATUS[c.corrida.status] ?? c.corrida.status));
@@ -317,7 +337,12 @@ async function passo(p: Passo) {
     if (MENU.test(n) || supportCloseDecision("passenger", texto).sendMenu) { const saiu = p.txt("support_exit", ""); if (saiu) p.dizer(saiu); return irPara(p, "menu"); }
     return; // o operador responde pelo painel
   }
-  if (MENU.test(n) && c.etapa !== "inicio") { c.rascunho = {}; return irPara(p, "menu"); }
+  // "0" é "seguir sem preferência" / "pular" na pesquisa de preferências; nas outras etapas é voltar ao menu.
+  const zeroDaPesquisa = n === "0" && (c.etapa === "opcoes" || c.etapa === "opcao_detalhe");
+  if (MENU.test(n) && c.etapa !== "inicio" && !zeroDaPesquisa) { c.rascunho = {}; return irPara(p, "menu"); }
+
+  // Pergunta de preço ("quanto custa pra Ribeirão?"): responde com a tabela "Preços por cidade". No meio do pedido só vale a pergunta sozinha.
+  if (texto && !localDe(r) && await perguntaDePreco(p)) return;
 
   // Pedido urgente ("urgente", "rápido", "com pressa"): só o embarque, sem destino, categoria nem pagamento.
   if (texto && !localDe(r) && !c.rascunho.urgente && c.etapa !== "avaliacao" && !bloqueado(p)) {
@@ -393,6 +418,7 @@ async function passo(p: Passo) {
       if (localDe(r)) { c.rascunho.embarque = localDe(r)!; c.rascunho.salvos = undefined; return irPara(p, "destino"); }
       const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
       if (e.recusa) return p.dizer(e.recusa);
+      if (e.opcoes) { c.rascunho.salvos = undefined; c.rascunho.opcoesRua = e.opcoes; c.etapa = "selecao_rua"; return p.dizer(listaDeEmbarque(texto, e.opcoes)); }
       if (!e.local) return p.dizer(p.txt("address_retry", T.embarqueDeNovo()));
       c.rascunho.salvos = undefined;
       c.rascunho.embarque = e.local;
@@ -421,6 +447,7 @@ async function passo(p: Passo) {
       if (localDe(r)) { c.rascunho.destino = localDe(r)!; c.rascunho.semDestino = false; return irPara(p, "confirmar"); }
       {
         const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
+        if (e.opcoes) { c.rascunho.opcoesRua = e.opcoes; c.etapa = "selecao_rua_destino"; return p.dizer(listaDeDestino(texto, e.opcoes)); }
         if (e.local) {
           c.rascunho.destino = e.local; c.rascunho.semDestino = false;
           if (e.pedirNumero) { c.etapa = "numero_destino"; return p.dizer(T.pedirNumeroDestino(e.local.texto)); }
@@ -438,6 +465,34 @@ async function passo(p: Passo) {
       const e = await entenderLocal(p.empresaId, texto, p.c.conexao);
       if (e.local && !e.pedirNumero) { c.rascunho.destino = e.local; return irPara(p, "confirmar"); }
       return p.dizer(T.pedirNumeroDestino(base));
+    }
+
+    case "selecao_rua": {
+      const lista = c.rascunho.opcoesRua ?? [];
+      const o = escolhaDaLista(texto, lista);
+      if (o) {
+        const escolhida = lista[o - 1];
+        c.rascunho.opcoesRua = undefined;
+        c.rascunho.embarque = escolhida;
+        if (!addressHasNumber(escolhida.texto)) { c.etapa = "numero_embarque"; return p.dizer(T.pedirNumeroEmbarque(escolhida.texto)); }
+        return irPara(p, "destino");
+      }
+      // Nome que serve para mais de uma opção: mostra a lista de novo.
+      if (servePraMais(texto, lista)) return p.dizer(`📍 Qual destas? Responda com o número.\n\n${lista.map((x, i) => `${i + 1} - ${x.texto}`).join("\n")}`);
+      // Digitou outro endereço em vez de escolher: volta a pedir o endereço de embarque.
+      if (texto && !/^[1-9]$/.test(n)) { c.rascunho.opcoesRua = undefined; c.etapa = "embarque"; return p.dizer(p.txt("address_retry", T.embarqueDeNovo())); }
+      return p.dizer(opcaoInvalidaEmbarque(lista.length));
+    }
+
+    case "selecao_rua_destino": {
+      const lista = c.rascunho.opcoesRua ?? [];
+      const o = escolhaDaLista(texto, lista);
+      if (!o) return p.dizer(opcaoInvalidaDestino(lista));
+      const escolhida = lista[o - 1];
+      c.rascunho.opcoesRua = undefined;
+      c.rascunho.destino = escolhida; c.rascunho.semDestino = false;
+      if (!addressHasNumber(escolhida.texto)) { c.etapa = "numero_destino"; return p.dizer(T.pedirNumeroDestino(escolhida.texto)); }
+      return irPara(p, "confirmar");
     }
 
     case "agendamento": {
@@ -496,6 +551,38 @@ async function passo(p: Passo) {
       const o = opcao(texto, PAGAMENTOS.length, { 1: /\bdinheiro\b/, 2: /\bpix\b/, 3: /\b(cartao|credito|debito|maquininha)\b/ });
       if (!o) return p.dizer(p.txt("payment_retry", "") ? `${p.txt("payment_retry", "")}\n${PAGAMENTOS.map((x, i) => `*${i + 1}* - ${x}`).join("\n")}` : T.pagamentoDeNovo());
       c.rascunho.pagamento = PAGAMENTOS[o - 1];
+      return depoisDoPagamento(p);
+    }
+
+    case "opcoes": {
+      const itens = enabledOptions(p.cfg.opcoes);
+      if (!p.cfg.opcoes.bot || !itens.length) return criar(p);
+      const resp = parseOptionsReply(texto, itens);
+      if (resp.invalid) return p.dizer(`⚠️ Não entendi.
+
+${botOptionsMenu(itens)}`);
+      let escolhas: RideChoices = {};
+      const pendentes: InputKey[] = [];
+      for (const it of resp.picked) {
+        if (it.input) pendentes.push(it.input);
+        else if (it.key === "retorno") escolhas.retorno = true;
+        else escolhas = { ...escolhas, extras: { ...(escolhas.extras ?? {}), [it.key]: true } };
+      }
+      c.rascunho.opcoes = sanitizeChoices(escolhas, p.cfg.opcoes);
+      c.rascunho.opcoesPendentes = pendentes.length ? pendentes : undefined;
+      if (pendentes.length) { c.etapa = "opcao_detalhe"; return p.dizer(INPUT_PROMPTS[pendentes[0]]); }
+      return criar(p);
+    }
+
+    case "opcao_detalhe": {
+      const pendentes = (c.rascunho.opcoesPendentes ?? []).filter((k) => k in INPUT_PROMPTS);
+      if (!pendentes.length) return criar(p);
+      const res = applyInput(sanitizeChoices(c.rascunho.opcoes, p.cfg.opcoes), pendentes[0], texto);
+      if (res.error) return p.dizer(`⚠️ ${res.error}`);
+      const resto = pendentes.slice(1);
+      c.rascunho.opcoes = sanitizeChoices(res.choices, p.cfg.opcoes);
+      c.rascunho.opcoesPendentes = resto.length ? resto : undefined;
+      if (resto.length) return p.dizer(INPUT_PROMPTS[resto[0]]);
       return criar(p);
     }
 
@@ -518,6 +605,30 @@ async function passo(p: Passo) {
     default:
       return irPara(p, "menu");
   }
+}
+
+const ETAPAS_DO_PEDIDO: Array<Conversa["etapa"]> = ["embarque", "selecao_rua", "selecao_rua_destino", "numero_embarque", "destino", "numero_destino", "agendamento", "confirmar", "categoria", "pagamento", "opcoes", "opcao_detalhe"];
+
+/** "Quanto custa?": responde com a tabela de preços por cidade. Devolve true quando respondeu (a mensagem não segue o fluxo). */
+async function perguntaDePreco(p: Passo): Promise<boolean> {
+  const { c, texto } = p;
+  const noMenu = c.etapa === "inicio" || c.etapa === "menu";
+  const noPedido = ETAPAS_DO_PEDIDO.includes(c.etapa) && isPriceQuestionOnly(texto);
+  if (!noPedido && !(noMenu && isPriceQuestion(texto) && !(pareceRua(texto) && /\d/.test(texto)))) return false;
+  const cod = A.cidadeDaConexao(p.empresaId, c.conexao ?? ID_PRINCIPAL);
+  const cidade = cod ? cidadePorCodigo(p.empresaId, cod) : null;
+  const resp = responderPreco(p.empresaId, texto, cidade ? { cidade: cidade.nome, uf: cidade.uf } : null, { noPedido });
+  if (noPedido) {
+    p.dizer(resp?.texto ?? "💰 Você vê o *valor da corrida* antes de confirmar, junto com a forma de pagamento.");
+    p.dizer(textoDeRetomada(c.etapa));
+    return true;
+  }
+  if (!resp) return false; // nada cadastrado: segue como conversa normal
+  p.dizer(resp.texto);
+  if (resp.semValor) { c.etapa = "suporte"; return true; } // a central responde pelo painel; "sair" volta ao menu
+  c.etapa = "menu";
+  p.dizer(`🚕 Quer pedir a corrida?${opcoesMenu(p.cfg.agendar)}`);
+  return true;
 }
 
 /** Passageiro bloqueado ou suspenso no cadastro "clientes" não pede corrida. */
@@ -605,10 +716,29 @@ async function iniciarCancelamento(p: Passo) {
     : `📅 Qual agendamento você quer cancelar? Responda com o número:\n\n${lista.map((x, i) => `${i + 1} - ${formatScheduleBR(x.quandoMs)}`).join("\n")}\n\n(ou *não* para manter todos)`);
 }
 
+/**
+ * Depois da forma de pagamento (ou da categoria, sem pagamento): se a empresa ligou opções para o bot, pergunta
+ * "Alguma preferência para esta corrida?" e a corrida só sai quando a pessoa responder. Pedido urgente não pergunta.
+ */
+async function depoisDoPagamento(p: Passo): Promise<void> {
+  const { c } = p;
+  const itens = enabledOptions(p.cfg.opcoes);
+  if (c.rascunho.urgente || !p.cfg.opcoes.bot || !itens.length) { c.rascunho.opcoes = undefined; return criar(p); }
+  c.etapa = "opcoes";
+  c.rascunho.opcoes = {};
+  c.rascunho.opcoesPendentes = undefined;
+  p.dizer(botOptionsMenu(itens));
+}
+
 async function criar(p: Passo): Promise<void> {
   const { c, empresaId } = p;
   const rasc = c.rascunho;
   if (!rasc.embarque || rasc.pagamento === undefined) { c.rascunho = {}; return irPara(p, "embarque"); }
+  const escolhas = sanitizeChoices(rasc.opcoes, p.cfg.opcoes);
+  const escolhidas = describeChoices(escolhas, p.cfg.opcoes);
+  const aviso = escolhidas.length ? `
+
+✨ ${escolhidas.join(" · ")}` : "";
   // Trava: a etapa "criando" fica gravada antes de chamar o sistema de origem.
   c.etapa = "criando";
   A.salvarConversa(empresaId, c);
@@ -616,20 +746,21 @@ async function criar(p: Passo): Promise<void> {
     const nova = await corridasDoBot().criar(empresaId, {
       passageiro: { nome: c.nome, telefone: c.id }, embarque: rasc.embarque,
       destino: rasc.semDestino ? undefined : rasc.destino, categoria: rasc.categoria?.nome ?? "",
-      pagamento: rasc.pagamento, observacao: "Pedido pelo WhatsApp", agendadaPara: rasc.agendarPara ? horarioBrasilia(rasc.agendarPara) : undefined,
+      pagamento: rasc.pagamento, observacao: ["Pedido pelo WhatsApp", ...escolhidas].join(" · "), agendadaPara: rasc.agendarPara ? horarioBrasilia(rasc.agendarPara) : undefined,
+      ...(escolhas.cupom ? { cupom: escolhas.cupom } : {}), ...(escolhas.parada ? { parada: { texto: escolhas.parada } } : {}), ...(escolhas.recado ? { infoDepois: escolhas.recado } : {}),
     });
     if (rasc.agendarPara) {
       // Corrida agendada não prende a conversa: a pessoa pode pedir outra para agora. Os avisos saem 15 e 5 minutos antes.
       guardarEndereco(c, rasc.embarque);
       c.etapa = "inicio"; c.rascunho = {};
-      return p.dizer(T.agendada(nova.os, formatScheduleBR(rasc.agendarPara), nova.valor));
+      return p.dizer(`${T.agendada(nova.os, formatScheduleBR(rasc.agendarPara), nova.valor)}${aviso}`);
     }
     c.corrida = { id: nova.id, os: nova.os, status: "procurando", grupo: "aberta", criadaEm: agora(), valor: nova.valor };
     guardarEndereco(c, rasc.embarque);
     c.etapa = "em_corrida";
     c.rascunho = {};
     const ok = p.txt("ride_success", "");
-    p.dizer(ok ? `${ok}\nNúmero *${nova.os}*.${nova.valor ? ` Valor estimado: *R$ ${nova.valor.toFixed(2).replace(".", ",")}*.` : ""}\nPara cancelar, envie *cancelar*.` : T.criada(nova.os, nova.valor));
+    p.dizer(ok ? `${ok}\nNúmero *${nova.os}*.${nova.valor ? ` Valor estimado: *R$ ${nova.valor.toFixed(2).replace(".", ",")}*.` : ""}\nPara cancelar, envie *cancelar*.${aviso}` : `${T.criada(nova.os, nova.valor)}${aviso}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[bot] criar corrida", empresaId, msg);

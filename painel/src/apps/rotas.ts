@@ -24,7 +24,7 @@ import { buscarFora, caminhoPelasRuas, pontoFora } from "../enderecos/externo.ts
 import * as D from "../servidor/dados.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
-import { arquivoDoAudio, enviarAudio, enviarTexto, maxAudioBytes, mensagens } from "./chat.ts";
+import { arquivoDaMidia, arquivoDoAudio, enviarAudio, enviarMidia, enviarTexto, maxAudioBytes, maxMidiaBytes, mensagens, resumoDaMensagem } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { ajustes } from "./ajustes.ts";
@@ -377,7 +377,7 @@ function aposMensagem(req: Request, c: CorridaPropria, m: ReturnType<typeof envi
   const o = outro(c, sessao.papel);
   if (o) {
     emitir(empresaId, o, "chat", dados);
-    void avisar(empresaId, o, { titulo: m.nome, texto: m.texto ?? "Mensagem de áudio", dados: { tipo: "chat", corridaId: c.id }, canal: "chat" });
+    void avisar(empresaId, o, { titulo: m.nome, texto: resumoDaMensagem(m), dados: { tipo: "chat", corridaId: c.id }, canal: "chat" });
   }
 }
 
@@ -406,6 +406,35 @@ r.post("/corridas/:id/audio", (req, res, next) => {
   const m = enviarAudio(empresaId, c.id, sessao.papel, nomeDe(req), String(req.headers["content-type"] ?? ""), corpo, num(req.headers["x-segundos"]));
   aposMensagem(req, c, m);
   res.json({ mensagem: m });
+}));
+
+// Foto ou vídeo: corpo cru com o Content-Type do arquivo (image/jpeg, video/mp4...). Legenda opcional no cabeçalho X-Legenda (texto codificado).
+r.post("/corridas/:id/midia", (req, res, next) => {
+  const max = maxMidiaBytes();
+  const erro = () => res.status(413).json({ erro: `Arquivo grande demais (máximo ${Math.round(max / 1024 / 1024)} MB).` });
+  if (Number(req.headers["content-length"] ?? 0) > max) return erro();
+  express.raw({ type: () => true, limit: max })(req, res, (err?: unknown) => (err ? erro() : next()));
+}, ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
+  chatAberto(c);
+  const corpo = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  let legenda = "";
+  try { legenda = decodeURIComponent(String(req.headers["x-legenda"] ?? "")); } catch { /* cabeçalho torto: sem legenda */ }
+  const m = enviarMidia(empresaId, c.id, sessao.papel, nomeDe(req), String(req.headers["content-type"] ?? ""), corpo, legenda);
+  aposMensagem(req, c, m);
+  res.json({ mensagem: m });
+}));
+
+r.get("/corridas/:id/midia/:midia", ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
+  const a = arquivoDaMidia(empresaId, c.id, req.params.midia);
+  if (!a) return res.status(404).json({ erro: "Arquivo não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  fs.createReadStream(a.caminho).pipe(res);
 }));
 
 r.get("/corridas/:id/audio/:audio", ok((req, res) => {
