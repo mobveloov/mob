@@ -81,9 +81,24 @@ export const REGRAS_API: RegraApi[] = [
   { caminho: /^\/filiais(\/|$)/, minimo: "gestor" },
 ];
 
+/** O Express casa rotas sem diferenciar maiúsculas e aceita "//", "/./" e "/" no fim; as regras acima não.
+ *  Por isso o caminho é normalizado antes de casar (senão "/Relatorios/Relatorio/x" burlaria o cargo e o recurso desligado). */
+export function normalizarCaminho(caminho: string): string {
+  let c = caminho;
+  try { c = decodeURIComponent(c); } catch { /* deixa como veio */ }
+  c = c.toLowerCase().replace(/\\/g, "/");
+  const saida: string[] = [];
+  for (const p of c.split("/")) {
+    if (p === "" || p === ".") continue;
+    if (p === "..") saida.pop(); else saida.push(p);
+  }
+  return "/" + saida.join("/");
+}
+
 /** Cargo mínimo para o pedido, ou null se só exige login. */
 export function cargoMinimoDaRota(metodo: string, caminho: string): Cargo | null {
   const m = metodo.toUpperCase();
-  for (const r of REGRAS_API) if ((!r.metodos || r.metodos.includes(m)) && r.caminho.test(caminho)) return r.minimo;
+  const c = normalizarCaminho(caminho);
+  for (const r of REGRAS_API) if ((!r.metodos || r.metodos.includes(m)) && r.caminho.test(c)) return r.minimo;
   return null;
 }

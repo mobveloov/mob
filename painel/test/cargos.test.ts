@@ -171,3 +171,17 @@ test("migração: cargo fora da lista vira operador, ninguém é apagado e os ca
   assert.equal(D.migrarCargos(), 0, "rodar de novo não muda nada");
   for (const [k, u] of Object.entries(quem)) assert.equal(depois.find((x) => x.id === u.id)?.papel, k === "adminOutra" ? "admin" : k);
 });
+
+test("maiúsculas, barras duplicadas e /./ não burlam o cargo mínimo (Operador leva 403)", async () => {
+  const rotas = [
+    "/api/Relatorios/Relatorio/x", "/api/RELATORIOS/relatorio/x", "/api//relatorios/relatorio/x", "/api/relatorios/./relatorio/x",
+    "/api/Usuarios", "/api/usuarios/", "/api/Superadmin/x", "/api/GESTAO/Equipe", "/api/Crm/campanhas", "/api/crm//campanhas",
+    "/api/Filiais", "/api/filiais/", "/api/Centrais/x", "/api/Integracoes", "/api/Config/Pagamentos",
+  ];
+  for (const url of rotas) assert.equal((await api("operador", "GET", url)).status, 403, url);
+  assert.equal(cargoMinimoDaRota("GET", "/Relatorios/Relatorio/x"), "admin");
+  assert.equal(cargoMinimoDaRota("GET", "//crm/./x"), "gestor");
+  const { moduloDaRota } = await import("../src/comum/modulos.ts");
+  assert.equal(moduloDaRota("/CRM/campanhas"), "crm");
+  assert.equal(moduloDaRota("//Filiais/"), "filiais");
+});

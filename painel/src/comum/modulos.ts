@@ -2,6 +2,8 @@
 // Cada módulo diz quais funções do menu e quais caminhos da API ele cobre: desligado, some do menu e o servidor recusa com 403.
 // Vale para o servidor e para o painel.
 
+import { normalizarCaminho } from "./cargos.ts";
+
 export interface Modulo {
   id: string;
   nome: string;
@@ -25,4 +27,7 @@ export const MODULOS: Modulo[] = [
 
 export const moduloPorId = (id: string) => MODULOS.find((m) => m.id === id) ?? null;
 export const moduloDaFuncao = (funcaoId: string): string | null => MODULOS.find((m) => m.funcoes.includes(funcaoId))?.id ?? null;
-export const moduloDaRota = (caminho: string): string | null => MODULOS.find((m) => m.api.some((r) => r.test(caminho)))?.id ?? null;
+export const moduloDaRota = (caminho: string): string | null => {
+  const c = normalizarCaminho(caminho);
+  return MODULOS.find((m) => m.api.some((r) => r.test(c)))?.id ?? null;
+};
