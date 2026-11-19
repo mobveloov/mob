@@ -3,6 +3,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { rota } from "../enderecos/index.ts";
+import { aposFinalizar } from "../apps/extras.ts";
 import { atribuirMotorista, avaliar, cancelarCorrida, criarCorridaPropria, estimarPreco, distanciaEstimada, listarProprias, mudarStatus, STATUS_TEXTO, type StatusProprio } from "./index.ts";
 
 export const rotasCorridasProprias = Router();
@@ -42,7 +43,10 @@ rotasCorridasProprias.post("/:id/motorista", ok(async (req, res) => {
 
 rotasCorridasProprias.post("/:id/status", ok(async (req, res) => {
   const b = req.body ?? {};
-  res.json({ corrida: await mudarStatus(emp(req), String(req.params.id), b.status as StatusProprio, { valor: b.valor == null || b.valor === "" ? undefined : Number(b.valor), nota: b.nota }, quem(req)) });
+  const feita = await mudarStatus(emp(req), String(req.params.id), b.status as StatusProprio, { valor: b.valor == null || b.valor === "" ? undefined : Number(b.valor), nota: b.nota }, quem(req));
+  // Finalizou: carteira e taxas da central (idempotente: cada lançamento entra uma vez só). Nunca desfaz a corrida já finalizada.
+  try { aposFinalizar(emp(req), feita); } catch (e) { console.error("[corridas] após finalizar:", e instanceof Error ? e.message : e); }
+  res.json({ corrida: feita });
 }));
 
 rotasCorridasProprias.post("/:id/cancelar", ok(async (req, res) => {

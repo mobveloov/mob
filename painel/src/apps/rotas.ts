@@ -339,7 +339,8 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   // Maçaneta em taxímetro: o valor sai da distância e do tempo reais, pela tarifa da categoria.
   if (novo === "finalizada") { const taxi = P.valorDoTaximetro(empresaId, c); if (taxi != null) valor = taxi; }
   const feita = await mudarStatus(empresaId, c.id, novo as never, { valor }, "app do motorista");
-  aposFinalizar(empresaId, feita); // pago com saldo: passa da carteira do passageiro para a do motorista
+  // pago com saldo: passa da carteira do passageiro para a do motorista. Se falhar, a corrida já está finalizada: não devolve erro.
+  try { aposFinalizar(empresaId, feita); } catch (e) { console.error("[apps] após finalizar:", e instanceof Error ? e.message : e); }
   P.vigiar(empresaId);
   res.json({ corrida: P.corridaParaApp(empresaId, feita, "motorista") });
 }));
