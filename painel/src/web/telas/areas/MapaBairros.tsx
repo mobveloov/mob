@@ -9,6 +9,7 @@ import { Download, Maximize2, Crosshair } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { Cabecalho, Janela, useAviso, Vazio } from "../cadastro/base";
 import { baixar, chamarAreas, usePeriodo } from "./comum";
+import { baseDoMapa } from "../../../comum/mapa-base.ts";
 
 type Situacao = "nunca" | "ativos" | "naoAtendidas" | "canceladas" | "concluidas";
 interface Bairro { bairro: string; cidade: string; lat: number | null; lng: number | null; corridas: number; passageiros: number; deserto: boolean; nunca: number; ativos: number; naoAtendidas: number; canceladas: number; concluidas: number }
@@ -30,7 +31,7 @@ function Mapa({ bairros, ativas, desertos, onEscolher, centralizar, cheio }: { b
   useEffect(() => {
     if (!caixa.current || mapa.current) return;
     const m = L.map(caixa.current, { center: [-14.2, -51.9], zoom: 4 });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
+    baseDoMapa(L, m);
     L.control.scale({ imperial: false }).addTo(m);
     camada.current = L.layerGroup().addTo(m);
     mapa.current = m;

@@ -5,10 +5,11 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { api, posicaoAgora, urlArquivo, type Posicao } from "../comum/api";
+import { api, config, posicaoAgora, urlArquivo, type Posicao } from "../comum/api";
 import { personalizacaoAtual, usePersonalizacao } from "../comum/personalizacao";
 import { LocateFixed, Moon, Sun } from "lucide-react";
 import { useRota } from "../comum/rota";
+import { baseDoMapa } from "../../../comum/mapa-base.ts";
 
 export interface PontoMapa { lat: number; lng: number; tipo: "embarque" | "parada" | "destino"; rotulo: string; detalhe?: string }
 
@@ -88,7 +89,7 @@ export function Mapa({ pontos = [], carro, alvoCarro, perto, eu: euProp, escuro 
   useEffect(() => {
     if (!caixa.current) return;
     const m = L.map(caixa.current, { zoomControl: false, attributionControl: true }).setView(BRASIL, 4);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
+    baseDoMapa(L, m, { api: config().api, empresaId: config().empresaId, app: true });
     m.attributionControl.setPrefix(false);
     camada.current = L.layerGroup().addTo(m);
     camadaCasas.current = L.layerGroup().addTo(m);
