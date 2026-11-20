@@ -15,6 +15,8 @@ import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
 import { registrarEvento, registrarPonto } from "../corridas/registro.ts";
 import { ajustes } from "./ajustes.ts";
+import { gerais } from "../config/gerais.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
 import { calcularComissao, taxasDoMotorista } from "../config/comissao.ts";
 import { estatisticas, urlDaFoto } from "./perfil.ts";
 import { pessoa } from "./extras.ts";
@@ -40,7 +42,7 @@ const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
 /** Posição mais velha que isso não conta (motorista sumiu). */
 const POSICAO_MS = 10 * 60_000; // o app reenvia a cada 30 s; em segundo plano o Android pode atrasar
 /** Depois de recusar ou deixar passar, o motorista só recebe de novo a mesma corrida depois disso. */
-const REOFERTA_MS = 2 * 60_000;
+const reofertaMs = (empresaId: string) => { try { return gerais(empresaId).motorista.reofertaMinutos * 60_000; } catch { return 120_000; } };
 
 /**
  * "Enviar mais de um carro" (marcação da corrida na tela Solicitar): a oferta vai a vários motoristas ao mesmo tempo e vale o
@@ -78,11 +80,13 @@ function anotarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
   try { banco().prepare("INSERT INTO app_ofertas (empresa, motorista, resultado, em) VALUES (?, ?, ?, ?)").run(empresaId, o.motoristaId, fim, new Date().toISOString()); } catch { /* estatística: não pode travar a chamada */ }
 }
 
+/** Quantas ofertas entram na taxa de aceitação (o app mostra este número no texto de ajuda). */
+const JANELA_ACEITACAO = 100;
 /** Taxa de aceitação: das últimas 100 ofertas, quantas foram aceitas, recusadas e ignoradas (a chamada venceu). */
 export function taxaDeAceitacao(empresaId: string, motoristaId: string) {
-  const l = banco().prepare("SELECT resultado, em FROM app_ofertas WHERE empresa = ? AND motorista = ? ORDER BY seq DESC LIMIT 100").all(empresaId, motoristaId) as Array<{ resultado: string; em: string }>;
+  const l = banco().prepare("SELECT resultado, em FROM app_ofertas WHERE empresa = ? AND motorista = ? ORDER BY seq DESC LIMIT " + JANELA_ACEITACAO).all(empresaId, motoristaId) as Array<{ resultado: string; em: string }>;
   const aceitas = l.filter((x) => x.resultado === "aceitou").length, rejeitadas = l.filter((x) => x.resultado === "recusou").length, ignoradas = l.filter((x) => x.resultado === "expirou").length;
-  return { ofertas: l.length, aceitas, rejeitadas, ignoradas, porcentagem: l.length ? Math.round((aceitas / l.length) * 100) : 0, atualizadoEm: l[0]?.em ?? null };
+  return { janela: JANELA_ACEITACAO, ofertas: l.length, aceitas, rejeitadas, ignoradas, porcentagem: l.length ? Math.round((aceitas / l.length) * 100) : 0, atualizadoEm: l[0]?.em ?? null };
 }
 
 /** Linha do "Histórico da OS": o que aconteceu com cada chamada enviada a um motorista. */
@@ -154,6 +158,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
   const m = c.motoristaId ? motorista(empresaId, c.motoristaId) : undefined;
   return {
     id: c.id, os: c.os, status: c.status, statusTexto: STATUS_TEXTO[c.status], aberta,
+    ...(papel === "motorista" && aberta ? (({ taxaCentral, valorLiquido }) => ({ taxaCentral, valorLiquido }))(valoresDaCorrida(empresaId, c, c.motoristaId ?? undefined)) : {}),
     embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
     estimativa: c.estimativa, valor: c.valor, cupom: c.cupom, desconto: c.desconto, avaliacao: c.avaliacao,
     solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm, finalizadaEm: c.finalizadaEm, canceladaPor: culpa ? "" : c.canceladaPor,
@@ -402,7 +407,7 @@ export function despachar(empresaId: string) {
       if ((busy.has(id) && !(regras.permitirProxima && pertoDoDestino(id, p))) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
       if (!filtros.podeAtender(c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
-      if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
+      if ((tentados.get(id) ?? 0) > agora - reofertaMs(empresaId)) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
       if (!gestao.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
@@ -622,7 +627,8 @@ export function iniciarApps(intervaloMs = 2000) {
 // ------------------------------------------------------------------ corridas abertas, pegar e contra-oferta
 
 export interface Contraoferta { id: string; corridaId: string; motoristaId: string; valor: number; expira: number; distanciaKm: number | null }
-const CONTRA_MS = 60_000;
+/** Validade da contra-oferta: Configurações › Gerais › Regras do motorista (padrão 60 s). */
+const contraMs = (empresaId: string) => { try { return gerais(empresaId).motorista.contraofertaSegundos * 1000; } catch { return 60_000; } };
 
 /** Valor mínimo da categoria (o passageiro e o motorista não passam abaixo disso). */
 export const descontoPeloValor = (empresaId: string, c: CorridaPropria, valor: number) => descontoDoCupom(empresaId, c.cupom, valor, c.categoria);
@@ -693,8 +699,10 @@ export function registrarContraoferta(empresaId: string, motoristaId: string, co
   const base = c.valorOferecido ?? c.estimativa.valor;
   if (!(valor > 0)) throw new Error("Valor inválido.");
   if (valor < minimoDaCategoria(empresaId, c.categoria)) throw new Error("O valor está abaixo do mínimo da categoria.");
-  if (base != null && valor > base * 3) throw new Error("O valor está muito acima do oferecido.");
-  const o: Contraoferta = { id: crypto.randomUUID(), corridaId, motoristaId, valor, expira: Date.now() + CONTRA_MS, distanciaKm: kmAteEmbarque(e, motoristaId, c) };
+  const neg = extraDaCategoria(empresaId, c.categoria).negociacao;
+  if (!neg.ativo) throw new Error("Esta categoria não aceita negociação de valor.");
+  if (base != null && valor > base * (1 + neg.acrescimoMaxMot / 100) + 0.005) throw new Error(`O valor passa do limite de ${neg.acrescimoMaxMot}% acima do oferecido.`);
+  const o: Contraoferta = { id: crypto.randomUUID(), corridaId, motoristaId, valor, expira: Date.now() + contraMs(empresaId), distanciaKm: kmAteEmbarque(e, motoristaId, c) };
   const outras = (e.contraofertas.get(corridaId) ?? []).filter((x) => x.motoristaId !== motoristaId && x.expira > Date.now());
   e.contraofertas.set(corridaId, [...outras, o]);
   emitir(empresaId, passageiroAlvo(c), "contraoferta", { corridaId, id: o.id, valor });
@@ -731,7 +739,7 @@ export function atualizarOferta(empresaId: string, corridaId: string) {
 // ------------------------------------------------------------------ maçaneta (corrida de rua)
 
 /** O motorista pega um passageiro na rua: a corrida já nasce com ele e já em andamento. */
-export async function criarMacaneta(empresaId: string, motoristaId: string, d: { modo: "taximetro" | "destino"; categoria: string; destino?: Ponto; lat: number; lng: number; passageiro?: { nome?: string; telefone?: string } }): Promise<CorridaPropria> {
+export async function criarMacaneta(empresaId: string, motoristaId: string, d: { modo: "taximetro" | "destino"; categoria: string; destino?: Ponto; lat: number; lng: number; passageiro?: { nome?: string; telefone?: string; cpf?: string; email?: string } }): Promise<CorridaPropria> {
   const e = estado(empresaId);
   if (!e.online.has(motoristaId)) throw new Error("Fique online para abrir uma corrida.");
   const lista = listarProprias(empresaId);
@@ -748,6 +756,7 @@ export async function criarMacaneta(empresaId: string, motoristaId: string, d: {
     passageiro: { nome: String(d.passageiro?.nome ?? "").trim() || "Passageiro de rua", telefone },
     embarque: { texto: aqui?.texto ?? "Embarque na rua (posição do motorista)", lat: d.lat, lng: d.lng },
     destino: d.modo === "destino" ? d.destino : undefined, categoria: d.categoria, pagamento: "Dinheiro", canal: "macaneta", semCadastro: !temFone,
+    observacao: [d.passageiro?.cpf ? `CPF do passageiro: ${d.passageiro.cpf}` : "", d.passageiro?.email ? `E-mail do passageiro: ${d.passageiro.email}` : ""].filter(Boolean).join(". ") || undefined,
   }, "maçaneta");
   await atribuirMotorista(empresaId, nova.id, motoristaId, "maçaneta");
   await mudarStatus(empresaId, nova.id, "em_andamento", {}, "maçaneta");

@@ -14,7 +14,8 @@ import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/
 import { exigirPapel } from "../servidor/sessao.ts";
 import { abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
-import { gerais as geraisDoPainel, termos as termosDoPainel } from "../config/gerais.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
+import { arquivoDoBanner, gerais as geraisDoPainel, termos as termosDoPainel } from "../config/gerais.ts";
 import { ajustes, contatos } from "./ajustes.ts";
 import { arquivo, ler, limitador, num, soDigitos, txt } from "./armazem.ts";
 import { marcarLida } from "./chat.ts";
@@ -68,6 +69,23 @@ const podeCriar = limitador(() => Number(process.env.APPS_CADASTROS_POR_IP) || 1
 
 rotasPublicasV2.get("/cidades", ok((req, res) => {
   res.json({ cidades: cidadesAtendidas(emp(req)).map((c) => ({ id: c.codigo, nome: c.nome, uf: c.uf })) });
+}));
+
+/** Regras de cadastro que a tela de criar conta precisa antes do login (Gerais › Regras do passageiro). */
+rotasPublicasV2.get("/regras-cadastro", ok((req, res) => res.json({ cpfObrigatorio: geraisDoPainel(emp(req)).passageiro.cpfObrigatorio })));
+
+/** Banners de Configurações › Gerais › Banners (tipo "app" na tela inicial, "login" na entrada). Só o que a imagem precisa para aparecer. */
+rotasPublicasV2.get("/banners", ok((req, res) => {
+  const tipo = req.query.tipo === "login" ? "login" : "app";
+  res.json({ banners: geraisDoPainel(emp(req)).banners.filter((b) => b.tipo === tipo).map((b) => ({ id: b.id, link: b.link, imagem: `/banners/${b.id}/imagem` })) });
+}));
+rotasPublicasV2.get("/banners/:id/imagem", ok((req, res) => {
+  const a = arquivoDoBanner(emp(req), req.params.id);
+  if (!a) return res.status(404).json({ erro: "Banner não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+  fs.createReadStream(a.caminho).pipe(res);
 }));
 
 /** Termos de uso e privacidade escritos no painel (Configurações › Termos de uso). Texto vazio = a empresa não exibe. */
@@ -256,6 +274,9 @@ rotasV2.post("/corridas/:id/oferta", so("passageiro"), ok(async (req, res) => {
   if (!(v > 0)) throw new Error("Valor inválido.");
   const minimo = P.minimoDaCategoria(empresaId, c.categoria);
   if (v < minimo) throw new Error(`O valor não pode ficar abaixo de R$ ${minimo.toFixed(2).replace(".", ",")}.`);
+  const neg = extraDaCategoria(empresaId, c.categoria).negociacao;
+  if (!neg.ativo && c.estimativa.valor != null && v !== c.estimativa.valor) throw new Error("Esta categoria não aceita negociação de valor.");
+  if (c.estimativa.valor != null && v < c.estimativa.valor * (1 - neg.descontoMaxPax / 100) - 0.005) throw new Error(`O desconto passa do limite de ${neg.descontoMaxPax}%.`);
   if (c.estimativa.valor != null && v > c.estimativa.valor * 3) throw new Error("O valor está muito acima do preço estimado.");
   const feita = await alterarCorrida(empresaId, c.id, (x) => {
     x.valorOferecido = x.estimativa.valor != null && v === x.estimativa.valor ? null : v;
@@ -348,11 +369,19 @@ rotasV2.get("/ofertas", so("motorista"), ok((req, res) => {
 rotasV2.post("/macaneta", so("motorista"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const modo = req.body?.modo === "destino" ? "destino" : "taximetro";
+  // Corrida Maçaneta: liga/desliga, categorias e dados do passageiro vêm de Configurações › Gerais › Maçaneta.
+  const mc = geraisDoPainel(empresaId).macaneta, pax = (req.body?.passageiro ?? {}) as Record<string, unknown>;
+  if (!mc.ativo) throw new Error("A empresa não usa a corrida Maçaneta.");
+  if (mc.categorias.length && !mc.categorias.includes(txt(req.body?.categoria, 60))) throw new Error("Esta categoria não faz corrida Maçaneta.");
+  if (mc.pedeNome && txt(pax.nome, 80).length < 2) throw new Error("Informe o nome do passageiro.");
+  if (mc.pedeTelefone && soDigitos(pax.telefone).length < 10) throw new Error("Informe o telefone do passageiro.");
+  if (mc.pedeCpf && soDigitos(pax.cpf).length !== 11) throw new Error("Informe o CPF do passageiro.");
+  if (mc.pedeEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(pax.email ?? ""))) throw new Error("Informe o e-mail do passageiro.");
   const lat = num(req.body?.lat), lng = num(req.body?.lng);
   if (lat == null || lng == null) throw new Error("Ligue o GPS para abrir a corrida.");
   const c = await P.criarMacaneta(empresaId, sessao.chave, {
     modo, categoria: txt(req.body?.categoria, 60), destino: req.body?.destino ? ponto(req.body.destino) : undefined, lat, lng,
-    passageiro: { nome: txt(req.body?.passageiro?.nome, 80), telefone: soDigitos(req.body?.passageiro?.telefone) },
+    passageiro: { nome: txt(pax.nome, 80), telefone: soDigitos(pax.telefone), cpf: soDigitos(pax.cpf), email: txt(pax.email, 100) },
   });
   res.json({ corrida: P.corridaParaApp(empresaId, c, "motorista") });
 }));

@@ -1,11 +1,17 @@
 // Início: topo na cor da marca com a foto e a saudação, "Para onde você vai?" com IR, atalhos Casa, Trabalho e
 // Recentes, e o mapa com a minha posição.
 
+<<<<<<< HEAD
+import { Briefcase, Gift, History, House, Search } from "lucide-react";
+=======
 import { useEffect, useState } from "react";
 import { Briefcase, Gift, History, House, Search, Tag, Trophy } from "lucide-react";
 import { api, reais, urlArquivo, type Posicao } from "../comum/api";
+>>>>>>> worktree-agent-a16dfa3641a968494
 import { saudacao, type Eu, type Lugares } from "./apoio";
-import { usePersonalizacao } from "../comum/personalizacao";
+import { urlArquivo, type Posicao } from "../comum/api";
+import { logoDaPersonalizacao, usePersonalizacao } from "../comum/personalizacao";
+import { Banners } from "../comum/ui";
 import { Mapa } from "./Mapa";
 import { Avatar } from "./pecas";
 
@@ -16,6 +22,9 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
   const primeiro = eu.nome.split(" ")[0];
   const pers = usePersonalizacao();
   const rec = pers?.recursos; // recursos ligados e desligados em Configurações > Personalização (sem a personalização, tudo como era)
+<<<<<<< HEAD
+  const comMapa = rec?.mapa !== false, comDestino = rec?.selecao_destino !== false;
+=======
   const comMapa = rec?.mapa !== false, comDestino = rec?.destino !== false;
   // Blocos opcionais da tela inicial (ordem e visibilidade vêm de Configurações > Personalização, recursos): cupons e desafio leem os dados reais do painel.
   const [cupons, setCupons] = useState<Array<{ codigo: string; tipo: string; valor: number }>>([]);
@@ -45,14 +54,22 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
       <span className="bloco-texto"><strong>{desafio.nome}</strong><small>{Math.min(desafio.feito, desafio.meta)} de {desafio.meta}</small></span>
     </button>
   );
+>>>>>>> worktree-agent-a16dfa3641a968494
   return (
     <div className={`inicio estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
       {comMapa && <Mapa eu={aqui} perto={aqui} controles className="fundo" />}
       <div className="inicio-topo">
+<<<<<<< HEAD
+        {pers && (pers.design.mostrarImagem || pers.design.mostrarNome) && (
+          <div className={`inicio-marca ${pers.design.marca}`}>
+            {pers.design.mostrarImagem && <img src={urlArquivo(logoDaPersonalizacao(pers))} alt="" />}
+            {pers.design.mostrarNome && <strong>{pers.empresa.nome}</strong>}
+=======
         {(mostrarImagem || mostrarNome) && (
           <div className="inicio-marca">
             {mostrarImagem && <img src={urlArquivo(pers!.design.imagemMarcaUrl)} alt="" style={pers!.design.dimensoesImagem ? { width: pers!.design.dimensoesImagem.largura, height: pers!.design.dimensoesImagem.altura } : undefined} />}
             {mostrarNome && <strong>{pers!.empresa.nomeExibido || pers!.empresa.nome}</strong>}
+>>>>>>> worktree-agent-a16dfa3641a968494
           </div>
         )}
         <div className="inicio-ola">
@@ -66,6 +83,7 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
           <button onClick={() => atalho("trabalho")}><span className="icone-redondo claro"><Briefcase size={18} /></span><strong>Trabalho</strong><small>{lugares?.trabalho ? "Ir trabalhar" : "Definir"}</small></button>
           <button onClick={() => atalho("recentes")}><span className="icone-redondo claro"><History size={18} /></span><strong>Recentes</strong><small>Ver últimos</small></button>
         </div>
+        <Banners tipo="app" />
       </div>
     </div>
   );

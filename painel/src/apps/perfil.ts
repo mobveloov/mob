@@ -126,9 +126,15 @@ export function criarContaPassageiro(empresaId: string, d: Record<string, unknow
   if (!GENEROS.includes(genero)) throw new Error("Escolha o gênero.");
   const telefone = soDigitos(d.telefone), email = String(d.email ?? "").trim().toLowerCase();
   conferirContato(empresaId, "passageiro", telefone, email);
+  // CPF obrigatório: Configurações › Gerais › Regras do passageiro.
+  const cpf = soDigitos(d.cpf);
+  let exigeCpf = false;
+  try { exigeCpf = gerais(empresaId).passageiro.cpfObrigatorio; } catch { /* sem configuração */ }
+  if (exigeCpf && !cpfValido(cpf)) throw new Error("Informe um CPF válido.");
+  if (cpf && !cpfValido(cpf)) throw new Error("CPF inválido.");
   conferirForcaDaSenha(String(d.senha ?? ""));
   const cidadeId = cidadeValida(empresaId, d.cidadeId);
-  mesclar(empresaId, CLI(), [{ nome, telefone, email, genero, status: "Ativo", cidade: nomeDaCidade(empresaId, cidadeId) || null }], "app");
+  mesclar(empresaId, CLI(), [{ nome, telefone, email, genero, ...(cpf ? { cpf } : {}), status: "Ativo", cidade: nomeDaCidade(empresaId, cidadeId) || null }], "app");
   const p = pessoa(empresaId, "passageiro", telefone);
   p.senha = hashSenha(String(d.senha)); p.email = email; p.cidadeId = cidadeId;
   salvarPessoa(empresaId, "passageiro", telefone, p);

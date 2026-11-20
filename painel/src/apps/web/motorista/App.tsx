@@ -20,13 +20,18 @@ import { AvisoDoMotorista, BarraBaixo, Dialogo } from "./Pecas";
 import { LogoMarca } from "./Marca";
 import { Desafios, Notificacoes, PasseLivre, Preferencias } from "./Telas";
 import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
-import { aplicarTema, NOMES_TEMA, useAjustes } from "./ajustes";
+import { aplicarTema, NOMES_TEMA, temaPadraoDaEmpresa, useAjustes } from "./ajustes";
+import { acompanharPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
 import { usarSoWifi } from "./gravador";
 import type { Corrida, Eu, Oferta } from "./tipos";
 
 export default function App() {
-  const { marca, erro } = useMarca();
+  const { marca: marcaBase, erro } = useMarca();
+  const pers = usePersonalizacao();
+  // O nome escolhido em Configurações > Personalização app motorista vale no app inteiro.
+  const marca = marcaBase && pers?.empresa.nome ? { ...marcaBase, nome: pers.empresa.nome } : marcaBase;
   const [logado, setLogado] = useState(!!token());
+  useEffect(() => { personalizacaoDoCache(); }, []);
   const [cadastrando, setCadastrando] = useState(false);
   useEffect(() => { aplicarTema(); const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
@@ -39,6 +44,11 @@ export default function App() {
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [ajustes, mudarAjustes] = useAjustes();
+  const pers = usePersonalizacao();
+  // Lê a personalização ao entrar, a cada minuto e ao voltar para o app (muda no painel, muda aqui, sem gerar APK).
+  useEffect(() => acompanharPersonalizacao(), []);
+  useEffect(() => { if (pers) temaPadraoDaEmpresa(pers.tema); }, [pers?.tema]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rec = (id: keyof NonNullable<typeof pers>["recursos"]) => pers?.recursos[id] !== false; // sem a personalização, tudo aparece
   const [eu, setEu] = useState<Eu | null>(null);
   const [online, setOnline] = useState(false);
   const [posicao, setPosicao] = useState<Posicao | null>(null);
@@ -242,15 +252,15 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   );
   if (tela === "corridas") return <>{<Corridas barra={barra("corridas")} aoPegar={(c) => { setCorrida(c); setTela(""); }} />}{dialogos}{chamada}</>;
   return (
-    <div className="inicio-m">
+    <div className={`inicio-m estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
       <Mapa pontos={posicao ? [{ ...posicao, rotulo: "Você", tipo: "eu" }] : []} centralizar={centro} className="cheia" />
       <div className="inicio-topo">
         <button type="button" className="pilula-menu" aria-label="Menu" onClick={() => setMenu(true)}><LogoMarca marca={marca} tamanho={40} /><IconeMenu size={24} /></button>
-        <span className="pilula-ganhos">
+        {rec("saldo") && <span className="pilula-ganhos">
           <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
           <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("atividades")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
-        </span>
-        <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>
+        </span>}
+        {rec("notificacoes") && <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>}
       </div>
 
       {(aviso || erro || analise) && (
@@ -261,14 +271,14 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         </div>
       )}
 
-      {(regras?.motorista.botaoPanico ?? true) && <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>}
+      {(regras?.motorista.botaoPanico ?? true) && rec("ajuda") && <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>}
 
       <div className="inicio-flutuantes">
-        {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
+        {online && (regras?.macaneta.ativo ?? true) && rec("macaneta") && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
         <div className="direita">
-          {online && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
-          <button type="button" className="mapa-botao" aria-label={`Aparência: ${NOMES_TEMA[ajustes.tema]}. Toque para trocar`} onClick={() => mudarAjustes({ tema: ajustes.tema === "sistema" ? "claro" : ajustes.tema === "claro" ? "escuro" : "sistema" })}>{ajustes.tema === "escuro" ? <Moon size={22} /> : <Sun size={22} />}</button>
-          <button type="button" className="mapa-botao" aria-label="Centralizar no mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={22} /></button>
+          {online && rec("preferencias") && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
+          {rec("tema") && <button type="button" className="mapa-botao" aria-label={`Aparência: ${NOMES_TEMA[ajustes.tema]}. Toque para trocar`} onClick={() => mudarAjustes({ tema: ajustes.tema === "sistema" ? "claro" : ajustes.tema === "claro" ? "escuro" : "sistema" })}>{ajustes.tema === "escuro" ? <Moon size={22} /> : <Sun size={22} />}</button>}
+          {rec("centralizar") && <button type="button" className="mapa-botao" aria-label="Centralizar no mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={22} /></button>}
         </div>
         {!online && <button type="button" className="botao-onoff" onClick={() => setDialogo(analise ? "analise" : "online")}>INICIAR</button>}
       </div>

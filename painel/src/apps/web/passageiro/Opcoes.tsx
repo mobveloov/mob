@@ -27,7 +27,7 @@ export function pontosDaRota(r: { embarque: { texto: string; lat?: number; lng?:
 export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: () => void; pediu: (c: Corrida) => void; agendou: (c: Corrida) => void }) {
   const [quando, setQuando] = useState<"agora" | "agendar">("agora");
   const [opcoes, setOpcoes] = useState<{ categorias: Categoria[]; pagamentos: string[] } | null>(null);
-  const [estimativas, setEstimativas] = useState<Record<string, { valor: number | null; distanciaKm: number | null; minutos: number | null; taxaServico?: number }>>({});
+  const [estimativas, setEstimativas] = useState<Record<string, { valor: number | null; distanciaKm: number | null; minutos: number | null; taxaServico?: number; dinamica?: boolean }>>({});
   const [ofertas, setOfertas] = useState<Record<string, number>>({});
   const [categoria, setCategoria] = useState("");
   const [pagamento, setPagamento] = useState("");
@@ -123,7 +123,11 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
           {!opcoes && !erro && <p className="dica centro">Carregando as opções…</p>}
           {opcoes?.categorias.map((c) => {
             const b = base(c), v = valorDe(c);
-            const faixa = b != null ? faixaDaOferta(b, c.aPartirDe) : null;
+            const neg = dadosDaCategoria(c.nome)?.negociacao;
+            const faixa0 = b != null ? faixaDaOferta(b, c.aPartirDe) : null;
+            // Negociação por categoria (Tarifas e categorias): desligada, o preço é fixo; ligada, o desconto máximo vem do painel.
+            const faixa = faixa0 && b != null && neg ? { min: neg.ativo ? Math.min(b, Math.max(c.aPartirDe ?? 0, Math.round(b * (1 - neg.descontoMaxPax / 100) * 100) / 100)) : b, max: neg.ativo ? faixa0.max : b } : faixa0;
+            const preco = (valorMostrado: number) => (neg && !neg.ativo ? <strong className="preco-fixo">{reais(valorMostrado)}</strong> : <PrecoAjustavel valor={valorMostrado} min={faixa!.min} max={faixa!.max} passo={PASSO_OFERTA} mudar={(n) => { setCategoria(c.nome); setOfertas((o) => ({ ...o, [c.nome]: n })); }} />);
             const calculando = !!rota.destino && !(c.nome in estimativas);
             return (
               <div key={c.nome} role="radio" aria-checked={categoria === c.nome} tabIndex={0} className={`categoria ${categoria === c.nome ? "ativa" : ""}`}
@@ -134,7 +138,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
                   <small>{c.descricao}</small>
                 </span>
                 {calculando ? <span className="suave">…</span>
-                  : v != null && faixa ? <PrecoAjustavel valor={v} min={faixa.min} max={faixa.max} passo={PASSO_OFERTA} mudar={(n) => { setCategoria(c.nome); setOfertas((o) => ({ ...o, [c.nome]: n })); }} />
+                  : v != null && faixa ? preco(v)
                   : <strong className="preco-fixo">{rota.destino ? "a combinar" : c.aPartirDe != null ? `a partir de ${reais(c.aPartirDe)}` : "a combinar"}</strong>}
               </div>
             );
@@ -144,6 +148,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
           <p className="dica">Você está oferecendo {reais(valor)}. O valor sugerido é {reais(base(atual))}.</p>
         )}
         {!!atual && !!rota.destino && !!estimativas[atual.nome]?.taxaServico && <p className="dica">Taxa de serviço: {reais(estimativas[atual.nome].taxaServico!)}, cobrada à parte do valor da corrida (pode mudar conforme a forma de pagamento).</p>}
+        {!!atual && !!rota.destino && !!estimativas[atual.nome]?.dinamica && (regras?.passageiro.avisoDinamica ?? false) && <p className="dica"><strong>Alta demanda:</strong> os preços estão mais altos agora.</p>}
         <Aviso texto={erro} />
         <div className="rodape-pedido">
           <div className="rodape-linha">

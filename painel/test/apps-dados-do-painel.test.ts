@@ -144,9 +144,89 @@ test("editar a rota no meio da corrida segue o painel (Passageiro pode editar ro
 
 test("gravação das corridas segue o painel (Regras do motorista)", async () => {
   const tm = await entrar("motorista", "11900000002");
-  assert.deepEqual((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo, { ativa: true, obrigatoria: false, video: false, dias: 30 });
+  assert.deepEqual((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo, { ativa: true, obrigatoria: false, video: false, dias: 30, diasNoAparelho: 3 });
   salvarGerais(E.id, { motorista: { gravacao: { ativa: true, obrigatoria: true, video: true, dias: 10 } } });
-  assert.deepEqual((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo, { ativa: true, obrigatoria: true, video: true, dias: 10 });
+  assert.deepEqual((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo, { ativa: true, obrigatoria: true, video: true, dias: 10, diasNoAparelho: 3 });
   salvarGerais(E.id, { motorista: { gravacao: { ativa: false } } });
   assert.equal((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo.obrigatoria, false);
+});
+
+test("Maçaneta: nunca salva = ligada; o painel desliga, limita categorias e define os dados pedidos", async () => {
+  const tm = await entrar("motorista", "11900000002");
+  assert.equal((await chamar("GET", `${API}/config`, undefined, tm)).corpo.macaneta.ativo, true, "nunca salva vale ligada");
+  salvarGerais(E.id, { motorista: { editarValorFinal: true }, macaneta: { ativo: false } });
+  const off = await chamar("POST", `${API}/macaneta`, { modo: "taximetro", categoria: "Econômico", lat: -23.55, lng: -46.63 }, tm);
+  assert.equal(off.status, 400);
+  assert.match(off.corpo.erro, /não usa a corrida Maçaneta/);
+  salvarGerais(E.id, { macaneta: { ativo: true, pedeNome: true, pedeTelefone: true, pedeCpf: true, pedeEmail: true, categorias: ["Outra"] } });
+  const cat = await chamar("POST", `${API}/macaneta`, { modo: "taximetro", categoria: "Econômico", lat: -23.55, lng: -46.63 }, tm);
+  assert.match(cat.corpo.erro, /categoria não faz/);
+  salvarGerais(E.id, { macaneta: { categorias: [] } });
+  const sem = await chamar("POST", `${API}/macaneta`, { modo: "taximetro", categoria: "Econômico", lat: -23.55, lng: -46.63, passageiro: { nome: "Zé Silva" } }, tm);
+  assert.match(sem.corpo.erro, /telefone/);
+  const cpf = await chamar("POST", `${API}/macaneta`, { modo: "taximetro", categoria: "Econômico", lat: -23.55, lng: -46.63, passageiro: { nome: "Zé Silva", telefone: "11977776666" } }, tm);
+  assert.match(cpf.corpo.erro, /CPF/);
+  salvarGerais(E.id, { macaneta: { pedeNome: false, pedeTelefone: false, pedeCpf: false, pedeEmail: false } });
+});
+
+test("CPF do passageiro, banners, taxa de saque, validade da contra-oferta e aviso de alta demanda seguem o painel", async () => {
+  // CPF obrigatório no cadastro (rota pública avisa a tela de criar conta).
+  assert.equal((await chamar("GET", `${API}/regras-cadastro`)).corpo.cpfObrigatorio, false);
+  salvarGerais(E.id, { passageiro: { cpfObrigatorio: true } });
+  assert.equal((await chamar("GET", `${API}/regras-cadastro`)).corpo.cpfObrigatorio, true);
+  const dados = { papel: "passageiro", nome: "Maria Souza", genero: "Feminino", telefone: "11955554444", email: "maria@teste.test", senha: "Senha-forte-9" };
+  const sem = await chamar("POST", `${API}/conta/criar`, dados);
+  assert.equal(sem.status, 400);
+  assert.match(sem.corpo.erro, /CPF/);
+  const com = await chamar("POST", `${API}/conta/criar`, { ...dados, cpf: "529.982.247-25" });
+  assert.equal(com.status, 200, JSON.stringify(com.corpo));
+  salvarGerais(E.id, { passageiro: { cpfObrigatorio: false } });
+  // Banners de Gerais › Banners (sem banner: lista vazia; imagem inexistente: 404).
+  assert.deepEqual((await chamar("GET", `${API}/banners?tipo=app`)).corpo, { banners: [] });
+  assert.equal((await chamar("GET", `${API}/banners/nao-existe/imagem`)).status, 404);
+  // Taxa fixa do saque: fica com a central, o valor precisa cobrir a taxa.
+  const m2 = criar(E.id, cadastroPorId("motoristas")!, { nome: "Bia Motorista", telefone: "11900000077", status: "Ativo", veiculo: "Sedã", placa: "BIA1A11" }, "teste");
+  const tm = await entrar("motorista", "11900000077");
+  lancar(E.id, "motorista", m2.id, 200, "Crédito de teste 2", "teste");
+  salvarPagamentos(E.id, { saque: { ativo: true, minimo: 1, taxaFixa: 5 } });
+  assert.equal((await chamar("GET", `${API}/carteira`, undefined, tm)).corpo.saque.taxaFixa, 5);
+  const baixo = await chamar("POST", `${API}/saques`, { valor: 4, chavePix: "11900000077" }, tm);
+  assert.equal(baixo.status, 400);
+  const ok = await chamar("POST", `${API}/saques`, { valor: 40, chavePix: "11900000077" }, tm);
+  assert.equal(ok.status, 200, JSON.stringify(ok.corpo));
+  assert.equal(ok.corpo.saque.taxa, 5);
+  salvarPagamentos(E.id, { saque: { taxaFixa: 0, minimo: 10 } });
+  // Validade da contra-oferta e demais tempos, e regras do motorista.
+  salvarGerais(E.id, { motorista: { contraofertaSegundos: 45, reofertaMinutos: 3, mapaNavegacao: false, distanciaRecalculo: 200, confirmarTaxas: true, editarValorFinal: false } });
+  const cfg = (await chamar("GET", `${API}/config`, undefined, tm)).corpo.motorista;
+  assert.equal(cfg.contraofertaSegundos, 45);
+  assert.equal(cfg.reofertaMinutos, 3);
+  assert.equal(cfg.mapaNavegacao, false);
+  assert.equal(cfg.distanciaRecalculo, 200);
+  assert.equal(cfg.confirmarTaxas, true);
+  assert.equal(cfg.editarValorFinal, false);
+  // Estimativa avisa se o preço está em alta demanda.
+  const tp = await entrar("passageiro", "11988880020");
+  const est = await chamar("GET", `${API}/estimativa?categoria=${encodeURIComponent("Econômico")}&latEmbarque=-23.55&lngEmbarque=-46.63&latDestino=-23.6&lngDestino=-46.66`, undefined, tp);
+  assert.equal(est.corpo.dinamica, false);
+  assert.equal((await chamar("GET", `${API}/aceitacao`, undefined, tm)).corpo.janela, 100);
+  assert.equal((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo.diasNoAparelho, 3);
+});
+
+test("valor final da corrida: com a edição desligada vale o valor combinado", async () => {
+  salvarGerais(E.id, { motorista: { editarValorFinal: false } });
+  const tp = await entrar("passageiro", "11988880021");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Cris Motorista", telefone: "11900000088", status: "Ativo", veiculo: "Sedã", placa: "CRI1A11" }, "teste");
+  const tm = await entrar("motorista", "11900000088");
+  await chamar("POST", `${API}/online`, { lat: -23.552, lng: -46.63 }, tm);
+  const c = await chamar("POST", `${API}/corridas`, { pedidoId: "valor-final-1", embarque: EMB, destino: { texto: "Fim", lat: -23.6, lng: -46.66 }, categoria: "Econômico", pagamento: "Dinheiro" }, tp);
+  assert.equal(c.status, 200, JSON.stringify(c.corpo));
+  const estado = await chamar("GET", `${API}/estado`, undefined, tm);
+  const idCorrida = estado.corpo.oferta.corrida.id as string;
+  const cheia = (await chamar("POST", `${API}/ofertas/${estado.corpo.oferta.id}/aceitar`, {}, tm));
+  assert.equal(cheia.status, 200, JSON.stringify(cheia.corpo));
+  for (const st of ["no_local", "em_andamento"]) await chamar("POST", `${API}/corridas/${idCorrida}/status`, { status: st }, tm);
+  const fim = await chamar("POST", `${API}/corridas/${idCorrida}/status`, { status: "finalizada", valor: 999 }, tm);
+  assert.equal(fim.status, 200, JSON.stringify(fim.corpo));
+  assert.equal(fim.corpo.corrida.valor, cheia.corpo.corrida.estimativa.valor);
 });

@@ -1,21 +1,31 @@
-// Personalização do app do passageiro (Configurações do painel): o app lê GET /personalizacao ao abrir, a cada minuto e quando volta
-// para a tela, e aplica na hora (cores por variável CSS, nome, ícone do carro no mapa, recursos e estilo da tela inicial), sem gerar APK.
-// Guarda a última resposta no aparelho para já abrir com as cores certas.
+// Personalização do app (Configurações do painel): o app lê ao abrir, a cada minuto e quando volta para a tela, e aplica na hora
+// (cores por variável CSS, nome, logo do topo, tema, ícone do carro, estilo e recursos), sem gerar APK.
+// Passageiro lê GET /personalizacao; motorista lê GET /personalizacao-motorista. Guarda a última resposta no aparelho
+// para já abrir com as cores certas (a rota exige o login do app).
 
 import { useSyncExternalStore } from "react";
 import { api, config } from "./api";
 
-export interface PersonalizacaoApp {
+interface Basico {
   versao: string;
   empresa: { id: string; nome: string; nomeExibido: string; logoClaro: string; logoEscuro: string; icone: string };
   cores: { principal: string; textoSobrePrincipal: string; escura: string; clara: string };
   design: { estiloTela: "flutuante" | "neutro" | "marcante"; marca: string; mostrarNome: boolean; mostrarImagem: boolean; imagemMarcaUrl: string; dimensoesImagem: { largura: number; altura: number } | null };
-  veiculoMapa: { id: string; tipo: number; iconeLivreUrl: string; iconeOcupadoUrl: string; diferenciaOcupado: boolean; iconeAlternativoUrl: string };
-  telaInicial: { estilo: string; recursos: Array<{ id: string; visivel: boolean; posicao: number }>; ordemVisiveis: string[]; mapaFixo: boolean };
-  recursos: Record<"mapa" | "destino" | "cupons" | "anuncio" | "desafio", boolean>;
+  veiculoMapa: { id: string; tipo: number; iconeLivreUrl: string; iconeOcupadoUrl: string; diferenciaOcupado: boolean };
 }
+export interface PersonalizacaoPassageiro extends Basico {
+  veiculoMapa: Basico["veiculoMapa"] & { iconeAlternativoUrl: string };
+  telaInicial: { estilo: string; recursos: Array<{ id: string; visivel: boolean; posicao: number }>; ordemVisiveis: string[]; mapaFixo: boolean };
+  recursos: Record<"mapa" | "selecao_destino" | "aviso_cupons" | "anuncio" | "desafio", boolean>; desafioLiberado: boolean;
+}
+export interface PersonalizacaoMotoristaApp extends Basico {
+  tema: "sistema" | "claro" | "escuro";
+  recursos: Record<"saldo" | "notificacoes" | "ajuda" | "tema" | "centralizar" | "preferencias" | "macaneta" | "iniciar" | "rodape", boolean>;
+}
+export type PersonalizacaoApp = PersonalizacaoPassageiro & PersonalizacaoMotoristaApp;
 
-const chave = () => `personalizacao-${config().empresaId}`;
+const rota = () => (config().papel === "motorista" ? "/personalizacao-motorista" : "/personalizacao");
+const chave = () => `personalizacao-${config().papel}-${config().empresaId}`;
 let atual: PersonalizacaoApp | null = null;
 const ouvintes = new Set<() => void>();
 
@@ -48,10 +58,24 @@ export function personalizacaoDoCache() {
 }
 
 export async function carregarPersonalizacao() {
-  try { aplicarPersonalizacao(await api<PersonalizacaoApp>("/personalizacao")); } catch { /* sem sinal: segue com o que já tem */ }
+  try { aplicarPersonalizacao(await api<PersonalizacaoApp>(rota())); } catch { /* sem sinal: segue com o que já tem */ }
+}
+
+/** Lê ao entrar, a cada 60 s e ao voltar para o app. Devolve a função que para. */
+export function acompanharPersonalizacao(): () => void {
+  void carregarPersonalizacao();
+  const t = setInterval(() => void carregarPersonalizacao(), 60000);
+  const f = () => { if (document.visibilityState === "visible") void carregarPersonalizacao(); };
+  document.addEventListener("visibilitychange", f);
+  return () => { clearInterval(t); document.removeEventListener("visibilitychange", f); };
 }
 
 export const personalizacaoAtual = () => atual;
 export function usePersonalizacao(): PersonalizacaoApp | null {
   return useSyncExternalStore((f) => { ouvintes.add(f); return () => { ouvintes.delete(f); }; }, () => atual);
+}
+
+/** Logo do topo vindo da Personalização: a imagem escolhida (ou nada, para mostrar o nome). Nunca uma imagem fixa do app. */
+export function logoDaPersonalizacao(p: PersonalizacaoApp | null): string {
+  return p && p.design.mostrarImagem ? p.design.imagemMarcaUrl : "";
 }

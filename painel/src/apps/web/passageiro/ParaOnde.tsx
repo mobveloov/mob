@@ -155,7 +155,7 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
                 <button key={f.id} className="sub" onClick={() => void escolher(f.ponto)}><span className="icone-redondo claro">{f.icone}</span><span><strong>{f.nome}</strong><small>{linhasDoEndereco(f.ponto)[0]}</small></span></button>
               )) : <p className="dica sub">Nenhum favorito ainda. Toque na ☆ da partida para salvar.</p>)}
               <button onClick={() => setNoMapa(true)}><span className="icone-redondo cinza"><Pin size={18} /></span><span className="texto-forte">Escolher no mapa</span><ChevronRight size={18} /></button>
-              {!definindo && ativo === "destino" && <button onClick={semDestino}><span className="icone-redondo cinza"><Ban size={18} /></span><span className="texto-forte">Não informar destino</span><ChevronRight size={18} /></button>}
+              {!definindo && ativo === "destino" && (regras?.passageiro.destinoLivre ?? true) && <button onClick={semDestino}><span className="icone-redondo cinza"><Ban size={18} /></span><span className="texto-forte">Não informar destino</span><ChevronRight size={18} /></button>}
             </div>
             {!!lugares?.recentes.length && (
               <>
