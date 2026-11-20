@@ -3,7 +3,7 @@
 // Quando a empresa tem ao menos uma taxa do motorista, elas substituem a comissão da categoria (config/comissao.ts).
 
 import { normal } from "../servidor/util.ts";
-import { FORMAS_TAXA, MAX_FAIXAS, MAX_TAXAS, valorDaTaxa, type FaixaTaxa, type FormaTaxa, type Taxa } from "../comum/taxas.ts";
+import { FORMAS_TAXA, MAX_FAIXAS, MAX_TAXAS, limparNomeTaxa, valorDaTaxa, type FaixaTaxa, type FormaTaxa, type Taxa } from "../comum/taxas.ts";
 import { centavos, gravarConfig, lerConfig, lista, novoId, numero, texto, umDe } from "./armazem.ts";
 
 const IDS_FORMA = FORMAS_TAXA.map((f) => f.id) as readonly FormaTaxa[];
@@ -33,7 +33,7 @@ export function sanearFaixas(e: unknown): FaixaTaxa[] {
 /** Valida e normaliza uma taxa vinda do painel. `existentes` serve para recusar nome repetido. */
 export function sanearTaxa(e: unknown, existentes: Taxa[], por: string, agora: string): Taxa {
   const o = (e ?? {}) as Record<string, unknown>;
-  const nome = texto(o.nome, 60);
+  const nome = limparNomeTaxa(texto(o.nome, 80));
   if (!nome) throw new Error("Informe o nome da taxa.");
   const id = texto(o.id, 20) || novoId();
   if (existentes.some((t) => t.id !== id && normal(t.nome) === normal(nome))) throw new Error("Já existe uma taxa com este nome.");
@@ -41,7 +41,7 @@ export function sanearTaxa(e: unknown, existentes: Taxa[], por: string, agora: s
   if (!categorias.length) throw new Error("Escolha ao menos uma categoria.");
   const pagamentos = [...new Set(lista(o.pagamentos).filter((p): p is FormaTaxa => IDS_FORMA.includes(p as FormaTaxa)))];
   if (!pagamentos.length) throw new Error("Escolha ao menos uma forma de pagamento.");
-  return { id, nome, quemPaga: umDe(o.quemPaga, ["motorista", "passageiro"] as const, "motorista"), categorias, pagamentos, faixas: sanearFaixas(o.faixas), atualizadoPor: por.slice(0, 80), atualizadoEm: agora };
+  return { id, nome, quemPaga: umDe(o.quemPaga, ["motorista", "passageiro"] as const, "motorista"), categorias, pagamentos, faixas: sanearFaixas(o.faixas), ativa: o.ativa !== false, atualizadoPor: por.slice(0, 80), atualizadoEm: agora };
 }
 
 function ler(empresaId: string): Taxa[] {
@@ -75,7 +75,7 @@ export interface EntradaTaxa { categoria: string; valor: number; forma: FormaTax
 /** Taxas que valem para esta corrida. Forma de pagamento desconhecida (ex.: saldo da carteira): só as taxas que cobrem todas as formas. */
 function aplicaveis(empresaId: string, quem: "motorista" | "passageiro", e: EntradaTaxa): Taxa[] {
   const cat = normal(e.categoria);
-  return taxas(empresaId).filter((t) => t.quemPaga === quem && t.categorias.some((c) => normal(c) === cat)
+  return taxas(empresaId).filter((t) => t.ativa !== false && t.quemPaga === quem && t.categorias.some((c) => normal(c) === cat)
     && (e.forma ? t.pagamentos.includes(e.forma) : t.pagamentos.length === IDS_FORMA.length));
 }
 /** Forma de pagamento escrita na corrida -> forma das taxas (null quando não reconhece, como "Saldo da carteira"). */
@@ -89,7 +89,7 @@ export function formaDaTaxa(pagamento: string | undefined): FormaTaxa | null {
   if (t.includes("credito") || t.includes("cartao")) return "credito";
   return null;
 }
-export const temTaxaDoMotorista = (empresaId: string) => taxas(empresaId).some((t) => t.quemPaga === "motorista");
+export const temTaxaDoMotorista = (empresaId: string) => taxas(empresaId).some((t) => t.ativa !== false && t.quemPaga === "motorista");
 
 export function cobrancas(empresaId: string, quem: "motorista" | "passageiro", e: EntradaTaxa): Cobranca[] {
   let restante = e.valor;

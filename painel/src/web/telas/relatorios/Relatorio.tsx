@@ -34,6 +34,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
   const [form, setForm] = useState<Valores>(padrao);
   const [aplicado, setAplicado] = useState<Valores>(padrao);
   const [pagina, setPagina] = useState(1);
+  const [ordem, setOrdem] = useState(""), [dir, setDir] = useState<"asc" | "desc">("asc");
   const { msg, salvar } = useSalvar();
 
   // pré-preenche os padrões do relatório (ex.: taxa de 20%) na primeira vez
@@ -49,14 +50,16 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
     for (const [k, x] of Object.entries(v)) if (x !== "" && x != null) u.set(k, Array.isArray(x) ? x.join("|") : String(x));
     return u.toString() + extra;
   };
-  const consulta = qs(aplicado, `&pagina=${pagina}`);
+  const consulta = qs(aplicado, `&pagina=${pagina}${ordem ? `&ordem=${encodeURIComponent(ordem)}&dir=${dir}` : ""}`);
   const obrigatorioFalta = !!def && (def.filtros as any[]).some((f) => f.obrigatorio && !String(aplicado[f.chave] ?? "").trim());
   const d = useCarregar(() => (obrigatorioFalta ? Promise.resolve(null) : pedirRel<any>(`/relatorio/${id}?${consulta}`)), [id, consulta, obrigatorioFalta]);
   const x = d.dados;
   const opc = defs.dados?.opcoes;
 
   const filtrar = (e: React.FormEvent) => { e.preventDefault(); setPagina(1); setAplicado(form); };
-  const limpar = () => { setForm(padrao); setAplicado(padrao); setPagina(1); };
+  const limpar = () => { setForm(padrao); setAplicado(padrao); setPagina(1); setOrdem(""); setDir("asc"); };
+  // Cabeçalho clicável como na Machine: clica para ordenar, clica de novo para inverter.
+  const ordenar = (chave: string) => { if (ordem === chave) setDir(dir === "asc" ? "desc" : "asc"); else { setOrdem(chave); setDir("asc"); } setPagina(1); };
   const alternar = (chave: string, forma: string) => {
     const atual: string[] = form[chave] ?? [];
     setForm({ ...form, [chave]: atual.includes(forma) ? atual.filter((f) => f !== forma) : [...atual, forma] });
@@ -71,7 +74,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
     <>
       <Cab titulo={def.titulo} sub={def.descricao}>
         {aoVoltar && <button className="botao" onClick={aoVoltar}>Voltar</button>}
-        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => baixarCsvRel(`/relatorio/${id}/csv?${qs(aplicado)}`, `${id}.csv`), "CSV exportado.")}><Download size={14} /> Exportar</button>}
+        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => baixarCsvRel(`/relatorio/${id}/csv?${qs(aplicado, ordem ? `&ordem=${encodeURIComponent(ordem)}&dir=${dir}` : "")}`, `${id}.csv`), "CSV exportado.")}><Download size={14} /> Exportar</button>}
         {(BOTOES[id]?.imprimir ?? true) && <button className="botao" onClick={() => window.print()}><Printer size={14} /> Imprimir</button>}
       </Cab>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
@@ -84,7 +87,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
           const rot = f.obrigatorio ? `${f.rotulo} *` : f.rotulo;
           if (f.tipo === "empresa") return <Campo key={f.chave} rotulo={rot}><select value={form[f.chave] ?? ""} onChange={(e) => setForm({ ...form, [f.chave]: e.target.value })}><option value="">Selecione</option>{opc?.empresas.map((n: string) => <option key={n}>{n}</option>)}</select></Campo>;
           if (f.tipo === "pagamento") return <Campo key={f.chave} rotulo={rot}><select value={form[f.chave] ?? ""} onChange={(e) => setForm({ ...form, [f.chave]: e.target.value })}><option value="">Selecione</option>{defs.dados.formas.map((n: string) => <option key={n}>{n}</option>)}</select></Campo>;
-          if (f.tipo === "categoria") return <Campo key={f.chave} rotulo={rot}><select value={form[f.chave] ?? ""} onChange={(e) => setForm({ ...form, [f.chave]: e.target.value })}><option value="">Selecione</option>{opc?.categorias.map((n: string) => <option key={n}>{n}</option>)}</select></Campo>;
+          if (f.tipo === "categoria") return <Campo key={f.chave} rotulo={rot} dica="Filtre apenas por categorias atualmente ativas. Categorias excluídas são exibidas no histórico geral, mas não estão disponíveis para seleção aqui."><select value={form[f.chave] ?? ""} onChange={(e) => setForm({ ...form, [f.chave]: e.target.value })}><option value="">Selecione</option>{opc?.categorias.map((n: string) => <option key={n}>{n}</option>)}</select></Campo>;
           if (f.tipo === "pagamentos") return (
             <fieldset key={f.chave} className="dm-campo" style={{ flexBasis: "100%", border: 0, padding: 0 }}>
               <span>{f.rotulo}</span>
@@ -102,7 +105,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
         <div className="dm-cartao tabela-rola">
           <p><small>Período: {dataBrDia(x.periodo.inicio)} a {dataBrDia(x.periodo.fim)}. {x.total ? `Exibindo ${de}-${ate} de ${x.total} resultados.` : ""}</small></p>
           <table>
-            <thead><tr>{x.colunas.map((c: any) => <th key={c.chave} className={["dinheiro", "numero", "pct", "km"].includes(c.tipo) ? "num" : ""}>{c.rotulo}</th>)}</tr></thead>
+            <thead><tr>{x.colunas.map((c: any) => <th key={c.chave} className={["dinheiro", "numero", "pct", "km"].includes(c.tipo) ? "num" : ""} aria-sort={ordem === c.chave ? (dir === "asc" ? "ascending" : "descending") : "none"}><button type="button" className="est-ordem" onClick={() => ordenar(c.chave)}>{c.rotulo}{ordem === c.chave && <span aria-hidden> {dir === "asc" ? "▲" : "▼"}</span>}</button></th>)}</tr></thead>
             <tbody>
               {!x.linhas.length ? <tr><td colSpan={x.colunas.length} className="vazio">Nenhum resultado encontrado.</td></tr> : x.linhas.map((l: any, i: number) => (
                 <tr key={i}>{x.colunas.map((c: any) => <td key={c.chave} className={["dinheiro", "numero", "pct", "km"].includes(c.tipo) ? "num" : ""}>{celula(c.tipo, l[c.chave])}</td>)}</tr>

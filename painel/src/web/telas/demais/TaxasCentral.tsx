@@ -3,42 +3,55 @@
 // Servidor: /api/config/taxas (src/config/taxas.ts). Vale para a central escolhida no topo (cada central tem as suas).
 
 import { useState } from "react";
-import { ChevronRight, Info, Plus, PlusCircle, Trash2 } from "lucide-react";
-import { FORMAS_TAXA, MAX_FAIXAS, resumoDaTaxa, simular, type FaixaTaxa, type Taxa } from "../../../comum/taxas";
-import { Abas, Aviso, Cab, Campo, Carregando, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
+import { Bot, ChevronDown, ChevronRight, ChevronUp, Info, Plus, PlusCircle, Trash2 } from "lucide-react";
+import { FORMAS_TAXA, MAX_FAIXAS, MAX_NOME_TAXA, resumoDaTaxa, simular, type FaixaTaxa, type Taxa } from "../../../comum/taxas";
+import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const txt = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));
 const rs = (n: number) => dinheiro(n);
 
-interface Rascunho { id?: string; nome: string; quemPaga: "motorista" | "passageiro"; categorias: string[]; pagamentos: string[]; faixas: FaixaTaxa[] }
+interface Rascunho { id?: string; ativa?: boolean; nome: string; quemPaga: "motorista" | "passageiro"; categorias: string[]; pagamentos: string[]; faixas: FaixaTaxa[] }
 const NOVA: Rascunho = { nome: "", quemPaga: "motorista", categorias: [], pagamentos: [], faixas: [{ de: 0, ate: null, tipo: "porcentagem", valor: 0 }] };
 
 export function TaxasCentral() {
   const admin = useAdmin();
   const [aba, setAba] = useState<"taxa" | "automacoes">("taxa");
+  const [aberto, setAberto] = useState(true);
+  const { msg, salvar } = useSalvar();
   const d = useCarregar(() => pedirConfig<{ taxas: Taxa[]; categorias: string[] }>("/taxas"), []);
   const [edit, setEdit] = useState<Rascunho | null>(null);
   const taxas = d.dados?.taxas ?? [];
   return (
     <>
       <Cab titulo="Taxas da central" sub="Defina o que a central cobra a cada corrida, do motorista ou do passageiro." />
-      <Abas abas={[["taxa", "Taxa por corrida"], ["automacoes", "Automações"]]} valor={aba} onChange={setAba} />
-      {aba === "automacoes" ? (
-        <section className="dm-cartao dm-secao"><div className="dm-vazio-pequeno"><h4>Nenhuma automação por aqui</h4><p>As taxas valem para todas as corridas finalizadas, sem nada a mais para ligar.</p></div></section>
+      <section className="dm-cartao dm-secao" aria-label="Taxa por corrida">
+        <div className="dm-linha dm-entre">
+          <h2>{aba === "automacoes" ? "Automações" : "Taxa por corrida"}</h2>
+          <div className="dm-linha">
+            {aba === "taxa"
+              ? <button className="botao" onClick={() => setAba("automacoes")}><Bot size={16} aria-hidden /> Automações</button>
+              : <button className="botao" onClick={() => setAba("taxa")}>Voltar para Taxa por corrida</button>}
+            <button className="icone" aria-expanded={aberto} aria-label={aberto ? "Recolher" : "Expandir"} onClick={() => setAberto(!aberto)}>{aberto ? <ChevronUp size={18} /> : <ChevronDown size={18} />}</button>
+          </div>
+        </div>
+      {!aberto ? null : aba === "automacoes" ? (
+        <div className="dm-vazio-pequeno"><h4>Nenhuma automação por aqui</h4><p>As taxas valem para todas as corridas finalizadas, sem nada a mais para ligar.</p></div>
       ) : (
         <>
           <div className="dm-info"><Info size={16} aria-hidden /> <span>Ao criar várias taxas, verifique se elas não se sobrepõem para evitar uma cobrança indevida.</span></div>
-          <section className="dm-cartao dm-secao">
+          <div className="dm-secao">
             <div className="dm-linha dm-entre">
               <div><h3>Taxa da central</h3><p className="sub">Defina qual será o valor da taxa cobrada a cada corrida realizada. Você pode optar por um valor fixo ou percentual do total da corrida.</p></div>
             </div>
-            <Aviso erro={d.erro} />
+            <Aviso erro={d.erro ?? msg?.erro} />
             {!d.dados ? <Carregando /> : !taxas.length ? <div className="dm-vazio-pequeno"><h4>Nenhuma taxa criada</h4><p>Sem taxas, nada é cobrado por corrida além da comissão das categorias.</p></div> : (
               <ul className="dm-taxas">
                 {taxas.map((t) => (
-                  <li key={t.id}>
-                    <button className="dm-taxa" onClick={() => setEdit({ id: t.id, nome: t.nome, quemPaga: t.quemPaga, categorias: t.categorias, pagamentos: t.pagamentos, faixas: t.faixas })} aria-label={`Abrir a taxa ${t.nome}`}>
+                  <li key={t.id} className={`dm-taxa-linha ${t.ativa === false ? "desligada" : ""}`}>
+                    <Interruptor valor={t.ativa !== false} desabilitado={!admin} rotulo={t.ativa === false ? "Desativada" : "Ativa"}
+                      onChange={(v) => salvar(async () => { await pedirConfig("/taxas", "POST", { ...t, ativa: v }); d.recarregar(); }, v ? "Taxa ativada." : "Taxa desativada.")} />
+                    <button className="dm-taxa" onClick={() => setEdit({ id: t.id, ativa: t.ativa, nome: t.nome, quemPaga: t.quemPaga, categorias: t.categorias, pagamentos: t.pagamentos, faixas: t.faixas })} aria-label={`Abrir a taxa ${t.nome}`}>
                       <strong>{t.nome}</strong>
                       <span><small>Taxa</small>{resumoDaTaxa(t.faixas)}</span>
                       <span><small>Quem paga</small>{t.quemPaga === "motorista" ? "Motorista" : "Passageiro"}</span>
@@ -51,9 +64,10 @@ export function TaxasCentral() {
               </ul>
             )}
             {admin && <div><button className="botao primario" onClick={() => setEdit(structuredClone(NOVA))}><Plus size={14} /> Criar taxa</button></div>}
-          </section>
+          </div>
         </>
       )}
+      </section>
       {edit && <EditorTaxa inicial={edit} categorias={d.dados?.categorias ?? []} admin={admin} onFechar={() => setEdit(null)} onMudou={() => { setEdit(null); d.recarregar(); }} />}
     </>
   );
@@ -75,12 +89,12 @@ function EditorTaxa({ inicial, categorias, admin, onFechar, onMudou }: { inicial
   const tirar = (i: number) => setT({ ...t, faixas: t.faixas.filter((_, j) => j !== i).map((f, j, l) => ({ ...f, de: j === 0 ? 0 : l[j - 1].ate ?? f.de, ate: j === l.length - 1 ? null : f.ate })) });
   const alterna = (campo: "categorias" | "pagamentos", v: string) => setT({ ...t, [campo]: t[campo].includes(v) ? t[campo].filter((x) => x !== v) : [...t[campo], v] });
   const todos = (campo: "categorias" | "pagamentos", lista: string[]) => setT({ ...t, [campo]: t[campo].length === lista.length ? [] : [...lista] });
-  const sim = simular(t.quemPaga, t.faixas, num(valorSim));
+  const sim = simular(t.quemPaga, t.faixas, Math.min(999.99, Math.max(0, num(valorSim))));
   const idsPag = FORMAS_TAXA.map((f) => f.id as string);
   return (
     <Modal aberto onFechar={onFechar} titulo={t.id ? "Editar taxa" : "Criar taxa"} larga>
       <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); if (!admin) return; const r = await salvar(() => pedirConfig("/taxas", "POST", t), "Taxa salva."); if (r) onMudou(); }}>
-        <Campo rotulo="Nome *" dica="O nome da taxa será mostrado no extrato do motorista e no extrato de crédito."><input value={t.nome} maxLength={60} required disabled={!admin} onChange={(e) => setT({ ...t, nome: e.target.value })} /></Campo>
+        <Campo rotulo="Nome *" dica="O nome da taxa será mostrado no extrato do motorista e no extrato de crédito."><input value={t.nome} maxLength={MAX_NOME_TAXA} required disabled={!admin} onChange={(e) => setT({ ...t, nome: e.target.value.replace(/[\p{Extended_Pictographic}]/gu, "").slice(0, MAX_NOME_TAXA) })} /></Campo>
         <Abas abas={[["config", "Configurações"], ["aplicacoes", "Aplicações"]]} valor={aba} onChange={setAba} />
         {aba === "config" ? (
           <>
@@ -105,12 +119,12 @@ function EditorTaxa({ inicial, categorias, admin, onFechar, onMudou }: { inicial
             <h4>Quem irá pagar a taxa?</h4>
             <p className="sub">Define quem assumirá o custo financeiro desta taxa.</p>
             <div className="dm-opcoes">
-              <label className={t.quemPaga === "passageiro" ? "ativo" : ""}><input type="radio" name="quem" disabled={!admin} checked={t.quemPaga === "passageiro"} onChange={() => setT({ ...t, quemPaga: "passageiro" })} /><span><strong>Passageiro</strong><small>A taxa será acrescida ao valor calculado da corrida.</small></span></label>
+              <label className={t.quemPaga === "passageiro" ? "ativo" : ""}><input type="radio" name="quem" disabled={!admin} checked={t.quemPaga === "passageiro"} onChange={() => setT({ ...t, quemPaga: "passageiro" })} /><span><strong>Passageiro</strong><small>A taxa será acrescida ao valor calculado da corrida.</small><small className="dm-versao-minima"><Info size={14} aria-hidden /> Versão mínima no app Motorista: 24.9</small></span></label>
               <label className={t.quemPaga === "motorista" ? "ativo" : ""}><input type="radio" name="quem" disabled={!admin} checked={t.quemPaga === "motorista"} onChange={() => setT({ ...t, quemPaga: "motorista" })} /><span><strong>Motorista</strong><small>A taxa será abatida do valor a ser repassado ao motorista.</small></span></label>
             </div>
             <div className="dm-cartao">
               <h4>Simulador de taxa</h4>
-              <Campo rotulo="Digite o valor da corrida"><input inputMode="decimal" value={valorSim} onChange={(e) => setValorSim(e.target.value)} placeholder="0,00" /></Campo>
+              <Campo rotulo="Digite o valor da corrida"><input inputMode="decimal" value={valorSim} onChange={(e) => setValorSim(e.target.value)} onBlur={() => setValorSim(txt(Math.min(999.99, Math.max(0.01, num(valorSim) || 0.01))))} placeholder="0,00" /></Campo>
               <div className="dm-duplo">
                 <div><small>Total pago pelo passageiro</small><p><strong>{rs(sim.passageiroPaga)}</strong></p><small>{t.quemPaga === "passageiro" ? "(Valor base + Taxa)" : "(Valor base)"}</small></div>
                 <div><small>Total recebido pelo motorista</small><p><strong>{rs(sim.motoristaRecebe)}</strong></p><small>{t.quemPaga === "motorista" ? "(Valor base - Taxa)" : "(Valor base)"}</small></div>

@@ -57,7 +57,7 @@ export function RelatorioFaturamento() {
         <Kpi titulo="Solicitações canceladas" dica="Valor total de corridas canceladas no período (pelo passageiro ou motorista)." valor={x?.canceladas} />
       </div>
       <div className="dm-cartao tabela-rola">
-        <div className="dm-busca"><Search size={14} aria-hidden /><input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por ordem de serviço" aria-label="Buscar por ordem de serviço" /></div>
+        <div className="dm-busca"><Search size={14} aria-hidden /><input type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por número da OS" aria-label="Buscar por número da OS" /><button type="button" className="botao" aria-label="Buscar" onClick={() => setPagina(1)}><Search size={14} /></button></div>
         {x && <p><small>{x.total ? `Exibindo ${de}-${ate} de ${x.total} resultados` : ""}</small></p>}
         <table>
           <thead><tr><th>Data e Hora</th><th>Ordem de serviço</th><th>Forma de pagamento</th><th className="num">Valor</th><th className="num">Taxa da central</th><th>Status</th></tr></thead>
