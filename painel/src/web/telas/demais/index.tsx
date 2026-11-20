@@ -3,6 +3,7 @@
 import type { JSX } from "react";
 import "./demais.css";
 import "./grupoc.css";
+import { ConfigCarteirasCredito } from "./ConfigCarteirasCredito";
 import { Carteiras, Extrato, Recargas, Relatorios, Saques } from "./Financeiro";
 import { ExtratoCentral, ExtratoOnline, VisaoGeral } from "./FinanceiroMachine";
 import { TransacaoPix } from "./Pix";
@@ -36,7 +37,7 @@ export const TELAS_DEMAIS: Record<string, JSX.Element> = {
   "ultimo-boleto": <UltimoBoleto />,
   "alertas-empresas": <AlertasEmpresas />,
   carteiras: <Carteiras />,
-  "carteiras-credito": <Carteiras />,
+  "carteiras-credito": <ConfigCarteirasCredito />,
   extrato: <Extrato />,
   saques: <Saques />,
   recargas: <Recargas />,
