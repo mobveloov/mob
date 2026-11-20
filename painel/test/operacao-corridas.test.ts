@@ -221,8 +221,15 @@ test("ocorrências lista falhas recentes e não mostra as finalizadas", async ()
   const o = await pedir("/ocorrencias?horas=1", { cookie: co });
   assert.equal(o.status, 200);
   assert.ok(o.corpo.total >= 2);
-  assert.ok(o.corpo.itens.every((i: { grupo: string }) => i.grupo === "cancelada" || i.grupo === "nao_atendida"));
+  assert.ok(o.corpo.itens.every((i: { grupo: string; tipo: string }) => i.grupo !== "finalizada" && ["C", "N", "P", "A"].includes(i.tipo)));
   assert.match(o.corpo.itens.find((i: { os: string }) => i.os === os1).motivo, /passageiro/i);
+  assert.equal(o.corpo.itens.find((i: { os: string }) => i.os === os1).ocorrencia, "Cancelada");
+  // Filtros do Machine: só os tipos marcados, categoria e nome da empresa.
+  const soN = await pedir("/ocorrencias?status=N", { cookie: co });
+  assert.ok(soN.corpo.itens.every((i: { tipo: string }) => i.tipo === "N"));
+  assert.equal((await pedir("/ocorrencias?nomeEmpresa=zzzz", { cookie: co })).corpo.total, 0);
+  assert.equal((await pedir("/ocorrencias?categoria=Inexistente", { cookie: co })).corpo.total, 0);
+  assert.deepEqual(o.corpo.opcoes.tipos.map((t: { id: string }) => t.id), ["C", "N", "P", "A"]);
 });
 
 test("programadas: agenda, edita e filtra", async () => {
