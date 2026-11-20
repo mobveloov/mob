@@ -202,7 +202,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     veiculos: <MeusVeiculos voltar={voltar} />,
     cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} irCarteira={() => setTela("carteira")} aoSairDaConta={() => { setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />,
     senha: <AlterarSenha voltar={voltar} />,
-    config: <Configuracoes voltar={voltar} />,
+    config: <Configuracoes voltar={voltar} irPermissoes={() => setTela("permissoes")} />,
     diagnostico: <Diagnostico voltar={voltar} eu={eu} conectado={conectado} posicao={posicao} online={online} />,
     suporte: <Suporte voltar={voltar} marca={marca} />,
     fale: <FaleConosco voltar={voltar} marca={marca} />,

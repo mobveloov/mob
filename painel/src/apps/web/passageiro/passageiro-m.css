@@ -265,3 +265,11 @@ input, select, textarea { min-height: 48px; }
 label { line-height: 1.3; overflow-wrap: anywhere; }
 .tela { scroll-padding-bottom: 40vh; } /* o teclado não cobre o campo que está sendo digitado */
 @media (max-width: 380px) { .conta-grupo { margin-left: .7rem; margin-right: .7rem; } .seletor-tema button { padding: .6rem .2rem; font-size: .85rem; } }
+
+/* Tela inicial guiada pela Personalização do painel: marca no topo e blocos em ordem (destino, cupons, desafio) */
+.inicio-marca { display: flex; align-items: center; gap: .6rem; padding: .2rem .2rem .6rem; font-weight: 800; }
+.inicio-marca img { max-width: 100%; object-fit: contain; border-radius: 10px; }
+.inicio-blocos { display: flex; flex-direction: column; gap: .6rem; }
+.bloco-inicio { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .75rem .9rem; border: 0; border-radius: 18px; background: var(--cartao); color: var(--texto); text-align: left; cursor: pointer; min-height: 56px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.bloco-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
+.bloco-texto small { opacity: .75; }

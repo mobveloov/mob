@@ -550,3 +550,6 @@ html[data-tema="escuro"] { --m-bg: #0b0e14; --m-card: #161b26; --m-card2: #222a3
 .campo-rotulo { line-height: 1.3; overflow-wrap: anywhere; }
 .cartao-m { overflow-wrap: anywhere; }
 @media (max-width: 380px), (max-height: 680px) { .config-titulo { padding-top: 1rem; } .cartao-m { padding-left: .9rem; padding-right: .9rem; } }
+.cartao-m.perm-item { display: flex; flex-direction: row; align-items: center; text-align: left; }
+.cartao-m.perm-resumo { display: flex; flex-direction: row; text-align: left; }
+.perm-texto strong { display: block; }

@@ -322,7 +322,7 @@ export function AlterarSenha({ voltar }: Voltar) {
 
 // ------------------------------------------------------------------ Configurações e diagnóstico
 
-export function Configuracoes({ voltar }: Voltar) {
+export function Configuracoes({ voltar, irPermissoes }: Voltar & { irPermissoes?: () => void }) {
   const [a, mudar] = useAjustes();
   const [abrir, setAbrir] = useState<"" | "tema" | "navegador" | "sons">("");
   const linha = (I: typeof User, titulo: string, texto: string | undefined, valor: string, f: () => void) => (
@@ -330,6 +330,12 @@ export function Configuracoes({ voltar }: Voltar) {
   );
   return (
     <Pagina><Topo titulo="Configurações" voltar={voltar} />
+      {irPermissoes && (
+        <>
+          <div className="config-titulo">Receber corridas</div>
+          <div className="config-grupo">{linha(ShieldCheck, "Permissões do aparelho", "Localização, notificações, exibir sobre outros apps e bateria", "Conferir e liberar", irPermissoes)}</div>
+        </>
+      )}
       <div className="config-titulo">Interface &amp; Tema</div>
       <div className="config-grupo">
         {linha(Settings, "Tema do Aplicativo", undefined, NOMES_TEMA[a.tema], () => setAbrir("tema"))}
