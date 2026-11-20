@@ -6,6 +6,8 @@ import { atualizarUsuarioDaEquipe, criarUsuario, listarUsuarios, removerUsuario,
 import { definirFilialDe, filialDe, filiaisPorPessoa, listarFiliais } from "../filiais/filiais.ts";
 import { emp, ok, soAdmin } from "./comum.ts";
 import { rotasMotoristas } from "./motoristas.ts";
+import { rotasCartoes, rotasPasseLivre } from "./cadastros-machine.ts";
+import { rotasOuvidoria, rotasSuporte, rotasTermosPainel } from "./ajuda-machine.ts";
 import { rotasOutros } from "./outros.ts";
 
 export { regraDeCobrancaDoMotorista } from "./cobranca.ts";
@@ -15,6 +17,11 @@ const PAPEIS: Papel[] = ["admin", "gestor", "operador"];
 export const rotasGestao = Router();
 rotasMotoristas(rotasGestao);
 rotasOutros(rotasGestao);
+rotasPasseLivre(rotasGestao);
+rotasCartoes(rotasGestao);
+rotasTermosPainel(rotasGestao);
+rotasSuporte(rotasGestao);
+rotasOuvidoria(rotasGestao);
 
 // Equipe: os usuários do painel (cargos ADMIN, Gestor e Operador).
 const publico = ({ hash: _h, ...u }: ReturnType<typeof listarUsuarios>[number], filiais?: Map<string, string>) => ({ ...u, filialId: filiais?.get(u.id) ?? filialDe(u.empresaId, "operador", u.id) ?? "" });

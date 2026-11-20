@@ -28,6 +28,7 @@ export const FUNCOES: Funcao[] = [
   { id: "painel", grupo: "Painel", nome: "Painel", rota: "/" },
 
   { id: "cupons", grupo: "Cadastro", nome: "Cupons", rota: "/cupons", minimo: "gestor" },
+  { id: "passe-livre", grupo: "Cadastro", nome: "Passe Livre", rota: "/passe-livre", minimo: "admin" },
   { id: "empresas", grupo: "Cadastro", nome: "Empresas", rota: "/empresas", antigas: ["/conveniadas"], minimo: "gestor" },
   { id: "faixas-vouchers", grupo: "Cadastro", nome: "Faixa de Vouchers", rota: "/faixas-vouchers", minimo: "gestor" },
   { id: "areas", grupo: "Cadastro", secao: "Gestão de Áreas", nome: "Áreas", rota: "/areas", minimo: "gestor" },
@@ -36,6 +37,7 @@ export const FUNCOES: Funcao[] = [
   { id: "motoristas", grupo: "Cadastro", nome: "Motoristas", rota: "/motoristas" },
   { id: "punicoes", grupo: "Cadastro", nome: "Punições", rota: "/punicoes", minimo: "gestor" },
   { id: "passageiros", grupo: "Cadastro", nome: "Clientes", rota: "/passageiros", antigas: ["/clientes"] },
+  { id: "consulta-cartoes", grupo: "Cadastro", secao: "Clientes", nome: "Consulta de cartões", rota: "/consulta-cartoes", minimo: "gestor" },
   { id: "ruas", grupo: "Cadastro", nome: "Ruas", rota: "/ruas", minimo: "gestor" },
   { id: "desafios", grupo: "Cadastro", nome: "Desafios", rota: "/desafios", minimo: "gestor" },
   { id: "destravar", grupo: "Cadastro", secao: EXTRA, nome: "Destravar Motoristas", rota: "/destravar" },
@@ -102,7 +104,10 @@ export const FUNCOES: Funcao[] = [
 
   { id: "avaliacoes", grupo: "Avaliações", nome: "NPS", rota: "/avaliacoes", antigas: ["/nps"] },
 
+  { id: "ajuda-termos", grupo: "Ajuda", nome: "Termos de uso", rota: "/ajuda-termos" },
   { id: "juridico", grupo: "Ajuda", nome: "Política de privacidade", rota: "/juridico" },
+  { id: "central-suporte", grupo: "Ajuda", nome: "Central de suporte", rota: "/central-suporte" },
+  { id: "ouvidoria", grupo: "Ajuda", nome: "Ouvidoria", rota: "/ouvidoria" },
   { id: "central-ajuda", grupo: "Ajuda", secao: EXTRA, nome: "Central de Ajuda", rota: "/central-ajuda" },
 
   // Cobrança entre centrais (grupo nosso, fora da Machine).
