@@ -83,7 +83,7 @@ interface DadosCarteira {
   saque?: { ativo: boolean; minimo: number; taxaFixa: number };
   saldo: number; recarga: string;
   extrato: Array<{ id?: string; valor: number; descricao: string; em: string }>;
-  saques?: Array<{ id?: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string }>;
+  saques?: Array<{ id?: string; taxa?: number; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string }>;
 }
 
 export function Carteira({ voltar }: { voltar: () => void }) {
@@ -118,6 +118,7 @@ export function Carteira({ voltar }: { voltar: () => void }) {
               <label className="campo"><span className="campo-rotulo">Chave Pix</span><span className="campo-caixa"><input value={pix} maxLength={120} onChange={(e) => setPix(e.target.value)} placeholder="CPF, celular, e-mail ou chave aleatória" /></span></label>
               <button className="botao-m" disabled={ocupado || !(v >= minimo) || v > d.saldo || pix.trim().length < 5}>RETIRAR</button>
               {v > d.saldo && <p className="dica">O valor é maior que o saldo.</p>}
+              {!!d.saque?.taxaFixa && <p className="dica">Taxa de saque: {reais(d.saque.taxaFixa)}.{v > d.saque.taxaFixa ? ` Você recebe ${reais(v - d.saque.taxaFixa)} no Pix.` : ""}</p>}
             </>
           )}
           <Erro texto={erroSaque} /><Info texto={ok} tipo="ok" />

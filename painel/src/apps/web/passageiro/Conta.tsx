@@ -8,6 +8,7 @@ import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../com
 import { ListaDeAvisos, useNaoLidos } from "../comum/Avisos";
 import { compartilharTexto, dataCurta, prepararFoto, quandoAgendada, type Eu, type Perfil } from "./apoio";
 import { GENEROS } from "./Entrar";
+import { useConfigDoPainel } from "../comum/ui";
 import { Avatar, Campo, TextoDoPainel } from "./pecas";
 import { NOMES_TEMA_APP, useTemaApp, type TemaApp } from "../comum/tema";
 
@@ -118,13 +119,14 @@ function Cupons() {
 
 /** Meus Cartões: hoje o app não guarda cartões; mostra as formas de pagamento que existem. */
 function Cartoes() {
+  const regras = useConfigDoPainel();
   const [formas, setFormas] = useState<string[] | null>(null);
   useEffect(() => { void api<{ pagamentos: string[] }>("/opcoes").then((r) => setFormas(r.pagamentos)).catch(() => setFormas([])); }, []);
   return (
     <>
       <Cartao>
         <strong>Cartões salvos no app</strong>
-        <p className="dica" style={{ margin: 0 }}>Ainda não é possível salvar cartão no app.{formas?.length ? ` Formas de pagamento disponíveis: ${formas.join(", ")}.` : ""}</p>
+        <p className="dica" style={{ margin: 0 }}>{regras?.pagamentos.cartaoApp.ativo ? "Cartão indisponível no momento: a empresa ligou o cartão no app, mas o pagamento por cartão ainda não foi liberado nesta versão do aplicativo." : "A empresa não oferece pagamento por cartão no app."}{formas?.length ? ` Formas de pagamento disponíveis: ${formas.join(", ")}.` : ""}</p>
       </Cartao>
     </>
   );

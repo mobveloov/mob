@@ -41,9 +41,9 @@ criar(E.id, cadastroPorId("clientes")!, { nome: "Cli", telefone: "11922220001", 
 const painel = (metodo: string, url: string, corpo?: unknown, tipo = "application/json") =>
   fetch(`${base}/api/config${url}`, { method: metodo, headers: { cookie, "content-type": tipo }, body: corpo === undefined ? undefined : corpo instanceof Uint8Array ? (corpo as unknown as BodyInit) : JSON.stringify(corpo) })
     .then(async (r) => ({ status: r.status, corpo: (await r.json().catch(() => ({}))) as Record<string, any> }));
-async function tokenApp(empresa: string, telefone: string) {
-  const c = await (await fetch(`${base}/api/apps/${empresa}/entrar/codigo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ papel: "passageiro", telefone }) })).json() as any;
-  const e = await (await fetch(`${base}/api/apps/${empresa}/entrar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ papel: "passageiro", telefone, codigo: c.codigoTeste }) })).json() as any;
+async function tokenApp(empresa: string, telefone: string, papel = "passageiro") {
+  const c = await (await fetch(`${base}/api/apps/${empresa}/entrar/codigo`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ papel, telefone }) })).json() as any;
+  const e = await (await fetch(`${base}/api/apps/${empresa}/entrar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ papel, telefone, codigo: c.codigoTeste }) })).json() as any;
   return e.token as string;
 }
 const doApp = async (empresa: string, token?: string) => {
@@ -74,7 +74,7 @@ test("muda no painel, o app recebe o novo valor (cores, veículo, estilo, recurs
   const t = await tokenApp(E.id, "11922220001");
   const antes = (await doApp(E.id, t)).corpo.versao;
   const s = await painel("PUT", "/personalizacao", { nome: "Meu App", corPrincipal: "#FF7000", veiculoMapa: "moderno", estiloTela: "marcante", marca: "texto",
-    recursos: [{ id: "anuncio", visivel: true }, { id: "destino", visivel: false }, { id: "cupons", visivel: true }] });
+    recursos: [{ id: "anuncio", visivel: true }, { id: "selecao_destino", visivel: false }, { id: "aviso_cupons", visivel: true }] });
   assert.equal(s.status, 200, JSON.stringify(s.corpo));
   const r = (await doApp(E.id, t)).corpo;
   assert.equal(r.empresa.nome, "Meu App");
@@ -83,9 +83,9 @@ test("muda no painel, o app recebe o novo valor (cores, veículo, estilo, recurs
   assert.equal(r.veiculoMapa.tipo, 1);
   assert.equal(r.veiculoMapa.diferenciaOcupado, true);
   assert.equal(r.design.estiloTela, "marcante");
-  assert.equal(r.recursos.destino, false);
-  assert.equal(r.recursos.cupons, true);
-  assert.deepEqual(r.telaInicial.ordemVisiveis, ["anuncio", "cupons", "mapa"], "no estilo marcante a ordem pedida vale; o que faltou entra no fim");
+  assert.equal(r.recursos.selecao_destino, false);
+  assert.equal(r.recursos.aviso_cupons, true);
+  assert.deepEqual(r.telaInicial.ordemVisiveis, ["anuncio", "aviso_cupons", "mapa"], "no estilo marcante a ordem pedida vale; o que faltou entra no fim");
   assert.notEqual(r.versao, antes);
 });
 
@@ -127,4 +127,39 @@ test("outra empresa não vê a personalização da primeira", async () => {
   const t2 = await tokenApp(E2.id, "11922220002");
   assert.equal((await doApp(E2.id, t2)).corpo.empresa.nome, "Pers Dois");
   assert.equal((await doApp(E.id, t2)).status, 401, "o token só vale na empresa em que foi criado");
+});
+
+test("app do motorista: rota própria com token de motorista, padrão, mudança no painel e logo por URL", async () => {
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Mot Teste", telefone: "11911110001", status: "Ativo" }, "teste");
+  const tm = await tokenApp(E.id, "11911110001", "motorista");
+  const tp = await tokenApp(E.id, "11922220001");
+  const url = `${base}/api/apps/${E.id}/personalizacao-motorista`;
+  assert.equal((await fetch(url)).status, 401);
+  assert.equal((await fetch(url, { headers: { authorization: `Bearer ${tp}` } })).status, 403, "passageiro não lê a do motorista");
+  const ler = async () => (await (await fetch(url, { headers: { authorization: `Bearer ${tm}` } })).json()) as Record<string, any>;
+  const a = await ler();
+  assert.equal(a.tema, "sistema");
+  assert.equal(a.recursos.iniciar, true);
+  assert.equal(a.recursos.saldo, true);
+  const s = await painel("PUT", "/personalizacao-motorista", { nome: "Motorista Up", corPrincipal: "#FFC400", tema: "escuro", veiculoMapa: "classico", estiloTela: "marcante", marca: "texto",
+    recursos: [{ id: "saldo", visivel: false }, { id: "iniciar", visivel: false }, { id: "rodape", visivel: false }, { id: "macaneta", visivel: false }] });
+  assert.equal(s.status, 200, JSON.stringify(s.corpo));
+  const b = await ler();
+  assert.equal(b.empresa.nome, "Motorista Up");
+  assert.equal(b.cores.principal, "#ffc400");
+  assert.equal(b.tema, "escuro");
+  assert.equal(b.veiculoMapa.tipo, 0);
+  assert.equal(b.recursos.saldo, false);
+  assert.equal(b.recursos.macaneta, false);
+  assert.equal(b.recursos.iniciar, true, "INICIAR e o rodapé não saem da tela");
+  assert.equal(b.recursos.rodape, true);
+  assert.notEqual(b.versao, a.versao);
+  assert.equal((await painel("PUT", "/personalizacao-motorista", { nome: "X", marca: "imagem" })).status, 400);
+  const up = await painel("POST", "/personalizacao-motorista/imagem", PNG(), "image/png");
+  assert.equal(up.status, 200, JSON.stringify(up.corpo));
+  assert.equal((await painel("PUT", "/personalizacao-motorista", { nome: "Motorista Up", marca: "imagem" })).status, 200);
+  const c = await ler();
+  assert.equal(c.design.mostrarImagem, true);
+  assert.match(c.design.imagemMarcaUrl, /personalizacaoMarcaMotorista\.png/);
+  assert.equal((await painel("GET", "/personalizacao")).corpo.imagemMarcaUrl, "", "a do passageiro é separada");
 });

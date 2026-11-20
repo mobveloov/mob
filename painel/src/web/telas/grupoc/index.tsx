@@ -5,11 +5,13 @@ import type { JSX } from "react";
 import "../demais/grupoc.css";
 import { AlterarOS } from "./AlterarOS";
 import { Personalizacao } from "./Personalizacao";
+import { PersonalizacaoMotorista } from "./PersonalizacaoMotorista";
 import { Recompensas } from "./Recompensas";
 
 export const TELAS_GRUPOC: Record<string, JSX.Element> = {
   "alterar-os": <AlterarOS />,
   "personalizacao-app": <Personalizacao />,
+  "personalizacao-motorista": <PersonalizacaoMotorista />,
   "indicacoes": <Recompensas />,
   "recompensas-indicacao": <Recompensas />,
 };

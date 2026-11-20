@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Building2, Camera, ChevronLeft, CircleHelp, Contact, Eye, EyeOff, Image as Imagem, Lock, Mail, MessageCircle, Search, ShieldCheck, Smartphone, UserRound, Users } from "lucide-react";
 import { api, guardarToken, urlArquivo } from "../comum/api";
-import { mensagemDeErro, ServidorTeste, type MarcaApp } from "../comum/ui";
+import { logoDaPersonalizacao, usePersonalizacao } from "../comum/personalizacao";
+import { Banners, mensagemDeErro, ServidorTeste, type MarcaApp } from "../comum/ui";
 import { apiOu, linkWhatsapp, prepararFoto, rotaFaltando } from "./apoio";
 import { Aviso, Campo, Carregando, FolhaModal, TextoDoPainel } from "./pecas";
 
@@ -24,7 +25,8 @@ export function mascaraTelefone(v: string) {
 }
 
 function Logo({ marca }: { marca: MarcaApp }) {
-  const src = urlArquivo(marca.logoEscuro || marca.logoClaro || marca.icone);
+  const pers = usePersonalizacao(); // a imagem da Personalização manda; sem ela, o logo da marca da empresa
+  const src = urlArquivo(logoDaPersonalizacao(pers) || marca.logoEscuro || marca.logoClaro || marca.icone);
   return src ? <img className="login-logo" src={src} alt={marca.nome} /> : <div className="login-logo-texto">{marca.nome}</div>;
 }
 
@@ -71,6 +73,7 @@ export function Entrar({ marca, aoEntrar }: { marca: MarcaApp; aoEntrar: () => v
         {passo === "esqueci" && <PassoEsqueci login={login} mascarado={mascarado} voltar={() => setPasso("login")} entrou={entrou} />}
         {passo === "codigo" && <PassoCodigo telefone={login} nome={nomeDepois} voltar={() => setPasso("login")} entrou={entrou} />}
       </div>
+      <div style={{ padding: "0 1rem" }}><Banners tipo="login" /></div>
       <div className="login-onda" aria-hidden="true" />
       <p className="login-rodape">Ao continuar, você concorda com os <button type="button" className="botao-link" onClick={() => setTexto("passageiro")}><b>Termos de Uso</b></button> e a <button type="button" className="botao-link" onClick={() => setTexto("privacidade")}><b>Privacidade</b></button>.</p>
       {texto && <TextoDoPainel tipo={texto} fechar={() => setTexto(null)} />}
@@ -290,6 +293,9 @@ function CriarConta({ login, cidade, whatsapp, voltar, entrou, semRota }: {
   const [genero, setGenero] = useState("");
   const [telefone, setTelefone] = useState(ehEmail(login) ? "" : mascaraTelefone(login));
   const [email, setEmail] = useState(ehEmail(login) ? login.trim().toLowerCase() : "");
+  const [cpf, setCpf] = useState("");
+  const [exigeCpf, setExigeCpf] = useState(false);
+  useEffect(() => { void apiOu<{ cpfObrigatorio: boolean }>("/regras-cadastro", { cpfObrigatorio: false }).then((r) => setExigeCpf(r.cpfObrigatorio)).catch(() => undefined); }, []);
   const [senha, setSenha] = useState("");
   const [senha2, setSenha2] = useState("");
   const [verSenha, setVerSenha] = useState(false);
@@ -298,6 +304,7 @@ function CriarConta({ login, cidade, whatsapp, voltar, entrou, semRota }: {
   useEffect(() => () => { if (previa) URL.revokeObjectURL(previa); }, [previa]);
 
   const faltando = !foto ? "Coloque uma foto de perfil." : nome.trim().split(/\s+/).length < 2 ? "Digite o nome completo." : !genero ? "Escolha o gênero."
+    : exigeCpf && soNumeros(cpf).length !== 11 ? "Digite o CPF (11 números)."
     : soNumeros(telefone).length < 10 ? "Digite o celular com DDD." : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? "Digite um e-mail válido."
     : senha.length < 6 ? "A senha precisa ter pelo menos 6 caracteres." : senha !== senha2 ? "As senhas não são iguais." : "";
 
@@ -306,7 +313,7 @@ function CriarConta({ login, cidade, whatsapp, voltar, entrou, semRota }: {
     setErro(""); setOcupado(true);
     try {
       const r = await api<{ token: string }>("/conta/criar", {
-        corpo: { papel: PAPEL, nome: nome.trim(), genero, telefone: soNumeros(telefone), email: email.trim().toLowerCase(), senha, cidadeId: cidade?.id },
+        corpo: { papel: PAPEL, nome: nome.trim(), genero, telefone: soNumeros(telefone), email: email.trim().toLowerCase(), senha, cidadeId: cidade?.id, cpf: soNumeros(cpf) || undefined },
       });
       guardarToken(r.token);
       if (foto) await api("/foto", { bruto: await prepararFoto(foto) }).catch(() => undefined);
@@ -342,6 +349,7 @@ function CriarConta({ login, cidade, whatsapp, voltar, entrou, semRota }: {
           <Campo rotulo="Celular (com DDD)" icone={<Smartphone size={20} />} obrigatorio travado={!ehEmail(login) && !!login}>
             <input inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" value={telefone} readOnly={!ehEmail(login) && !!login} onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} />
           </Campo>
+          {exigeCpf && <Campo rotulo="CPF" icone={<Contact size={20} />} obrigatorio><input inputMode="numeric" autoComplete="off" placeholder="000.000.000-00" value={cpf} maxLength={14} onChange={(e) => setCpf(e.target.value)} /></Campo>}
           <Campo rotulo="E-mail" icone={<Mail size={20} />} obrigatorio travado={ehEmail(login)}>
             <input type="email" inputMode="email" autoComplete="email" placeholder="voce@exemplo.com" value={email} readOnly={ehEmail(login)} onChange={(e) => setEmail(e.target.value)} />
           </Campo>

@@ -15,6 +15,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { assuntosDeOcorrencia, configDosApps, tiposDeDocumento } from "../config/apps.ts";
 import { pagamentos as pagamentosDoPainel } from "../config/pagamentos.ts";
 import { gerais } from "../config/gerais.ts";
+import { carteiraParaApp } from "../config/carteiras-credito.ts";
 import { mensagensDaPessoa, receberDaPessoa } from "../config/comunicacao.ts";
 import { criar, listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, avaliarPassageiro, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
@@ -311,7 +312,7 @@ export function conferirPagamento(empresaId: string, telefone: string, pagamento
 
 // ------------------------------------------------------------------ saques do motorista
 
-export interface Saque { id: string; motoristaId: string; nome: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string; resolvidoEm: string | null; resolvidoPor: string }
+export interface Saque { id: string; motoristaId: string; nome: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string; resolvidoEm: string | null; resolvidoPor: string; /** Taxa fixa do saque (Integrações › Pagamentos): fica com a central; o Pix sai de valor menos taxa. */ taxa?: number }
 
 /** Regras de saque e de recarga do motorista: Configurações › Integrações › Pagamentos. */
 export function regrasDeSaque(empresaId: string) {
@@ -327,10 +328,11 @@ export function pedirSaque(empresaId: string, motoristaId: string, nome: string,
   if (!regra.ativo) throw new Error("Os saques estão desligados no momento. Fale com a central.");
   if (!(v >= regra.minimo) || !(v > 0)) throw new Error(`O saque mínimo é ${reaisTexto(regra.minimo)}.`);
   if (pix.length < 5) throw new Error("Informe a chave Pix.");
+  if (regra.taxaFixa >= v) throw new Error(`O valor precisa ser maior que a taxa de saque de ${reaisTexto(regra.taxaFixa)}.`);
   return transacao(() => {
     if (saldo(empresaId, "motorista", motoristaId) < v) throw new Error("Saldo insuficiente para este saque.");
     if (banco().prepare("SELECT 1 FROM saques WHERE empresa = ? AND motorista = ? AND situacao = 'Pendente'").get(empresaId, motoristaId)) throw new Error("Você já tem um saque esperando a central.");
-    const s: Saque = { id: crypto.randomUUID(), motoristaId, nome: nome.slice(0, 80), valor: v, chavePix: pix, situacao: "Pendente", motivo: "", em: agoraBr().toISOString(), resolvidoEm: null, resolvidoPor: "" };
+    const s: Saque = { id: crypto.randomUUID(), motoristaId, nome: nome.slice(0, 80), valor: v, chavePix: pix, situacao: "Pendente", motivo: "", em: agoraBr().toISOString(), resolvidoEm: null, resolvidoPor: "", ...(regra.taxaFixa > 0 ? { taxa: regra.taxaFixa } : {}) };
     banco().prepare("INSERT INTO saques (empresa, id, motorista, situacao, em, dados) VALUES (?, ?, ?, ?, ?, ?)").run(empresaId, s.id, motoristaId, s.situacao, s.em, JSON.stringify(s));
     // O valor fica reservado (sai do saldo agora; volta se a central recusar).
     lancar(empresaId, "motorista", motoristaId, -v, "Saque solicitado (Pix)", "app do motorista");
@@ -677,6 +679,8 @@ rotasExtras.get("/carteira", ok((req, res) => {
     saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave),
     saques: sessao.papel === "motorista" ? saques(empresaId, sessao.chave) : undefined,
     saque: sessao.papel === "motorista" ? regrasDeSaque(empresaId) : undefined,
+    // Configurações › Carteiras de crédito: o que aparece na carteira do motorista (recarga, saque, telefone, presencial) e o aviso de saldo baixo.
+    ...(sessao.papel === "motorista" ? carteiraParaApp(empresaId, saldo(empresaId, sessao.papel, sessao.chave)) : {}),
     recargaRegras: (() => { const r = pagamentosDoPainel(empresaId).recarga; return sessao.papel === "motorista" ? { ativa: r.motorista, minimo: r.minimoMotorista } : { ativa: r.passageiro, minimo: r.minimoPassageiro }; })(),
     recarga: `Depois de pedir o depósito, a central confirma e o valor entra no seu saldo${m.textos.suporteTelefone ? `. Dúvidas: ${m.textos.suporteTelefone}` : ""}.`,
   });

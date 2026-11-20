@@ -21,12 +21,22 @@ function carregar(): Ajustes {
 }
 
 let atual = carregar();
+let escolheuTema = (() => { try { return "tema" in (JSON.parse(localStorage.getItem(CHAVE) ?? "{}") as object); } catch { return false; } })();
 const ouvintes = new Set<() => void>();
 
 export const ajustes = () => atual;
+
+/** Tema que a empresa escolheu na Personalização: vale enquanto o motorista não escolheu o dele (o dele, guardado no aparelho, manda). */
+export function temaPadraoDaEmpresa(t: Tema) {
+  if (escolheuTema || atual.tema === t) return;
+  atual = { ...atual, tema: t };
+  aplicarTema();
+  ouvintes.forEach((f) => f());
+}
 export function mudarAjustes(p: Partial<Ajustes>) {
   atual = { ...atual, ...p };
-  try { localStorage.setItem(CHAVE, JSON.stringify(atual)); } catch { /* sem armazenamento */ }
+  if (p.tema) escolheuTema = true;
+  try { const { tema, ...resto } = atual; localStorage.setItem(CHAVE, JSON.stringify(escolheuTema ? atual : resto)); } catch { /* sem armazenamento */ }
   aplicarTema();
   ouvintes.forEach((f) => f());
 }
