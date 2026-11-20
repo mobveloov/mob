@@ -4,7 +4,7 @@ import express, { type Request, type Response } from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { GRUPO_TEXTO, type Filtro, type GrupoStatus } from "../comum/corrida.ts";
-import { sanearMarca, TIPOS_ARQUIVO, type TipoArquivo } from "../comum/marca.ts";
+import { sanearMarca, imagemDaEmpresa, TIPOS_ARQUIVO, type TipoArquivo } from "../comum/marca.ts";
 import { situacaoIa, VARIAVEL_CHAVE } from "../ia/roteador.ts";
 import { analisarComIa, responderPergunta } from "../analise/analise.ts";
 import { calcular } from "../analise/estatisticas.ts";
@@ -123,7 +123,8 @@ app.get("/api/publico/arquivo/:empresa/:nome", ok((req, res) => {
 app.get("/manifest.webmanifest", ok((req, res) => {
   const e = empresaPublica(req);
   const m = e ? D.marca(e.id) : sanearMarca({});
-  const icone = e && m.arquivos.iconeApp ? `/api/publico/arquivo/${e.id}/${m.arquivos.iconeApp}` : null;
+  const imgIcone = m.arquivos.iconeApp || imagemDaEmpresa(m.arquivos);
+  const icone = e && imgIcone ? `/api/publico/arquivo/${e.id}/${imgIcone}` : null;
   res.type("application/manifest+json").json({
     name: m.produto, short_name: m.app.nome || m.produto, start_url: "/", display: "standalone",
     background_color: m.cores.fundo, theme_color: m.cores.primaria, lang: "pt-BR",

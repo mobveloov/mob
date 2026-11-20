@@ -91,10 +91,10 @@ export const api = {
   relatorio: (filtro: Filtro) => pedir<Relatorio>("/api/relatorio", json("POST", { filtro })),
   perguntar: (filtro: Filtro, pergunta: string) => pedir<{ resposta: string }>("/api/perguntar", json("POST", { filtro, pergunta })),
   salvarMarca: (m: Marca) => pedir<{ marca: Marca }>("/api/marca", json("PUT", m)),
-  enviarImagem: (tipo: string, arq: File) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }),
-  enviarFotoEmpresa: (arq: File) => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }),
-  apagarFotoEmpresa: () => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "DELETE" }),
-  apagarImagem: (tipo: string) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "DELETE" }),
+  enviarImagem: (tipo: string, arq: File) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }).then(depoisDeImagem),
+  enviarFotoEmpresa: (arq: File) => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "POST", headers: { "Content-Type": arq.type || "application/octet-stream" }, body: arq }).then(depoisDeImagem),
+  apagarFotoEmpresa: () => pedir<{ marca: Marca }>("/api/empresa/foto", { method: "DELETE" }).then(depoisDeImagem),
+  apagarImagem: (tipo: string) => pedir<{ marca: Marca }>(`/api/marca/arquivo?tipo=${tipo}`, { method: "DELETE" }).then(depoisDeImagem),
   integracoes: () => pedir<Integracoes>("/api/integracoes"),
   novaIntegracao: (tipo: string) => pedir("/api/integracoes", json("POST", { tipo })),
   salvarIntegracao: (id: string, d: { nome?: string; ativa?: boolean; credenciais?: Record<string, string> }) => pedir(`/api/integracoes/${id}`, json("PUT", d)),
@@ -116,7 +116,10 @@ export const api = {
   cancelarCorridaPropria: (id: string, quem: string, motivo: string) => pedir(`/api/corridas-proprias/${id}/cancelar`, json("POST", { quem, motivo })),
 };
 
-export const urlImagem = (empresaId: string, nome: string) => (nome ? `/api/publico/arquivo/${empresaId}/${nome}?v=${encodeURIComponent(nome)}` : "");
+// A versão muda a cada envio/remoção de imagem: trocar a logo pelo mesmo nome de arquivo não fica preso no cache do navegador.
+let versaoImagens = 0;
+const depoisDeImagem = <T,>(r: T): T => { versaoImagens = Date.now(); return r; };
+export const urlImagem = (empresaId: string, nome: string) => (nome ? `/api/publico/arquivo/${empresaId}/${nome}?v=${encodeURIComponent(nome)}${versaoImagens ? "." + versaoImagens : ""}` : "");
 
 // ---------- formatos (as datas já vêm em horário de Brasília guardado como UTC: mostrar com timeZone "UTC")
 

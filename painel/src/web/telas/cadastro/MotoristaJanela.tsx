@@ -118,7 +118,7 @@ export default function MotoristaJanela({ id, onFechar, onSalvo, cidades, catego
   const st = det?.status;
 
   return (
-    <Janela aberta titulo={novo ? "Novo Motorista" : nome || "Motorista"} sub={novo ? "Criando Motorista" : "Alterando Motorista"} onFechar={onFechar} largura="grande"
+    <Janela cheia aberta titulo={novo ? "Novo Motorista" : nome || "Motorista"} sub={novo ? "Criando Motorista" : "Alterando Motorista"} onFechar={onFechar} largura="grande"
       abas={<Abas itens={abas} valor={aba} onChange={setAba} />}
       rodape={<>
         {!novo && <button className="cg-botao perigo" style={{ marginRight: "auto" }} onClick={() => void excluir()}>Excluir</button>}

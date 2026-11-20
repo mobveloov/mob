@@ -1,5 +1,5 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useState } from "react";
-import { MARCA_PADRAO, variaveisTema, type Marca } from "../comum/marca.ts";
+import { MARCA_PADRAO, imagemDaEmpresa, variaveisTema, type Marca } from "../comum/marca.ts";
 import { api, ErroApi, escolherEmpresa, urlImagem, type Sessao } from "./api";
 import Entrar from "./paginas/Entrar";
 import { useSecurityShield } from "./useSecurityShield";
@@ -27,10 +27,17 @@ export function aplicarMarca(m: Marca, empresaId: string | null, escuro: boolean
   let link = document.getElementById(idFonte) as HTMLLinkElement | null;
   if (!link) { link = document.createElement("link"); link.id = idFonte; link.rel = "stylesheet"; document.head.appendChild(link); }
   link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(m.fonte).replace(/%20/g, "+")}:wght@400;500;600;700;800&display=swap`;
-  const fav = document.getElementById("favicon") as HTMLLinkElement | null;
-  if (fav) fav.href = empresaId && m.arquivos.favicon ? urlImagem(empresaId, m.arquivos.favicon) : "data:,";
+  // Ícone da aba e manifest seguem a imagem da empresa; ao trocar, o link é recriado para o navegador não usar o antigo.
+  const img = empresaId ? imagemDaEmpresa(m.arquivos) : "";
+  const href = img && empresaId ? urlImagem(empresaId, img) : "data:,";
+  const antigo = document.getElementById("favicon") as HTMLLinkElement | null;
+  if (!antigo || antigo.getAttribute("href") !== href) {
+    const novo = document.createElement("link");
+    novo.rel = "icon"; novo.id = "favicon"; novo.href = href;
+    if (antigo) antigo.replaceWith(novo); else document.head.appendChild(novo);
+  }
   const man = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
-  if (man && empresaId) man.href = `/manifest.webmanifest?empresa=${empresaId}`;
+  if (man && empresaId) man.href = `/manifest.webmanifest?empresa=${empresaId}&v=${encodeURIComponent(img)}`;
 }
 
 function usaEscuro(m: Marca): boolean {
