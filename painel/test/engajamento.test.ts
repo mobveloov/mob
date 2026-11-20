@@ -168,9 +168,15 @@ test("ações: mensagem e mudança de situação ficam no histórico; operador n
   assert.equal((await pedir("/acao", { corpo: { papel: "motoristas", indicador: "corridas", faixa: 0, tipo: "status", status: "Inativo" }, cookie: co })).status, 400);
   assert.equal((await pedir("/acao", { corpo: { papel: "passageiros", indicador: "solicitacoes", faixa: 2, tipo: "mensagem", texto: "x" }, cookie: ca })).status, 400, "faixa vazia");
   assert.equal((await pedir("/acao", { corpo: { papel: "passageiros", indicador: "solicitacoes", faixa: 1, tipo: "desafio", titulo: "t", texto: "x" }, cookie: ca })).status, 400, "desafio é só de motorista");
+  const pun = { papel: "motoristas", indicador: "corridas", faixa: 0, tipo: "punir", tempo: 2, unidade: "horas", motivo: "Recusas seguidas" };
+  assert.equal((await pedir("/acao", { corpo: pun, cookie: co })).status, 400, "operador não pune");
+  assert.equal((await pedir("/acao", { corpo: { ...pun, motivo: "" }, cookie: ca })).status, 400, "motivo obrigatório");
+  assert.equal((await pedir("/acao", { corpo: { ...pun, papel: "passageiros", indicador: "solicitacoes", faixa: 1 }, cookie: ca })).status, 400, "só motorista");
+  const punido = await pedir("/acao", { corpo: pun, cookie: ca });
+  assert.equal(punido.status, 200, punido.texto);
   const h = await pedir("/historico", { cookie: ca });
-  assert.equal(h.corpo.acoes.length, 1);
-  assert.equal(h.corpo.acoes[0].tipo, "mensagem");
+  assert.equal(h.corpo.acoes.length, 2);
+  assert.equal(h.corpo.acoes[0].tipo, "punir");
   assert.equal((await pedir("/historico", { cookie: cb })).corpo.acoes.length, 0);
   const alt = await pedir("/acao", { corpo: { papel: "motoristas", indicador: "corridas", faixa: 0, tipo: "status", status: "Inativo" }, cookie: ca });
   assert.equal(alt.status, 200, alt.texto);

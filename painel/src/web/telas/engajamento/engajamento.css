@@ -138,3 +138,4 @@
 :root[data-theme="dark"] .me-pill { color: var(--pc-escuro); }
 
 .me-config .me-regua { height: 200px; flex: none; }
+.me-menu__item--perigo { color: #ef4444; }
