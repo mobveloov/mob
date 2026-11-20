@@ -205,7 +205,7 @@ export function InformacoesDaCorrida({ ganho: c, voltar }: Voltar & { ganho: Gan
 interface DadosCarteira { saldo: number; extrato: Array<{ id?: string; valor: number; descricao: string; em: string; corridaId?: string | null }> }
 
 /** Recarregar saldo: o motorista deposita crédito para a central descontar as taxas das corridas (não é saque). O pedido vai para a central, que confirma o depósito e credita na carteira. */
-function RecargaDeSaldo({ saldo, instrucao, minimo = 10, voltar }: { saldo: number | undefined; instrucao: string; minimo?: number; voltar: () => void }) {
+function RecargaDeSaldo({ saldo, instrucao, minimo, voltar }: { saldo: number | undefined; instrucao: string; minimo: number; voltar: () => void }) {
   const [valor, setValor] = useState("");
   const [erro, setErro] = useState(""), [ok, setOk] = useState(""), [ocupado, setOcupado] = useState(false);
   const v = Number(valor.replace(",", "."));
@@ -227,8 +227,8 @@ function RecargaDeSaldo({ saldo, instrucao, minimo = 10, voltar }: { saldo: numb
         </section>
         <form className="cartao-m" onSubmit={(e) => { e.preventDefault(); void depositar(); }}>
           <h3 className="titulo-secao">Depositar</h3>
-          <label className="campo"><span className="campo-rotulo">Valor do depósito (mínimo {reais(minimo)})</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
-          <button className="botao-m" disabled={ocupado || !(v >= minimo)}>DEPOSITAR</button>
+          <label className="campo"><span className="campo-rotulo">Valor do depósito{minimo > 0 ? ` (mínimo ${reais(minimo)})` : ""}</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
+          <button className="botao-m" disabled={ocupado || !(v > 0 && v >= minimo)}>DEPOSITAR</button>
           {instrucao && <p className="dica">{instrucao}</p>}
           <Erro texto={erro} /><Info texto={ok} tipo="ok" />
         </form>
@@ -238,10 +238,10 @@ function RecargaDeSaldo({ saldo, instrucao, minimo = 10, voltar }: { saldo: numb
 }
 
 export function CarteiraDoMotorista({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string; minimoSaque?: number }>("/carteira");
+  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string; recargaRegras?: { ativa: boolean; minimo: number } }>("/carteira");
   const [tela, setTela] = useState<"" | "recarregar" | "retirar">("");
   if (tela === "retirar") return <CarteiraAntiga voltar={() => setTela("")} />;
-  if (tela === "recarregar") return <RecargaDeSaldo saldo={dados?.saldo} instrucao={dados?.recarga ?? ""} minimo={dados?.minimoSaque} voltar={() => setTela("")} />;
+  if (tela === "recarregar") return <RecargaDeSaldo saldo={dados?.saldo} instrucao={dados?.recarga ?? ""} minimo={dados?.recargaRegras?.minimo ?? 0} voltar={() => setTela("")} />;
   return (
     <Pagina>
       <Topo estilo="esquerda" titulo="Carteira" voltar={voltar} />

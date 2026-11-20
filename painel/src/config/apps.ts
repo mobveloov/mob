@@ -1,5 +1,6 @@
 // O que o servidor dos apps lê das configurações da empresa: um lugar só (Config › Gerais do App, NPS, Categorias, Integrações).
 
+import { cadastroPorId } from "../comum/cadastros.ts";
 import { categoriasCompletas } from "./categorias.ts";
 import { configNps } from "./avaliacoes.ts";
 import { gerais, termos } from "./gerais.ts";
@@ -11,6 +12,8 @@ export function tiposDeDocumento(empresaId: string): Record<string, string> {
   return Object.fromEntries(gerais(empresaId).motorista.documentos.map((d) => [d.id, d.nome]));
 }
 
+export const assuntosDeOcorrencia = (): string[] => cadastroPorId("ocorrencias")?.campos.find((c) => c.chave === "assunto")?.opcoes ?? ["Outro"];
+
 export function configDosApps(empresaId: string) {
   const g = gerais(empresaId), p = pagamentos(empresaId), t = termos(empresaId);
   return {
@@ -20,6 +23,8 @@ export function configDosApps(empresaId: string) {
     contatos: { whatsapp: g.suporte.whatsapp, telefone: g.suporte.telefone, linkAjuda: g.suporte.linkAjuda },
     documentosExigidos: g.motorista.documentos.map((d) => ({ id: d.id, nome: d.nome, alvo: d.alvo, validade: d.validade, exigir: d.exigir })),
     mensagensRapidas: g.motorista.mensagensRapidas,
+    /** Assuntos da reclamação do passageiro: as opções do campo Assunto de Retorno e ocorrências. */
+    assuntosDeOcorrencia: assuntosDeOcorrencia(),
     etiquetasAvaliacao: configNps(empresaId, "passageiro").etiquetas,
     opcionais: g.preferencias.filter((x) => x.ativo && x.tipo === "exigencia").map((x) => x.nome),
     formasDePagamento: g.preferencias.filter((x) => x.ativo && x.tipo === "pagamento").map((x) => x.nome).filter((n) => p.metodos[n] !== false),

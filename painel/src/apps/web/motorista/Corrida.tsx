@@ -8,7 +8,7 @@ import {
   ArrowUp, BadgeCheck, Share2, CornerUpLeft, CornerUpRight, Moon, ShieldAlert, Star, Sun, Undo2, Volume2, VolumeX, X,
 } from "lucide-react";
 import { api, reais, type Posicao } from "../comum/api";
-import { Estrelas, mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { Estrelas, mensagemDeErro, useConfigDoPainel, type MarcaApp } from "../comum/ui";
 import { falar, linkNavegar, useAjustes } from "./ajustes";
 import { Mapa, type PontoMapa } from "./Mapa";
 import { textoMetros, useNavegacao } from "./Navegacao";
@@ -102,7 +102,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   const passouParada = () => { const n = parada + 1; setParada(n); gravarParada(c.id, n); };
   const [motivos, setMotivos] = useState<string[]>([]);
   const [motivo, setMotivo] = useState("");
-  useEffect(() => { if (folha === "cancelar" && !motivos.length) void api<{ motivos: string[] }>("/motivos-cancelamento").then((r) => setMotivos(r.motivos)).catch(() => setMotivos(["Passageiro não apareceu", "Problema no veículo", "Outro motivo"])); }, [folha]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (folha === "cancelar" && !motivos.length) void api<{ motivos: string[] }>("/motivos-cancelamento").then((r) => setMotivos(r.motivos)).catch(() => setMotivos([])); }, [folha]); // eslint-disable-line react-hooks/exhaustive-deps
   const cancelar = async () => {
     const desistir = c.status === "a_caminho";
     try {
@@ -111,7 +111,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
     } catch (e) { setErro(mensagemDeErro(e)); }
     setFolha("");
   };
-  const PROBLEMAS = ["Passageiro difícil ou agressivo", "Endereço errado ou local perigoso", "Problema no veículo", "Problema no aplicativo", "Cobrança ou pagamento", "Outro problema"];
+  const PROBLEMAS = useConfigDoPainel()?.motorista.problemasNaCorrida ?? [];
   const avisarProblema = async (tipo: string) => {
     try {
       await api("/suporte", { corpo: { texto: `Problema na corrida OS ${c.os} (${c.passageiro.nome}): ${tipo}.` } });
