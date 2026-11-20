@@ -33,7 +33,7 @@ import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
 import { registrarCotacao } from "../operacao/radar.ts";
-import { entrar, eu, pedirCodigo, sair, salvarGeneroPassageiro, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
+import { entrar, eu, pedirCodigo, registrarContato, sair, salvarGeneroPassageiro, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
 export const rotasApps = express.Router();
 export const rotasAppsCentral = express.Router();
@@ -74,6 +74,7 @@ function exigirApp(req: Request, res: Response, next: NextFunction) {
   const s = sessaoDoToken(req.params.empresa, token);
   if (!s) return res.status(401).json({ erro: "Entre de novo." });
   req.app_ = { empresaId: req.params.empresa, sessao: s, token };
+  registrarContato(req.params.empresa, s.papel, s.chave);
   if (s.papel === "motorista") P.marcarVisto(req.params.empresa, s.chave); // ainda está com o app aberto
   next();
 }

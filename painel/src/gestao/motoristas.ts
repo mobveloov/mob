@@ -3,7 +3,10 @@
 // Lista com filtros e contadores por situação, janela do motorista (Geral, Veículos, Financeiro, Documentos,
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
+import { gerais } from "../config/gerais.ts";
+import { comSessaoRecente, ultimosContatos } from "../apps/sessoes.ts";
 import { podeCargo } from "../comum/cargos.ts";
+import { espelharCamposDoMotorista, visaoDoMotorista } from "../comum/motorista-campos.ts";
 import express, { type Request as Req, type Router } from "express";
 import { PAGAMENTOS_MACHINE, SITUACOES_MOTORISTA } from "../comum/cadastros.ts";
 import { atualizar, criar, remover, type Registro } from "../cadastros/armazem.ts";
@@ -11,7 +14,7 @@ import { cancelarCorrida, listarProprias } from "../corridas/index.ts";
 import { estaOnline, ficarOffline } from "../apps/despacho.ts";
 import { ajustes } from "../apps/ajustes.ts";
 import { arquivo, ler } from "../apps/armazem.ts";
-import { enviarDocumento, extrato, lancar, pessoa, removerDocumento, salvarPessoa, saldo, saldos, TIPOS_DOCUMENTO, MAX_DOC } from "../apps/extras.ts";
+import { documentosObrigatorios, enviarDocumento, extrato, lancar, pessoa, removerDocumento, salvarPessoa, saldo, saldos, TIPOS_DOCUMENTO, MAX_DOC } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
 import { agoraBr, arred, celulaCsv, normal } from "../servidor/util.ts";
 import { conferir, cepValido, cpfValido, emailValido, placaValida, renavamValido, soDigitos, telefoneValido, UFS } from "./validacao.ts";
@@ -55,7 +58,7 @@ function veiculosPorMotorista(empresaId: string) {
   return m;
 }
 
-function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<string, Registro[]>; saldo: Map<string, number>; tokens: Set<string> }) {
+function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<string, Registro[]>; saldo: Map<string, number>; tokens: Set<string>; contatos: Map<string, number>; sessoes: Set<string>; desde: number }) {
   const doMot = ctx.veiculos.get(m.id) ?? [];
   const ativo = doMot.find((v) => v.emUso === true);
   return {
@@ -66,13 +69,15 @@ function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<str
     viatura: String(m.viatura ?? ""), categorias: String(m.categorias ?? ""), validadeCnh: m.validadeCnh ?? null, cnh: situacaoCnh(m.validadeCnh),
     validadeLicenciamento: (ativo?.validadeLicenciamento ?? m.validadeLicenciamento ?? null) as string | null, tipoVinculo: String(m.tipoVinculo ?? ""),
     criadoEm: m.criadoEm,
-    diagnostico: { online: estaOnline(empresaId, m.id), app: ctx.tokens.has(m.id), fantasma: m.fantasma === true, versao: null as string | null },
+    diagnostico: { online: estaOnline(empresaId, m.id), app: ctx.tokens.has(m.id) || ctx.sessoes.has(m.id) || (ctx.contatos.get(m.id) ?? 0) >= ctx.desde, ultimoContato: ctx.contatos.get(m.id) ? new Date(ctx.contatos.get(m.id)!).toISOString() : null, fantasma: m.fantasma === true, versao: null as string | null },
   };
 }
 
 function contexto(empresaId: string) {
+  const dias = gerais(empresaId).motorista.diasSemContatoApp, desde = Date.now() - dias * 86_400_000;
+  const contatos = ultimosContatos(empresaId, "motorista"), sessoes = comSessaoRecente(empresaId, "motorista", desde);
   const tokens = new Set(ler<Array<{ papel: string; chave: string }>>(arquivo(empresaId, "push.json"), []).filter((t) => t.papel === "motorista").map((t) => t.chave));
-  return { veiculos: veiculosPorMotorista(empresaId), saldo: new Map(saldos(empresaId).filter((s) => s.papel === "motorista").map((s) => [s.chave, s.saldo])), tokens };
+  return { veiculos: veiculosPorMotorista(empresaId), saldo: new Map(saldos(empresaId).filter((s) => s.papel === "motorista").map((s) => [s.chave, s.saldo])), tokens, contatos, sessoes, desde };
 }
 
 /** Lista de motoristas com os filtros da tela. */
@@ -121,7 +126,7 @@ function juntar(anterior: Registro | null, dados: Record<string, unknown>, campo
   for (const k of campos) if (k in dados) novo[k] = dados[k];
   return novo;
 }
-const CAMPOS_MOTORISTA = ["cidade", "nome", "cpf", "telefone", "email", "nascimento", "genero", "nivel", "endereco", "numero", "cep", "bairro", "chavePix", "viatura", "cnhNumero", "validadeCnh", "status", "fantasma", "cobranca", "cobrancaTipo", "cobrancaValor", "categorias", "observacao",
+const CAMPOS_MOTORISTA = ["cidade", "nome", "cpf", "telefone", "email", "nascimento", "genero", "nivel", "endereco", "rua", "cnh", "numero", "cep", "bairro", "chavePix", "viatura", "cnhNumero", "validadeCnh", "status", "fantasma", "cobranca", "cobrancaTipo", "cobrancaValor", "categorias", "observacao",
   "tipoVinculo", "semNumero", "complemento", "uf", "referencia", "informacoesAdicionais", "tipoChavePix", "obsInterna1", "obsInterna2", "obsInterna3",
   "bancoCpfTitular", "bancoNomeTitular", "ocupacao", "renda", "bancoNumero", "bancoAgencia", "bancoConta", "bancoContaDv", "aceitaPagamentos", "validadeLicenciamento"];
 /** Dados bancários e Pix: só o administrador grava e o operador vê a conta mascarada. */
@@ -197,7 +202,8 @@ export function rotasMotoristas(r: Router) {
     const corridas = listarProprias(e).filter((x) => x.motoristaId === m.id);
     const p = pessoa(e, "motorista", m.id);
     const admin = ehAdmin(req);
-    const motorista: Registro = admin ? m : { ...m, bancoConta: mascarar(m.bancoConta) as never, bancoCpfTitular: mascarar(m.bancoCpfTitular) as never, bancoAgencia: mascarar(m.bancoAgencia) as never };
+    const visto = visaoDoMotorista(m);
+    const motorista: Registro = admin ? visto : { ...visto, bancoConta: mascarar(m.bancoConta) as never, bancoCpfTitular: mascarar(m.bancoCpfTitular) as never, bancoAgencia: mascarar(m.bancoAgencia) as never };
     const punicao = punicoesEmVigor(e).filter((x) => x.motoristaId === m.id).sort((a, b) => b.fim.localeCompare(a.fim))[0];
     const avaliadas = corridas.filter((x) => typeof x.avaliacao === "number");
     const ultima = [...corridas].sort((a, b) => b.solicitadaEm.localeCompare(a.solicitadaEm))[0];
@@ -223,7 +229,7 @@ export function rotasMotoristas(r: Router) {
       padrao: creditosPadrao(e),
       cerca: c.cerca,
       veiculos: veiculosPorMotorista(e).get(m.id) ?? [],
-      documentos: Object.entries(TIPOS_DOCUMENTO).map(([tipo, nome]) => ({ tipo, nome, ...(p.documentos[tipo] ? { situacao: p.documentos[tipo].situacao, motivo: p.documentos[tipo].motivo, em: p.documentos[tipo].em, enviado: true } : { situacao: "Pendente", enviado: false }) })),
+      documentos: Object.entries(TIPOS_DOCUMENTO).map(([tipo, nome]) => ({ tipo, nome, obrigatorio: documentosObrigatorios(e).includes(tipo), ...(p.documentos[tipo] ? { situacao: p.documentos[tipo].situacao, motivo: p.documentos[tipo].motivo, em: p.documentos[tipo].em, enviado: true } : { situacao: "Pendente", enviado: false }) })),
       resumo: { finalizadas: corridas.filter((x) => x.status === "finalizada").length, versaoApp: null, aceitacao: null, online: estaOnline(e, m.id) },
       creditos: situacaoCreditos(e, m.id),
     });
@@ -261,7 +267,7 @@ export function rotasMotoristas(r: Router) {
   r.post("/motoristas", ok((req, res) => {
     const e = emp(req), b = (req.body ?? {}) as Record<string, unknown>;
     const entrada = semFinanceiro(req, { ...((b.dados ?? {}) as Record<string, unknown>) });
-    validarMotorista(entrada, null, true); normalizarMotorista(entrada); cpfRepetido(e, entrada.cpf);
+    validarMotorista(entrada, null, true); normalizarMotorista(entrada); espelharCamposDoMotorista(entrada); cpfRepetido(e, entrada.cpf);
     const dados = juntar(null, entrada, CAMPOS_MOTORISTA);
     if (!dados.status) dados.status = "Em análise";
     dados.statusMudouEm = new Date().toISOString();
@@ -274,7 +280,7 @@ export function rotasMotoristas(r: Router) {
   r.put("/motoristas/:id", ok((req, res) => {
     const e = emp(req), anterior = achar(e, req.params.id), b = (req.body ?? {}) as Record<string, unknown>;
     const entrada = semFinanceiro(req, { ...((b.dados ?? {}) as Record<string, unknown>) });
-    validarMotorista(entrada, anterior, false); normalizarMotorista(entrada);
+    validarMotorista(entrada, anterior, false); normalizarMotorista(entrada); espelharCamposDoMotorista(entrada);
     if ("cpf" in entrada) cpfRepetido(e, entrada.cpf, anterior.id);
     const dados = juntar(anterior, entrada, CAMPOS_MOTORISTA);
     if ("status" in entrada && entrada.status !== anterior.status) dados.statusMudouEm = new Date().toISOString();
@@ -466,7 +472,7 @@ export function rotasMotoristas(r: Router) {
     const m = achar(e, String(b.motoristaId ?? ""));
     const jaTem = registros(e, "veiculos").some((v) => v.motoristaId === m.id && v.emUso === true);
     const extra = dadosDoVeiculo(b);
-    const v = criar(e, cad("veiculos"), { ...extra, placa: placaNormal(b.placa), modelo: b.modelo, cor: b.cor, ano: b.ano, categoria: b.categoria, motorista: m.nome, motoristaId: m.id, emUso: !jaTem, status: "Ativo" }, quem(req));
+    const v = criar(e, cad("veiculos"), { ...extra, placa: placaNormal(b.placa), marca: b.marca, modelo: b.modelo, cor: b.cor, ano: b.ano, categoria: b.categoria, motorista: m.nome, motoristaId: m.id, emUso: !jaTem, status: "Ativo" }, quem(req));
     if (!jaTem) sincronizarMotorista(e, m, v, quem(req));
     res.json({ veiculo: v });
   }));
@@ -476,7 +482,7 @@ export function rotasMotoristas(r: Router) {
     const e = emp(req), b = req.body ?? {};
     const v = registros(e, "veiculos").find((x) => x.id === req.params.id);
     if (!v) throw new Error("Veículo não encontrado.");
-    const novo = atualizar(e, cad("veiculos"), v.id, { ...v, ...dadosDoVeiculo(b, true), ...(b.placa != null ? { placa: placaNormal(b.placa) } : {}), ...Object.fromEntries(["modelo", "cor", "ano", "categoria"].filter((k) => k in b).map((k) => [k, b[k]])) }, quem(req));
+    const novo = atualizar(e, cad("veiculos"), v.id, { ...v, ...dadosDoVeiculo(b, true), ...(b.placa != null ? { placa: placaNormal(b.placa) } : {}), ...Object.fromEntries(["marca", "modelo", "cor", "ano", "categoria"].filter((k) => k in b).map((k) => [k, b[k]])) }, quem(req));
     const m = novo.emUso === true ? registros(e, "motoristas").find((x) => x.id === novo.motoristaId) : null;
     if (m) sincronizarMotorista(e, m, novo, quem(req));
     res.json({ veiculo: novo });

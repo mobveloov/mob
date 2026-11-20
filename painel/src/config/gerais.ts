@@ -16,6 +16,8 @@ export interface ConfigGerais {
     bonusCadastroAtivo: boolean; bonusCadastroValor: number; editarValorFinal: boolean; confirmarTaxas: boolean; editarRota: boolean;
     cpfObrigatorio: boolean; descontarCupomNoToque: boolean; botaoPanico: boolean; mapaNavegacao: boolean; distanciaRecalculo: number;
     mensagensRapidas: string[]; documentos: DocumentoExigido[];
+    /** Dias sem nenhum contato do app para o diagnóstico mostrar APP OFF. */
+    diasSemContatoApp: number;
   };
   preferencias: Preferencia[];
   passageiro: {
@@ -51,7 +53,7 @@ export const GERAIS_PADRAO: ConfigGerais = {
     bonusCadastroAtivo: false, bonusCadastroValor: 0, editarValorFinal: false, confirmarTaxas: false, editarRota: false, cpfObrigatorio: true,
     descontarCupomNoToque: true, botaoPanico: true, mapaNavegacao: true, distanciaRecalculo: 150,
     mensagensRapidas: ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor.", "Bom dia", "Boa tarde", "Boa noite"],
-    documentos: DOCS_PADRAO,
+    documentos: DOCS_PADRAO, diasSemContatoApp: 7,
   },
   preferencias: PREF_PADRAO,
   passageiro: { cpfObrigatorio: false, avisoDinamica: true, editarRota: true, bonusAtivo: false, bonusValor: 0, paradasAtivo: true, limiteParadas: 3, destinoLivre: false },
@@ -96,6 +98,7 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
       editarValorFinal: sim(m.editarValorFinal), confirmarTaxas: sim(m.confirmarTaxas), editarRota: sim(m.editarRota), cpfObrigatorio: sim(m.cpfObrigatorio),
       descontarCupomNoToque: sim(m.descontarCupomNoToque), botaoPanico: sim(m.botaoPanico), mapaNavegacao: sim(m.mapaNavegacao),
       distanciaRecalculo: Math.round(numero(m.distanciaRecalculo, 150, 20, 5000)),
+      diasSemContatoApp: Math.round(numero(m.diasSemContatoApp, 7, 1, 365)),
       mensagensRapidas: lista(m.mensagensRapidas).map((x) => texto(x, 120)).filter(Boolean).slice(0, 20),
       documentos: docs.map((d) => {
         const o = (d ?? {}) as Record<string, unknown>;
