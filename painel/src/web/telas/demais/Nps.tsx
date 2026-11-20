@@ -145,8 +145,8 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
             <Campo rotulo="Período"><select value={rasc.periodo} onChange={(e) => setRasc({ ...rasc, periodo: e.target.value })}>{PERIODOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
             {rasc.periodo === "CT" && <><Campo rotulo="De"><input type="date" value={rasc.inicio} onChange={(e) => setRasc({ ...rasc, inicio: e.target.value })} /></Campo><Campo rotulo="Até"><input type="date" value={rasc.fim} onChange={(e) => setRasc({ ...rasc, fim: e.target.value })} /></Campo></>}
             <Campo rotulo="Tipo"><select value={rasc.tipo} onChange={(e) => setRasc({ ...rasc, tipo: e.target.value })}>{TIPOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
-            <Campo rotulo="Email"><input value={rasc.email} minLength={2} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, email: e.target.value })} /></Campo>
-            <Campo rotulo="Telefone"><input value={rasc.telefone} minLength={2} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, telefone: e.target.value })} /></Campo>
+            <Campo rotulo="Email"><input value={rasc.email} minLength={2} placeholder="Buscar passageiro" onChange={(e) => setRasc({ ...rasc, email: e.target.value })} /></Campo>
+            <Campo rotulo="Telefone"><input value={rasc.telefone} minLength={2} placeholder="Buscar passageiro" onChange={(e) => setRasc({ ...rasc, telefone: e.target.value })} /></Campo>
           </div>
           <div className="dm-linha" style={{ marginTop: 10 }}>
             <button className="botao primario" type="button" onClick={() => { aplicar(); setMais(false); }}>Filtrar</button>
