@@ -30,6 +30,7 @@ import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoG
 import { csvExtratoCreditos, csvRecargasESaques, csvSaldoMotoristas, csvTransacoesCartao, extratoCreditos, listaTransacoesCartao, painelCartao, recargasESaques, saldoDaCentral, saldoDosMotoristas } from "./financeiro-credito.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
+import { carteirasCredito, salvarCarteirasCredito } from "./carteiras-credito.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
 import { enviarImagemMarcaMotorista, personalizacaoMotorista, removerImagemMarcaMotorista, salvarPersonalizacaoMotorista } from "./personalizacao-motorista.ts";
@@ -278,6 +279,9 @@ rotasConfig.put("/integracao-financeira", admin, ok((req, res) => {
   res.json(visaoIntegracao(emp(req), true));
 }));
 rotasConfig.post("/integracao-financeira/atualizar-cadastro", admin, ok((req, res) => { atualizarCadastro(emp(req), quem(req)); res.json(visaoIntegracao(emp(req), true)); }));
+// Configurações › Carteiras de crédito (igual à Machine): saldo mínimo, mensagem de recarga, movimentações do app, repasse da taxa de cancelamento.
+rotasConfig.get("/carteiras-credito", ok((req, res) => res.json(carteirasCredito(emp(req)))));
+rotasConfig.put("/carteiras-credito", admin, ok((req, res) => res.json(salvarCarteirasCredito(emp(req), req.body))));
 rotasConfig.get("/pagamentos", ok((req, res) => res.json({ ...pagamentos(emp(req)), credenciais: credenciaisMp(emp(req)), campos: CAMPOS_MP })));
 rotasConfig.put("/pagamentos", admin, ok((req, res) => {
   if (req.body?.credenciais && typeof req.body.credenciais === "object") salvarCredenciaisMp(emp(req), req.body.credenciais as Record<string, unknown>);

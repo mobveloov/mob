@@ -15,6 +15,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { assuntosDeOcorrencia, configDosApps, tiposDeDocumento } from "../config/apps.ts";
 import { pagamentos as pagamentosDoPainel } from "../config/pagamentos.ts";
 import { gerais } from "../config/gerais.ts";
+import { carteiraParaApp } from "../config/carteiras-credito.ts";
 import { mensagensDaPessoa, receberDaPessoa } from "../config/comunicacao.ts";
 import { criar, listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, avaliarPassageiro, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
@@ -678,6 +679,8 @@ rotasExtras.get("/carteira", ok((req, res) => {
     saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave),
     saques: sessao.papel === "motorista" ? saques(empresaId, sessao.chave) : undefined,
     saque: sessao.papel === "motorista" ? regrasDeSaque(empresaId) : undefined,
+    // Configurações › Carteiras de crédito: o que aparece na carteira do motorista (recarga, saque, telefone, presencial) e o aviso de saldo baixo.
+    ...(sessao.papel === "motorista" ? carteiraParaApp(empresaId, saldo(empresaId, sessao.papel, sessao.chave)) : {}),
     recargaRegras: (() => { const r = pagamentosDoPainel(empresaId).recarga; return sessao.papel === "motorista" ? { ativa: r.motorista, minimo: r.minimoMotorista } : { ativa: r.passageiro, minimo: r.minimoPassageiro }; })(),
     recarga: `Depois de pedir o depósito, a central confirma e o valor entra no seu saldo${m.textos.suporteTelefone ? `. Dúvidas: ${m.textos.suporteTelefone}` : ""}.`,
   });

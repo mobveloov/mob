@@ -238,7 +238,7 @@ function RecargaDeSaldo({ saldo, instrucao, minimo, voltar }: { saldo: number | 
 }
 
 export function CarteiraDoMotorista({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string; recargaRegras?: { ativa: boolean; minimo: number } }>("/carteira");
+  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string; recargaRegras?: { ativa: boolean; minimo: number }; avisoRecarga?: string; movimentos?: { recarga: boolean; saque: boolean; pix: boolean; presencial: boolean; telefone: string } }>("/carteira");
   const [tela, setTela] = useState<"" | "recarregar" | "retirar">("");
   if (tela === "retirar") return <CarteiraAntiga voltar={() => setTela("")} />;
   if (tela === "recarregar") return <RecargaDeSaldo saldo={dados?.saldo} instrucao={dados?.recarga ?? ""} minimo={dados?.recargaRegras?.minimo ?? 0} voltar={() => setTela("")} />;
@@ -250,10 +250,13 @@ export function CarteiraDoMotorista({ voltar }: Voltar) {
         <section className="cartao-m">
           <small className="dica">Saldo para taxas das corridas</small>
           <p className="valor-grande esquerda">{dados ? reais(dados.saldo) : "—"}</p>
+          {dados?.avisoRecarga && <p className="dica" role="alert">{dados.avisoRecarga}</p>}
           <div className="acoes-carteira">
-            <button type="button" onClick={() => setTela("recarregar")}><span className="quadro"><Plus size={22} /></span>Adicionar</button>
-            <button type="button" onClick={() => setTela("retirar")}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>
+            {(dados?.movimentos?.recarga ?? true) && <button type="button" onClick={() => setTela("recarregar")}><span className="quadro"><Plus size={22} /></span>Adicionar</button>}
+            {(dados?.movimentos?.saque ?? true) && <button type="button" onClick={() => setTela("retirar")}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>}
           </div>
+          {dados?.movimentos?.presencial && <p className="dica">Recarga e saque também podem ser feitos presencialmente na central.</p>}
+          {dados?.movimentos?.telefone && <p className="dica">Telefone para recarga ou saque: {dados.movimentos.telefone}</p>}
         </section>
         <section className="cartao-m">
           <h3 className="titulo-secao">Histórico da carteira</h3>
