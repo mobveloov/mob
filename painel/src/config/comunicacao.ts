@@ -31,6 +31,11 @@ export function mensagensDaPessoa(empresaId: string, papel: PapelApp, chave: str
   return l.reverse().map((x) => ({ id: x.id, de: x.de === "central" ? "central" : "pessoa", texto: x.texto, em: x.em, lida: !!x.lida }));
 }
 
+/** Quantas mensagens a conversa tem no total (para o botão "Carregar mais mensagens"). */
+export function totalMensagens(empresaId: string, papel: PapelApp, chave: string): number {
+  return Number((bancoConfig().prepare("SELECT COUNT(*) AS n FROM central_chat WHERE empresa = ? AND papel = ? AND chave = ?").get(empresaId, papel, chave) as { n: number }).n);
+}
+
 export function conversas(empresaId: string) {
   const nomes = new Map<string, string>();
   for (const m of listar(empresaId, cadastroPorId("motoristas")!)) nomes.set(`motorista|${m.id}`, String(m.nome ?? ""));

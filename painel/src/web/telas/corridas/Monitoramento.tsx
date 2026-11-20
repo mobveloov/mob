@@ -9,7 +9,11 @@ const GRUPO: Record<string, string> = { procurando: "alerta", a_caminho: "info",
 
 const VAZIO = { passageiro: "", telefone: "", motorista: "", endereco: "", empresa: "", filial: "" };
 
+const COLS: Array<[string, string]> = [["os", "Nº OS"], ["passageiro", "Nome do passageiro"], ["motorista", "Motorista"], ["empresa", "Empresa"], ["statusTexto", "Status"]];
+const ordenadas = (l: any[], o: { k: string; d: number }) => (o.k ? [...l].sort((a, b) => o.d * String(a[o.k] ?? "").localeCompare(String(b[o.k] ?? ""), "pt-BR", { numeric: true })) : l);
+
 export default function Monitoramento() {
+  const [ordem, setOrdem] = useState<{ k: string; d: number }>({ k: "", d: 1 });
   const [rasc, setRasc] = useState(VAZIO);
   const [f, setF] = useState(VAZIO);
   const [aberta, setAberta] = useState<string | null>(null);
@@ -45,8 +49,8 @@ export default function Monitoramento() {
         {carregando && !dados && <Vazio><Loader2 size={16} className="gira" /> Carregando...</Vazio>}
         {dados && !dados.corridas.length && <Vazio>Nenhum resultado encontrado.</Vazio>}
         {!!total && <><p className="suave" style={{ marginTop: 0 }}>Exibindo 1-{total} de {total} {total === 1 ? "resultado" : "resultados"}.</p><div className="oc-rola"><table>
-          <thead><tr><th>Nº OS</th><th>Nome do passageiro</th><th>Motorista</th><th>Empresa</th><th>Status</th></tr></thead>
-          <tbody>{dados.corridas.map((c: any) => (
+          <thead><tr>{COLS.map(([k, r]) => <th key={k} style={{ cursor: "pointer" }} aria-sort={ordem.k === k ? (ordem.d > 0 ? "ascending" : "descending") : "none"} onClick={() => setOrdem({ k, d: ordem.k === k ? -ordem.d : 1 })}>{r}{ordem.k === k ? (ordem.d > 0 ? " ▲" : " ▼") : ""}</th>)}</tr></thead>
+          <tbody>{ordenadas(dados.corridas, ordem).map((c: any) => (
             <tr key={c.id} className="clic" onClick={() => setAberta(c.id)}>
               <td className="forte">{c.os}</td>
               <td>{c.passageiro}<br /><small className="corta suave">{c.embarque}</small></td>

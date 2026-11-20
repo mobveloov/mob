@@ -1,6 +1,7 @@
 // Cadastro › Passageiros (clientes): filtros, abas por origem do cadastro, lista e janela com dados e restrições.
 // Servidor: /api/gestao/passageiros.
 
+import { DataBr } from "../../componentes/DataBr";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
@@ -51,9 +52,9 @@ export default function Passageiros() {
           <Campo rotulo="Telefone"><input value={form.telefone} placeholder="11 96123-4567" maxLength={30} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></Campo>
           <Campo rotulo="CPF"><input value={form.cpf} inputMode="numeric" onChange={(e) => setForm({ ...form, cpf: e.target.value })} /></Campo>
           <Campo rotulo="E-mail"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Campo>
-          <Campo rotulo="Período de data de nascimento"><input type="date" aria-label="Nascimento de" value={form.nascIni} onChange={(e) => setForm({ ...form, nascIni: e.target.value })} /><input type="date" aria-label="Nascimento até" value={form.nascFim} onChange={(e) => setForm({ ...form, nascFim: e.target.value })} /></Campo>
-          <Campo rotulo="Período de cadastro"><input type="date" aria-label="Cadastro de" value={form.cadIni} onChange={(e) => setForm({ ...form, cadIni: e.target.value })} /><input type="date" aria-label="Cadastro até" value={form.cadFim} onChange={(e) => setForm({ ...form, cadFim: e.target.value })} /></Campo>
-          <Campo rotulo="Avaliação"><select value={form.avaliacao} onChange={(e) => setForm({ ...form, avaliacao: e.target.value })}><option value="">Todas</option>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} ★ ou mais</option>)}</select></Campo>
+          <Campo rotulo="Período de data de nascimento"><DataBr aria-label="Nascimento de" placeholder="Data inicial" valor={form.nascIni} onChange={(v) => setForm({ ...form, nascIni: v })} /><DataBr aria-label="Nascimento até" placeholder="Data final" valor={form.nascFim} onChange={(v) => setForm({ ...form, nascFim: v })} /></Campo>
+          <Campo rotulo="Período de cadastro"><DataBr aria-label="Cadastro de" placeholder="Data inicial" valor={form.cadIni} onChange={(v) => setForm({ ...form, cadIni: v })} /><DataBr aria-label="Cadastro até" placeholder="Data final" valor={form.cadFim} onChange={(v) => setForm({ ...form, cadFim: v })} /></Campo>
+          <Campo rotulo="Avaliação"><input value={form.avaliacao} maxLength={3} inputMode="decimal" onChange={(e) => setForm({ ...form, avaliacao: e.target.value.replace(",", ".").replace(/[^0-9.]/g, "") })} /></Campo>
           <Campo rotulo="Status"><div>{STATUS.map((st) => <label key={st} style={{ display: "block" }}><input type="checkbox" checked={form.status.includes(st)} onChange={() => marcar(st)} /> {st}</label>)}</div></Campo>
           <Campo rotulo="Tipo"><select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option value="">Selecione</option>{TIPOS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></Campo>
           <button className="cg-botao primario cheio">Filtrar</button>
@@ -112,19 +113,23 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
       {aviso}
       <h4 className="cg-secao">Informações gerais</h4>
       <div className="cg-grade">
-        <Campo rotulo="Bandeira *"><select value={f.cidade} onChange={(e) => set("cidade", e.target.value)}><option value="">Selecione</option>{cidades.map((c) => <option key={c}>{c}</option>)}</select></Campo>
-        <Campo rotulo="Tipo *"><select value={f.origemCadastro} onChange={(e) => set("origemCadastro", e.target.value)}>{TIPOS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></Campo>
-        <Campo rotulo="Status *"><select value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUS.map((st) => <option key={st}>{st}</option>)}</select></Campo>
+        <Campo rotulo="Bandeira *"><select value={f.cidade || cidades[0] || ""} disabled={novo && cidades.length === 1} onChange={(e) => set("cidade", e.target.value)}>{cidades.length !== 1 && <option value="">Selecione</option>}{cidades.map((c) => <option key={c}>{c}</option>)}</select></Campo>
+        <Campo rotulo="Tipo *"><select value={f.origemCadastro} onChange={(e) => set("origemCadastro", e.target.value)}>{TIPOS.filter(([v]) => estabelecimento || novo === false || v !== "Estabelecimento").map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></Campo>
+        <Campo rotulo="Status *"><select value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUS.filter((st) => !novo || ["Ativo", "Inativo", "Suspenso", "Aguardando Ativação", "Aguardando Deleção"].includes(st)).map((st) => <option key={st}>{st}</option>)}</select></Campo>
       </div>
       <h4 className="cg-secao">Dados pessoais</h4>
       <div className="cg-grade">
+        {!novo && <Campo rotulo="Foto de perfil" className="larga"><input readOnly disabled value="(Sem foto)" /></Campo>}
         <Campo rotulo="Nome *" className="larga"><input value={f.nome} onChange={(e) => set("nome", e.target.value)} /></Campo>
         <Campo rotulo="Telefone *"><input value={f.telefone} placeholder="11 96123-4567" maxLength={30} onChange={(e) => set("telefone", e.target.value)} /></Campo>
-        <Campo rotulo="CPF"><input value={f.cpf} inputMode="numeric" onChange={(e) => set("cpf", e.target.value)} /></Campo>
+        <Campo rotulo="CPF"><input value={f.cpf} inputMode="numeric" maxLength={14} onChange={(e) => set("cpf", e.target.value)} /></Campo>
+        {!novo && <Campo rotulo="CPF validado"><input readOnly disabled value="Não" /></Campo>}
         {!novo && <>
           <Campo rotulo="E-mail"><input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Campo>
           <Campo rotulo="Data de nascimento"><input type="date" value={f.nascimento} onChange={(e) => set("nascimento", e.target.value)} /></Campo>
           <Campo rotulo="Gênero"><select value={f.genero} onChange={(e) => set("genero", e.target.value)}><option value="">Não informado</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select></Campo>
+          <Campo rotulo="E-mail validado?" dica="Não enviamos link de validação de e-mail."><input readOnly disabled value="Não" /></Campo>
+          <Campo rotulo="Recebimento de e-mails bloqueado?"><select disabled value="false"><option value="true">Sim</option><option value="false">Não</option></select></Campo>
           <Campo rotulo="Senha do app" dica="Deixe vazio para manter."><input type="text" autoComplete="off" value={f.senha} onChange={(e) => set("senha", e.target.value)} /></Campo>
         </>}
       </div>

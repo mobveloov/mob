@@ -16,7 +16,7 @@ import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, duplicarCategoria, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
 import { pedidosRecentes } from "../corridas/index.ts";
-import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, totalMensagens, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { removerTaxa, salvarTaxa, taxas } from "./taxas.ts";
 import { FORMAS_TAXA } from "../comum/taxas.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
@@ -119,7 +119,8 @@ rotasConfig.get("/conversas", ok((req, res) => res.json({ conversas: conversas(e
 rotasConfig.get("/conversas/:papel/:chave", ok((req, res) => {
   const papel = papelCart(req.params.papel);
   marcarLidas(emp(req), papel, req.params.chave);
-  res.json({ mensagens: mensagensDaPessoa(emp(req), papel, req.params.chave) });
+  const limite = Math.min(2000, Math.max(1, Math.floor(Number(req.query.limite)) || 200));
+  res.json({ mensagens: mensagensDaPessoa(emp(req), papel, req.params.chave, limite), total: totalMensagens(emp(req), papel, req.params.chave) });
 }));
 rotasConfig.post("/conversas/lidas", ok((req, res) => res.json({ marcadas: marcarLidas(emp(req)) })));
 rotasConfig.post("/conversas/:papel/:chave", ok((req, res) => res.json({ mensagem: responder(emp(req), papelCart(req.params.papel), req.params.chave, String(req.body?.texto ?? "")) })));

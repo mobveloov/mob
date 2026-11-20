@@ -44,6 +44,7 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
   const [categorias, setCategorias] = useState<string[]>([]);
   const [status, setStatus] = useState<string[]>([]);
   const [todasCategorias, setTodas] = useState<string[]>([]);
+  const [confirmar, setConfirmar] = useState(false);
   const { msg, salvando, salvar } = useSalvar();
 
   useEffect(() => {
@@ -70,6 +71,8 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (!pronto) return;
+    if (!agendar && !confirmar) { setConfirmar(true); return; }
+    setConfirmar(false);
     const base = { papel: destino, segmento: "todos", titulo: titulo.trim(), tituloOpcional: true, mensagem: mensagem.trim(), filtros: filtros() };
     const r = await salvar(
       () => (agendar ? pedirConfig("/notificacoes/agendar", "POST", { ...base, regra: "unico", data: quando.slice(0, 10), hora: quando.slice(11, 16) }) : pedirConfig("/notificacoes", "POST", base)),
@@ -132,10 +135,21 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
           </div>
         </div>
 
+        {confirmar && (
+          <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "#0008", display: "grid", placeItems: "center", zIndex: 60 }}>
+            <div className="dm-cartao" style={{ maxWidth: 440, width: "92%" }}>
+              <h3>Confirmar envio</h3>
+              <p className="sub">Para: {destino === "motorista" ? "Motoristas" : "Clientes App"}{ativos.length ? " (com filtros)" : " (todos)"}</p>
+              {titulo.trim() && <p><strong>{titulo}</strong></p>}
+              <p>{mensagem}</p>
+              <div className="dm-rodape-modal"><button type="button" className="botao" onClick={() => setConfirmar(false)}>Voltar</button><button type="button" className="botao primario" disabled={salvando} onClick={(ev) => void enviar(ev as unknown as React.FormEvent)}>Enviar notificação</button></div>
+            </div>
+          </div>
+        )}
         <Aviso erro={msg?.erro} ok={msg?.ok} />
         <div className="dm-rodape-modal">
           <button type="button" className="botao" onClick={onVoltar}>Voltar</button>
-          <button className="botao primario" disabled={!pronto || salvando}>{agendar ? "Agendar notificação" : "Enviar notificação"}</button>
+          <button className="botao primario" disabled={!pronto || salvando}>{agendar ? "Agendar notificação" : "Avançar"}</button>
         </div>
       </form>
     </>

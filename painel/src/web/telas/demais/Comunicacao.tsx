@@ -91,7 +91,8 @@ function CriarConversa({ aberto, papel, onFechar, onEscolher }: { aberto: boolea
 }
 
 function Chat({ papel, chave, nome, onFechar, onMudou }: { papel: string; chave: string; nome: string; onFechar: () => void; onMudou: () => void }) {
-  const m = useCarregar(() => pedirConfig(`/conversas/${papel}/${encodeURIComponent(chave)}`), [papel, chave], 5000);
+  const [limite, setLimite] = useState(30);
+  const m = useCarregar(() => pedirConfig(`/conversas/${papel}/${encodeURIComponent(chave)}?limite=${limite}`), [papel, chave, limite], 5000);
   const [texto, setTexto] = useState("");
   const { msg, salvando, salvar } = useSalvar();
   const fim = useRef<HTMLDivElement>(null);
@@ -106,6 +107,7 @@ function Chat({ papel, chave, nome, onFechar, onMudou }: { papel: string; chave:
     <div className="dm-chat">
       <div className="dm-chat-topo"><button className="botao dm-voltar" onClick={onFechar}>←</button><div><h2>{nome}</h2></div></div>
       <div className="dm-chat-msgs" aria-live="polite">
+        {(m.dados?.total ?? 0) > lista.length && <button type="button" className="botao" onClick={() => setLimite(limite + 30)}>Carregar mais mensagens</button>}
         {!m.dados ? <Carregando /> : !lista.length ? <p className="vazio">Sua caixa de entrada está pronta.</p> : lista.map((x) => <div key={x.id} className={`dm-bolha ${x.de === "central" ? "minha" : ""}`}><small><b>{x.de === "central" ? "Central" : nome}</b></small><p>{x.texto}</p><small>{x.em.slice(11, 16)} {x.em.slice(8, 10)}/{x.em.slice(5, 7)}/{x.em.slice(0, 4)}</small></div>)}
         <div ref={fim} />
       </div>

@@ -24,8 +24,8 @@ const mascaraCep = (v: string) => soDigitos(v).slice(0, 8).replace(/(\d{5})(\d)/
 const documentoBonito = (v: unknown) => { const d = soDigitos(String(v ?? "")); return d.length === 11 ? mascaraCpf(d) : d.length === 14 ? mascaraCnpj(d) : String(v ?? ""); };
 
 export default function Empresas() {
-  const [form, setForm] = useState(VAZIO);
-  const [filtro, setFiltro] = useState(VAZIO);
+  const [form, setForm] = useState({ ...VAZIO, status: "Ativa" });
+  const [filtro, setFiltro] = useState({ ...VAZIO, status: "Ativa" });
   const [pagina, setPagina] = useState(1);
   const l = useCarregar(() => chamar<Resposta>("GET", `/empresas${consulta({ ...filtro, pagina })}`), [filtro, pagina]);
   const cidades = useCarregar(() => chamar<{ cidades: string[] }>("GET", "/cidades"), []);
@@ -52,9 +52,9 @@ export default function Empresas() {
       </Cabecalho>
       <ComFiltros filtros={
         <form onSubmit={(e) => { e.preventDefault(); setPagina(1); setFiltro(form); }}>
-          <Campo rotulo="Nome fantasia"><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo>
-          <Campo rotulo="CPF/CNPJ"><input value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} /></Campo>
-          <Campo rotulo="Status da empresa"><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="">Selecione</option>{SITUACOES.map((s) => <option key={s} value={s}>{ROTULO[s]}</option>)}</select></Campo>
+          <Campo rotulo="Nome fantasia"><input maxLength={32} value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo>
+          <Campo rotulo="CPF/CNPJ"><input maxLength={18} value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} /></Campo>
+          <Campo rotulo="Status da empresa"><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="">Selecione</option>{["Ativa", "Encerrada", "Suspensa", "Aguardando ativação"].filter((s) => SITUACOES.includes(s)).map((s) => <option key={s} value={s}>{ROTULO[s]}</option>)}</select></Campo>
           <button className="cg-botao primario cheio">Filtrar</button>
           <button type="button" className="cg-botao cheio" onClick={() => { setForm(VAZIO); setFiltro(VAZIO); setPagina(1); }}>Limpar filtros</button>
         </form>
@@ -138,9 +138,9 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
           <div className="cg-duplo"><input value={f.cnpj} inputMode="numeric" onChange={(x) => set("cnpj", mascara(x.target.value))} />
             <button type="button" className="cg-botao" onClick={() => setF({ ...f, tipoDocumento: f.tipoDocumento === "CPF" ? "CNPJ" : "CPF", cnpj: "" })}>Alterar para {f.tipoDocumento === "CPF" ? "CNPJ" : "CPF"}</button></div>
         </Campo>
-        <Campo rotulo="Número do contrato *"><input value={f.numeroContrato} onChange={(x) => set("numeroContrato", x.target.value)} /></Campo>
-        <Campo rotulo="Razão social"><input value={f.razaoSocial} onChange={(x) => set("razaoSocial", x.target.value)} /></Campo>
-        <Campo rotulo="Nome fantasia *"><input value={f.nome} onChange={(x) => set("nome", x.target.value)} /></Campo>
+        <Campo rotulo="Número do contrato *"><input inputMode="numeric" maxLength={6} placeholder="000000" value={f.numeroContrato} onChange={(x) => set("numeroContrato", x.target.value)} /></Campo>
+        <Campo rotulo="Razão social"><input maxLength={100} value={f.razaoSocial} onChange={(x) => set("razaoSocial", x.target.value)} /></Campo>
+        <Campo rotulo="Nome fantasia *"><input maxLength={32} value={f.nome} onChange={(x) => set("nome", x.target.value)} /></Campo>
         <Campo rotulo="Responsável"><input value={f.contato} onChange={(x) => set("contato", x.target.value)} /></Campo>
         <Campo rotulo="E-mail do responsável"><input type="email" value={f.email} onChange={(x) => set("email", x.target.value)} /></Campo>
         <Campo rotulo="Telefone"><input value={f.telefone} placeholder="(00) 00000-0000" onChange={(x) => set("telefone", x.target.value)} /></Campo>
@@ -148,14 +148,14 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
 
       <h4 className="cg-secao">Endereço</h4>
       <div className="cg-grade">
-        <Campo rotulo="Endereço" className="larga"><input value={f.endereco} onChange={(x) => set("endereco", x.target.value)} /></Campo>
+        <Campo rotulo="Endereço" className="larga"><input maxLength={250} value={f.endereco} onChange={(x) => set("endereco", x.target.value)} /></Campo>
         <Campo rotulo="Número"><input value={f.enderecoNumero} onChange={(x) => set("enderecoNumero", x.target.value)} /></Campo>
-        <Campo rotulo="Complemento"><input value={f.complemento} onChange={(x) => set("complemento", x.target.value)} /></Campo>
+        <Campo rotulo="Complemento"><input maxLength={100} value={f.complemento} onChange={(x) => set("complemento", x.target.value)} /></Campo>
         <p className="cg-suave" style={{ gridColumn: "1 / -1", margin: 0 }}><a href="/central-ajuda">Não achou o endereço?</a></p>
         <Campo rotulo="UF"><select value={f.uf} onChange={(x) => set("uf", x.target.value)}><option value="">Selecione</option>{opcoes.ufs.map((u) => <option key={u}>{u}</option>)}</select></Campo>
         <Campo rotulo="Cidade"><input list="emp-cidades" value={f.cidade} onChange={(x) => set("cidade", x.target.value)} /><datalist id="emp-cidades">{cidades.map((c) => <option key={c} value={c} />)}</datalist></Campo>
-        <Campo rotulo="Bairro"><input value={f.bairro} onChange={(x) => set("bairro", x.target.value)} /></Campo>
-        <Campo rotulo="CEP"><input value={f.cep} placeholder="00000-000" onChange={(x) => set("cep", mascaraCep(x.target.value))} /></Campo>
+        <Campo rotulo="Bairro"><input maxLength={60} value={f.bairro} onChange={(x) => set("bairro", x.target.value)} /></Campo>
+        <Campo rotulo="CEP"><input maxLength={9} value={f.cep} placeholder="00000-000" onChange={(x) => set("cep", mascaraCep(x.target.value))} /></Campo>
       </div>
 
       <h4 className="cg-secao">Status</h4>
@@ -188,7 +188,7 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
       </div>
 
       <h4 className="cg-secao">Outras informações</h4>
-      <Campo rotulo="Observação para motorista" dica="O motorista vê esta observação nas corridas da empresa."><textarea rows={2} value={f.obsMotorista} onChange={(x) => set("obsMotorista", x.target.value)} /></Campo>
+      <Campo rotulo="Observação para motorista" dica="O motorista vê esta observação nas corridas da empresa."><textarea rows={2} maxLength={300} value={f.obsMotorista} onChange={(x) => set("obsMotorista", x.target.value)} /></Campo>
       <Campo rotulo="Observação interna"><textarea rows={2} value={f.observacao} onChange={(x) => set("observacao", x.target.value)} /></Campo>
       <Campo rotulo="Dados extras" dica="Até 10 itens (nome e valor)."><span /></Campo>
       {extras.map((x, i) => (

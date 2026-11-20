@@ -2,16 +2,20 @@
 import { useState } from "react";
 import { Ban, Edit3, FileDown, Loader2 } from "lucide-react";
 import { Aviso, Janela, Paginacao, Selo, Vazio, dia, dhAno, msgErro, op, qs, reais, useDados, fone } from "./comum";
+import { DataBr } from "../../componentes/DataBr";
 import "./corridas.css";
 
 const TOM: Record<string, string> = { procurando: "alerta", a_caminho: "info", no_local: "info", em_andamento: "info", finalizada: "ok", cancelada: "ruim", nao_atendida: "alerta" };
 const TOM_SIT: Record<string, string> = { distribuida: "ok", aguardando: "alerta", cancelada: "ruim", erro: "ruim" };
+const dia_ = (n: number) => new Date(Date.now() - 3 * 3600_000 + n * 86_400_000).toISOString().slice(0, 10);
+/** Como na Machine: abre de ontem a 30 dias à frente. */
+const PADRAO = { centralChamada: "", empresa: "", os: "", categoria: "", passageiro: "", motorista: "", dataIni: dia_(-1), dataFim: dia_(30), pagamento: "", situacao: "", filial: "" };
 const VAZIO = { centralChamada: "", empresa: "", os: "", categoria: "", passageiro: "", motorista: "", dataIni: "", dataFim: "", pagamento: "", situacao: "", filial: "" };
 type Filtros = typeof VAZIO;
 
 export default function Programadas() {
-  const [f, setF] = useState<Filtros>(VAZIO);
-  const [rasc, setRasc] = useState<Filtros>(VAZIO);
+  const [f, setF] = useState<Filtros>(PADRAO);
+  const [rasc, setRasc] = useState<Filtros>(PADRAO);
   const [pagina, setPagina] = useState(1);
   const [sel, setSel] = useState<any>(null);
   const [pronto, setPronto] = useState<string | null>(null);
@@ -24,7 +28,7 @@ export default function Programadas() {
   );
   const campo = (k: keyof Filtros, r: string, tipo = "text") => <label className="oc-l">{r}<input type={tipo} value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })} /></label>;
   const filtrar = () => { setF(rasc); setPagina(1); };
-  const limpar = () => { setRasc(VAZIO); setF(VAZIO); setPagina(1); };
+  const limpar = () => { setRasc(PADRAO); setF(PADRAO); setPagina(1); };
   async function exportar() {
     setErroEx(null);
     try {
@@ -52,7 +56,7 @@ export default function Programadas() {
         <div className="oc-grid3">
           {lista("centralChamada", "Central chamada", o?.centrais, true)}{lista("empresa", "Empresa", o?.empresas)}{campo("os", "Nº OS")}
           {lista("categoria", "Categoria", o?.categorias)}{campo("passageiro", "Nome do passageiro")}{campo("motorista", "Nome/VTR do motorista")}
-          {campo("dataIni", "Data inicial", "date")}{campo("dataFim", "Data final", "date")}{lista("pagamento", "Forma de pagamento", o?.pagamentos)}
+          <label className="oc-l">Data inicial<DataBr valor={rasc.dataIni} onChange={(v) => setRasc({ ...rasc, dataIni: v })} /></label><label className="oc-l">Data final<DataBr valor={rasc.dataFim} onChange={(v) => setRasc({ ...rasc, dataFim: v })} /></label>{lista("pagamento", "Forma de pagamento", o?.pagamentos)}
           {lista("situacao", "Situação do disparo", o?.situacoes)}{!!o?.filiais?.length && lista("filial", "Filial", o.filiais)}
         </div>
         <div className="oc-fila" style={{ marginTop: 12 }}>

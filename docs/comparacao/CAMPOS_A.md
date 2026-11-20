@@ -83,10 +83,30 @@ Fonte: páginas salvas da Machine (todas as variações) lidas em texto (rótulo
 | Empresas > Criar Empresa > "Não achou o endereço?" | não | sim | Link para a Central de Ajuda |
 | Mapa de motoristas, Cadastro de passageiro, Leme (Painel inicial) | sim | sim | Conferidos; ver GRUPO_A.md |
 
+## Terceira rodada (pendências resolvidas)
+| Tela > Aba/Janela > Campo | existia? | igual agora? | o que mudei |
+|---|---|---|---|
+| Notificações app > Nova notificação (Para agora / Agendar, conteúdo, destinatário, 5 filtros) | sim (feito pelo grupo D em CriarNotificacao.tsx) | sim | Não dupliquei. Acrescentei o passo "Avançar" com janela de confirmação do envio, como na Machine ("Agendar notificação" segue direto) |
+| Consultar corridas > Filtro > Data inicial, Hora inicial, Data final, Hora final | campo de data do navegador | sim | Texto com máscara dd/mm/aaaa e hh:mm; datas abrem com hoje |
+| Corridas programadas > Data inicial / final | idem | sim | Máscara dd/mm/aaaa; abre de ontem a 30 dias à frente, como na Machine |
+| Objetos perdidos > Personalizado > datas | idem | sim | Máscara dd/mm/aaaa |
+| Clientes > Filtros > nascimento e cadastro (inicial/final) | idem | sim | Máscara dd/mm/aaaa, placeholders "Data inicial"/"Data final" |
+| Clientes > Avaliação | lista | sim | Campo de texto de até 3 caracteres, como na Machine |
+| Clientes > Cadastro de passageiro > Bandeira | lista aberta | sim | Fica travada quando só há uma central |
+| > Tipo / Status (criação) | todas as opções | sim | Na criação, sem Estabelecimento (só pelo botão Criar Estabelecimento) e só os 5 status da Machine |
+| > CPF | sem limite | sim | Até 14 caracteres |
+| > Edição > Foto de perfil, CPF validado, E-mail validado?, Recebimento de e-mails bloqueado? | não | sim | Campos somente leitura ("(Sem foto)", "Não") |
+| Acompanhamento > colunas Nº OS, Nome do passageiro, Motorista, Empresa, Status | fixas | sim | Clicar no título ordena (nova batida inverte), com seta |
+| Chat > Carregar mais mensagens | não | sim | Mostra as últimas 30; o botão traz mais 30 (servidor: `?limite=` e `total`) |
+| Empresas > Filtros > Status da empresa | ordem diferente, vazio | sim | Ordem Ativo, Deletado, Suspenso, Aguardando Ativação; abre em Ativo |
+| Empresas > Filtros > Nome fantasia / CPF-CNPJ | sem limite | sim | Até 32 e 18 caracteres |
+| Criar Empresa > Número do contrato, Nome fantasia, Razão social, Endereço, Complemento, Bairro, CEP, Observação para motorista | sem limite | sim | Limites 6, 32, 100, 250, 100, 60, 9 e 300 |
+| Leme (Painel inicial) | sim | sim | Conferido no navegador: Indicadores, Estatísticas da operação (Ontem), Corridas solicitadas e origens, Ganhos gerais, Ticket médio, Motoristas ativos, Corridas por motorista, Passageiros cadastrados, Tempo online (Ruim, Aceitável, Bom, "O que este número significa"), NPS dos passageiros e dos Motoristas, Comparativos, Evolução do NPS. Extras nossos: seletor de cidades, "Ajustar faixas", origens WhatsApp e Ponto fixo, formas de pagamento da nossa base |
+| Programadas, Clientes, Motoristas, Empresas | sim | sim | Conferidos no navegador campo a campo contra as páginas da Machine; diferenças acima corrigidas |
+
 ## Não consegui igualar
 - Janela de detalhe da corrida (Machine): não há página salva dela (carrega por ajax), então não deu para comparar.
 - Janelas da Machine sem conteúdo salvo: "Determina posição" (Acompanhamento), "disparada", "lista de clientes" e "mensagem da corrida" (Solicitar), "horário de consulta" (Motoristas).
-- Criar notificação: o fluxo da Machine (Para agora / Agendar, filtros por quantidade de corridas, período de cadastro, gênero, categorias e status, passo "Avançar") não foi refeito; mantemos o nosso formulário (disparo imediato e agendamento recorrente).
-- Datas dos filtros da Machine são texto com máscara e valor inicial; as nossas usam campo de data do navegador.
-- Satélite no mapa do Solicitar (Machine usa Google), colunas ordenáveis do Acompanhamento, "Carregar mais mensagens" no Chat, filtros de cartão em Clientes e "Tipo de operação" em Empresas: dependem de dado ou serviço externo que não temos.
-- Cadastro de passageiro: bloqueio e validação de e-mail por link dependem de envio de e-mail (sem chave de e-mail no ambiente).
+- Satélite no mapa do Solicitar (a Machine usa Google), filtros de cartão em Clientes e "Tipo de operação" em Empresas: dependem de dado ou serviço externo que não temos.
+- Validar e-mail por link e bloqueio de e-mail do passageiro: precisam de envio de e-mail (sem chave de e-mail no ambiente).
+- Origens extras no Leme e menu "Exportar relatório" dentro de "mais opções" (Empresas): mantidos como nosso.

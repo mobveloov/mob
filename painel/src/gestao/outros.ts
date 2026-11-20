@@ -56,7 +56,7 @@ function rotasPassageiros(r: Router) {
     const st = String(q.status ?? "Todos"), disp = String(q.dispositivo ?? "Todos");
     const listaSt = st.split("|").filter((x) => x && x !== "Todos");
     const tipoQ = String(q.tipo ?? "");
-    const aval = Number(q.avaliacao) || 0;
+    const aval = Number(String(q.avaliacao ?? "").replace(",", ".")) || 0;
     const f = todos.filter((c) => (!texto(q.cidade) || normal(c.cidade) === normal(q.cidade)) && contem(c.nome, texto(q.nome))
       && (!digitos(q.telefone) || c.telefone.includes(digitos(q.telefone)))
       && (!digitos(q.cpf) || c.cpf.replace(/\D/g, "").includes(digitos(q.cpf)))

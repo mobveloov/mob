@@ -7,6 +7,7 @@ import { api, baixar, corridasCsv, type CorridaPainel, type Relatorio } from "..
 import { useSessao } from "../../App";
 import { RelatorioIa } from "../../componentes/RelatorioIa";
 import { Aviso, Paginacao, Selo, GRUPO_CLASSE, Janela, Vazio, dh, op, qs, reais, useDados, msgErro } from "./comum";
+import { mascaraData, mascaraHora } from "../../componentes/DataBr";
 import { JanelaCorrida, JanelaExterna } from "./JanelaCorrida";
 
 // Atalhos da Machine (15 minutos a 4 horas). "Hoje" é nosso, no fim, e é o padrão.
@@ -15,6 +16,7 @@ const ATALHOS: Array<[string, string]> = [["15min", "15 minutos"], ["30min", "30
 const STATUS_SEM_FLUXO: Array<[string, string]> = [["aguardando_aceite", "Aguardando aceite"], ["aguardando_liberacao", "Aguardando liberação"], ["pagamento_pendente", "Pagamento pendente"], ["negociacao", "Em negociação"]];
 /** Ordem dos status no filtro da Machine. */
 const ORDEM_STATUS = ["distribuindo", "a_caminho", "nao_atendida", "cancelada", "cancelada_pax", "cancelada_mot", "andamento", "finalizada", "pendente", "espera"];
+const hojeBrTxt = () => { const d = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10); return `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}`; };
 const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "", filial: "" };
 type Filtros = typeof VAZIO;
 
@@ -71,6 +73,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
     try { setResposta({ texto: (await api.perguntar(dados.filtroBase, pergunta)).resposta }); } catch (e) { setResposta({ texto: msgErro(e), erro: true }); } finally { setPerguntando(false); }
   }
   const campo = (k: keyof Filtros, r: string, ph = "", tipo = "text") => <label className="oc-l">{r}<input type={tipo} value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })} placeholder={ph} /></label>;
+  const mascarado = (k: keyof Filtros, r: string, m: (s: string) => string, max = 10) => <label className="oc-l">{r}<input type="text" inputMode="numeric" maxLength={max} placeholder={max === 5 ? "hh:mm" : "dd/mm/aaaa"} value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: m(e.target.value) })} /></label>;
   const lista = (k: keyof Filtros, r: string, itens: Array<string | { id: string; nome: string }> = [], todos = "Todas") => (
     <label className="oc-l">{r}<select value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })}><option value="">{todos}</option>
       {itens.map((x) => typeof x === "string" ? <option key={x} value={x}>{x}</option> : <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
@@ -96,7 +99,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
 
       <div className="oc-card oc-fila" style={{ justifyContent: "space-between" }}>
         <div className="oc-fila">
-          <button className="oc-btn" onClick={() => { setRasc(f); setFiltroAberto(true); }}><Filter size={16} /> Filtro{nFiltros > 0 && <Selo tom="info">{nFiltros}</Selo>}</button>
+          <button className="oc-btn" onClick={() => { setRasc({ ...f, dataIni: f.dataIni || hojeBrTxt(), dataFim: f.dataFim || hojeBrTxt() }); setFiltroAberto(true); }}><Filter size={16} /> Filtro{nFiltros > 0 && <Selo tom="info">{nFiltros}</Selo>}</button>
           <label className="oc-sw"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> {auto ? "Atualizando automaticamente" : "Atualização automática pausada"}</label>
         </div>
         <div className="oc-fila">
@@ -153,7 +156,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
             <div className="oc-grid3">{campo("nomePax", "Nome do passageiro", "")}{campo("telPax", "Telefone do passageiro", "+55 11 96123-4567", "tel")}{campo("cpfPax", "CPF do passageiro", "000.000.000-00")}</div>
             {campo("endereco", "Endereço de partida", "")}
             {campo("motorista", "Nome/VTR/Placa do motorista", "")}
-            <div className="oc-grid2">{campo("dataIni", "Data inicial", "", "date")}{campo("horaIni", "Hora inicial", "00:00", "time")}{campo("dataFim", "Data final", "", "date")}{campo("horaFim", "Hora final", "23:59", "time")}</div>
+            <div className="oc-grid2">{mascarado("dataIni", "Data inicial", mascaraData)}{mascarado("horaIni", "Hora inicial", mascaraHora, 5)}{mascarado("dataFim", "Data final", mascaraData)}{mascarado("horaFim", "Hora final", mascaraHora, 5)}</div>
             <div className="oc-grid2">
               {lista("pagamento", "Forma de pagamento", op_?.pagamentos, "Selecione")}
               <label className="oc-l">Status<select value={rasc.status} onChange={(e) => setRasc({ ...rasc, status: e.target.value })}><option value="">Selecione</option>

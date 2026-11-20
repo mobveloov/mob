@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { CheckCircle2, Filter, MoreVertical } from "lucide-react";
 import { Aviso, Janela, Paginacao, Selo, Vazio, dia, fone, msgErro, op, qs, useDados } from "./comum";
+import { DataBr } from "../../componentes/DataBr";
 import "./corridas.css";
 
 const hojeIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
@@ -45,7 +46,7 @@ export default function Objetos() {
         </div>
         <div className="oc-fila">
           <select style={{ maxWidth: 200 }} value={periodo} onChange={(e) => { setPeriodo(e.target.value); setPagina(1); }} aria-label="Período">{PERIODOS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select>
-          {periodo === "pers" && <><input type="date" value={de} onChange={(e) => setDe(e.target.value)} aria-label="Data inicial" /><input type="date" value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Data final" /></>}
+          {periodo === "pers" && <><DataBr valor={de} onChange={setDe} aria-label="Data inicial" placeholder="Data inicial" /><DataBr valor={ate} onChange={setAte} aria-label="Data final" placeholder="Data final" /></>}
           <input id="nomeCliente_filter" name="nomeCliente" placeholder="Buscar passageiro" value={f.passageiro} onChange={(e) => { setF({ ...f, passageiro: e.target.value }); setPagina(1); }} style={{ maxWidth: 200 }} />
           <button className="oc-btn" onClick={() => { setRasc(f); setMaisAberto(true); }}><Filter size={16} /> Mais filtros</button>
         </div>
