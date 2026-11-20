@@ -91,6 +91,7 @@ const PUBLICAS: Array<[string, string, string]> = [
   ["POST", "/api/apps/:empresa/entrar", "app: entra com o código"],
   ["GET", "/api/apps/:empresa/marca", "app: marca"],
   ["GET", "/api/apps/:empresa/cidades", "app: cidades atendidas"],
+  ["GET", "/api/apps/:empresa/termos/:tipo", "app: termos de uso e privacidade (texto público da empresa, visto antes de criar a conta)"],
   ["POST", "/api/apps/:empresa/conta/existe", "app: conta existe?"],
   ["POST", "/api/apps/:empresa/conta/entrar", "app: login com senha"],
   ["POST", "/api/apps/:empresa/conta/criar", "app: criar conta"],
