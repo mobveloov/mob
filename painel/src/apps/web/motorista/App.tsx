@@ -9,7 +9,6 @@ import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons
 import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { PermissoesPasso } from "./Permissoes";
-import { carregarPersonalizacao, personalizacaoDoCache } from "../comum/personalizacao";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
@@ -143,15 +142,6 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, [online]);
   useEffect(() => { void posicaoAgora().then((p) => setPosicao((a) => a ?? p)).catch(() => undefined); }, []);
   useEffect(() => { void api("/ping", { corpo: {} }).catch(() => undefined); }, []); // avisa a central que o app está aberto
-  // A cor principal e o nome da empresa vêm do painel (Configurações > Personalização): lê ao entrar, a cada minuto e ao voltar ao app, sem APK novo.
-  useEffect(() => {
-    personalizacaoDoCache();
-    void carregarPersonalizacao();
-    const t = setInterval(() => void carregarPersonalizacao(), 60000);
-    const f = () => { if (document.visibilityState === "visible") void carregarPersonalizacao(); };
-    document.addEventListener("visibilitychange", f);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", f); };
-  }, []);
   // Primeira vez (e sempre que faltar alguma): abre o passo a passo das permissões do Android.
   useEffect(() => { void permissoesNativas.faltando().then((f) => { if (f.length) setTela((t) => t || "permissoes"); }); }, []);
   useEffect(() => { void api<{ online: boolean }>("/eu").then((r) => { if (r.online) setOnline(true); }).catch(() => undefined); }, []);

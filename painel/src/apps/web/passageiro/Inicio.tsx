@@ -1,15 +1,10 @@
 // Início: topo na cor da marca com a foto e a saudação, "Para onde você vai?" com IR, atalhos Casa, Trabalho e
 // Recentes, e o mapa com a minha posição.
 
-<<<<<<< HEAD
-import { Briefcase, Gift, History, House, Search } from "lucide-react";
-=======
 import { useEffect, useState } from "react";
 import { Briefcase, Gift, History, House, Search, Tag, Trophy } from "lucide-react";
 import { api, reais, urlArquivo, type Posicao } from "../comum/api";
->>>>>>> worktree-agent-a16dfa3641a968494
 import { saudacao, type Eu, type Lugares } from "./apoio";
-import { urlArquivo, type Posicao } from "../comum/api";
 import { logoDaPersonalizacao, usePersonalizacao } from "../comum/personalizacao";
 import { Banners } from "../comum/ui";
 import { Mapa } from "./Mapa";
@@ -22,28 +17,24 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
   const primeiro = eu.nome.split(" ")[0];
   const pers = usePersonalizacao();
   const rec = pers?.recursos; // recursos ligados e desligados em Configurações > Personalização (sem a personalização, tudo como era)
-<<<<<<< HEAD
   const comMapa = rec?.mapa !== false, comDestino = rec?.selecao_destino !== false;
-=======
-  const comMapa = rec?.mapa !== false, comDestino = rec?.destino !== false;
   // Blocos opcionais da tela inicial (ordem e visibilidade vêm de Configurações > Personalização, recursos): cupons e desafio leem os dados reais do painel.
   const [cupons, setCupons] = useState<Array<{ codigo: string; tipo: string; valor: number }>>([]);
   const [desafio, setDesafio] = useState<{ nome: string; meta: number; feito: number } | null>(null);
-  const querCupons = rec?.cupons === true, querDesafio = rec?.desafio === true;
+  const querCupons = rec?.aviso_cupons === true, querDesafio = rec?.desafio === true;
   useEffect(() => { if (querCupons) void api<{ cupons: Array<{ codigo: string; tipo: string; valor: number }> }>("/cupons").then((r) => setCupons(r.cupons ?? [])).catch(() => setCupons([])); }, [querCupons]);
   useEffect(() => { if (querDesafio) void api<{ desafios: Array<{ nome: string; meta: number; feito: number }> }>("/desafios").then((r) => setDesafio(r.desafios?.[0] ?? null)).catch(() => setDesafio(null)); }, [querDesafio]);
-  const ordem = pers?.telaInicial.ordemVisiveis ?? ["mapa", "destino"];
+  const ordem = pers?.telaInicial.ordemVisiveis ?? ["mapa", "selecao_destino"];
   const pos = (id: string) => { const i = ordem.indexOf(id); return i < 0 ? 99 : i; };
-  const mostrarImagem = !!pers?.design.mostrarImagem && !!pers.design.imagemMarcaUrl, mostrarNome = !!pers?.design.mostrarNome;
   const blocoDestino = comDestino && (
-    <button key="destino" className="busca-inicio" style={{ order: pos("destino") }} onClick={irPara}>
+    <button key="destino" className="busca-inicio" style={{ order: pos("selecao_destino") }} onClick={irPara}>
       <span className="icone-redondo cor"><Search size={22} /></span>
       <span className="busca-texto"><strong>Para onde você vai?</strong><small>Digite um endereço ou lugar</small></span>
       <span className="botao-ir">IR</span>
     </button>
   );
   const blocoCupons = querCupons && cupons.length > 0 && (
-    <button key="cupons" className="bloco-inicio" style={{ order: pos("cupons") }} onClick={indique}>
+    <button key="cupons" className="bloco-inicio" style={{ order: pos("aviso_cupons") }} onClick={indique}>
       <span className="icone-redondo claro"><Tag size={18} /></span>
       <span className="bloco-texto"><strong>{cupons.length === 1 ? "1 cupom disponível" : `${cupons.length} cupons disponíveis`}</strong><small>Use {cupons[0].codigo}: {cupons[0].tipo === "valor" ? reais(cupons[0].valor) : `${cupons[0].valor}%`} de desconto</small></span>
     </button>
@@ -54,22 +45,14 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
       <span className="bloco-texto"><strong>{desafio.nome}</strong><small>{Math.min(desafio.feito, desafio.meta)} de {desafio.meta}</small></span>
     </button>
   );
->>>>>>> worktree-agent-a16dfa3641a968494
   return (
     <div className={`inicio estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
       {comMapa && <Mapa eu={aqui} perto={aqui} controles className="fundo" />}
       <div className="inicio-topo">
-<<<<<<< HEAD
         {pers && (pers.design.mostrarImagem || pers.design.mostrarNome) && (
           <div className={`inicio-marca ${pers.design.marca}`}>
             {pers.design.mostrarImagem && <img src={urlArquivo(logoDaPersonalizacao(pers))} alt="" />}
             {pers.design.mostrarNome && <strong>{pers.empresa.nome}</strong>}
-=======
-        {(mostrarImagem || mostrarNome) && (
-          <div className="inicio-marca">
-            {mostrarImagem && <img src={urlArquivo(pers!.design.imagemMarcaUrl)} alt="" style={pers!.design.dimensoesImagem ? { width: pers!.design.dimensoesImagem.largura, height: pers!.design.dimensoesImagem.altura } : undefined} />}
-            {mostrarNome && <strong>{pers!.empresa.nomeExibido || pers!.empresa.nome}</strong>}
->>>>>>> worktree-agent-a16dfa3641a968494
           </div>
         )}
         <div className="inicio-ola">
