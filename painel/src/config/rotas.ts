@@ -15,7 +15,8 @@ import { central, marcarCentralLidas } from "./central-notificacoes.ts";
 import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, duplicarCategoria, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
-import { pedidosRecentes } from "../corridas/index.ts";
+import { listarProprias, pedidosRecentes } from "../corridas/index.ts";
+import { mapa as servicoMapa } from "../operacao/servico.ts";
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { removerTaxa, salvarTaxa, taxas } from "./taxas.ts";
 import { FORMAS_TAXA } from "../comum/taxas.ts";
@@ -24,7 +25,7 @@ import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
 import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
-import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
+import { dentroDoPoligono, dinamicaGlobal, salvarGlobal, areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
 import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoGeral, relatorioFaturamento, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { csvExtratoCreditos, csvRecargasESaques, csvSaldoMotoristas, csvTransacoesCartao, extratoCreditos, listaTransacoesCartao, painelCartao, recargasESaques, saldoDaCentral, saldoDosMotoristas } from "./financeiro-credito.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
@@ -185,9 +186,33 @@ rotasConfig.post("/categorias/:id/tarifas-extras", gestor, ok((req, res) => res.
 rotasConfig.put("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
 rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
 
+/** Regras com a ficha de cada área de mapa: motoristas livres dentro dela, corridas pendentes e corridas perdidas (não atendidas nas últimas 24 h) com embarque ali. */
+function fichasDasAreas(empresaId: string) {
+  const regras = dinamicas(empresaId);
+  const mapaRegras = regras.filter((r) => r.tipo === "mapa");
+  const livres = mapaRegras.length ? servicoMapa(empresaId).motoristas.filter((m) => m.situacao === "livre" && m.lat != null && m.lng != null) : [];
+  const corridas = mapaRegras.length ? listarProprias(empresaId) : [];
+  const limite = Date.now() - 24 * 3600_000;
+  return regras.map((r) => {
+    const base = { ...r, nivel: nivelDinamica(r) };
+    if (r.tipo !== "mapa") return base;
+    const dentro = (p?: { lat?: number | null; lng?: number | null }) => p?.lat != null && p.lng != null && dentroDoPoligono(p.lat, p.lng, r.poligono);
+    const ponto = (c: any) => (r.aplicaEm === "destino" ? c.destino : c.embarque);
+    return {
+      ...base,
+      ficha: {
+        motoristasLivres: livres.filter((m) => dentro(m)).length,
+        disponiveis: corridas.filter((c) => c.status === "procurando" && dentro(ponto(c))).length,
+        perdidas: corridas.filter((c) => c.status === "nao_atendida" && Date.parse(c.solicitadaEm) >= limite && dentro(ponto(c))).length,
+      },
+    };
+  });
+}
+
 /** Tudo da tela Tarifas dinâmicas: regras manuais (com a faixa da legenda), automações, áreas automáticas abertas agora e a prioridade. */
 const painelDinamicas = (empresaId: string) => ({
-  regras: dinamicas(empresaId).map((r) => ({ ...r, nivel: nivelDinamica(r) })),
+  regras: fichasDasAreas(empresaId),
+  global: dinamicaGlobal(empresaId),
   automacoes: automacoes(empresaId).map((a) => ({ ...a, nivel: nivelDinamica(a) })),
   automaticas: areasAutomaticas(empresaId, pedidosRecentes(empresaId)),
   prioridade: prioridadeDinamicas(empresaId),
@@ -197,6 +222,7 @@ const painelDinamicas = (empresaId: string) => ({
 rotasConfig.get("/dinamicas", ok((req, res) => res.json(painelDinamicas(emp(req)))));
 rotasConfig.post("/dinamicas", gestor, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.post("/dinamicas/:id/ativa", gestor, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.put("/dinamicas-global", gestor, ok((req, res) => { salvarGlobal(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.put("/dinamicas-prioridade", gestor, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.post("/dinamicas-automacoes", gestor, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.post("/dinamicas-automacoes/:id/ativa", gestor, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));

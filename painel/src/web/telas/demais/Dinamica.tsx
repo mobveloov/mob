@@ -33,13 +33,18 @@ export function TarifasDinamicas() {
   const [edit, setEdit] = useState<any>(null);
   const [auto, setAuto] = useState<any>(null);
   const [mostraAutomacoes, setMostraAutomacoes] = useState(false);
+  const [lado, setLado] = useState<"embarque" | "destino">("embarque");
+  const [busca, setBusca] = useState(""), [ordem, setOrdem] = useState<"nome" | "valor">("nome"), [cheia, setCheia] = useState(false);
+  const [globalEdit, setGlobalEdit] = useState<any>(null);
   const { msg, salvar } = useSalvar();
   const dados = d.dados;
   const regras: any[] = dados?.regras ?? [];
   const manuais = regras.filter((r) => r.tipo === "mapa");
+  const doLado = (l: string) => manuais.filter((r) => (r.aplicaEm ?? "embarque") === l);
+  const visiveis = doLado(lado).filter((r) => !busca.trim() || r.nome.toLowerCase().includes(busca.trim().toLowerCase())).sort((a, b) => (ordem === "valor" ? b.valor - a.valor : a.nome.localeCompare(b.nome)));
   const semArea = regras.filter((r) => r.tipo !== "mapa");
   const automaticas: any[] = dados?.automaticas ?? [];
-  const nova = (tipo: string) => setEdit({ tipo, nome: "", cidade: "", cobranca: "percentual", valor: 0, minimo: 0, poligono: [], janelas: [], gatilho: 10, ativa: true });
+  const nova = (tipo: string) => setEdit({ tipo, aplicaEm: lado, nome: "", cidade: "", cobranca: "percentual", valor: 0, minimo: 0, poligono: [], janelas: [], gatilho: 10, ativa: true });
   const titulo = aba === "manuais" ? "Exibindo as áreas manuais da sua central" : aba === "automaticas" ? "Exibindo as áreas automáticas abertas agora" : "Dinâmicas sem área (horário e alta demanda)";
   const ativar = (url: string, v: boolean, depois = "Salvo.") => salvar(async () => { await pedirConfig(url, "POST", { ativa: v }); d.recarregar(); }, depois);
   return (
@@ -52,7 +57,7 @@ export function TarifasDinamicas() {
       <div className="dm-abas" role="tablist">{ABAS.map(([k, n]) => <button key={k} role="tab" aria-selected={aba === k} className={aba === k ? "ativo" : ""} onClick={() => setAba(k)}>{n}</button>)}</div>
       {guia && <div className="dm-cartao dm-guia"><strong>Navegue entre as dinâmicas</strong><p>Cada dinâmica tem suas configurações próprias. Use esse menu para configurá-las e visualizá-las em tempo real.</p><button className="botao" onClick={() => setGuia(false)}>Entendi</button></div>}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
-      <div className="dm-dinamicas">
+      <div className={`dm-dinamicas${cheia ? " dm-tela-cheia" : ""}`}>
         <div className="dm-cartao dm-mapa-principal">
           <p className="sub" role="status">{titulo}</p>
           <MapaDinamicas aba={aba} manuais={manuais} automaticas={automaticas} />
@@ -66,8 +71,32 @@ export function TarifasDinamicas() {
               {!automaticas.length ? <p className="vazio">Nenhuma área automática aberta agora.</p> : <ul className="dm-transacoes">{automaticas.map((a) => <li key={a.id}><span><strong>{a.nome}</strong><small>{valorDinamica(a)} · {a.pedidos} pedidos recentes</small></span></li>)}</ul>}
               <p className="sub">{(dados.automacoes ?? []).length} automação(ões) cadastrada(s).</p>
             </>
-          ) : !(aba === "manuais" ? manuais : semArea).length ? <p className="vazio">Nenhuma regra {aba === "manuais" ? "de área" : "sem área"}.</p> : (
-            <ul className="dm-transacoes">{(aba === "manuais" ? manuais : semArea).map((r) => (
+          ) : aba === "manuais" ? (
+            <>
+              <div className="dm-cartao dm-global">
+                <strong>DINÂMICA SEM ÁREA</strong>
+                <p className="sub">Dinâmica aplicada em todas as regiões do mapa.</p>
+                <span className="dm-linha"><span className="selo"><Zap size={12} /> {valorDinamica(dados.global)}</span>
+                  <Interruptor valor={dados.global.ativa} desabilitado={!admin} rotulo="Dinâmica sem área ativa" onChange={(v) => salvar(async () => { await pedirConfig("/dinamicas-global", "PUT", { ...dados.global, ativa: v }); d.recarregar(); }, v ? "Dinâmica sem área ligada." : "Dinâmica sem área desligada.")} />
+                  {admin && <button className="icone" aria-label="Editar dinâmica sem área" onClick={() => setGlobalEdit({ ...dados.global })}><Pencil size={14} /></button>}</span>
+              </div>
+              <div className="dm-linha dm-entre"><h3>Dinâmicas</h3><span className="dm-linha">
+                <button className="botao" aria-label="Ordenar" onClick={() => setOrdem(ordem === "nome" ? "valor" : "nome")}>Ordem: {ordem === "nome" ? "nome" : "maior valor"}</button>
+                <button className="botao" aria-pressed={cheia} aria-label="Tela cheia" onClick={() => setCheia(!cheia)}>{cheia ? "Sair da tela cheia" : "Tela cheia"}</button>
+                {admin && <button className="botao primario" onClick={() => nova("mapa")}><Plus size={14} /> Criar dinâmica</button>}</span></div>
+              <div className="dm-abas" role="tablist">{(["embarque", "destino"] as const).map((l) => <button key={l} role="tab" aria-selected={lado === l} className={lado === l ? "ativo" : ""} onClick={() => setLado(l)}>No {l} {doLado(l).length}</button>)}</div>
+              <input type="search" placeholder="Buscar por nome da área" aria-label="Buscar por nome da área" value={busca} onChange={(e) => setBusca(e.target.value)} />
+              {!visiveis.length ? <p className="vazio">Nenhuma área {busca ? "com esse nome" : `no ${lado}`}.</p> : (
+                <ul className="dm-transacoes">{visiveis.map((r) => (
+                  <li key={r.id}><span><strong><span className="selo"><Zap size={12} /> {valorDinamica(r)}</span> {r.nome}</strong>
+                    <small>{r.ficha?.motoristasLivres ?? 0} Motoristas livres · {r.ficha?.disponiveis ?? 0} Disponível · {r.ficha?.perdidas ?? 0} Perdidas · Fator único{r.cidade ? ` · ${r.cidade}` : ""}</small></span>
+                    <span className="dm-linha"><Interruptor valor={r.ativa} desabilitado={!admin} rotulo={`${r.nome} ativa`} onChange={(v) => ativar(`/dinamicas/${r.id}/ativa`, v, v ? "Regra ligada." : "Regra desligada.")} />
+                      {admin && <><button className="icone" aria-label={`Editar ${r.nome}`} onClick={() => setEdit(structuredClone(r))}><Pencil size={14} /></button><button className="icone" aria-label={`Remover ${r.nome}`} onClick={async () => { if (confirm(`Remover a regra "${r.nome}"?`)) { await salvar(async () => { await pedirConfig(`/dinamicas/${r.id}`, "DELETE"); d.recarregar(); }, "Regra removida."); } }}><Trash2 size={14} /></button></>}</span></li>
+                ))}</ul>
+              )}
+            </>
+          ) : !semArea.length ? <p className="vazio">Nenhuma regra sem área.</p> : (
+            <ul className="dm-transacoes">{semArea.map((r) => (
               <li key={r.id}><span><strong>{r.nome}</strong><small>{valorDinamica(r)}{r.tipo === "demanda" ? ` · acima de ${r.gatilho} corridas ativas` : ""}{r.tipo === "horario" ? ` · ${r.janelas.length} janela(s)` : ""}{r.cidade ? ` · ${r.cidade}` : ""}</small></span>
                 <span className="dm-linha"><Interruptor valor={r.ativa} desabilitado={!admin} rotulo={`${r.nome} ativa`} onChange={(v) => ativar(`/dinamicas/${r.id}/ativa`, v, v ? "Regra ligada." : "Regra desligada.")} />
                   {admin && <><button className="icone" aria-label={`Editar ${r.nome}`} onClick={() => setEdit(structuredClone(r))}><Pencil size={14} /></button><button className="icone" aria-label={`Remover ${r.nome}`} onClick={async () => { if (confirm(`Remover a regra "${r.nome}"?`)) { await salvar(async () => { await pedirConfig(`/dinamicas/${r.id}`, "DELETE"); d.recarregar(); }, "Regra removida."); } }}><Trash2 size={14} /></button></>}</span></li>
@@ -80,6 +109,17 @@ export function TarifasDinamicas() {
           </select>
         </section>
       </div>
+      {globalEdit && (
+        <Modal aberto onFechar={() => setGlobalEdit(null)} titulo="Dinâmica sem área" sub="Aplicada em todas as regiões do mapa">
+          <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); const x = await salvar(() => pedirConfig("/dinamicas-global", "PUT", globalEdit)); if (x !== undefined) { setGlobalEdit(null); d.recarregar(); } }}>
+            <div className="dm-duplo">
+              <Campo rotulo="Tipo Cobrança"><select value={globalEdit.cobranca} onChange={(e) => setGlobalEdit({ ...globalEdit, cobranca: e.target.value })}><option value="multiplicador">Multiplicador (1,1x)</option><option value="percentual">% de acréscimo</option><option value="fixo">R$ Adicional</option></select></Campo>
+              <Campo rotulo="Valor"><input inputMode="decimal" required value={txt(globalEdit.valor)} onChange={(e) => setGlobalEdit({ ...globalEdit, valor: num(e.target.value) })} /></Campo>
+            </div>
+            <div className="dm-rodape-modal"><button type="button" className="botao" onClick={() => setGlobalEdit(null)}>Cancelar</button><button className="botao primario">Salvar</button></div>
+          </form>
+        </Modal>
+      )}
       {edit && <JanelaDinamica inicial={edit} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
       <Modal aberto={mostraAutomacoes} onFechar={() => setMostraAutomacoes(false)} titulo="Automações" sub="Áreas automáticas por demanda (beta)" larga>
         <p className="sub">Quando uma região do mapa recebe pedidos demais num período curto, o painel abre uma área com preço extra ali, e a fecha quando a procura cai. Ligue cada automação nas categorias, na aba Dinâmica.</p>
@@ -173,6 +213,7 @@ function JanelaDinamica({ inicial, onFechar, onSalvo }: { inicial: any; onFechar
         {!r.id && T !== "mapa" && <Campo rotulo="Tipo da dinâmica"><select value={T} onChange={(e) => set("tipo", e.target.value)}><option value="horario">Por horário</option><option value="demanda">Por alta demanda</option></select></Campo>}
         <Campo rotulo={T === "demanda" ? "Nome" : "Nome da Regra"}><input value={r.nome} onChange={(e) => set("nome", e.target.value)} placeholder={T === "mapa" ? "Ex: Zona Show" : T === "horario" ? "Ex: Rush Manhã" : ""} required maxLength={60} /></Campo>
         <Campo rotulo="Cidade"><input value={r.cidade} onChange={(e) => set("cidade", e.target.value)} maxLength={80} /></Campo>
+        {T === "mapa" && <Campo rotulo="Aplicar quando a área estiver" dica="Vale para o preço da corrida."><select value={r.aplicaEm ?? "embarque"} onChange={(e) => set("aplicaEm", e.target.value)}><option value="embarque">No embarque</option><option value="destino">No destino</option></select></Campo>}
         {T === "mapa" && (
           <div><div className="dm-linha dm-entre"><small>{r.poligono.length >= 3 ? `Área com ${r.poligono.length} pontos` : "Clique no mapa para desenhar"}</small><button type="button" className="botao" onClick={() => { set("poligono", []); setChaveMapa(chaveMapa + 1); }}>Limpar desenho</button></div>
             <DesenhoArea key={chaveMapa} pontos={r.poligono} onChange={(p) => setR((x: any) => ({ ...x, poligono: p }))} /></div>

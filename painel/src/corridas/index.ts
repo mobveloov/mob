@@ -298,7 +298,7 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
   if (calc.valor == null) return { valor: null, distanciaKm: km, minutos, categoria: nome, erro: calc.erro ?? null, tarifaExtra: extra };
   // Tarifas dinâmicas (Config › Tarifas Dinâmicas) ligadas à categoria: horário, área no mapa, alta demanda e áreas automáticas.
   const demanda = listarProprias(empresaId).filter((x) => x.status === "procurando" || x.status === "a_caminho" || x.status === "no_local" || x.status === "em_andamento").length;
-  const valor = aplicarDinamica(empresaId, { categoria: nome, valor: arred(calc.valor), embarque: p.embarque, demanda, pedidos: pedidosRecentes(empresaId) }).valor;
+  const valor = aplicarDinamica(empresaId, { categoria: nome, valor: arred(calc.valor), embarque: p.embarque, destino: p.destino, demanda, pedidos: pedidosRecentes(empresaId) }).valor;
   // Matriz de descontos por forma de pagamento (Config › Descontos): só quando se sabe a forma e o canal.
   const forma = formaDaMatriz(p.pagamento);
   const descontoPct = forma ? percentualDaMatriz(empresaId, forma, canalDaMatriz(p.canal, p.app)) : 0;
