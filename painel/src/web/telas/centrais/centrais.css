@@ -19,3 +19,44 @@
 .cc-resumo { display: flex; gap: 24px; flex-wrap: wrap; justify-content: flex-end; }
 .dm-dica { color: var(--suave); font-size: 13px; margin: 6px 0; }
 @media (max-width: 640px) { .cc-servico { grid-template-columns: 1fr; } .seletor-central select { max-width: 150px; } }
+
+/* Meus planos no formato da Machine */
+.mp-cabeca { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 8px 0 12px; }
+.mp-cabeca h2 { display: flex; align-items: center; gap: 10px; margin: 0; }
+.mp-coroa { color: #a12eff; }
+.mp-dropdown { position: relative; }
+.mp-dropdown-botao { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--borda); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.mp-dropdown-lista { position: absolute; right: 0; top: 100%; z-index: 20; margin-top: 4px; min-width: 240px; padding: 6px; border-radius: 10px; border: 1px solid var(--borda); background: var(--fundo-cartao, #fff); box-shadow: 0 8px 24px rgba(0,0,0,.2); display: flex; flex-direction: column; }
+.mp-dropdown-lista a { padding: 8px 10px; border-radius: 6px; color: inherit; text-decoration: none; }
+.mp-dropdown-lista a:hover { background: rgba(128,128,128,.15); }
+.mp-cartao { border: 1px solid var(--borda); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; background: var(--fundo-cartao, transparent); }
+.mp-titulo { margin: 0 0 12px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+.mp-suave { color: var(--suave); }
+.mp-destaque { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(320px, 1.5fr); gap: 20px; align-items: center; }
+.mp-faixa { display: flex; align-items: center; gap: 16px; }
+.mp-gema { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 8px; background: var(--faixa); color: #fff; box-shadow: 0 0 0 8px color-mix(in srgb, var(--faixa) 14%, transparent); }
+.mp-faixa-nome { font-size: 24px; font-weight: 700; }
+.mp-credito { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 16px 20px; border: 1px solid var(--borda); border-radius: 10px; }
+.mp-credito-titulo { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.mp-credito-titulo b { color: var(--faixa); }
+.mp-credito-valor { text-align: right; display: flex; flex-direction: column; }
+.mp-credito-valor strong { font-size: 28px; color: var(--faixa); }
+.mp-ajuda { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--borda); background: transparent; color: var(--suave); font-size: 14px; font-weight: 700; cursor: help; }
+.mp-barra { height: 44px; padding: 5px; margin-top: 24px; border-radius: 999px; background: rgba(128,128,128,.18); }
+.mp-barra > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--faixa) 80%, #fff), var(--faixa)); }
+.mp-barra-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.mp-grade3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.mp-grade3 > .mp-cartao { margin-bottom: 0; }
+.mp-formula { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mp-chip { padding: 8px 12px; border-radius: 8px; background: rgba(128,128,128,.14); font-weight: 700; }
+.mp-chip small { font-weight: 400; color: var(--suave); }
+.mp-op { color: var(--suave); font-weight: 700; font-size: 20px; }
+.mp-teto { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--primaria) 10%, transparent); }
+.mp-preco { font-size: 32px; font-weight: 700; }
+.mp-preco small { font-size: 16px; font-weight: 400; color: var(--suave); }
+.mp-taxa { display: flex; flex-direction: column; gap: 2px; padding: 8px 14px; margin-bottom: 6px; border-radius: 8px; background: rgba(128,128,128,.1); }
+.mp-taxa span { font-size: 14px; color: var(--suave); font-weight: 600; }
+.mp-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.mp-checks div { display: flex; gap: 10px; align-items: flex-start; }
+.mp-checks svg { color: #14b65c; flex: 0 0 auto; margin-top: 3px; }
+@media (max-width: 700px) { .mp-destaque, .mp-checks { grid-template-columns: 1fr; } }

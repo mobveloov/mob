@@ -229,7 +229,6 @@ export default function Painel() {
     serie: cmp.periodo, ...(cmp.periodo === "personalizado" ? { serieInicio: cmp.ini, serieFim: cmp.fim } : {}),
   } : null;
   const { dados, erro } = useCarregar(() => (pedido ? api.indicadores(pedido) : Promise.resolve(null)), [JSON.stringify(pedido)]);
-  const { dados: oc } = useCarregar(() => fetch("/api/operacao/ocorrencias?horas=1", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).catch(() => null), [], 300_000);
   const [cidades, setCidades] = useState<string[]>([]);
   useEffect(() => { if (dados?.cidades?.length) setCidades((c) => [...new Set([...c, ...dados.cidades])].sort((a, b) => a.localeCompare(b, "pt-BR"))); }, [dados]);
   const d = dados?.indicadores as Dados | undefined;
@@ -247,7 +246,6 @@ export default function Painel() {
   const ant = (n: number | undefined, casas = 0) => `Comparado com ${dados?.rotuloAnterior ?? "o período anterior"}: ${numero(n ?? 0, casas)}`;
   const taxa = c ? pc(c.finalizadas) : 0;
   const dicaCorridas = c && c.total ? (taxa >= 70 ? "Seu número de corridas finalizadas é considerado alto. Procure mantê-lo acima de 70%." : "Seu número de corridas finalizadas é considerado baixo. Procure mantê-lo acima de 70%.") : "Seu número de corridas finalizadas é considerado alto. Procure mantê-lo acima de 70%.";
-  const tem = (oc?.total ?? 0) > 0;
 
   return (
     <>
@@ -263,9 +261,6 @@ export default function Painel() {
           </Seletor>
         </div>
       </Titulo>
-      {tem && (
-        <div className="aviso-ocorrencia" role="alert"><AlertTriangle size={16} /><span>Há corridas que podem requerer atenção do operador. Acione a <Link to="/ocorrencias">tela de ocorrências</Link> e registre ciência nas corridas para liberar este alerta</span></div>
-      )}
       <Avisos lista={[...(dados?.avisos ?? []), erro]} />
 
       <div className="ind-secao-linha"><h3 className="ind-secao">Estatísticas da operação</h3><SeletorPeriodo opcoes={ESTATISTICAS} valor={est} onMudar={setEst} /></div>
@@ -292,6 +287,9 @@ export default function Painel() {
 
       <SecaoEngajamento />
 
+      <Link className="banner-analise" to="/relatorios">
+        <BarChart3 size={22} /><span>Precisa de uma visão mais avançada da operação?</span><span className="botao primario">Ver dados avançados</span>
+      </Link>
       <div className="ind-secao-linha"><h3 className="ind-secao">Métricas de avaliação</h3><SeletorPeriodo opcoes={METRICAS} valor={met} onMudar={setMet} /></div>
       <div className="ind-graficos">
         <Medidor titulo="NPS dos passageiros" d={m?.passageiros} pronto={pronto} />
