@@ -83,6 +83,12 @@ export function ConfigGerais() {
             ))}</ul>
             {admin && <div className="dm-linha"><input value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Escreva uma nova mensagem..." aria-label="Nova mensagem rápida" maxLength={120} /><button className="botao" onClick={() => { if (chat.trim()) { set(["motorista", "mensagensRapidas"], [...g.motorista.mensagensRapidas, chat.trim()]); setChat(""); } }}>Adicionar</button></div>}
           </Secao>
+          <Secao titulo="Gravação das corridas" sub="O app do motorista grava o áudio da corrida para a segurança dele. O passageiro é avisado.">
+            {sw(["motorista", "gravacao", "ativa"], "Gravar as corridas", "Liga a gravação de áudio nos aplicativos dos motoristas.")}
+            {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "obrigatoria"], "Gravação obrigatória", "O motorista não consegue desligar a gravação.")}
+            {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "video"], "Liberar gravação de vídeo", "Além do áudio, o motorista pode gravar vídeo (qualidade leve).")}
+            {g.motorista.gravacao.ativa && <Campo rotulo="Guardar as gravações por (dias)"><input type="number" min={1} max={365} value={g.motorista.gravacao.dias} disabled={!admin} onChange={(e) => set(["motorista", "gravacao", "dias"], Number(e.target.value))} /></Campo>}
+          </Secao>
           <ListaEditavel titulo="Avisos de conduta (mapa do motorista)" sub="Lembretes que aparecem para o motorista na tela do mapa. Lista vazia esconde o aviso." lista={g.motorista.avisosDeConduta} on={(l) => set(["motorista", "avisosDeConduta"], l)} admin={admin} nome="Aviso" />
           <ListaEditavel titulo="Problemas na corrida" sub="Opções do botão de avisar a central sobre um problema durante a corrida." lista={g.motorista.problemasNaCorrida} on={(l) => set(["motorista", "problemasNaCorrida"], l)} admin={admin} nome="Problema" />
           <Secao titulo="Gestão de Documentos" sub="O que o motorista precisa enviar para ser aprovado." acao={admin && <button className="botao" onClick={() => setNovoDoc(true)}><Plus size={14} /> Novo Doc</button>}>

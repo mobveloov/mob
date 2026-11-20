@@ -141,3 +141,12 @@ test("editar a rota no meio da corrida segue o painel (Passageiro pode editar ro
   const sim = await chamar("POST", `${API}/corridas/${r.corpo.corrida.id}/rota`, { destino: { texto: "Outro", lat: -23.61, lng: -46.67 } }, tp);
   assert.equal(sim.status, 200, JSON.stringify(sim.corpo));
 });
+
+test("gravação das corridas segue o painel (Regras do motorista)", async () => {
+  const tm = await entrar("motorista", "11900000002");
+  assert.deepEqual((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo, { ativa: true, obrigatoria: false, video: false, dias: 30 });
+  salvarGerais(E.id, { motorista: { gravacao: { ativa: true, obrigatoria: true, video: true, dias: 10 } } });
+  assert.deepEqual((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo, { ativa: true, obrigatoria: true, video: true, dias: 10 });
+  salvarGerais(E.id, { motorista: { gravacao: { ativa: false } } });
+  assert.equal((await chamar("GET", `${API}/gravacao/config`, undefined, tm)).corpo.obrigatoria, false);
+});

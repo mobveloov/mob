@@ -18,6 +18,8 @@ export interface ConfigGerais {
     mensagensRapidas: string[]; documentos: DocumentoExigido[];
     /** Lembretes de conduta mostrados ao motorista no mapa, e assuntos do aviso de problema na corrida. */
     avisosDeConduta: string[]; problemasNaCorrida: string[];
+    /** Gravação das corridas pelo app do motorista (áudio e, se liberado, vídeo) e quantos dias a central guarda. */
+    gravacao: { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number };
   };
   preferencias: Preferencia[];
   passageiro: {
@@ -58,6 +60,7 @@ export const GERAIS_PADRAO: ConfigGerais = {
     descontarCupomNoToque: true, botaoPanico: true, mapaNavegacao: true, distanciaRecalculo: 150,
     mensagensRapidas: ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor.", "Bom dia", "Boa tarde", "Boa noite"],
     documentos: DOCS_PADRAO,
+    gravacao: { ativa: true, obrigatoria: false, video: false, dias: 30 },
     avisosDeConduta: ["Carro limpo e organizado", "Ambiente agradável e cheiroso", "Não fume", "Atenção ao trânsito", "Não use o celular ao dirigir", "Seja respeitoso com todos", "Atendimento gentil faz a diferença"],
     problemasNaCorrida: ["Passageiro difícil ou agressivo", "Endereço errado ou local perigoso", "Problema no veículo", "Problema no aplicativo", "Cobrança ou pagamento", "Outro problema"],
   },
@@ -110,6 +113,7 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
       descontarCupomNoToque: sim(m.descontarCupomNoToque), botaoPanico: sim(m.botaoPanico), mapaNavegacao: sim(m.mapaNavegacao),
       distanciaRecalculo: Math.round(numero(m.distanciaRecalculo, 150, 20, 5000)),
       mensagensRapidas: lista(m.mensagensRapidas).map((x) => texto(x, 120)).filter(Boolean).slice(0, 20),
+      gravacao: (() => { const o = { ...atual.motorista.gravacao, ...((m.gravacao ?? {}) as object) } as Record<string, unknown>; const ativa = sim(o.ativa, true); return { ativa, obrigatoria: ativa && sim(o.obrigatoria), video: sim(o.video), dias: Math.round(numero(o.dias, 30, 1, 365)) }; })(),
       avisosDeConduta: m.avisosDeConduta === undefined ? atual.motorista.avisosDeConduta : lista(m.avisosDeConduta).map((x) => texto(x, 80)).filter(Boolean).slice(0, 12),
       problemasNaCorrida: m.problemasNaCorrida === undefined ? atual.motorista.problemasNaCorrida : lista(m.problemasNaCorrida).map((x) => texto(x, 80)).filter(Boolean).slice(0, 12),
       documentos: docs.map((d) => {
