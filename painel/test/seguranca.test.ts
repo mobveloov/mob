@@ -72,6 +72,8 @@ const PUBLICAS: Array<[string, string, string]> = [
   ["GET", "/api/publico/marca", "marca na tela de entrada"],
   ["GET", "/api/publico/arquivo/:empresa/:nome", "logo e ícone da empresa"],
   ["GET", "/manifest.webmanifest", "PWA"],
+  ["GET", "/api/mapa/:empresa/config", "provedor de mapa em uso (nada secreto), lido pelos apps"],
+  ["GET", "/api/mapa/:empresa/tiles/:estilo/:z/:x/:y", "imagem de mapa pedida por <img>; cópia em disco e limite por IP"],
   ["POST", "/api/configurar", "primeiro acesso (recusa quando já existe usuário)"],
   ["POST", "/api/entrar", "login"],
   ["POST", "/api/sair", "sair"],
