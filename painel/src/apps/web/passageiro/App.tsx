@@ -80,7 +80,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     void api<{ mensagens: Mensagem[] }>(`/corridas/${corrida.id}/chat`).then((r) => setMensagens(r.mensagens)).catch(() => undefined);
   }, [corrida?.id, corrida?.aberta, !!corrida?.motorista]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { void manterTelaLigada(!!corrida && corrida.aberta); return () => { void manterTelaLigada(false); }; }, [!!corrida, corrida?.aberta]); // tela acesa enquanto acompanha a viagem
+  useEffect(() => { void manterTelaLigada(true); return () => { void manterTelaLigada(false); }; }, []); // tela acesa enquanto acompanha a viagem
 
   useEffect(() => tempoReal((tipo, d) => {
     if (tipo === "corrida") {

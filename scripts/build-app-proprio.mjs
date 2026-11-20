@@ -159,6 +159,12 @@ if (papel === "motorista") {
   if (!xml.includes("PosicaoService")) xml = xml.replace("</application>", '    <service android:name=".PosicaoService" android:exported="false" android:foregroundServiceType="location" />\n    </application>');
   if (!xml.includes("showWhenLocked")) xml = xml.replace("<activity", '<activity android:showWhenLocked="true" android:turnScreenOn="true"');
 }
+// Passageiro: só a Activity com a tela sempre acesa (sem plugins nativos).
+if (papel === "passageiro") {
+  const pastaJava = path.join(saida, "android", "app", "src", "main", "java", ...pacote.split("."));
+  fs.mkdirSync(pastaJava, { recursive: true });
+  fs.writeFileSync(path.join(pastaJava, "MainActivity.java"), fs.readFileSync(path.join(RAIZ, "scripts", "nativo", "MainActivityPassageiro.java"), "utf8").replaceAll("__PACOTE__", pacote));
+}
 fs.writeFileSync(manifesto, xml);
 
 const cores = path.join(saida, "android", "app", "src", "main", "res", "values", "colors.xml");

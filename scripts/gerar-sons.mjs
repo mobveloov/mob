@@ -81,7 +81,9 @@ const SONS = {
 };
 
 fs.mkdirSync(SAIDA, { recursive: true });
+// aceite, buzina, mensagem e cancelado agora vêm de scripts/gerar-toques.mjs (versões suaves); aqui ficam só chamada e alerta.
 for (const [nome, { total, notas }] of Object.entries(SONS)) {
+  if (["aceite", "buzina", "mensagem", "cancelado"].includes(nome)) continue;
   const buf = wav(sintetizar(notas, total));
   fs.writeFileSync(path.join(SAIDA, `${nome}.wav`), buf);
   console.log(`✔ ${nome}.wav  ${(buf.length / 1024).toFixed(0)} KB`);

@@ -5,8 +5,8 @@
 
 import { useEffect, useState } from "react";
 import { CalendarClock, Flag, Minus, Plus, Star, UserRound, Users } from "lucide-react";
-import { pararSons, reais } from "../comum/api";
-import { ajustes, tocar, tremer } from "./ajustes";
+import { pararSons, reais, tocarToque } from "../comum/api";
+import { ajustes, tremer } from "./ajustes";
 import { Erro } from "./Pecas";
 import { diaHora, distanciaTexto, nomePassageiro, notaPassageiro, valorDe, type DadosChamada } from "./tipos";
 
@@ -38,7 +38,8 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
   useEffect(() => () => { if (tocarSom) pararSons(); }, []); // fechou a chamada (aceitou, recusou, venceu ou outro pegou): o som para na hora
   useEffect(() => {
     if (!tocarSom) return;
-    const avisar = () => { tocar(4); tremer([400, 200, 400, 200, 400]); };
+    const avisar = () => { tremer([400, 200, 400, 200, 400]); };
+    tocarToque(ajustes().sons, true); // toque em laço: só para quando a chamada fecha (aceitou, recusou, expirou ou outro motorista pegou)
     avisar();
     if (!ajustes().insistente) return;
     const t = setInterval(avisar, 5000);
