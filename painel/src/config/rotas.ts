@@ -30,10 +30,12 @@ import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoG
 import { csvExtratoCreditos, csvRecargasESaques, csvSaldoMotoristas, csvTransacoesCartao, extratoCreditos, listaTransacoesCartao, painelCartao, recargasESaques, saldoDaCentral, saldoDosMotoristas } from "./financeiro-credito.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
+import { carteirasCredito, salvarCarteirasCredito } from "./carteiras-credito.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
 import { salvarConfigMapas, visaoMapas } from "./mapas.ts";
 import { ultimoErroDoProvedor } from "../servidor/mapas-tiles.ts";
+import { enviarImagemMarcaMotorista, personalizacaoMotorista, removerImagemMarcaMotorista, salvarPersonalizacaoMotorista } from "./personalizacao-motorista.ts";
 import { enviarImagemMarca, MAX_IMAGEM_MARCA, personalizacao, removerImagemMarca, salvarPersonalizacao } from "./personalizacao.ts";
 import { bandeira, salvarBandeira } from "./bandeira.ts";
 import { camposBandeira, salvarCamposBandeira } from "./bandeira-campos.ts";
@@ -250,6 +252,12 @@ rotasConfig.post("/personalizacao/imagem", gestor, express.raw({ type: "image/*"
   res.json(enviarImagemMarca(emp(req), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()));
 }));
 rotasConfig.delete("/personalizacao/imagem", gestor, ok((req, res) => res.json(removerImagemMarca(emp(req)))));
+rotasConfig.get("/personalizacao-motorista", ok((req, res) => res.json(personalizacaoMotorista(emp(req)))));
+rotasConfig.put("/personalizacao-motorista", gestor, ok((req, res) => res.json(salvarPersonalizacaoMotorista(emp(req), req.body))));
+rotasConfig.post("/personalizacao-motorista/imagem", gestor, express.raw({ type: "image/*", limit: MAX_IMAGEM_MARCA }), ok((req, res) => {
+  res.json(enviarImagemMarcaMotorista(emp(req), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()));
+}));
+rotasConfig.delete("/personalizacao-motorista/imagem", gestor, ok((req, res) => res.json(removerImagemMarcaMotorista(emp(req)))));
 const motoristasAtivos = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!).filter((m) => m.status === "Ativo").length;
 rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)), motoristasAtivos: motoristasAtivos(emp(req)) })));
 rotasConfig.put("/descontos-matriz", gestor, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body), motoristasAtivos: motoristasAtivos(emp(req)) })));
@@ -273,6 +281,9 @@ rotasConfig.put("/integracao-financeira", admin, ok((req, res) => {
   res.json(visaoIntegracao(emp(req), true));
 }));
 rotasConfig.post("/integracao-financeira/atualizar-cadastro", admin, ok((req, res) => { atualizarCadastro(emp(req), quem(req)); res.json(visaoIntegracao(emp(req), true)); }));
+// Configurações › Carteiras de crédito (igual à Machine): saldo mínimo, mensagem de recarga, movimentações do app, repasse da taxa de cancelamento.
+rotasConfig.get("/carteiras-credito", ok((req, res) => res.json(carteirasCredito(emp(req)))));
+rotasConfig.put("/carteiras-credito", admin, ok((req, res) => res.json(salvarCarteirasCredito(emp(req), req.body))));
 rotasConfig.get("/pagamentos", ok((req, res) => res.json({ ...pagamentos(emp(req)), credenciais: credenciaisMp(emp(req)), campos: CAMPOS_MP })));
 rotasConfig.put("/pagamentos", admin, ok((req, res) => {
   if (req.body?.credenciais && typeof req.body.credenciais === "object") salvarCredenciaisMp(emp(req), req.body.credenciais as Record<string, unknown>);

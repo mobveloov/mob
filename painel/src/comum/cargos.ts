@@ -57,6 +57,8 @@ export const REGRAS_API: RegraApi[] = [
   { caminho: /^\/operacao\/pendencias(\/|$)/, minimo: "admin" },
   { caminho: /^\/operacao\/pix(\/|$)/, minimo: "gestor" },
   { caminho: /^\/config\/(visao-geral|transacoes-online|relatorios)(\/|$)/, minimo: "admin" },
+  { metodos: ESCRITA, caminho: /^\/config\/carteiras-credito(\/|$)/, minimo: "admin" },
+  { caminho: /^\/config\/carteiras-credito(\/|$)/, minimo: "gestor" },
   { metodos: ESCRITA, caminho: /^\/config\/(carteiras|saques|extrato-central|recargas)(\/|$)/, minimo: "admin" },
   { caminho: /^\/config\/(carteiras|extrato|saques|recargas|extrato-central)(\/|$)/, minimo: "gestor" },
   { caminho: /^\/apps-central\/(carteiras|saques)(\/|$)/, minimo: "gestor" },

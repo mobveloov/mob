@@ -19,9 +19,13 @@ export interface ConfigGerais {
     /** Lembretes de conduta mostrados ao motorista no mapa, e assuntos do aviso de problema na corrida. */
     avisosDeConduta: string[]; problemasNaCorrida: string[];
     /** Gravação das corridas pelo app do motorista (áudio e, se liberado, vídeo) e quantos dias a central guarda. */
-    gravacao: { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number };
+    gravacao: { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number; /** Dias que a cópia fica no celular do motorista depois de enviada. */ diasNoAparelho: number };
     /** Dias sem nenhum contato do app para o diagnóstico mostrar APP OFF. */
     diasSemContatoApp: number;
+    /** Quantos segundos a contra-oferta do motorista vale para o passageiro. */
+    contraofertaSegundos: number;
+    /** Minutos até a central oferecer a mesma corrida de novo a um motorista que a recusou ou deixou passar. */
+    reofertaMinutos: number;
   };
   preferencias: Preferencia[];
   passageiro: {
@@ -58,16 +62,16 @@ const ind = (valorIndicado: number, valorIndicador: number, corridas: number, at
 export const GERAIS_PADRAO: ConfigGerais = {
   suporte: { whatsapp: "", telefone: "", linkAjuda: "" },
   motorista: {
-    bonusCadastroAtivo: false, bonusCadastroValor: 0, editarValorFinal: false, confirmarTaxas: false, editarRota: false, cpfObrigatorio: true,
+    bonusCadastroAtivo: false, bonusCadastroValor: 0, editarValorFinal: true, confirmarTaxas: false, editarRota: false, cpfObrigatorio: true,
     descontarCupomNoToque: true, botaoPanico: true, mapaNavegacao: true, distanciaRecalculo: 150,
     mensagensRapidas: ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor.", "Bom dia", "Boa tarde", "Boa noite"],
-    documentos: DOCS_PADRAO, diasSemContatoApp: 7,
-    gravacao: { ativa: true, obrigatoria: false, video: false, dias: 30 },
+    documentos: DOCS_PADRAO, diasSemContatoApp: 7, contraofertaSegundos: 60, reofertaMinutos: 2,
+    gravacao: { ativa: true, obrigatoria: false, video: false, dias: 30, diasNoAparelho: 3 },
     avisosDeConduta: ["Carro limpo e organizado", "Ambiente agradável e cheiroso", "Não fume", "Atenção ao trânsito", "Não use o celular ao dirigir", "Seja respeitoso com todos", "Atendimento gentil faz a diferença"],
     problemasNaCorrida: ["Passageiro difícil ou agressivo", "Endereço errado ou local perigoso", "Problema no veículo", "Problema no aplicativo", "Cobrança ou pagamento", "Outro problema"],
   },
   preferencias: PREF_PADRAO,
-  passageiro: { cpfObrigatorio: false, avisoDinamica: true, editarRota: true, bonusAtivo: false, bonusValor: 0, paradasAtivo: true, limiteParadas: 3, destinoLivre: false, agendamentoMinutos: 15, agendamentoDias: 30 },
+  passageiro: { cpfObrigatorio: false, avisoDinamica: true, editarRota: true, bonusAtivo: false, bonusValor: 0, paradasAtivo: true, limiteParadas: 3, destinoLivre: true, agendamentoMinutos: 15, agendamentoDias: 30 },
   avaliacao: {
     etiquetasBoas: ["Direção segura", "Carro limpo", "Simpático", "Rota boa", "Pontual"],
     etiquetasRuins: ["Direção perigosa", "Carro sujo", "Mal-educado", "Rota ruim", "Atrasou"],
@@ -79,7 +83,7 @@ export const GERAIS_PADRAO: ConfigGerais = {
     motorista: { ativo: true, minutos: 5, reenvio: true, reenvioMinutos: 2, motivos: ["Passageiro não apareceu", "Local de embarque perigoso", "Problema no veículo", "Outro"] },
     rejeicao: { ativo: false, limite: 15, minutos: 60 },
   },
-  macaneta: { ativo: false, pedeNome: true, pedeTelefone: true, pedeCpf: false, pedeEmail: false, categorias: [] },
+  macaneta: { ativo: true, pedeNome: false, pedeTelefone: false, pedeCpf: false, pedeEmail: false, categorias: [] },
   banners: [],
 };
 
@@ -115,8 +119,10 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
       descontarCupomNoToque: sim(m.descontarCupomNoToque), botaoPanico: sim(m.botaoPanico), mapaNavegacao: sim(m.mapaNavegacao),
       distanciaRecalculo: Math.round(numero(m.distanciaRecalculo, 150, 20, 5000)),
       diasSemContatoApp: Math.round(numero(m.diasSemContatoApp, 7, 1, 90)),
+      contraofertaSegundos: Math.round(numero(m.contraofertaSegundos, 60, 10, 600)),
+      reofertaMinutos: Math.round(numero(m.reofertaMinutos, 2, 1, 60)),
       mensagensRapidas: lista(m.mensagensRapidas).map((x) => texto(x, 120)).filter(Boolean).slice(0, 20),
-      gravacao: (() => { const o = { ...atual.motorista.gravacao, ...((m.gravacao ?? {}) as object) } as Record<string, unknown>; const ativa = sim(o.ativa, true); return { ativa, obrigatoria: ativa && sim(o.obrigatoria), video: sim(o.video), dias: Math.round(numero(o.dias, 30, 1, 365)) }; })(),
+      gravacao: (() => { const o = { ...atual.motorista.gravacao, ...((m.gravacao ?? {}) as object) } as Record<string, unknown>; const ativa = sim(o.ativa, true); return { ativa, obrigatoria: ativa && sim(o.obrigatoria), video: sim(o.video), dias: Math.round(numero(o.dias, 30, 1, 365)), diasNoAparelho: Math.round(numero(o.diasNoAparelho, 3, 1, 30)) }; })(),
       avisosDeConduta: m.avisosDeConduta === undefined ? atual.motorista.avisosDeConduta : lista(m.avisosDeConduta).map((x) => texto(x, 80)).filter(Boolean).slice(0, 12),
       problemasNaCorrida: m.problemasNaCorrida === undefined ? atual.motorista.problemasNaCorrida : lista(m.problemasNaCorrida).map((x) => texto(x, 80)).filter(Boolean).slice(0, 12),
       documentos: docs.map((d) => {
@@ -150,7 +156,7 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
       rejeicao: { ativo: sim(cr.ativo), limite: Math.round(numero(cr.limite, 15, 1, 1000)), minutos: Math.round(numero(cr.minutos, 60, 1, 10_000)) },
     },
     macaneta: {
-      ativo: sim(mc.ativo), pedeNome: sim(mc.pedeNome), pedeTelefone: sim(mc.pedeTelefone), pedeCpf: sim(mc.pedeCpf), pedeEmail: sim(mc.pedeEmail),
+      ativo: sim(mc.ativo, true), pedeNome: sim(mc.pedeNome), pedeTelefone: sim(mc.pedeTelefone), pedeCpf: sim(mc.pedeCpf), pedeEmail: sim(mc.pedeEmail),
       categorias: lista(mc.categorias).map((x) => texto(x, 60)).filter(Boolean).slice(0, 50),
     },
     banners: atual.banners, // banners só mudam pelo envio de imagem

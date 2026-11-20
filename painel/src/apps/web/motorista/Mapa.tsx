@@ -5,6 +5,8 @@
 import { useEffect, useRef } from "react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { urlArquivo } from "../comum/api";
+import { personalizacaoAtual } from "../comum/personalizacao";
 import { useCaminho } from "../comum/rota";
 import { config } from "../comum/api";
 import { baseDoMapa } from "../../../comum/mapa-base.ts";
@@ -21,6 +23,9 @@ const corMarca = () => getComputedStyle(document.documentElement).getPropertyVal
 
 function icone(p: PontoMapa) {
   if (p.tipo === "eu") {
+    // O veículo escolhido em Configurações > Personalização app motorista (Realista, Moderno ou Clássico).
+    const v = personalizacaoAtual()?.veiculoMapa;
+    if (v) return L.divIcon({ className: "pino", iconSize: [44, 44], iconAnchor: [22, 22], html: `<img class="pino-veiculo" src="${urlArquivo(v.iconeLivreUrl)}" width="44" height="44" alt="Você" draggable="false">` });
     return L.divIcon({
       className: "pino", iconSize: [34, 34], iconAnchor: [17, 17],
       html: `<span class="pino-eu"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 11 22 2l-9 19-2-8-8-2z" fill="currentColor"/></svg></span>`,

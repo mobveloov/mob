@@ -109,7 +109,7 @@ export function apagarImagem(id: string, nome: string) {
 /** Guarda uma imagem da marca. Devolve o nome do arquivo salvo. */
 export function salvarImagem(id: string, tipo: string, mime: string, bytes: Uint8Array, maximo = MAX_IMAGEM): string {
   const ext = TIPOS_IMAGEM[mime];
-  if (tipo === "fotoEmpresa" || tipo === "personalizacaoMarca") {
+  if (tipo === "fotoEmpresa" || tipo === "personalizacaoMarca" || tipo === "personalizacaoMarcaMotorista") {
     if (!ext || !["png", "jpg", "webp"].includes(ext)) throw new Error(tipo === "fotoEmpresa" ? "Envie a foto em PNG, JPG ou WEBP." : "Envie uma imagem em formato PNG ou JPG.");
     if (!bytesDaImagemConferem(ext, bytes)) throw new Error("O arquivo não é uma imagem válida.");
   }
