@@ -238,9 +238,34 @@ const GERADAS: AbaForm[] = [{"id":"motorista","titulo":"Motorista","intro":["Alt
 {"rotulo":"Exibir opção de Com retorno","controles":[{"nome":"exibe_opcao_com_retorno","tipo":"radio","opcoes":[{"v":"1","t":"Sim"},{"v":"0","t":"Não"}],"padrao":"0"}],"ajuda":"Indica se deve exibir a opção de Com retorno na central e no app passageiro. Esta opção irá gerar uma nova corrida tendo como destino o endereço de partida da corrida original. É para as centrais que irão pagar pelo retorno do motorista."},
 {"secao":"Filtros customizáveis"}]}];
 
+// ------------------------------------------------------------------ Integrações › Saque Automático
+const cx = (nome: string, rotulo: string, padrao: boolean, de?: ControleForm["de"]): ControleForm => ({ nome, tipo: "caixa", rotulo, padrao, ...(de ? { de } : {}) });
+const DIAS_SAQUE = [["dom", "Domingo"], ["seg", "Segunda"], ["ter", "Terça"], ["qua", "Quarta"], ["qui", "Quinta"], ["sex", "Sexta"], ["sab", "Sábado"]];
+const ABA_SAQUE: AbaForm = {
+  id: "saque", titulo: "Saque Automático",
+  intro: ["Apenas usuários com o cargo de Administrador podem modificar as configurações de saque automático.", "Agora você pode configurar a funcionalidade de saques automáticos para os motoristas, permitindo maior agilidade nas transferências e otimização das operações financeiras."],
+  itens: [
+    { secao: "Configurar Saques Automáticos" },
+    linha("Banco selecionado *", [{ nome: "saque_banco", tipo: "selecao", opcoes: [{ v: "inter", t: "Banco Inter" }, { v: "asaas", t: "Asaas" }], padrao: "inter" }], "O provedor que faz os saques precisa de conta e certificado da central (certificado .crt e chave .key); isso depende de contrato com o banco e não é enviado por esta tela."),
+    { secao: "Configurações" },
+    linha("Definir valores mínimo e máximo para saque", [cx("saque_limite_personalizado", "Definir valores mínimo e máximo para saque", true)], "Ao ativar, os saques deverão respeitar os limites configurados por operação. Solicitações abaixo do valor mínimo ou acima do valor máximo serão bloqueadas. O valor mínimo obrigatório é de 10,00 e o teto diário máximo é de 1.000,00 por motorista."),
+    linha("Valor mínimo por saque R$", [{ nome: "saque_valor_minimo", tipo: "numero", padrao: 10, min: 10, max: 1000, passo: 0.01, de: { nome: "saque_limite_personalizado", em: ["true"] } }], "O valor mínimo por saque deve ser maior ou igual a 10,00."),
+    linha("Valor máximo por saque R$", [{ nome: "saque_valor_maximo", tipo: "numero", padrao: 500, min: 10, max: 1000, passo: 0.01, de: { nome: "saque_limite_personalizado", em: ["true"] } }], "O valor máximo por saque deve ser menor ou igual a 1.000,00 e superior ou igual a 10,00."),
+    { secao: "Taxa de saque" },
+    linha("Quem irá pagar a taxa? *", [{ nome: "saque_quem_paga", tipo: "selecao", opcoes: [{ v: "motorista", t: "Motorista" }, { v: "bandeira", t: "Bandeira" }], padrao: "motorista" }], "A taxa de saque cobre custos operacionais e tecnológicos da operação. Essa taxa pode ser paga pelo motorista ou pela central."),
+    linha("Isenção no primeiro saque", [cx("saque_isencao_primeiro", "Isenção no primeiro saque", false)], "Ao ativar, o motorista não paga a taxa no primeiro saque da semana. Quando desativada, a taxa continua sendo paga pela central, mas o valor será descontado da carteira do motorista em todos os saques, incluindo o primeiro."),
+    linha("Cobrança adicional", [cx("saque_cobranca_adicional", "Cobrança adicional", false)], "Ao ativar, um valor extra configurado será adicionado a taxa de saques do motorista. Se a isenção no primeiro saque estiver ativa, essa cobrança também será isenta no primeiro saque semanal."),
+    linha("Valor da cobrança adicional", [{ nome: "saque_valor_adicional", tipo: "numero", padrao: null, min: 0, max: 100, passo: 0.01, de: { nome: "saque_cobranca_adicional", em: ["true"] } }]),
+    linha("Permitir apenas chave Pix do tipo CPF para saque automático", [cx("saque_apenas_pix_cpf", "Permitir apenas chave Pix do tipo CPF", false)], "Ao ativar, o saque via Pix do motorista só poderá ser feito usando chave Pix do tipo CPF. Chaves e-mail, celular ou aleatória não serão aceitas."),
+    linha("Limitar o número de saques diários dos motoristas", [cx("saque_limitar_diarios", "Limitar o número de saques diários dos motoristas", true)], "Ao ativar, cada motorista poderá realizar no máximo a quantidade configurada de saques bem-sucedidos por dia. Ao atingir esse limite, novas solicitações de saque serão bloqueadas até o final do período."),
+    linha("Limite de saques por dia", [{ nome: "saque_limite_diario", tipo: "numero", padrao: 3, min: 0, max: 5, passo: 1, de: { nome: "saque_limitar_diarios", em: ["true"] } }], "O contador é reiniciado diariamente às 00:00 (horário da central). Como medida de segurança, o motorista possui um limite máximo de 5 tentativas de saque por dia (bem-sucedidas ou não). Caso esse limite de tentativas seja atingido, ele será bloqueado do sistema de saques até o final do período."),
+    linha("Definir dias da semana habilitados para saque", DIAS_SAQUE.map(([k, n]) => cx(`saque_dia_${k}`, n, true)), "O saque automático só poderá ser realizado nos dias selecionados abaixo. O saque não ficará disponível para os motoristas nos dias que estiverem desmarcados."),
+  ],
+};
+
 const g = (id: string) => GERADAS.find((a) => a.id === id)!;
 /** As abas desta tela, na ordem da Machine (a aba Despacho, que fica entre Passageiro e Financeiro, é desenhada à parte). */
-export const ABAS_FORM: AbaForm[] = [g("motorista"), g("passageiro"), g("financeiro"), g("filtros"), ABA_PAGAMENTOS, ABA_PREMIUM];
+export const ABAS_FORM: AbaForm[] = [g("motorista"), g("passageiro"), g("financeiro"), g("filtros"), ABA_PAGAMENTOS, ABA_PREMIUM, ABA_SAQUE];
 
 export const TODOS_CONTROLES: ControleForm[] = controlesDe(ABAS_FORM);
 const porNome = new Map(TODOS_CONTROLES.map((c) => [c.nome, c]));

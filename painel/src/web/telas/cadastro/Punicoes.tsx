@@ -85,7 +85,7 @@ function Aplicar({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => v
               <>
                 <small>Campos com * são obrigatórios.</small>
                 <Campo rotulo="Selecione o tempo de punição: *"><select value={f.tempo} onChange={(e) => setF({ ...f, tempo: e.target.value })}><option value="">Selecione</option>{TEMPOS.map(([v, r]) => <option key={v} value={v}>{r}</option>)}</select></Campo>
-                <Campo rotulo="Motivo da punição:"><textarea value={f.motivo} maxLength={300} onChange={(e) => setF({ ...f, motivo: e.target.value })} /></Campo>
+                <Campo rotulo="Motivo da punição:"><textarea value={f.motivo} maxLength={120} onChange={(e) => setF({ ...f, motivo: e.target.value })} /></Campo>
               </>
             ) : !n ? <Vazio titulo="Nenhuma punição registrada para este motorista." /> : (
               <div className="cg-rolagem"><table className="cg-tabela"><thead><tr><th>Aplicada em</th><th>Até</th><th>Motivo</th><th>Situação</th></tr></thead>

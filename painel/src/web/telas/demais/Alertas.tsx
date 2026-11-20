@@ -17,7 +17,10 @@ export function AlertasEmpresas() {
   const d = useCarregar(() => pedirConfig(`/alertas?${qs}`), [qs]);
   const { msg, salvar } = useSalvar();
   if (criando) return <CriarAlerta empresas={d.dados?.empresas ?? []} onVoltar={() => setCriando(false)} onCriado={() => { setCriando(false); d.recarregar(); }} />;
+  const [ord, setOrd] = useState<{ k: string; asc: boolean }>({ k: "inicioEm", asc: true });
   const x = d.dados;
+  const itens = [...(x?.itens ?? [])].sort((a: any, b: any) => (String(a[ord.k] ?? "") < String(b[ord.k] ?? "") ? -1 : 1) * (ord.asc ? 1 : -1));
+  const th = (k: string, n: string) => <th><a href="#" className={`sort-link${ord.k === k ? (ord.asc ? " asc" : " desc") : ""}`} onClick={(e) => { e.preventDefault(); setOrd({ k, asc: ord.k === k ? !ord.asc : true }); }}>{n}{ord.k === k ? (ord.asc ? " ▲" : " ▼") : ""}</a></th>;
   return (
     <>
       <Cab titulo="Alertas para empresas" sub="Avisos com início e duração, para uma empresa cliente ou para todas">
@@ -41,9 +44,9 @@ export function AlertasEmpresas() {
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-cartao tabela-rola">
         <table>
-          <thead><tr><th>Empresa</th><th>Conteúdo do alerta</th><th>Data de início</th><th>Data de término</th><th /></tr></thead>
+          <thead><tr>{th("empresaAlvo", "Empresa")}{th("conteudo", "Conteúdo do alerta")}{th("inicioEm", "Data de início")}{th("terminoEm", "Data de término")}<th /></tr></thead>
           <tbody>
-            {!x ? <tr><td colSpan={5}><Carregando /></td></tr> : !x.itens.length ? <tr><td colSpan={5} className="vazio">Nenhum resultado encontrado.</td></tr> : x.itens.map((a: any) => (
+            {!x ? <tr><td colSpan={5}><Carregando /></td></tr> : !itens.length ? <tr><td colSpan={5} className="vazio">Nenhum resultado encontrado.</td></tr> : itens.map((a: any) => (
               <tr key={a.id}><td>{a.empresaAlvo}</td><td><span className={`selo ${TOM[a.tipo]}`}>{a.tipo}</span> {a.conteudo}<small className="bloco">por {a.criadoPor}{a.agendado ? " · agendado" : ""}</small></td>
                 <td>{dataHoraBr(a.inicioEm)}</td><td>{dataHoraBr(a.encerradoEm ?? a.terminoEm)}</td>
                 <td>{a.status === "Ativo" && <button className="botao" onClick={() => { if (confirm("Encerrar este alerta agora?")) salvar(async () => { await pedirConfig(`/alertas/${a.id}/encerrar`, "POST", {}); d.recarregar(); }, "Alerta encerrado."); }}>Encerrar</button>}</td></tr>

@@ -40,7 +40,7 @@ async function api(cookie: string, metodo: string, url: string, corpo?: unknown)
 }
 
 test("o formulário tem as abas da Machine e nenhum campo repetido", () => {
-  assert.deepEqual(ABAS_FORM.map((a) => a.titulo), ["Motorista", "Passageiro", "Financeiro", "Filtros", "Formas de pagamento", "Recursos Premium"]);
+  assert.deepEqual(ABAS_FORM.map((a) => a.titulo), ["Motorista", "Passageiro", "Financeiro", "Filtros", "Formas de pagamento", "Recursos Premium", "Saque Automático"]);
   const nomes = TODOS_CONTROLES.map((c) => c.nome);
   assert.equal(new Set(nomes).size, nomes.length);
   assert.ok(nomes.length > 150);
