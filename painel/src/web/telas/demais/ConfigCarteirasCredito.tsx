@@ -5,8 +5,7 @@ import { useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import { Aviso, Cab, Carregando, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
-const txt = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));
-const num = (v: string) => Number(String(v).replace(/\./g, "").replace(",", "."));
+const txt = (n: number | null | undefined) => (n == null ? "" : n.toFixed(2).replace(".", ","));
 
 function SimNao({ nome, valor, onChange, desabilitado }: { nome: string; valor: boolean; onChange: (v: boolean) => void; desabilitado: boolean }) {
   return (
