@@ -416,7 +416,7 @@ function cartaoDoMotorista(empresaId: string, m: Record<string, unknown> & { id:
     id: m.id, nome: String(m.nome ?? ""), cpf: String(m.cpf ?? ""), telefone: String(m.telefone ?? ""), email: String(m.email ?? ""), nascimento: String(m.nascimento ?? ""),
     genero: String(m.genero ?? ""), chavePix: String(m.chavePix ?? ""), situacao: String(m.status ?? ""), cidade: String(m.cidade ?? ""),
     endereco: { cep: String(m.cep ?? ""), rua: String(m.rua ?? ""), numero: String(m.numero ?? ""), complemento: String(m.complemento ?? ""), bairro: String(m.bairro ?? ""), uf: String(m.uf ?? "") },
-    veiculos: p.veiculos, foto: !!p.foto, documentos: Object.fromEntries(Object.entries(p.documentos).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])),
+    veiculos: veiculos(empresaId, m.id), foto: !!p.foto, documentos: Object.fromEntries(Object.entries(p.documentos).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])),
     pendencias: pendenciasDoMotorista(empresaId, m.id),
   };
 }
@@ -450,9 +450,6 @@ rotasV2Central.post("/aprovacoes/:id/aprovar", exigirPapel("admin", "operador"),
   const pend = pendenciasDoMotorista(e, req.params.id);
   if (pend.length && req.body?.forcar !== true) throw new Error(`Faltam itens no cadastro: ${pend.join(", ")}. Marque "aprovar mesmo assim" se quiser.`);
   const m = alterarCampos(e, cadastroPorId("motoristas")!, req.params.id, { status: "Ativo" }, quem(req));
-  const p = pessoa(e, "motorista", req.params.id);
-  p.veiculos = p.veiculos.map((v) => ({ ...v, situacao: "Aprovado" }));
-  salvarPessoa(e, "motorista", req.params.id, p);
   responderPelaCentral(e, "motorista", req.params.id, "Seu cadastro foi aprovado! Você já pode ficar online e receber corridas.");
   res.json({ motorista: cartaoDoMotorista(e, m) });
 }));

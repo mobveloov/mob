@@ -255,7 +255,7 @@ export default function MotoristaJanela({ id, onFechar, onSalvo, cidades, catego
 
 // ---------------------------------------------------------------- veículos
 
-const VEICULO_VAZIO = { modelo: "", cor: "", corHex: "", placa: "", ano: "", anoExercicio: "", ufEmplacamento: "", cidadeEmplacamento: "", renavam: "", validadeLicenciamento: "", veiculoProprio: "Sim", categoria: "" };
+const VEICULO_VAZIO = { marca: "", modelo: "", cor: "", corHex: "", placa: "", ano: "", anoExercicio: "", ufEmplacamento: "", cidadeEmplacamento: "", renavam: "", validadeLicenciamento: "", veiculoProprio: "Sim", categoria: "" };
 
 function Veiculos({ motoristaId, lista, docs, recarregar }: { motoristaId: string; lista: Veiculo[]; docs: Detalhe["documentos"]; recarregar: () => Promise<void> }) {
   const { aviso, tentar } = useAviso();
@@ -293,6 +293,7 @@ function FormVeiculo({ inicial, onSalvar, rotuloSalvar, limpar }: { inicial: Rec
     <>
       <div className="cg-grade">
         <Campo rotulo="Placa *"><input value={f.placa} placeholder="ABC1D23" onChange={(e) => set("placa", e.target.value.toUpperCase())} /></Campo>
+        <Campo rotulo="Marca"><input value={f.marca} onChange={(e) => set("marca", e.target.value)} /></Campo>
         <Campo rotulo="Modelo *"><input value={f.modelo} onChange={(e) => set("modelo", e.target.value)} /></Campo>
         <Campo rotulo="Ano de fabricação *"><input type="number" value={f.ano} onChange={(e) => set("ano", e.target.value)} /></Campo>
         <Campo rotulo="Ano de exercício"><input type="number" value={f.anoExercicio} onChange={(e) => set("anoExercicio", e.target.value)} /></Campo>

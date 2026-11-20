@@ -128,6 +128,8 @@ export const CADASTROS: Cadastro[] = [
       { chave: "notaApp", rotulo: "Nota para o app", tipo: "numero" },
       { chave: "conveniada", rotulo: "Empresa conveniada", tipo: "texto" },
       { chave: "enderecoFavorito", rotulo: "Endereço favorito", tipo: "texto" },
+      { chave: "enderecoCasa", rotulo: "Endereço de casa", tipo: "texto" },
+      { chave: "enderecoTrabalho", rotulo: "Endereço de trabalho", tipo: "texto" },
       { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
       { chave: "corridas", rotulo: "Corridas (90 dias)", tipo: "numero", calculado: true },
@@ -142,6 +144,7 @@ export const CADASTROS: Cadastro[] = [
     chaveUnica: "placa",
     campos: [
       { chave: "placa", rotulo: "Placa", tipo: "texto", obrigatorio: true },
+      { chave: "marca", rotulo: "Marca", tipo: "texto" },
       { chave: "modelo", rotulo: "Modelo", tipo: "texto", obrigatorio: true },
       { chave: "cor", rotulo: "Cor", tipo: "texto" },
       { chave: "ano", rotulo: "Ano", tipo: "numero" },

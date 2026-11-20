@@ -4,6 +4,7 @@
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
 import { podeCargo } from "../comum/cargos.ts";
+import { espelharCamposDoMotorista, visaoDoMotorista } from "../comum/motorista-campos.ts";
 import express, { type Request as Req, type Router } from "express";
 import { PAGAMENTOS_MACHINE, SITUACOES_MOTORISTA } from "../comum/cadastros.ts";
 import { atualizar, criar, remover, type Registro } from "../cadastros/armazem.ts";
@@ -121,7 +122,7 @@ function juntar(anterior: Registro | null, dados: Record<string, unknown>, campo
   for (const k of campos) if (k in dados) novo[k] = dados[k];
   return novo;
 }
-const CAMPOS_MOTORISTA = ["cidade", "nome", "cpf", "telefone", "email", "nascimento", "genero", "nivel", "endereco", "numero", "cep", "bairro", "chavePix", "viatura", "cnhNumero", "validadeCnh", "status", "fantasma", "cobranca", "cobrancaTipo", "cobrancaValor", "categorias", "observacao",
+const CAMPOS_MOTORISTA = ["cidade", "nome", "cpf", "telefone", "email", "nascimento", "genero", "nivel", "endereco", "rua", "cnh", "numero", "cep", "bairro", "chavePix", "viatura", "cnhNumero", "validadeCnh", "status", "fantasma", "cobranca", "cobrancaTipo", "cobrancaValor", "categorias", "observacao",
   "tipoVinculo", "semNumero", "complemento", "uf", "referencia", "informacoesAdicionais", "tipoChavePix", "obsInterna1", "obsInterna2", "obsInterna3",
   "bancoCpfTitular", "bancoNomeTitular", "ocupacao", "renda", "bancoNumero", "bancoAgencia", "bancoConta", "bancoContaDv", "aceitaPagamentos", "validadeLicenciamento"];
 /** Dados bancários e Pix: só o administrador grava e o operador vê a conta mascarada. */
@@ -197,7 +198,8 @@ export function rotasMotoristas(r: Router) {
     const corridas = listarProprias(e).filter((x) => x.motoristaId === m.id);
     const p = pessoa(e, "motorista", m.id);
     const admin = ehAdmin(req);
-    const motorista: Registro = admin ? m : { ...m, bancoConta: mascarar(m.bancoConta) as never, bancoCpfTitular: mascarar(m.bancoCpfTitular) as never, bancoAgencia: mascarar(m.bancoAgencia) as never };
+    const visto = visaoDoMotorista(m);
+    const motorista: Registro = admin ? visto : { ...visto, bancoConta: mascarar(m.bancoConta) as never, bancoCpfTitular: mascarar(m.bancoCpfTitular) as never, bancoAgencia: mascarar(m.bancoAgencia) as never };
     const punicao = punicoesEmVigor(e).filter((x) => x.motoristaId === m.id).sort((a, b) => b.fim.localeCompare(a.fim))[0];
     const avaliadas = corridas.filter((x) => typeof x.avaliacao === "number");
     const ultima = [...corridas].sort((a, b) => b.solicitadaEm.localeCompare(a.solicitadaEm))[0];
@@ -261,7 +263,7 @@ export function rotasMotoristas(r: Router) {
   r.post("/motoristas", ok((req, res) => {
     const e = emp(req), b = (req.body ?? {}) as Record<string, unknown>;
     const entrada = semFinanceiro(req, { ...((b.dados ?? {}) as Record<string, unknown>) });
-    validarMotorista(entrada, null, true); normalizarMotorista(entrada); cpfRepetido(e, entrada.cpf);
+    validarMotorista(entrada, null, true); normalizarMotorista(entrada); espelharCamposDoMotorista(entrada); cpfRepetido(e, entrada.cpf);
     const dados = juntar(null, entrada, CAMPOS_MOTORISTA);
     if (!dados.status) dados.status = "Em análise";
     dados.statusMudouEm = new Date().toISOString();
@@ -274,7 +276,7 @@ export function rotasMotoristas(r: Router) {
   r.put("/motoristas/:id", ok((req, res) => {
     const e = emp(req), anterior = achar(e, req.params.id), b = (req.body ?? {}) as Record<string, unknown>;
     const entrada = semFinanceiro(req, { ...((b.dados ?? {}) as Record<string, unknown>) });
-    validarMotorista(entrada, anterior, false); normalizarMotorista(entrada);
+    validarMotorista(entrada, anterior, false); normalizarMotorista(entrada); espelharCamposDoMotorista(entrada);
     if ("cpf" in entrada) cpfRepetido(e, entrada.cpf, anterior.id);
     const dados = juntar(anterior, entrada, CAMPOS_MOTORISTA);
     if ("status" in entrada && entrada.status !== anterior.status) dados.statusMudouEm = new Date().toISOString();
@@ -466,7 +468,7 @@ export function rotasMotoristas(r: Router) {
     const m = achar(e, String(b.motoristaId ?? ""));
     const jaTem = registros(e, "veiculos").some((v) => v.motoristaId === m.id && v.emUso === true);
     const extra = dadosDoVeiculo(b);
-    const v = criar(e, cad("veiculos"), { ...extra, placa: placaNormal(b.placa), modelo: b.modelo, cor: b.cor, ano: b.ano, categoria: b.categoria, motorista: m.nome, motoristaId: m.id, emUso: !jaTem, status: "Ativo" }, quem(req));
+    const v = criar(e, cad("veiculos"), { ...extra, placa: placaNormal(b.placa), marca: b.marca, modelo: b.modelo, cor: b.cor, ano: b.ano, categoria: b.categoria, motorista: m.nome, motoristaId: m.id, emUso: !jaTem, status: "Ativo" }, quem(req));
     if (!jaTem) sincronizarMotorista(e, m, v, quem(req));
     res.json({ veiculo: v });
   }));
@@ -476,7 +478,7 @@ export function rotasMotoristas(r: Router) {
     const e = emp(req), b = req.body ?? {};
     const v = registros(e, "veiculos").find((x) => x.id === req.params.id);
     if (!v) throw new Error("Veículo não encontrado.");
-    const novo = atualizar(e, cad("veiculos"), v.id, { ...v, ...dadosDoVeiculo(b, true), ...(b.placa != null ? { placa: placaNormal(b.placa) } : {}), ...Object.fromEntries(["modelo", "cor", "ano", "categoria"].filter((k) => k in b).map((k) => [k, b[k]])) }, quem(req));
+    const novo = atualizar(e, cad("veiculos"), v.id, { ...v, ...dadosDoVeiculo(b, true), ...(b.placa != null ? { placa: placaNormal(b.placa) } : {}), ...Object.fromEntries(["marca", "modelo", "cor", "ano", "categoria"].filter((k) => k in b).map((k) => [k, b[k]])) }, quem(req));
     const m = novo.emUso === true ? registros(e, "motoristas").find((x) => x.id === novo.motoristaId) : null;
     if (m) sincronizarMotorista(e, m, novo, quem(req));
     res.json({ veiculo: novo });

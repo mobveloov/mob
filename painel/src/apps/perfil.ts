@@ -8,7 +8,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { cadastroPorId, GENEROS } from "../comum/cadastros.ts";
-import { alterarCampos, criar, listar, mesclar, type Registro } from "../cadastros/armazem.ts";
+import { visaoDoMotorista } from "../comum/motorista-campos.ts";
+import { alterarCampos, atualizar, criar, listar, mesclar, remover, type Registro } from "../cadastros/armazem.ts";
 import { listarProprias, type Ponto } from "../corridas/index.ts";
 import { cidadesAtendidas } from "../enderecos/index.ts";
 import { agoraBr } from "../servidor/util.ts";
@@ -18,7 +19,10 @@ import { pessoa, salvarPessoa, tiposDoApp } from "./extras.ts";
 import { eu as euBase, telefoneValido, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
 export interface Lugares { casa: Ponto | null; trabalho: Ponto | null; favoritos: Array<{ id: string; nome: string; ponto: Ponto }> }
-export interface Veiculo { id: string; modelo: string; placa: string; cor: string; ano: number | null; cnh: string; validadeCnh: string; ativo: boolean; situacao: string }
+export interface Veiculo {
+  id: string; marca: string; modelo: string; placa: string; cor: string; ano: number | null; cnh: string; validadeCnh: string; ativo: boolean; situacao: string;
+  ufEmplacamento: string; cidadeEmplacamento: string; renavam: string; corHex: string; anoExercicio: number | null;
+}
 
 const MOT = () => cadastroPorId("motoristas")!;
 const CLI = () => cadastroPorId("clientes")!;
@@ -215,7 +219,14 @@ export function lugares(empresaId: string, telefone: string) {
     vistos.add(k); recentes.push(c.destino);
     if (recentes.length >= 8) break;
   }
-  return { casa: p.lugares.casa, trabalho: p.lugares.trabalho, favoritos: p.lugares.favoritos, recentes };
+  const cli = listar(empresaId, CLI()).find((r) => soDigitos(r.telefone) === telefone);
+  // Casa e trabalho são do cadastro do passageiro (o painel edita lá); o app guarda a posição no mapa junto.
+  const doCadastro = (campo: string, guardado: Ponto | null): Ponto | null => {
+    const texto = String(cli?.[campo] ?? "").trim();
+    if (!texto) return cli ? null : guardado;
+    return guardado && guardado.texto.trim() === texto ? guardado : { texto };
+  };
+  return { casa: doCadastro("enderecoCasa", p.lugares.casa), trabalho: doCadastro("enderecoTrabalho", p.lugares.trabalho), favoritos: p.lugares.favoritos, recentes };
 }
 
 function pontoLimpo(v: unknown): Ponto {
@@ -224,6 +235,13 @@ function pontoLimpo(v: unknown): Ponto {
   if (!texto) throw new Error("Informe o endereço.");
   const lat = num(o.lat), lng = num(o.lng);
   return { texto, ...(lat != null && lng != null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : {}) };
+}
+
+/** Casa, trabalho e o primeiro favorito vão para o cadastro do passageiro (o painel mostra e edita lá). */
+function espelharLugarNoCadastro(empresaId: string, telefone: string, p: ReturnType<typeof pessoa>) {
+  const cli = listar(empresaId, CLI()).find((r) => soDigitos(r.telefone) === telefone);
+  if (!cli) return;
+  alterarCampos(empresaId, CLI(), cli.id, { enderecoCasa: p.lugares.casa?.texto ?? null, enderecoTrabalho: p.lugares.trabalho?.texto ?? null, ...(p.lugares.favoritos[0] ? { enderecoFavorito: p.lugares.favoritos[0].ponto.texto } : {}) }, "app do passageiro");
 }
 
 export function salvarLugar(empresaId: string, telefone: string, tipo: string, nome: string, ponto: unknown) {
@@ -238,6 +256,7 @@ export function salvarLugar(empresaId: string, telefone: string, tipo: string, n
     p.lugares.favoritos.push({ id: crypto.randomBytes(5).toString("hex"), nome: n, ponto: pt });
   } else throw new Error("Tipo inválido.");
   salvarPessoa(empresaId, "passageiro", telefone, p);
+  espelharLugarNoCadastro(empresaId, telefone, p);
   return lugares(empresaId, telefone);
 }
 
@@ -247,6 +266,7 @@ export function removerLugar(empresaId: string, telefone: string, id: string) {
   else if (id === "trabalho") p.lugares.trabalho = null;
   else p.lugares.favoritos = p.lugares.favoritos.filter((f) => f.id !== id);
   salvarPessoa(empresaId, "passageiro", telefone, p);
+  espelharLugarNoCadastro(empresaId, telefone, p);
   return lugares(empresaId, telefone);
 }
 
@@ -258,68 +278,110 @@ const motoristaDoCadastro = (empresaId: string, id: string): Registro => {
   return m;
 };
 
-export function veiculos(empresaId: string, motoristaId: string): Veiculo[] {
-  return pessoa(empresaId, "motorista", motoristaId).veiculos;
+const VEI = () => cadastroPorId("veiculos")!;
+const str = (v: unknown) => String(v ?? "");
+
+/** O veículo como o app vê: o mesmo registro do cadastro Veículos do painel (CNH e situação vêm do motorista). */
+function veiculoDoApp(v: Registro, m: Registro): Veiculo {
+  return {
+    id: v.id, marca: str(v.marca), modelo: str(v.modelo), placa: str(v.placa), cor: str(v.cor), ano: v.ano == null ? null : Number(v.ano),
+    cnh: str(m.cnhNumero || m.cnh), validadeCnh: str(m.validadeCnh), ativo: v.emUso === true, situacao: m.status === "Ativo" ? "Aprovado" : "Em análise",
+    ufEmplacamento: str(v.ufEmplacamento), cidadeEmplacamento: str(v.cidadeEmplacamento), renavam: str(v.renavam), corHex: str(v.corHex), anoExercicio: v.anoExercicio == null ? null : Number(v.anoExercicio),
+  };
 }
 
-/** O veículo ativo vai para o cadastro do motorista (a central vê modelo, placa, ano e CNH). */
-function sincronizarVeiculo(empresaId: string, motoristaId: string, lista: Veiculo[]) {
-  const a = lista.find((v) => v.ativo);
+/** Veículos guardados antes só no perfil do app passam, uma vez, para o cadastro Veículos (a única fonte). */
+function migrarVeiculosAntigos(empresaId: string, motoristaId: string) {
+  const p = pessoa(empresaId, "motorista", motoristaId) as unknown as { veiculos?: Array<Record<string, unknown>> };
+  const antigos = p.veiculos ?? [];
+  if (!antigos.length) return;
+  const m = motoristaDoCadastro(empresaId, motoristaId);
+  const ja = listar(empresaId, VEI()).some((v) => v.motoristaId === motoristaId);
+  for (const a of ja ? [] : antigos) {
+    try { criar(empresaId, VEI(), { placa: a.placa, modelo: a.modelo, cor: a.cor, ano: a.ano, motorista: m.nome, motoristaId, emUso: a.ativo === true, status: "Ativo" }, "app do motorista"); } catch { /* placa já em outro cadastro: fica de fora */ }
+  }
+  p.veiculos = [];
+  salvarPessoa(empresaId, "motorista", motoristaId, p as never);
+}
+
+const doMotorista = (empresaId: string, motoristaId: string) => listar(empresaId, VEI()).filter((v) => v.motoristaId === motoristaId);
+
+export function veiculos(empresaId: string, motoristaId: string): Veiculo[] {
+  migrarVeiculosAntigos(empresaId, motoristaId);
+  const m = motoristaDoCadastro(empresaId, motoristaId);
+  return doMotorista(empresaId, motoristaId).map((v) => veiculoDoApp(v, m));
+}
+
+/** O veículo em uso vai para o cadastro do motorista (a central vê modelo, placa, ano e CNH nos dois lugares). */
+function sincronizarVeiculo(empresaId: string, motoristaId: string, cnh?: { cnh: string; validadeCnh: string }) {
+  const a = doMotorista(empresaId, motoristaId).find((v) => v.emUso === true);
   alterarCampos(empresaId, MOT(), motoristaId, {
-    veiculo: a ? `${a.modelo}${a.cor ? ` ${a.cor}` : ""}` : null, placa: a?.placa ?? null, anoVeiculo: a?.ano ?? null, cnh: a?.cnh ?? null, validadeCnh: a?.validadeCnh || null,
+    veiculo: a ? `${str(a.modelo)}${a.cor ? ` ${str(a.cor)}` : ""}` : null, placa: a?.placa ?? null, anoVeiculo: a?.ano ?? null,
+    ...(a?.validadeLicenciamento ? { validadeLicenciamento: a.validadeLicenciamento } : {}),
+    ...(cnh ? { cnh: cnh.cnh, cnhNumero: cnh.cnh, validadeCnh: cnh.validadeCnh } : {}),
   }, "app do motorista");
 }
 
 export function salvarVeiculo(empresaId: string, motoristaId: string, d: Record<string, unknown>, id?: string): Veiculo[] {
+  migrarVeiculosAntigos(empresaId, motoristaId);
   const m = motoristaDoCadastro(empresaId, motoristaId);
-  const p = pessoa(empresaId, "motorista", motoristaId);
+  const meus = doMotorista(empresaId, motoristaId);
   const placa = String(d.placa ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!placaValida(placa)) throw new Error("Placa inválida. Use o padrão ABC1234 ou ABC1D23.");
   const modelo = txt(d.modelo, 60);
   if (!modelo) throw new Error("Informe o modelo.");
   const ano = num(d.ano);
   if (ano == null || ano < 1990 || ano > agoraBr().getUTCFullYear() + 1) throw new Error("Ano do veículo inválido.");
-  const cnh = soDigitos(d.cnh);
+  const cnh = soDigitos(d.cnh ?? m.cnhNumero ?? m.cnh);
   if (cnh.length < 9 || cnh.length > 12) throw new Error("Informe o número da CNH.");
-  const validadeCnh = String(d.validadeCnh ?? "");
+  const validadeCnh = String(d.validadeCnh ?? m.validadeCnh ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(validadeCnh)) throw new Error("Informe a validade da CNH.");
   if (validadeCnh < agoraBr().toISOString().slice(0, 10)) throw new Error("A CNH está vencida.");
-  if (p.veiculos.some((v) => v.placa === placa && v.id !== id)) throw new Error("Esta placa já está nos seus veículos.");
-  const antigo = id ? p.veiculos.find((v) => v.id === id) : undefined;
+  if (meus.some((v) => v.placa === placa && v.id !== id)) throw new Error("Esta placa já está nos seus veículos.");
+  if (listar(empresaId, VEI()).some((v) => v.placa === placa && v.motoristaId !== motoristaId)) throw new Error("Esta placa já está cadastrada em outro motorista. Fale com a central.");
+  const antigo = id ? meus.find((v) => v.id === id) : undefined;
   if (id && !antigo) throw new Error("Veículo não encontrado.");
-  if (!id && p.veiculos.length >= 5) throw new Error("No máximo 5 veículos.");
-  const novo: Veiculo = {
-    id: antigo?.id ?? crypto.randomBytes(5).toString("hex"), modelo, placa, cor: txt(d.cor, 30), ano, cnh, validadeCnh,
-    ativo: antigo?.ativo ?? p.veiculos.length === 0, situacao: m.status === "Ativo" ? "Aprovado" : "Em análise",
+  if (!id && meus.length >= 5) throw new Error("No máximo 5 veículos.");
+  const uf = txt(d.ufEmplacamento, 2).toUpperCase();
+  if (uf && !/^[A-Z]{2}$/.test(uf)) throw new Error("UF de emplacamento inválida.");
+  const corHex = txt(d.corHex, 7);
+  if (corHex && !/^#?[0-9a-fA-F]{6}$/.test(corHex)) throw new Error("Código da cor inválido (ex.: #FFFFFF).");
+  const mantem = (k: string) => (d[k] === undefined ? antigo?.[k] ?? null : d[k] === "" ? null : d[k]);
+  const dados = {
+    placa, modelo, marca: d.marca === undefined ? antigo?.marca ?? null : txt(d.marca, 40) || null, cor: txt(d.cor, 30), ano,
+    ufEmplacamento: d.ufEmplacamento === undefined ? antigo?.ufEmplacamento ?? null : uf || null,
+    cidadeEmplacamento: d.cidadeEmplacamento === undefined ? antigo?.cidadeEmplacamento ?? null : txt(d.cidadeEmplacamento, 60) || null,
+    corHex: d.corHex === undefined ? antigo?.corHex ?? null : corHex || null, renavam: mantem("renavam") ? soDigitos(mantem("renavam")) : null, anoExercicio: mantem("anoExercicio"),
+    motorista: m.nome, motoristaId,
   };
-  p.veiculos = antigo ? p.veiculos.map((v) => (v.id === id ? novo : v)) : [...p.veiculos, novo];
-  salvarPessoa(empresaId, "motorista", motoristaId, p);
-  sincronizarVeiculo(empresaId, motoristaId, p.veiculos);
-  return p.veiculos;
+  if (antigo) atualizar(empresaId, VEI(), antigo.id, { ...antigo, ...dados }, "app do motorista");
+  else criar(empresaId, VEI(), { ...dados, emUso: meus.length === 0, status: "Ativo" }, "app do motorista");
+  sincronizarVeiculo(empresaId, motoristaId, { cnh, validadeCnh });
+  return veiculos(empresaId, motoristaId);
 }
 
 export function ativarVeiculo(empresaId: string, motoristaId: string, id: string): Veiculo[] {
-  const p = pessoa(empresaId, "motorista", motoristaId);
-  if (!p.veiculos.some((v) => v.id === id)) throw new Error("Veículo não encontrado.");
-  p.veiculos = p.veiculos.map((v) => ({ ...v, ativo: v.id === id }));
-  salvarPessoa(empresaId, "motorista", motoristaId, p);
-  sincronizarVeiculo(empresaId, motoristaId, p.veiculos);
-  return p.veiculos;
+  migrarVeiculosAntigos(empresaId, motoristaId);
+  const meus = doMotorista(empresaId, motoristaId);
+  if (!meus.some((v) => v.id === id)) throw new Error("Veículo não encontrado.");
+  for (const v of meus) if ((v.emUso === true) !== (v.id === id)) atualizar(empresaId, VEI(), v.id, { ...v, emUso: v.id === id }, "app do motorista");
+  sincronizarVeiculo(empresaId, motoristaId);
+  return veiculos(empresaId, motoristaId);
 }
 
 export function excluirVeiculo(empresaId: string, motoristaId: string, id: string): Veiculo[] {
-  const p = pessoa(empresaId, "motorista", motoristaId);
-  const v = p.veiculos.find((x) => x.id === id);
+  migrarVeiculosAntigos(empresaId, motoristaId);
+  const meus = doMotorista(empresaId, motoristaId);
+  const v = meus.find((x) => x.id === id);
   if (!v) throw new Error("Veículo não encontrado.");
-  if (v.ativo && p.veiculos.length > 1) throw new Error("Deixe outro veículo ativo antes de excluir este.");
-  p.veiculos = p.veiculos.filter((x) => x.id !== id);
-  salvarPessoa(empresaId, "motorista", motoristaId, p);
-  sincronizarVeiculo(empresaId, motoristaId, p.veiculos);
-  return p.veiculos;
+  if (v.emUso === true && meus.length > 1) throw new Error("Deixe outro veículo ativo antes de excluir este.");
+  remover(empresaId, VEI(), id);
+  sincronizarVeiculo(empresaId, motoristaId);
+  return veiculos(empresaId, motoristaId);
 }
 
 export function cadastroDoMotorista(empresaId: string, motoristaId: string) {
-  const m = motoristaDoCadastro(empresaId, motoristaId);
+  const m = visaoDoMotorista(motoristaDoCadastro(empresaId, motoristaId));
   const s = (k: string) => String(m[k] ?? "");
   return {
     dados: { nome: s("nome"), cpf: s("cpf"), telefone: s("telefone"), email: s("email"), nascimento: s("nascimento"), genero: s("genero"), chavePix: s("chavePix") },
@@ -356,7 +418,7 @@ export function salvarEnderecoDoMotorista(empresaId: string, motoristaId: string
   const semNumero = d.semNumero === true || String(d.semNumero) === "true";
   const numero = semNumero ? "S/N" : txt(d.numero, 10);
   if (!numero) throw new Error("Informe o número ou marque \"sem número\".");
-  alterarCampos(empresaId, MOT(), motoristaId, { cep, rua, numero, complemento: txt(d.complemento, 60) || null, bairro, cidade, uf }, "app do motorista");
+  alterarCampos(empresaId, MOT(), motoristaId, { cep, rua, endereco: rua, numero, semNumero, complemento: txt(d.complemento, 60) || null, bairro, cidade, uf }, "app do motorista");
   return cadastroDoMotorista(empresaId, motoristaId);
 }
 
@@ -367,8 +429,8 @@ export function pendenciasDoMotorista(empresaId: string, motoristaId: string): s
   const falta: string[] = [];
   if (!p.foto) falta.push("Foto do rosto");
   if (!["cpf", "nascimento", "genero", "chavePix"].every((k) => m[k])) falta.push("Dados pessoais");
-  if (!["cep", "rua", "numero", "bairro", "cidade", "uf"].every((k) => m[k])) falta.push("Endereço");
-  if (!p.veiculos.some((v) => v.ativo)) falta.push("Veículo");
+  if (!["cep", "rua", "numero", "bairro", "cidade", "uf"].every((k) => visaoDoMotorista(m)[k])) falta.push("Endereço");
+  if (!veiculos(empresaId, motoristaId).some((v) => v.ativo)) falta.push("Veículo");
   // Documentos exigidos no painel (Gerais do App) e as fotos das laterais do veículo. A foto do rosto é a do perfil.
   const tipos = tiposDoApp(empresaId);
   const exigidos = [...gerais(empresaId).motorista.documentos.filter((d) => d.exigir && d.id !== "foto").map((d) => d.id), "lateralEsquerda", "lateralDireita"];
