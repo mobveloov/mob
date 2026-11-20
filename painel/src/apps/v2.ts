@@ -14,6 +14,7 @@ import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/
 import { exigirPapel } from "../servidor/sessao.ts";
 import { abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
+import { termos as termosDoPainel } from "../config/gerais.ts";
 import { ajustes, contatos } from "./ajustes.ts";
 import { arquivo, ler, limitador, num, soDigitos, txt } from "./armazem.ts";
 import { marcarLida } from "./chat.ts";
@@ -67,6 +68,14 @@ const podeCriar = limitador(() => Number(process.env.APPS_CADASTROS_POR_IP) || 1
 
 rotasPublicasV2.get("/cidades", ok((req, res) => {
   res.json({ cidades: cidadesAtendidas(emp(req)).map((c) => ({ id: c.codigo, nome: c.nome, uf: c.uf })) });
+}));
+
+/** Termos de uso e privacidade escritos no painel (Configurações › Termos de uso). Texto vazio = a empresa não exibe. */
+rotasPublicasV2.get("/termos/:tipo", ok((req, res) => {
+  const t = termosDoPainel(emp(req)), tipo = req.params.tipo;
+  if (tipo !== "passageiro" && tipo !== "motorista" && tipo !== "privacidade") return res.status(404).json({ erro: "Texto não encontrado." });
+  const modo = tipo === "passageiro" ? t.modoPassageiro : tipo === "motorista" ? t.modoMotorista : "proprio";
+  res.json({ tipo, texto: modo === "nenhum" ? "" : t[tipo], versao: t.versao, atualizadoEm: t.atualizadoEm });
 }));
 
 rotasPublicasV2.post("/conta/existe", ok((req, res) => {

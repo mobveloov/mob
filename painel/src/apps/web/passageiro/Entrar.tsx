@@ -7,7 +7,7 @@ import { ArrowLeft, Building2, Camera, ChevronLeft, CircleHelp, Contact, Eye, Ey
 import { api, guardarToken, urlArquivo } from "../comum/api";
 import { mensagemDeErro, ServidorTeste, type MarcaApp } from "../comum/ui";
 import { apiOu, linkWhatsapp, prepararFoto, rotaFaltando } from "./apoio";
-import { Aviso, Campo, Carregando, FolhaModal } from "./pecas";
+import { Aviso, Campo, Carregando, FolhaModal, TextoDoPainel } from "./pecas";
 
 const PAPEL = "passageiro";
 export const GENEROS = ["Masculino", "Feminino", "Outro", "Prefiro não dizer"];
@@ -34,6 +34,7 @@ interface Cidade { id: string; nome: string; uf: string }
 export function Entrar({ marca, aoEntrar }: { marca: MarcaApp; aoEntrar: () => void }) {
   const [passo, setPasso] = useState<Passo>("login");
   const [ajuda, setAjuda] = useState(false);
+  const [texto, setTexto] = useState<"passageiro" | "privacidade" | null>(null);
   const [login, setLogin] = useState("");
   const [mascarado, setMascarado] = useState("");
   const [cidade, setCidade] = useState<Cidade | null>(null);
@@ -71,7 +72,8 @@ export function Entrar({ marca, aoEntrar }: { marca: MarcaApp; aoEntrar: () => v
         {passo === "codigo" && <PassoCodigo telefone={login} nome={nomeDepois} voltar={() => setPasso("login")} entrou={entrou} />}
       </div>
       <div className="login-onda" aria-hidden="true" />
-      <p className="login-rodape">Ao continuar, você concorda com os <b>Termos de Uso</b> e a <b>Privacidade</b>.</p>
+      <p className="login-rodape">Ao continuar, você concorda com os <button type="button" className="botao-link" onClick={() => setTexto("passageiro")}><b>Termos de Uso</b></button> e a <button type="button" className="botao-link" onClick={() => setTexto("privacidade")}><b>Privacidade</b></button>.</p>
+      {texto && <TextoDoPainel tipo={texto} fechar={() => setTexto(null)} />}
       <ServidorTeste />
     </div>
   );

@@ -116,3 +116,15 @@ test("agendamento e paradas seguem as regras do painel", async () => {
   assert.equal(nenhuma.status, 400);
   assert.match(nenhuma.corpo.erro, /não permite paradas/);
 });
+
+test("termos de uso e privacidade do app são os escritos no painel (rota pública)", async () => {
+  const { salvarTermos } = await import("../src/config/gerais.ts");
+  salvarTermos(E.id, { passageiro: "Regra do passageiro da Central Dados.", privacidade: "Privacidade da Central Dados.", modoPassageiro: "proprio" });
+  const p = await chamar("GET", `${API}/termos/passageiro`);
+  assert.equal(p.status, 200);
+  assert.equal(p.corpo.texto, "Regra do passageiro da Central Dados.");
+  assert.equal((await chamar("GET", `${API}/termos/privacidade`)).corpo.texto, "Privacidade da Central Dados.");
+  salvarTermos(E.id, { modoPassageiro: "nenhum" });
+  assert.equal((await chamar("GET", `${API}/termos/passageiro`)).corpo.texto, "");
+  assert.equal((await chamar("GET", `${API}/termos/outro`)).status, 404);
+});
