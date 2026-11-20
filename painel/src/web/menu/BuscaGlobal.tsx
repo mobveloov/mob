@@ -22,7 +22,10 @@ export function BuscaGlobal({ funcoes, assistente, empresa, cargo, aberta, fecha
   const achados = useMemo(() => {
     const q = sem(texto.trim());
     if (!q) return todos;
-    return todos.filter((i) => q.split(/\s+/).every((p) => sem(`${i.nome} ${i.caminho}`).includes(p)));
+    const partes = q.split(/\s+/);
+    // Quem tem a frase inteira no nome vem primeiro; depois quem tem todas as palavras no nome; por fim as do caminho.
+    const nota = (i: { nome: string; caminho: string }) => (sem(i.nome).includes(q) ? 0 : partes.every((p) => sem(i.nome).includes(p)) ? 1 : 2);
+    return todos.filter((i) => partes.every((p) => sem(`${i.nome} ${i.caminho}`).includes(p))).map((i, n) => ({ i, n, k: nota(i) })).sort((a, b) => a.k - b.k || a.n - b.n).map((x) => x.i);
   }, [todos, texto]);
 
   useEffect(() => { if (aberta) { setTexto(""); setSel(0); setTimeout(() => campo.current?.focus(), 0); } }, [aberta]);
