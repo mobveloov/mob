@@ -96,7 +96,7 @@ export function Carteira({ voltar }: { voltar: () => void }) {
     try {
       await api("/saques", { corpo: { valor: Number(valor.replace(",", ".")), chavePix: pix.trim() } });
       try { localStorage.setItem("chave-pix", pix.trim()); } catch { /* sem armazenamento */ }
-      setValor(""); setOk("Saque pedido. A central faz o Pix e a situação aparece aqui."); await recarregar();
+      setValor(""); setOk("Retirada pedida. A central faz o Pix e a situação aparece aqui."); await recarregar();
     } catch (e) { setErroSaque(mensagemDeErro(e)); } finally { setOcupado(false); }
   };
   if (!d) return <Pagina><Topo titulo="Carteira" voltar={voltar} />{erro ? <div className="conteudo"><Erro texto={erro} /></div> : <Carregando />}</Pagina>;
@@ -108,12 +108,12 @@ export function Carteira({ voltar }: { voltar: () => void }) {
       <div className="conteudo">
         <div className="cartao-ganhos"><div className="linha-topo"><span>Saldo disponível</span></div><p className="valor">{reais(d.saldo)}</p></div>
         <form className="cartao-m" onSubmit={(e) => { e.preventDefault(); void pedir(); }}>
-          <h3>Pedir saque</h3>
-          {pendente ? <p className="dica">Você já tem um saque esperando a central. Assim que ele for resolvido, pode pedir outro.</p> : (
+          <h3>Retirar saldo</h3>
+          {pendente ? <p className="dica">Você já tem uma retirada esperando a central. Assim que ela for resolvida, pode pedir outra.</p> : (
             <>
               <label className="campo"><span className="campo-rotulo">Valor (mínimo R$ 10,00)</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
               <label className="campo"><span className="campo-rotulo">Chave Pix</span><span className="campo-caixa"><input value={pix} maxLength={120} onChange={(e) => setPix(e.target.value)} placeholder="CPF, celular, e-mail ou chave aleatória" /></span></label>
-              <button className="botao-m" disabled={ocupado || !(v >= 10) || v > d.saldo || pix.trim().length < 5}>PEDIR SAQUE</button>
+              <button className="botao-m" disabled={ocupado || !(v >= 10) || v > d.saldo || pix.trim().length < 5}>RETIRAR</button>
               {v > d.saldo && <p className="dica">O valor é maior que o saldo.</p>}
             </>
           )}
@@ -121,7 +121,7 @@ export function Carteira({ voltar }: { voltar: () => void }) {
         </form>
         {!!d.saques?.length && (
           <>
-            <div className="rotulo-lista">SAQUES</div>
+            <div className="rotulo-lista">RETIRADAS</div>
             {d.saques.map((s, i) => (
               <div key={s.id ?? i} className="cartao-viagem">
                 <div className="l1"><span className="hora">{diaHora(s.em)} · Pix {s.chavePix}</span><span className="valor" style={{ color: "var(--m-tx)" }}>{reais(s.valor)}</span></div>

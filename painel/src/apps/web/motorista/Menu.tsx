@@ -289,7 +289,7 @@ export function MeuCadastro({ voltar, aoMudar, irCarteira, aoSairDaConta }: Volt
           {cartao(FileText, "Documentos", "CNH e documentos do veículo", () => setParte("docs"), dados?.pendencias.some((p) => p.startsWith("Documento")) ? "Falta" : undefined)}
         </div>
         <div className="rotulo-grupo" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 600, fontSize: ".8rem" }}>Financeiro</div>
-        <div className="lista-cartoes">{cartao(Wallet, "Carteira e saque", "Saldo, extrato e saque pelo Pix", irCarteira)}</div>
+        <div className="lista-cartoes">{cartao(Wallet, "Carteira", "Saldo para as taxas das corridas, recarga e extrato", irCarteira)}</div>
         <button type="button" className="botao-excluir-conta" onClick={() => setExcluir(true)}><span className="item-icone"><Trash2 size={20} /></span><span className="item-textos"><strong>Deletar minha conta</strong><small>Ação irreversível</small></span><ChevronRight size={18} /></button>
       </div>
       {excluir && (
