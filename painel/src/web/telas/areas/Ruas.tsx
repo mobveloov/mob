@@ -1,78 +1,122 @@
-// Cadastro › Ruas (regras de via): corrige o nome de exibição de uma rua para a central, dentro do traçado desenhado no mapa.
-// Leaflet + OpenStreetMap. Servidor: /api/areas/ruas (só o administrador grava).
+// Cadastro › Ruas (regras de via), no formato da Machine: lista de regras à esquerda ("Nova regra" no topo) e, à direita,
+// o cartão com o mapa (traçado da via) e os campos Rua, Bairro de exibição e CEP. Leaflet + OpenStreetMap.
+// Servidor: /api/areas/ruas (só o administrador grava).
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { MapPin, ChevronRight, Trash2, Save, Pencil } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
-import { Cabecalho, Campo, chamar as chamarBase, Interruptor, Janela, Selo, useAviso } from "../cadastro/base";
+import { Cabecalho, Campo, chamar as chamarBase, Janela, useAviso } from "../cadastro/base";
 import MapaAreas, { type Ponto } from "../cadastro/MapaAreas";
 
-interface Regra { id: string; nomeExibicao: string; nomeNoMapa: string; poligono: Ponto[]; ativa: boolean }
+interface Regra { id: string; nomeExibicao: string; bairro?: string; cep?: string; nomeNoMapa: string; poligono: Ponto[]; ativa: boolean }
 const chamar = <T,>(metodo: "GET" | "POST" | "PUT" | "DELETE", caminho: string, corpo?: unknown) => chamarBase<T>(metodo, caminho, corpo, "/api/areas");
+
+/** Máscara do CEP: 00000-000. */
+const mascaraCep = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 8); return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d; };
+const dentroDoQuadro = (p: Ponto, poly: Ponto[]) => {
+  let dentro = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [yi, xi] = poly[i], [yj, xj] = poly[j];
+    if (yi > p[0] !== yj > p[0] && p[1] < ((xj - xi) * (p[0] - yi)) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+};
+/** Duas regras "se cruzam" quando algum ponto de uma cai dentro da outra. */
+const seCruzam = (a: Ponto[], b: Ponto[]) => a.some((p) => dentroDoQuadro(p, b)) || b.some((p) => dentroDoQuadro(p, a));
 
 export default function RuasTela() {
   const l = useCarregar(() => chamar<{ regras: Regra[] }>("GET", "/ruas"), []);
-  const [editando, setEditando] = useState<Regra | "nova" | null>(null);
-  const { aviso, tentar } = useAviso();
+  // "nova" = cartão em branco; Regra = vendo/editando uma regra existente.
+  const [aberta, setAberta] = useState<Regra | "nova">("nova");
+  const { aviso } = useAviso();
   const regras = l.dados?.regras ?? [];
   return (
     <div className="cg-pagina-solta">
       {aviso}
-      <Cabecalho titulo="Ruas">{regras.length > 0 && <button className="cg-botao primario" onClick={() => setEditando("nova")}><Plus size={16} /> Criar nova regra</button>}</Cabecalho>
+      <Cabecalho titulo="Ruas" />
       {l.erro && <div className="cg-aviso erro">{l.erro}</div>}
-      {!regras.length && !l.erro ? (
-        <div className="cg-tabela-caixa" style={{ padding: 24, textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
-          <h3 style={{ margin: "0 0 8px", fontSize: 18 }}>O que são regras de via?</h3>
-          <p style={{ margin: "0 0 16px", color: "var(--cg-suave)", fontSize: 14 }}>Regras de via corrigem o nome de exibição de uma rua para a sua central, dentro do traçado desenhado no mapa — útil quando o nome retornado pelo mapa não é o mesmo usado pelos moradores da região.</p>
-          <button className="cg-botao primario" onClick={() => setEditando("nova")}>Criar nova regra</button>
+      <div className="cg-ruas">
+        <div className="cg-ruas-lista">
+          <button type="button" className={`cg-ruas-item ${aberta === "nova" ? "ativa" : ""}`} onClick={() => setAberta("nova")}>
+            <span className="cg-ruas-icone"><MapPin size={18} /></span><strong>Nova regra</strong><ChevronRight size={18} />
+          </button>
+          {regras.map((r) => (
+            <button type="button" key={r.id} className={`cg-ruas-item ${aberta !== "nova" && aberta.id === r.id ? "ativa" : ""}`} onClick={() => setAberta(r)}>
+              <span className="cg-ruas-icone"><MapPin size={18} /></span>
+              <span className="cg-ruas-nome"><strong>{r.nomeExibicao}</strong>{(r.bairro || r.cep) && <small>{[r.bairro, r.cep].filter(Boolean).join(" · ")}</small>}</span>
+              <ChevronRight size={18} />
+            </button>
+          ))}
         </div>
-      ) : (
-        <div className="cg-tabela-caixa"><div className="cg-rolagem"><table className="cg-tabela">
-          <thead><tr><th>Nome de exibição</th><th>Nome no mapa</th><th className="centro">Pontos do traçado</th><th>Situação</th><th /></tr></thead>
-          <tbody>{regras.map((r) => (
-            <tr key={r.id}>
-              <td><strong>{r.nomeExibicao}</strong></td>
-              <td>{r.nomeNoMapa || <span style={{ color: "var(--cg-suave)" }}>Qualquer rua do traçado</span>}</td>
-              <td className="centro">{r.poligono.length}</td>
-              <td>{r.ativa ? <Selo tom="ok">Ativa</Selo> : <Selo tom="neutro">Desligada</Selo>}</td>
-              <td className="direita"><div className="cg-acoes" style={{ justifyContent: "flex-end" }}>
-                <button className="cg-botao" onClick={() => setEditando(r)}>Editar</button>
-                <button className="cg-botao perigo" aria-label={`Excluir ${r.nomeExibicao}`} onClick={() => confirm(`Excluir a regra ${r.nomeExibicao}?`) && void tentar(async () => { await chamar("DELETE", `/ruas/${r.id}`); l.recarregar(); }, "Regra excluída.")}><Trash2 size={15} /></button>
-              </div></td>
-            </tr>))}</tbody>
-        </table></div></div>
-      )}
-      {editando && <Formulario r={editando === "nova" ? null : editando} outras={regras} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
+        <Cartao key={aberta === "nova" ? "nova" : aberta.id} r={aberta === "nova" ? null : aberta} outras={regras} onVoltar={() => setAberta("nova")} onMudou={() => l.recarregar()} />
+      </div>
     </div>
   );
 }
 
-function Formulario({ r, outras, onFechar, onSalvo }: { r: Regra | null; outras: Regra[]; onFechar: () => void; onSalvo: () => void }) {
-  const [nomeExibicao, setNomeExibicao] = useState(r?.nomeExibicao ?? "");
-  const [nomeNoMapa, setNomeNoMapa] = useState(r?.nomeNoMapa ?? "");
-  const [ativa, setAtiva] = useState(r?.ativa ?? true);
+function Cartao({ r, outras, onVoltar, onMudou }: { r: Regra | null; outras: Regra[]; onVoltar: () => void; onMudou: () => void }) {
+  const [editando, setEditando] = useState(!r);
+  const [rua, setRua] = useState(r?.nomeExibicao ?? "");
+  const [bairro, setBairro] = useState(r?.bairro ?? "");
+  const [cep, setCep] = useState(r?.cep ?? "");
   const [pontos, setPontos] = useState<Ponto[]>(r?.poligono ?? []);
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [sobrescrever, setSobrescrever] = useState<Regra[] | null>(null);
   const { aviso, tentar } = useAviso();
-  const salvar = async () => {
-    const corpo = { nomeExibicao, nomeNoMapa, ativa, poligono: pontos };
-    if (await tentar(() => (r ? chamar("PUT", `/ruas/${r.id}`, corpo) : chamar("POST", "/ruas", corpo)), "Regra salva.")) { onSalvo(); onFechar(); }
+  const pronto = rua.trim().length >= 2 && bairro.trim().length >= 2 && cep.replace(/\D/g, "").length === 8 && pontos.length >= 3;
+  const gravar = async () => {
+    const corpo = { nomeExibicao: rua, bairro, cep, nomeNoMapa: r?.nomeNoMapa ?? "", ativa: r?.ativa ?? true, poligono: pontos };
+    if (await tentar(() => (r ? chamar("PUT", `/ruas/${r.id}`, corpo) : chamar("POST", "/ruas", corpo)), "Regra salva.")) { onMudou(); onVoltar(); }
   };
+  const salvar = () => {
+    const cruzam = outras.filter((o) => o.id !== r?.id && seCruzam(o.poligono, pontos));
+    if (cruzam.length) setSobrescrever(cruzam); else void gravar();
+  };
+  const excluir = async () => {
+    if (!r) return;
+    setConfirmarExclusao(false);
+    if (await tentar(() => chamar("DELETE", `/ruas/${r.id}`), "Regra excluída.")) { onMudou(); onVoltar(); }
+  };
+  const lendo = !!r && !editando;
   return (
-    <Janela aberta titulo={r ? "Editar regra de via" : "Criar nova regra"} sub="Nome de exibição da rua" onFechar={onFechar} largura="grande" rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>{r ? "Salvar regra" : "Criar"}</button></>}>
+    <section className="cg-ruas-cartao">
       {aviso}
-      <div className="cg-grade" style={{ marginBottom: 12 }}>
-        <Campo rotulo="Nome de exibição *" dica="O nome que a sua central vai ver."><input value={nomeExibicao} maxLength={80} onChange={(e) => setNomeExibicao(e.target.value)} /></Campo>
-        <Campo rotulo="Nome no mapa" dica="Opcional. Vazio = vale para qualquer rua dentro do traçado."><input value={nomeNoMapa} maxLength={80} onChange={(e) => setNomeNoMapa(e.target.value)} placeholder="Ex.: Rua Doutor Silva" /></Campo>
-        <Campo rotulo="Situação"><Interruptor ligado={ativa} onChange={setAtiva} rotulo={ativa ? "Ativa" : "Desligada"} /></Campo>
+      <header>
+        <h2>{!r ? "Criando nova regra" : editando ? "Editando regra" : r.nomeExibicao}</h2>
+        {!r && <p>Criar uma regra corrige o nome de exibição de uma via para a própria central, dentro do traçado desenhado no mapa.</p>}
+      </header>
+      <MapaAreas areas={outras.filter((o) => o.id !== r?.id).map((o) => ({ id: o.id, nome: o.nomeExibicao, poligono: o.poligono, cor: "#3b82f6" }))} desenho={pontos} onDesenho={lendo ? undefined : setPontos} grande />
+      {!lendo && (
+        <ol className="cg-ruas-passos">
+          <li><b>1</b> Clique no mapa para desenhar o traçado da via.</li>
+          <li><b>2</b> Arraste um ponto para ajustar; clique com o botão direito para remover.</li>
+        </ol>
+      )}
+      <div className="cg-ruas-campos">
+        <Campo rotulo="Rua:"><input value={rua} maxLength={50} placeholder="Digite o nome da rua" disabled={lendo} onChange={(e) => setRua(e.target.value)} /></Campo>
+        <Campo rotulo="Bairro de exibição:"><input value={bairro} maxLength={50} placeholder="Digite o bairro de exibição" disabled={lendo} onChange={(e) => setBairro(e.target.value)} /></Campo>
+        <Campo rotulo="CEP:"><input value={cep} maxLength={9} inputMode="numeric" placeholder="00000-000" disabled={lendo} onChange={(e) => setCep(mascaraCep(e.target.value))} /></Campo>
       </div>
-      <div className="cg-cabecalho" style={{ margin: "0 0 8px" }}>
-        <div><strong>Traçado da rua</strong><p style={{ textTransform: "none", letterSpacing: 0 }}>Toque no mapa e contorne a rua ({pontos.length} pontos, mínimo 3).</p></div>
-        <div className="cg-acoes">
-          <button className="cg-botao" disabled={!pontos.length} onClick={() => setPontos(pontos.slice(0, -1))}>Desfazer</button>
-          <button className="cg-botao" disabled={!pontos.length} onClick={() => setPontos([])}>Limpar</button>
-        </div>
-      </div>
-      <MapaAreas areas={outras.filter((o) => o.id !== r?.id).map((o) => ({ id: o.id, nome: o.nomeExibicao, poligono: o.poligono, cor: "#3b82f6" }))} desenho={pontos} onDesenho={setPontos} grande />
-    </Janela>
+      <footer className="cg-acoes">
+        {!r && <>
+          <button className="cg-botao primario" disabled={!pronto} onClick={salvar}>Salvar nova regra</button>
+          <button className="cg-botao" onClick={onVoltar}>Desistir</button>
+        </>}
+        {r && lendo && <button className="cg-botao" title="Editar regra" aria-label="Editar regra" onClick={() => setEditando(true)}><Pencil size={16} /> Editar</button>}
+        {r && !lendo && <>
+          <button className="cg-botao primario" disabled={!pronto} title="Salvar regra" aria-label="Salvar regra" onClick={salvar}><Save size={16} /> Salvar</button>
+          <button className="cg-botao" onClick={onVoltar}>Desistir</button>
+          <button className="cg-botao perigo" title="Excluir regra" aria-label="Excluir regra" onClick={() => setConfirmarExclusao(true)}><Trash2 size={16} /></button>
+        </>}
+      </footer>
+      <Janela aberta={confirmarExclusao} titulo="Excluir regra" onFechar={() => setConfirmarExclusao(false)} largura="pequena"
+        rodape={<><button className="cg-botao" onClick={() => setConfirmarExclusao(false)}>Cancelar</button><button className="cg-botao perigo" onClick={() => void excluir()}>Excluir</button></>}>
+        <p>Excluir a regra de via <strong>{r?.nomeExibicao}</strong>? A rua volta a aparecer com o nome do mapa. Não dá para desfazer.</p>
+      </Janela>
+      <Janela aberta={!!sobrescrever} titulo="Já existe uma regra neste trecho" onFechar={() => setSobrescrever(null)} largura="pequena"
+        rodape={<><button className="cg-botao" onClick={() => setSobrescrever(null)}>Cancelar</button><button className="cg-botao primario" onClick={() => { setSobrescrever(null); void gravar(); }}>Salvar assim mesmo</button></>}>
+        <p>Este traçado cruza {sobrescrever && sobrescrever.length > 1 ? "outras regras" : "a regra"} <strong>{sobrescrever?.map((o) => o.nomeExibicao).join(", ")}</strong>. Se você continuar, no trecho em comum vale a regra mais nova.</p>
+      </Janela>
+    </section>
   );
 }

@@ -201,21 +201,27 @@ test("despacho: motorista em plantão em vigor tem prioridade sobre o mais perto
 
 test("ruas: regra de via troca o nome só dentro do traçado, por empresa, e só admin grava", async () => {
   const traco = quadrado(-23.552, -23.548, -46.632, -46.628);
-  assert.equal((await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "Rua do Mercado", poligono: [[-23.55, -46.63]] })).status, 400, "traçado precisa de 3 pontos");
-  assert.equal((await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "", poligono: traco })).status, 400);
-  assert.equal((await chamar("POST", "/api/areas/ruas", cOp, { nomeExibicao: "Rua do Mercado", poligono: traco })).status, 403);
-  const r = await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "Rua do Mercado", nomeNoMapa: "Rua Doutor Silva", poligono: traco });
+  assert.equal((await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "Rua do Mercado", bairro: "Centro", cep: "13610-000", poligono: [[-23.55, -46.63]] })).status, 400, "traçado precisa de 3 pontos");
+  assert.equal((await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "", bairro: "Centro", cep: "13610-000", poligono: traco })).status, 400);
+  assert.equal((await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "Rua do Mercado", cep: "13610-000", poligono: traco })).status, 400, "bairro é obrigatório");
+  assert.equal((await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "Rua do Mercado", bairro: "Centro", cep: "1361", poligono: traco })).status, 400, "CEP com 8 números");
+  assert.equal((await chamar("POST", "/api/areas/ruas", cOp, { nomeExibicao: "Rua do Mercado", bairro: "Centro", cep: "13610-000", poligono: traco })).status, 403);
+  const r = await chamar("POST", "/api/areas/ruas", cAdm, { nomeExibicao: "Rua do Mercado", bairro: "Centro", cep: "13610-000", nomeNoMapa: "Rua Doutor Silva", poligono: traco });
   assert.equal(r.status, 200, JSON.stringify(r.corpo));
   const end = { texto: "Rua Doutor Silva, 12 - Centro, Leme/SP", rua: "Rua Doutor Silva", lat: -23.55, lng: -46.63 };
   const trocado = Ru.aplicarRegrasDeVia(E, end);
   assert.equal(trocado.rua, "Rua do Mercado");
   assert.equal(trocado.texto, "Rua do Mercado, 12 - Centro, Leme/SP");
+  const comBairro = Ru.aplicarRegrasDeVia(E, { ...end, texto: "Rua Doutor Silva, 12 - Jardim Velho, Leme/SP", bairro: "Jardim Velho", cep: "13610-999" });
+  assert.equal(comBairro.bairro, "Centro", "bairro de exibição");
+  assert.equal(comBairro.cep, "13610-000", "CEP da regra");
+  assert.equal(comBairro.texto, "Rua do Mercado, 12 - Centro, Leme/SP");
   assert.equal(Ru.aplicarRegrasDeVia(E, { ...end, lat: -22, lng: -45 }).rua, "Rua Doutor Silva", "fora do traçado");
   assert.equal(Ru.aplicarRegrasDeVia(E, { ...end, rua: "Avenida Outra", texto: "Avenida Outra, 1" }).rua, "Avenida Outra", "outro nome de rua");
   assert.equal(Ru.aplicarRegrasDeVia(E2, end).rua, "Rua Doutor Silva", "outra empresa");
   assert.equal((await chamar("GET", "/api/areas/ruas", cAdm2)).corpo.regras.length, 0);
   // Desligada, não vale.
-  await chamar("PUT", `/api/areas/ruas/${r.corpo.regra.id}`, cAdm, { nomeExibicao: "Rua do Mercado", nomeNoMapa: "Rua Doutor Silva", poligono: traco, ativa: false });
+  await chamar("PUT", `/api/areas/ruas/${r.corpo.regra.id}`, cAdm, { nomeExibicao: "Rua do Mercado", bairro: "Centro", cep: "13610-000", nomeNoMapa: "Rua Doutor Silva", poligono: traco, ativa: false });
   assert.equal(Ru.aplicarRegrasDeVia(E, end).rua, "Rua Doutor Silva");
   assert.equal((await chamar("DELETE", `/api/areas/ruas/${r.corpo.regra.id}`, cOp)).status, 403);
   assert.equal((await chamar("DELETE", `/api/areas/ruas/${r.corpo.regra.id}`, cAdm)).status, 200);

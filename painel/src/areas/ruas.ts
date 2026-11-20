@@ -7,8 +7,10 @@ import { gravarG, lerG } from "../gestao/armazem.ts";
 import { arred, normal } from "../servidor/util.ts";
 import { dentroDe, type Ponto } from "./areas.ts";
 
-export interface RegraVia { id: string; nomeExibicao: string; nomeNoMapa: string; poligono: Ponto[]; ativa: boolean; criadoEm: string }
-export interface EntradaRegra { nomeExibicao?: unknown; nomeNoMapa?: unknown; poligono?: unknown; ativa?: unknown }
+// Como na Machine, a regra tem Rua, Bairro de exibição e CEP (os três obrigatórios) e o traçado no mapa.
+// "nomeExibicao" é a Rua. Regras antigas, sem bairro e CEP, continuam valendo só para o nome da rua.
+export interface RegraVia { id: string; nomeExibicao: string; bairro?: string; cep?: string; nomeNoMapa: string; poligono: Ponto[]; ativa: boolean; criadoEm: string }
+export interface EntradaRegra { nomeExibicao?: unknown; bairro?: unknown; cep?: unknown; nomeNoMapa?: unknown; poligono?: unknown; ativa?: unknown }
 
 const MAX_REGRAS = 500;
 export const regrasDeVia = (empresaId: string) => lerG<RegraVia[]>(empresaId, "ruas", []);
@@ -24,9 +26,13 @@ function tracado(v: unknown): Ponto[] {
 }
 
 function validar(e: EntradaRegra) {
-  const nomeExibicao = limpo(e.nomeExibicao, 80);
-  if (nomeExibicao.length < 2) throw new Error("Informe o nome de exibição da rua.");
-  return { nomeExibicao, nomeNoMapa: limpo(e.nomeNoMapa, 80), poligono: tracado(e.poligono), ativa: e.ativa !== false };
+  const nomeExibicao = limpo(e.nomeExibicao, 50);
+  if (nomeExibicao.length < 2) throw new Error("Informe o nome da rua.");
+  const bairro = limpo(e.bairro, 50);
+  if (bairro.length < 2) throw new Error("Informe o bairro de exibição.");
+  const digitos = String(e.cep ?? "").replace(/\D/g, "");
+  if (digitos.length !== 8) throw new Error("Informe o CEP com 8 números (00000-000).");
+  return { nomeExibicao, bairro, cep: `${digitos.slice(0, 5)}-${digitos.slice(5)}`, nomeNoMapa: limpo(e.nomeNoMapa, 80), poligono: tracado(e.poligono), ativa: e.ativa !== false };
 }
 
 export function criarRegra(empresaId: string, e: EntradaRegra): RegraVia {
@@ -55,14 +61,17 @@ export function removerRegra(empresaId: string, id: string) {
  * Troca o nome da rua do endereço pelo nome de exibição, se o ponto cair dentro do traçado de uma regra ativa.
  * Regra sem "nome no mapa" vale para qualquer rua dentro do traçado. A regra mais nova vence se houver duas.
  */
-export function aplicarRegrasDeVia<E extends { texto: string; rua: string; lat: number; lng: number }>(empresaId: string, e: E): E {
+export function aplicarRegrasDeVia<E extends { texto: string; rua: string; lat: number; lng: number; bairro?: string; cep?: string }>(empresaId: string, e: E): E {
   const regras = regrasDeVia(empresaId).filter((r) => r.ativa);
   if (!regras.length || !Number.isFinite(e.lat) || !Number.isFinite(e.lng)) return e;
   for (const r of [...regras].reverse()) {
     if (!dentroDe(e.lat, e.lng, r.poligono)) continue;
     if (r.nomeNoMapa && !normal(e.rua).includes(normal(r.nomeNoMapa))) continue;
-    const texto = e.rua && e.texto.includes(e.rua) ? e.texto.replace(e.rua, r.nomeExibicao) : e.texto;
-    return { ...e, rua: r.nomeExibicao, texto };
+    let texto = e.rua && e.texto.includes(e.rua) ? e.texto.replace(e.rua, r.nomeExibicao) : e.texto;
+    const extra: { bairro?: string; cep?: string } = {};
+    if (r.bairro) { if (e.bairro && texto.includes(e.bairro)) texto = texto.replace(e.bairro, r.bairro); if (e.bairro !== undefined) extra.bairro = r.bairro; }
+    if (r.cep && e.cep !== undefined) { if (e.cep && texto.includes(e.cep)) texto = texto.replace(e.cep, r.cep); extra.cep = r.cep; }
+    return { ...e, ...extra, rua: r.nomeExibicao, texto };
   }
   return e;
 }
