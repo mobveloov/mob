@@ -66,7 +66,7 @@ export const classeNps = (nota: number) => (nota >= 5 ? "Promotor" : nota === 4 
 export const TIPOS_NPS: Record<string, string> = { T: "Tudo", P: "Promotores", N: "Neutros", D: "Detratores" };
 export const PERIODOS_NPS: Record<string, string> = { TD: "Hoje", LW: "Semana passada", LM: "Mês passado", LS: "Últimos 7 dias", LT: "Últimos 30 dias", CT: "Personalizado" };
 
-export interface FiltroAvaliacoes { periodo?: string; inicio?: string; fim?: string; tipo?: string; email?: string; telefone?: string }
+export interface FiltroAvaliacoes { periodo?: string; inicio?: string; fim?: string; tipo?: string; email?: string; telefone?: string; nome?: string }
 
 /** Período do filtro (dias AAAA-MM-DD, horário de Brasília). Sem período: últimos 30 dias. */
 export function periodoNps(chave = "LT", inicio = "", fim = ""): { inicio: string; fim: string; rotulo: string } {
@@ -99,6 +99,8 @@ function montarNps(empresaId: string, papel: PapelNps, f: FiltroAvaliacoes, comT
     const chaves = [...pessoasNps(empresaId, papel)].filter(([, v]) => (!email || normal(v.email).includes(email)) && (!tel || v.telefone.replace(/\D/g, "").includes(tel))).map(([k]) => k);
     w.push("chave IN (SELECT value FROM json_each(?))"); p.push(JSON.stringify(chaves));
   }
+  const nome = String(f.nome ?? "").trim();
+  if (nome) { w.push("nome LIKE ? ESCAPE '!'"); p.push(`%${nome.replace(/[!%_]/g, "!$&")}%`); }
   if (comTipo && f.tipo === "P") w.push("nota >= 5"); else if (comTipo && f.tipo === "N") w.push("nota = 4"); else if (comTipo && f.tipo === "D") w.push("nota <= 3");
   return { onde: w.join(" AND "), p, per };
 }

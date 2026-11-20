@@ -248,7 +248,7 @@ const papelNps = (v: string): PapelNps => (v === "motorista" ? "motorista" : "pa
 rotasConfig.get("/nps/:papel", ok((req, res) => res.json({ config: configNps(emp(req), papelNps(req.params.papel)), resumo: resumoNps(emp(req), papelNps(req.params.papel)) })));
 const filtroNps = (req: Request) => {
   const v = (k: string, max = 80) => String(req.query[k] ?? "").trim().slice(0, max);
-  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20) };
+  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20), nome: v("nome", 50) };
 };
 /** Avaliações (NPS): nota, promotores, neutros, detratores e a lista paginada, com filtros de período, tipo, e-mail e telefone. */
 rotasConfig.get("/nps/:papel/avaliacoes", ok((req, res) => res.json({ ...avaliacoesNps(emp(req), papelNps(req.params.papel), filtroNps(req), Number(req.query.pagina) || 1), periodos: PERIODOS_NPS, tipos: TIPOS_NPS })));
