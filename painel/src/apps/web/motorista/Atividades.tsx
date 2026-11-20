@@ -276,10 +276,10 @@ export function CarteiraDoMotorista({ voltar }: Voltar) {
 // ====================================================================== Taxa de aceitação
 
 export function TaxaDeAceitacao({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<{ ofertas: number; aceitas: number; rejeitadas: number; ignoradas: number; porcentagem: number; atualizadoEm: string | null }>("/aceitacao");
+  const { dados, erro } = useBuscar<{ janela?: number; ofertas: number; aceitas: number; rejeitadas: number; ignoradas: number; porcentagem: number; atualizadoEm: string | null }>("/aceitacao");
   const [aberto, setAberto] = useState<number | null>(null);
   const perguntas: Array<[string, string]> = [
-    ["O que é a taxa de aceitação?", "É a porcentagem de chamadas que você aceitou, entre as últimas 100 que a central mandou para você."],
+    ["O que é a taxa de aceitação?", `É a porcentagem de chamadas que você aceitou, entre as últimas ${dados?.janela ?? 100} que a central mandou para você.`],
     ["Como a taxa é calculada?", "Aceitas ÷ ofertas. Chamada recusada ou que passou sem resposta conta como não aceita. Quem fica offline no meio da chamada não é contado."],
     ["O que é uma oferta?", "É cada chamada de corrida que aparece na sua tela com o tempo para aceitar."],
   ];
@@ -289,7 +289,7 @@ export function TaxaDeAceitacao({ voltar }: Voltar) {
       <div className="conteudo">
         <Erro texto={erro} />
         {dados && <>
-          <section className="cartao-m ganhos-resumo"><p className="valor-grande">{dados.porcentagem}%</p><p className="centro">Taxa de aceitação</p><small className="dica centro">Baseado nas últimas 100 ofertas</small></section>
+          <section className="cartao-m ganhos-resumo"><p className="valor-grande">{dados.porcentagem}%</p><p className="centro">Taxa de aceitação</p><small className="dica centro">Baseado nas últimas {dados.janela ?? 100} ofertas</small></section>
           <section className="cartao-m">
             <h3 className="titulo-secao">Detalhamento</h3>
             <div className="linha-valor"><span>Ofertas</span><strong>{dados.ofertas}</strong></div>

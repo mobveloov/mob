@@ -24,7 +24,7 @@ export function distanciaDaLinha(p: Posicao, linha: Array<[number, number]>): nu
 }
 export const textoMetros = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1).replace(".", ",")} km` : `${Math.max(10, Math.round(m / 10) * 10)} m`);
 
-export function useNavegacao(posicao: Posicao | null, alvo: { lat?: number; lng?: number } | null, ligada: boolean, voz: boolean): EstadoNavegacao {
+export function useNavegacao(posicao: Posicao | null, alvo: { lat?: number; lng?: number } | null, ligada: boolean, voz: boolean, recalcularM = 60): EstadoNavegacao {
   const [rota, setRota] = useState<Resposta | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [indice, setIndice] = useState(0);
@@ -50,8 +50,8 @@ export function useNavegacao(posicao: Posicao | null, alvo: { lat?: number; lng?
   useEffect(() => {
     if (!ligada || !posicao || !alvoOk) return;
     if (!rota) { if (Date.now() - ultimaBusca.current > 8000) void buscar(posicao); return; }
-    // Saiu da rota (mais de 60 m da linha): recalcula, no máximo a cada 6 s.
-    const longe = distanciaDaLinha(posicao, rota.caminho) > 60;
+    // Saiu da rota (mais de "recalcularM" metros da linha; vem de Gerais › Regras do motorista): recalcula, no máximo a cada 6 s.
+    const longe = distanciaDaLinha(posicao, rota.caminho) > recalcularM;
     setFora(longe);
     if (longe && Date.now() - ultimaBusca.current > 6000) { void buscar(posicao); return; }
     // Passou da manobra (a menos de 25 m): vai para a seguinte.

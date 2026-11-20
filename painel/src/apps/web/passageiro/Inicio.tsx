@@ -5,6 +5,7 @@ import { Briefcase, Gift, History, House, Search } from "lucide-react";
 import type { Posicao } from "../comum/api";
 import { saudacao, type Eu, type Lugares } from "./apoio";
 import { usePersonalizacao } from "../comum/personalizacao";
+import { Banners } from "../comum/ui";
 import { Mapa } from "./Mapa";
 import { Avatar } from "./pecas";
 
@@ -35,6 +36,7 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
           <button onClick={() => atalho("trabalho")}><span className="icone-redondo claro"><Briefcase size={18} /></span><strong>Trabalho</strong><small>{lugares?.trabalho ? "Ir trabalhar" : "Definir"}</small></button>
           <button onClick={() => atalho("recentes")}><span className="icone-redondo claro"><History size={18} /></span><strong>Recentes</strong><small>Ver últimos</small></button>
         </div>
+        <Banners tipo="app" />
       </div>
     </div>
   );

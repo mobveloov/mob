@@ -247,7 +247,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
       {(regras?.motorista.botaoPanico ?? true) && <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>}
 
       <div className="inicio-flutuantes">
-        {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
+        {online && (regras?.macaneta.ativo ?? true) && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
         <div className="direita">
           {online && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
           <button type="button" className="mapa-botao" aria-label={`Aparência: ${NOMES_TEMA[ajustes.tema]}. Toque para trocar`} onClick={() => mudarAjustes({ tema: ajustes.tema === "sistema" ? "claro" : ajustes.tema === "claro" ? "escuro" : "sistema" })}>{ajustes.tema === "escuro" ? <Moon size={22} /> : <Sun size={22} />}</button>
