@@ -10,11 +10,11 @@
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, taxasDoPassageiroDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
 import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
 import { ajustes } from "./ajustes.ts";
-import { calcularComissao } from "../config/comissao.ts";
+import { calcularComissao, taxasDoMotorista } from "../config/comissao.ts";
 import { estatisticas, urlDaFoto } from "./perfil.ts";
 import { pessoa } from "./extras.ts";
 import { naoLidas } from "./chat.ts";
@@ -152,7 +152,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
     },
     ...(papel === "motorista" ? { infoAntes: c.infoAntes ?? "", infoDepois: c.motoristaId ? c.infoDepois ?? "" : "", obsEmpresa: observacaoDaEmpresa(empresaId, c.empresaConveniada) } : {}),
     // Taxa de serviço do passageiro (vem à parte do valor da corrida; o app do passageiro mostra na estimativa e no recibo).
-    ...(papel === "passageiro" ? { taxaServico: taxaServicoDaCorrida(empresaId, c) } : {}),
+    ...(papel === "passageiro" ? { taxaServico: taxaServicoDaCorrida(empresaId, c), taxas: taxasDoPassageiroDaCorrida(empresaId, c) } : {}),
     canal: c.canal, valorOferecido: c.valorOferecido ?? null, opcionais: c.opcionais ?? [], etiquetas: c.etiquetas ?? [],
     modo: c.macaneta?.modo, distanciaPercorridaKm: c.macaneta ? c.macaneta.km : undefined,
     ...(papel === "passageiro" ? { ...aproximacao(empresaId, c), mensagensNaoLidas: aberta ? naoLidas(empresaId, c.id, "passageiro") : 0 } : {}),
@@ -723,20 +723,28 @@ export function valorDoTaximetro(empresaId: string, c: CorridaPropria): number |
 /** Uma corrida finalizada do ponto de vista do motorista: valor da corrida, comissão da central e valor líquido. */
 export function resumoDeGanho(empresaId: string, motoristaId: string, c: CorridaPropria) {
   const bruto = arred(c.valor ?? 0), desconto = arred(c.desconto ?? 0);
-  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(bruto - desconto)), motoristaId);
+  const base = Math.max(0, arred(bruto - desconto));
+  const co = calcularComissao(empresaId, c.categoria, base, motoristaId, c.pagamento);
+  const taxas = taxasDoMotorista(empresaId, c.categoria, base, motoristaId, c.pagamento); // uma linha por taxa da central (soma = taxaCentral)
   const minutos = c.iniciadaEm && c.finalizadaEm ? Math.max(1, Math.round((Date.parse(c.finalizadaEm) - Date.parse(c.iniciadaEm)) / 60_000)) : c.estimativa.minutos ?? null;
   const km = c.macaneta?.km || c.estimativa.distanciaKm || null;
   const liquido = arred(bruto - co.taxaCentral);
   return {
-    id: c.id, os: c.os, em: c.finalizadaEm, valor: c.valor, valorBruto: bruto, taxaCentral: co.taxaCentral, valorLiquido: liquido, desconto,
+    id: c.id, os: c.os, em: c.finalizadaEm, valor: c.valor, valorBruto: bruto, taxaCentral: co.taxaCentral, valorLiquido: liquido, taxas, desconto,
     percentualTaxa: bruto > 0 ? arred((co.taxaCentral / bruto) * 100, 1) : 0, ganhoPorKm: km && km > 0 ? arred(liquido / km) : null,
     categoria: c.categoria, pagamento: c.pagamento, canal: c.canal, km: km ? arred(km, 2) : null, minutos,
     passageiro: c.passageiro.nome, embarque: c.embarque.texto, destino: c.destino?.texto ?? "", solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm,
   };
 }
 
+/** Soma das taxas da central por nome (como configuradas no painel), para o resumo do período. */
+const taxasPorNome = (l: Array<{ taxas: Array<{ nome: string; valor: number }> }>) => {
+  const m = new Map<string, number>();
+  for (const c of l) for (const t of c.taxas) m.set(t.nome, (m.get(t.nome) ?? 0) + t.valor);
+  return [...m].map(([nome, valor]) => ({ nome, valor: arred(valor) }));
+};
 const somaGanhos = (l: Array<ReturnType<typeof resumoDeGanho>>) => ({
-  corridas: l.length, bruto: arred(l.reduce((s, c) => s + c.valorBruto, 0)), taxa: arred(l.reduce((s, c) => s + c.taxaCentral, 0)), liquido: arred(l.reduce((s, c) => s + c.valorLiquido, 0)),
+  taxas: taxasPorNome(l), corridas: l.length, bruto: arred(l.reduce((s, c) => s + c.valorBruto, 0)), taxa: arred(l.reduce((s, c) => s + c.taxaCentral, 0)), liquido: arred(l.reduce((s, c) => s + c.valorLiquido, 0)),
 });
 
 export function ganhos(empresaId: string, motoristaId: string) {
@@ -789,7 +797,7 @@ export function ganhosPeriodo(empresaId: string, motoristaId: string, periodo: "
   const kmTotal = lista.reduce((s, c) => s + (c.km ?? 0), 0);
   return {
     periodo, de, ate, total: arred(total), viagens: fin.length,
-    totalBruto: totais.bruto, totalTaxa: totais.taxa, totalLiquido: totais.liquido, ganhoPorKm: kmTotal > 0 ? arred(totais.liquido / kmTotal) : null,
+    totalBruto: totais.bruto, totalTaxa: totais.taxa, taxasPorNome: totais.taxas, totalLiquido: totais.liquido, ganhoPorKm: kmTotal > 0 ? arred(totais.liquido / kmTotal) : null,
     hoje: somaGanhos(todas.filter((c) => c.em!.slice(0, 10) === hojeDia)), semanaAtual: somaGanhos(todas.filter((c) => c.em!.slice(0, 10) >= dia(segunda) && c.em!.slice(0, 10) <= dia(new Date(segunda.getTime() + 6 * 86_400_000)))),
     porDiaLiquido: [...new Map(lista.map((c) => [c.em!.slice(0, 10), 0] as const))].map(([d]) => ({ dia: d, ...somaGanhos(lista.filter((c) => c.em!.slice(0, 10) === d)) })), minutosOnline: Math.round(online), minutosEmViagem: Math.round(emViagem),
     porDia: [...porDiaMapa].map(([d, valor]) => ({ dia: d, valor: arred(valor) })),

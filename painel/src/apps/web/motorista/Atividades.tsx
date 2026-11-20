@@ -3,19 +3,21 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Clock, Eye, EyeOff, Flag, Gift, Plus, SlidersHorizontal, Star, UserRound, Wallet, X, Car } from "lucide-react";
-import { reais } from "../comum/api";
-import { Avatar, Erro, Folha, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
+import { api, reais } from "../comum/api";
+import { mensagemDeErro } from "../comum/ui";
+import { Avatar, Erro, Folha, Info, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
 import { useAjustes } from "./ajustes";
 import { diaHora, soHora, type Eu } from "./tipos";
 import { Carteira as CarteiraAntiga } from "./Telas";
 
 export interface Ganho {
-  id: string; os: string; em: string; valor: number | null; valorBruto: number; taxaCentral: number; valorLiquido: number; desconto: number; percentualTaxa: number; ganhoPorKm: number | null;
+  id: string; os: string; em: string; valor: number | null; valorBruto: number; taxaCentral: number; taxas?: Taxa[]; valorLiquido: number; desconto: number; percentualTaxa: number; ganhoPorKm: number | null;
   categoria: string; pagamento: string; canal: string; km: number | null; minutos: number | null; passageiro: string; embarque: string; destino: string; solicitadaEm: string; iniciadaEm?: string | null;
 }
-interface Soma { corridas: number; bruto: number; taxa: number; liquido: number }
+interface Taxa { nome: string; valor: number }
+interface Soma { corridas: number; bruto: number; taxa: number; liquido: number; taxas?: Taxa[] }
 interface Periodo {
-  periodo: string; de: string; ate: string; total: number; viagens: number; totalBruto: number; totalTaxa: number; totalLiquido: number; ganhoPorKm: number | null;
+  periodo: string; de: string; ate: string; total: number; viagens: number; totalBruto: number; totalTaxa: number; taxasPorNome?: Taxa[]; totalLiquido: number; ganhoPorKm: number | null;
   minutosOnline: number; minutosEmViagem: number; hoje: Soma; semanaAtual: Soma;
   porDia: Array<{ dia: string; valor: number }>; porDiaLiquido: Array<{ dia: string } & Soma>;
   porPagamento: Array<{ pagamento: string; valor: number; corridas: number }>; lista: Ganho[];
@@ -54,7 +56,7 @@ export function Atividades({ voltar, eu, irHistorico, irCarteira, irAceitacao, i
           <div className="abas-linha" role="tablist">{(["hoje", "semanal", "mensal"] as const).map((a) => <button key={a} type="button" role="tab" aria-selected={aba === a} className={aba === a ? "ativa" : ""} onClick={() => setAba(a)}>{a === "hoje" ? "Hoje" : a === "semanal" ? "Semanal" : "Mensal"}</button>)}</div>
           <small className="dica">Ganhos</small>
           <p className="valor-grande">{dinheiro(g?.liquido)}</p>
-          {g && g.taxa > 0 && !esconder && <small className="dica">Corridas {reais(g.bruto)} · comissão da central −{reais(g.taxa)}</small>}
+          {g && g.taxa > 0 && !esconder && <small className="dica">Corridas {reais(g.bruto)} · taxas da central −{reais(g.taxa)}{(g.taxas ?? []).length > 1 ? ` (${g.taxas!.map((t) => `${t.nome} ${reais(t.valor)}`).join(", ")})` : ""}</small>}
           <div className="linha-icone"><Car size={20} /> {g?.corridas ?? 0} {g?.corridas === 1 ? "corrida" : "corridas"}</div>
           <div className="linha-icone"><Clock size={20} /> {per.dados ? tempo(per.dados.minutosOnline) : "—"} online na semana</div>
         </section>
@@ -104,7 +106,8 @@ export function HistoricoDeGanhos({ voltar }: Voltar) {
           <section className="cartao-m ganhos-resumo">
             <p className="titulo-centro">{titulo}</p>
             <p className="valor-grande">{reais(soma)}</p>
-            {somaTaxa > 0 && <small className="dica centro">Corridas {reais(somaBruto)} · comissão da central −{reais(somaTaxa)}</small>}
+            {somaTaxa > 0 && <small className="dica centro">Corridas {reais(somaBruto)} · taxas da central −{reais(somaTaxa)}</small>}
+            {(dados?.taxasPorNome ?? []).map((t) => <small key={t.nome} className="dica centro">{t.nome}: −{reais(t.valor)}</small>)}
             {barras && <div className="barras-semana">{barras.map((v, i) => <div key={i}><span style={{ height: v > 0 ? `${Math.max(4, (v / maior) * 100)}%` : 0 }} /><small>{SEMANA[i]}</small></div>)}</div>}
             <div className="grade-numeros">
               <div><small>Ganho por km</small><strong>{kmTotal > 0 ? reais(soma / kmTotal) : "—"}</strong></div>
@@ -127,7 +130,7 @@ export function HistoricoDeGanhos({ voltar }: Voltar) {
                 <button key={c.id} type="button" className="ganho-item" onClick={() => setAberta(c)}>
                   <div className="g-topo"><strong>{soHora(c.em)}</strong><span className="verde">{reais(c.valorLiquido)}</span></div>
                   <small className="cat">{c.categoria.toUpperCase()} · {km2(c.km)} · OS {c.os}</small>
-                  {c.taxaCentral > 0 && <small className="comissao">Corrida {reais(c.valorBruto)} · comissão da central −{reais(c.taxaCentral)}</small>}
+                  {c.taxaCentral > 0 && <small className="comissao">Corrida {reais(c.valorBruto)} · taxas da central −{reais(c.taxaCentral)}</small>}
                   <div className="rota-linha"><UserRound size={16} /> <span>{c.embarque}</span></div>
                   {c.destino && <div className="rota-linha"><Flag size={16} /> <span>{c.destino}</span></div>}
                 </button>
@@ -182,7 +185,8 @@ export function InformacoesDaCorrida({ ganho: c, voltar }: Voltar & { ganho: Gan
           <h3 className="titulo-secao">Seus ganhos</h3>
           <div className="linha-valor"><span>Valor da corrida</span><strong>{reais(c.valorBruto)}</strong></div>
           {c.desconto > 0 && <div className="linha-valor"><span>Desconto do passageiro (cupom)</span><strong>−{reais(c.desconto)}</strong></div>}
-          {c.taxaCentral > 0 && <div className="linha-valor"><span>Comissão da central{c.percentualTaxa ? ` (${c.percentualTaxa.toString().replace(".", ",")}%)` : ""}</span><strong>−{reais(c.taxaCentral)}</strong></div>}
+          {(c.taxas ?? []).map((t) => <div key={t.nome} className="linha-valor"><span>{t.nome}</span><strong>−{reais(t.valor)}</strong></div>)}
+          {(c.taxas ?? []).length > 1 && <div className="linha-valor"><span>Total de taxas{c.percentualTaxa ? ` (${c.percentualTaxa.toString().replace(".", ",")}%)` : ""}</span><strong>−{reais(c.taxaCentral)}</strong></div>}
           <hr />
           <div className="linha-valor total"><span>Total (líquido)</span><strong>{reais(c.valorLiquido)}</strong></div>
         </section>
@@ -200,21 +204,55 @@ export function InformacoesDaCorrida({ ganho: c, voltar }: Voltar & { ganho: Gan
 
 interface DadosCarteira { saldo: number; extrato: Array<{ id?: string; valor: number; descricao: string; em: string; corridaId?: string | null }> }
 
+/** Recarregar saldo: o motorista deposita crédito para a central descontar as taxas das corridas (não é saque). O pedido vai para a central, que confirma o depósito e credita na carteira. */
+function RecargaDeSaldo({ saldo, instrucao, voltar }: { saldo: number | undefined; instrucao: string; voltar: () => void }) {
+  const [valor, setValor] = useState("");
+  const [erro, setErro] = useState(""), [ok, setOk] = useState(""), [ocupado, setOcupado] = useState(false);
+  const v = Number(valor.replace(",", "."));
+  const depositar = async () => {
+    setErro(""); setOk(""); setOcupado(true);
+    try {
+      await api("/suporte", { corpo: { texto: `Pedido de recarga: quero depositar ${reais(v)} de saldo na carteira (taxas das corridas).` } });
+      setValor(""); setOk("Pedido de depósito enviado. Quando a central confirmar, o valor entra no saldo da sua carteira.");
+    } catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
+  };
+  return (
+    <Pagina>
+      <Topo estilo="esquerda" titulo="Recarregar saldo" voltar={voltar} />
+      <div className="conteudo">
+        <section className="cartao-m">
+          <small className="dica">Saldo para taxas das corridas</small>
+          <p className="valor-grande esquerda">{saldo != null ? reais(saldo) : "—"}</p>
+          <p className="dica">É com este saldo que a central desconta as taxas de cada corrida. Deposite para continuar recebendo corridas.</p>
+        </section>
+        <form className="cartao-m" onSubmit={(e) => { e.preventDefault(); void depositar(); }}>
+          <h3 className="titulo-secao">Depositar</h3>
+          <label className="campo"><span className="campo-rotulo">Valor do depósito (mínimo R$ 10,00)</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
+          <button className="botao-m" disabled={ocupado || !(v >= 10)}>DEPOSITAR</button>
+          {instrucao && <p className="dica">{instrucao}</p>}
+          <Erro texto={erro} /><Info texto={ok} tipo="ok" />
+        </form>
+      </div>
+    </Pagina>
+  );
+}
+
 export function CarteiraDoMotorista({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<DadosCarteira>("/carteira");
-  const [sacando, setSacando] = useState(false);
-  if (sacando) return <CarteiraAntiga voltar={() => setSacando(false)} />;
+  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string }>("/carteira");
+  const [tela, setTela] = useState<"" | "recarregar" | "retirar">("");
+  if (tela === "retirar") return <CarteiraAntiga voltar={() => setTela("")} />;
+  if (tela === "recarregar") return <RecargaDeSaldo saldo={dados?.saldo} instrucao={dados?.recarga ?? ""} voltar={() => setTela("")} />;
   return (
     <Pagina>
       <Topo estilo="esquerda" titulo="Carteira" voltar={voltar} />
       <div className="conteudo">
         <Erro texto={erro} />
         <section className="cartao-m">
-          <small className="dica">Saldo</small>
+          <small className="dica">Saldo para taxas das corridas</small>
           <p className="valor-grande esquerda">{dados ? reais(dados.saldo) : "—"}</p>
           <div className="acoes-carteira">
-            <button type="button" onClick={() => setSacando(true)}><span className="quadro"><Plus size={22} /></span>Adicionar</button>
-            <button type="button" onClick={() => setSacando(true)}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>
+            <button type="button" onClick={() => setTela("recarregar")}><span className="quadro"><Plus size={22} /></span>Adicionar</button>
+            <button type="button" onClick={() => setTela("retirar")}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>
           </div>
         </section>
         <section className="cartao-m">

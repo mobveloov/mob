@@ -177,7 +177,8 @@ function Historico({ irAgendadas }: { irAgendadas: () => void }) {
             <dt>Categoria</dt><dd>{c.categoria}</dd>
             <dt>Pagamento</dt><dd>{c.pagamento}</dd>
             {c.valor != null && <><dt>Valor</dt><dd>{reais(c.valor)}{c.desconto ? ` (desconto ${reais(c.desconto)})` : ""}</dd></>}
-            {c.taxaServico ? <><dt>Taxa de serviço</dt><dd>{reais(c.taxaServico)} (cobrada à parte)</dd></> : null}
+            {(c.taxas ?? []).length ? (c.taxas ?? []).map((t) => <Fragment key={t.nome}><dt>{t.nome}</dt><dd>{reais(t.valor)} (cobrada à parte)</dd></Fragment>) : c.taxaServico ? <><dt>Taxa de serviço</dt><dd>{reais(c.taxaServico)} (cobrada à parte)</dd></> : null}
+            {c.taxaServico && c.valor != null ? <><dt>Total pago</dt><dd><strong>{reais(c.valor + c.taxaServico)}</strong></dd></> : null}
             {c.taxaCancelamento ? <><dt>Taxa</dt><dd>{reais(c.taxaCancelamento)} de cancelamento</dd></> : null}
             <dt>Status</dt><dd>{esperandoHorario(c) ? "Agendada" : c.statusTexto}{c.canceladaPor ? ` por ${c.canceladaPor}` : ""}</dd>
             {c.motorista && <><dt>Motorista</dt><dd>{c.motorista.nome}{c.motorista.veiculo ? ` · ${c.motorista.veiculo}` : ""}{c.motorista.placa ? ` · ${c.motorista.placa}` : ""}</dd></>}
