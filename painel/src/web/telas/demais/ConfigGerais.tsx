@@ -3,17 +3,20 @@
 import { useState, type ReactNode } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { BandeiraDespacho } from "../grupoc/BandeiraDespacho";
+import { BandeiraAbas } from "../grupoc/BandeiraAbas";
+import { ABAS_FORM } from "../../../comum/bandeira-form.ts";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 
-type Aba = "geral" | "despacho" | "motorista" | "preferencias" | "passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
-const ABAS: Array<[Aba, string]> = [["geral", "Geral"], ["motorista", "Motorista"], ["preferencias", "Preferências"], ["passageiro", "Passageiro"], ["despacho", "Despacho"], ["indicacoes", "Indicações"], ["cancelamento", "Cancelamentos"], ["macaneta", "Maçaneta"], ["banners", "Banners"], ["juridico", "Jurídico"]];
+type Aba = "motorista" | "passageiro" | "despacho" | "financeiro" | "filtros" | "pagamentos" | "premium" | "geral" | "regras_motorista" | "preferencias" | "regras_passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
+// As sete primeiras são as da Machine (mesma ordem); as demais são do painel de referência.
+const ABAS: Array<[Aba, string]> = [["motorista", "Motorista"], ["passageiro", "Passageiro"], ["despacho", "Despacho"], ["financeiro", "Financeiro"], ["filtros", "Filtros"], ["pagamentos", "Formas de pagamento"], ["premium", "Recursos Premium"], ["geral", "Geral"], ["regras_motorista", "Regras do motorista"], ["preferencias", "Preferências"], ["regras_passageiro", "Regras do passageiro"], ["indicacoes", "Indicações"], ["cancelamento", "Cancelamentos"], ["macaneta", "Maçaneta"], ["banners", "Banners"], ["juridico", "Jurídico"]];
 
 const dinheiroNum = (v: string) => Number(String(v).replace(/\./g, "").replace(",", ".")) || 0;
 const Num = ({ v, on, ...r }: { v: number; on: (n: number) => void } & Record<string, unknown>) => <input inputMode="decimal" value={String(v).replace(".", ",")} onChange={(e) => on(dinheiroNum(e.target.value))} {...r} />;
 
 export function ConfigGerais() {
   const admin = useGestor();
-  const [aba, setAba] = useState<Aba>(() => { const a = new URLSearchParams(window.location.search).get("aba"); return ABAS.some(([k]) => k === a) ? (a as Aba) : "geral"; });
+  const [aba, setAba] = useState<Aba>(() => { const a = new URLSearchParams(window.location.search).get("aba"); return ABAS.some(([k]) => k === a) ? (a as Aba) : "motorista"; });
   const d = useCarregar(() => pedirConfig("/gerais"), []);
   const [c, setC] = useState<any>(null);
   const [lido, setLido] = useState<unknown>(null);
@@ -41,6 +44,8 @@ export function ConfigGerais() {
       <Abas abas={ABAS} valor={aba} onChange={setAba} />
       <Aviso erro={msg?.erro} ok={msg?.ok} />
       {aba === "despacho" && <BandeiraDespacho />}
+      {ABAS_FORM.filter((a) => a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : undefined} />)}
+      {aba === "motorista" && <NovoDocumento aberto={novoDoc} onFechar={() => setNovoDoc(false)} onAdd={(d) => { set(["motorista", "documentos"], [...g.motorista.documentos, d]); setNovoDoc(false); }} />}
       {aba === "geral" && (
         <Secao titulo="Suporte e Contato">
           <div className="dm-grade3">
@@ -51,7 +56,7 @@ export function ConfigGerais() {
           <Salvar parte={{ suporte: g.suporte }} texto="Salvar Alterações" />
         </Secao>
       )}
-      {aba === "motorista" && (
+      {aba === "regras_motorista" && (
         <>
           <Secao titulo="Bônus de Primeiro Cadastro" sub="Atraia mais motoristas dando um incentivo financeiro para quem baixar e se cadastrar no app organicamente.">
             <Interruptor valor={g.motorista.bonusCadastroAtivo} onChange={(v) => set(["motorista", "bonusCadastroAtivo"], v)} rotulo="Bônus ativo" desabilitado={!admin} />
@@ -101,7 +106,7 @@ export function ConfigGerais() {
           <NovoFiltro aberto={novoFiltro} onFechar={() => setNovoFiltro(false)} onAdd={(p) => { set(["preferencias"], [...g.preferencias, p]); setNovoFiltro(false); }} />
         </Secao>
       )}
-      {aba === "passageiro" && (
+      {aba === "regras_passageiro" && (
         <Secao titulo="Passageiro">
           {sw(["passageiro", "cpfObrigatorio"], "CPF Obrigatório no Cadastro", "Exige que o passageiro preencha o CPF ao criar uma nova conta no aplicativo.")}
           {sw(["passageiro", "avisoDinamica"], "Aviso de Alta Demanda (Dinâmica)", "Exibe um alerta pop-up na tela do passageiro informando que os preços estão mais altos devido à tarifa dinâmica na cidade.")}
@@ -196,6 +201,16 @@ export function ConfigGerais() {
       )}
     </>
   );
+}
+
+/** "Documentos padrão" da aba Motorista: o que o motorista precisa enviar no cadastro pelo aplicativo (a mesma lista de Regras do motorista). */
+function DocumentosPadrao({ docs, admin, onMudar, onAdicionar }: { docs: any[]; admin: boolean; onMudar: (l: any[]) => void; onAdicionar: () => void }) {
+  const grupo = (titulo: string, alvo: string) => (
+    <div><strong>{titulo}</strong>
+      {docs.map((d, i) => d.alvo === alvo && <label key={d.id} className="dm-check"><input type="checkbox" disabled={!admin} checked={d.exigir} onChange={(e) => onMudar(docs.map((x, j) => (j === i ? { ...x, exigir: e.target.checked } : x)))} /> {d.nome}</label>)}
+    </div>
+  );
+  return <div className="dm-radios dm-radios-col">{grupo("Documentos padrão", "motorista")}{grupo("Documentos adicionais", "veiculo")}{admin && <button type="button" className="botao" onClick={onAdicionar}><Plus size={14} /> Adicionar documento</button>}</div>;
 }
 
 function Secao({ titulo, sub, selo, acao, children }: { titulo: string; sub?: string; selo?: string; acao?: ReactNode; children: ReactNode }) {

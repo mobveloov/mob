@@ -9,9 +9,9 @@ const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").r
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
 const DIAS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 const METODOS: Array<[string, string, string]> = [
-  ["km_minuto", "Por tarifa inicial, km e minuto", "O valor da corrida será calculado a partir de uma tarifa inicial, acrescida do custo proporcional à distância percorrida (km) e ao tempo de viagem (minutos)."],
+  ["km_minuto", "Por KM e minuto", "O valor da corrida será calculado a partir de uma tarifa inicial, acrescida do custo proporcional à distância percorrida (km) e ao tempo de viagem (minutos)."],
   ["tabela_km", "Por tabela de KM", "A cobrança é baseada em faixas de distância. O sistema identifica em qual intervalo a quilometragem final se encaixa e aplica o valor fixo correspondente àquela faixa."],
-  ["bairro", "Por bairro de destino", "O valor da tarifa é fixo e calculado com base no bairro de destino. Quando o destino não está na lista, vale a tarifa inicial mais km e minuto."],
+  ["bairro", "Por bairro de destino", "O valor da tarifa é fixo e calculado com base na distância entre o endereço de partida e o bairro de destino."],
   ["hora_parada", "Por tarifa inicial, km e hora parada", "O valor da corrida será a soma de uma tarifa inicial (preço base), o custo da distância percorrida (km) e o tempo em que o motorista permanecer parado ou em espera."],
 ];
 const rotuloMetodo = (m: string) => METODOS.find(([k]) => k === m)?.[1] ?? m;
@@ -21,7 +21,7 @@ function daCategoria(c: any, extra?: any) {
   if (extra) return structuredClone(extra);
   return {
     metodo: c.extra.tarifa.metodo, precoBase: c.taxaBase, valorKm: c.precoKm, valorMinuto: c.precoMin, valorHoraParada: c.extra.tarifa.valorHoraParada, valorMinimo: c.tarifaMinima,
-    tabelaKm: structuredClone(c.extra.tarifa.tabelaKm), kmAdicional: c.extra.tarifa.kmAdicional, limiteKm: c.extra.tarifa.limiteKm, bairros: structuredClone(c.extra.tarifa.bairros),
+    tabelaKm: structuredClone(c.extra.tarifa.tabelaKm), kmAdicional: c.extra.tarifa.kmAdicional, limiteKm: c.extra.tarifa.limiteKm, variarKm: c.extra.tarifa.variarKm, faixasKm: structuredClone(c.extra.tarifa.faixasKm), kmAPartir: c.extra.tarifa.kmAPartir, bairros: structuredClone(c.extra.tarifa.bairros),
     paradaAdicional: c.extra.paradas.tipo === "fixo" ? c.extra.paradas.valor : 0,
     bonusDeslocamento: { ativo: c.extra.deslocamento.ativo, minKm: c.extra.deslocamento.minKm, tipo: c.extra.deslocamento.tipo, valor: c.extra.deslocamento.valor, teto: c.extra.deslocamento.teto },
   };
@@ -127,9 +127,33 @@ export function JanelaTarifa({ cat, extra, onFechar, onSalvo }: { cat: any; extr
           </div>
         ) : (
           <div className="dm-grade4">
-            {campoValor("Preço base *", "precoBase")}{campoValor("Valor Km *", "valorKm")}
-            {t.metodo === "hora_parada" ? campoValor("Valor hora parada *", "valorHoraParada") : campoValor("Valor minuto *", "valorMinuto")}
-            {campoValor("Valor mínimo", "valorMinimo")}
+            {campoValor("Preço base (R$) *", "precoBase", "Valor fixo cobrado ao iniciar qualquer corrida")}
+            <div>
+              <strong>Preço por KM (R$) *</strong>
+              <p className="sub">{t.variarKm ? "Valor variável por faixa de distância" : "Valor cobrado por cada quilômetro percorrido"}</p>
+              <label className="dm-check"><input type="checkbox" checked={!!t.variarKm} onChange={(e) => set("variarKm", e.target.checked)} /> Variar valor pela distância</label>
+              {!t.variarKm ? campoValor("Valor Km *", "valorKm") : (
+                <>
+                  {(t.faixasKm ?? []).map((f: any, i: number) => (
+                    <div key={i} className="dm-grade4">
+                      <Campo rotulo="Distância até (KM) *"><input inputMode="decimal" placeholder="0" value={txt(f.ate)} onChange={(e) => set("faixasKm", t.faixasKm.map((x: any, j: number) => (j === i ? { ...x, ate: num(e.target.value) } : x)))} /></Campo>
+                      <Campo rotulo="Valor por KM (R$) *"><div className="dm-linha">R$ <input inputMode="decimal" placeholder="0,00" value={txt(f.valor)} onChange={(e) => set("faixasKm", t.faixasKm.map((x: any, j: number) => (j === i ? { ...x, valor: num(e.target.value) } : x)))} /></div></Campo>
+                      <button type="button" className="icone" aria-label={`Remover distância ${i + 1}`} onClick={() => set("faixasKm", t.faixasKm.filter((_: any, j: number) => j !== i))}><X size={14} /></button>
+                    </div>
+                  ))}
+                  <button type="button" className="botao" onClick={() => set("faixasKm", [...(t.faixasKm ?? []), { ate: (t.faixasKm?.length ? Math.max(...t.faixasKm.map((f: any) => f.ate)) : 0) + 5, valor: 0 }])}><Plus size={14} /> Adicionar nova distância</button>
+                  <div className="dm-grade4">
+                    <Campo rotulo="A partir de (KM) *"><input disabled value={txt(t.faixasKm?.length ? Math.max(...t.faixasKm.map((f: any) => f.ate)) : 0)} /></Campo>
+                    <Campo rotulo="Valor por (KM) *"><div className="dm-linha">R$ <input inputMode="decimal" placeholder="0,00" value={txt(t.kmAPartir)} onChange={(e) => set("kmAPartir", num(e.target.value))} /></div></Campo>
+                  </div>
+                  <p className="sub">Define faixas de preço por km baseadas na distância total da corrida</p>
+                </>
+              )}
+              <label className="dm-check"><input type="checkbox" checked={t.limiteKm > 0} onChange={(e) => set("limiteKm", e.target.checked ? 50 : 0)} /> Limitar distância máxima da corrida</label>
+              {t.limiteKm > 0 && <Campo rotulo="Distância máxima (KM)"><input inputMode="decimal" value={txt(t.limiteKm)} onChange={(e) => set("limiteKm", num(e.target.value))} /></Campo>}
+            </div>
+            {t.metodo === "hora_parada" ? campoValor("Valor hora parada *", "valorHoraParada") : campoValor("Preço por minuto (R$) *", "valorMinuto", "Valor cobrado pelo tempo de viagem")}
+            {campoValor("Valor mínimo da corrida (R$) *", "valorMinimo", "Menor valor que uma corrida pode custar")}
           </div>
         )}
 

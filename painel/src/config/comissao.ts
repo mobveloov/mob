@@ -7,6 +7,7 @@ import { listar } from "../cadastros/armazem.ts";
 import { normal } from "../servidor/util.ts";
 import { credito } from "./credito.ts";
 import { extraDaCategoria, registroDaCategoria } from "./categorias.ts";
+import { passeVigente } from "./passe-livre.ts";
 import { cobrancas, formaDaTaxa, somaCobrancas, temTaxaDoMotorista } from "./taxas.ts";
 
 export interface ResultadoComissao { valorBruto: number; taxaCentral: number; valorLiquido: number }
@@ -33,11 +34,12 @@ export function regraDoMotorista(empresaId: string, motoristaId?: string) {
 }
 
 /** Quanto a central fica da corrida e quanto sobra para o motorista. Nunca passa do valor bruto; centavos arredondados. */
-export function calcularComissao(empresaId: string, categoria: string, valorBruto: number, motoristaId?: string, pagamento?: string): ResultadoComissao {
+/** Com `considerarPasse`, motorista com Passe Livre vigente agora não paga a taxa (usado nas ofertas mostradas no app; relatórios e o fechamento da corrida não usam). */
+export function calcularComissao(empresaId: string, categoria: string, valorBruto: number, motoristaId?: string, pagamento?: string, considerarPasse = false): ResultadoComissao {
   const bruto = Number.isFinite(valorBruto) && valorBruto > 0 ? cent(valorBruto) : 0;
   let taxa = 0;
   const mot = regraDoMotorista(empresaId, motoristaId);
-  if (mot?.isento) taxa = 0;
+  if (mot?.isento || (considerarPasse && motoristaId && passeVigente(empresaId, motoristaId))) taxa = 0;
   else if (mot) taxa = taxaDe(mot.tipo, mot.valor, bruto);
   else if (temTaxaDoMotorista(empresaId)) {
     // Config › Taxas da central: as taxas do motorista substituem a comissão da categoria.

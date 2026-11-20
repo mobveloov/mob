@@ -368,10 +368,10 @@ export function gerarRelatorio(empresaId: string, id: string, f: Filtros, pagina
   return { id: d.id, titulo: d.titulo, periodo: { inicio: f.inicio, fim: f.fim }, colunas: t.colunas, linhas: t.linhas.slice((p - 1) * POR_PAGINA, p * POR_PAGINA), totais: t.totais ?? null, total, pagina: p, paginas, porPagina: POR_PAGINA };
 }
 
-export function csvDoRelatorio(empresaId: string, id: string, f: Filtros): string {
+export function csvDoRelatorio(empresaId: string, id: string, f: Filtros, ordem?: string, dir?: string): string {
   const d = definicao(id);
   if (!d) throw new Error("Relatório não encontrado.");
-  const t = d.gerar(empresaId, f);
+  const t = ordenarLinhas(d.gerar(empresaId, f), ordem, dir);
   const linhas = t.linhas.slice(0, LIMITE_CSV).map((l) => t.colunas.map((c) => l[c.chave]));
   if (t.totais) linhas.push(t.colunas.map((c) => t.totais![c.chave] ?? ""));
   return montarCsv(t.colunas.map((c) => c.rotulo), linhas);

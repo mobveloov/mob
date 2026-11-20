@@ -11,7 +11,7 @@ import { CALCULO_PADRAO, METODOS, conferirCalculo, escolherTarifa, sanearCalculo
 export interface FaixaKm { de: number; ate: number; valor: number }
 export interface FaixaCompensacao { de: number; ate: number; modo: "diferenca" | "fixo"; valor: number }
 /** Parte da tarifa padrão que não cabe no cadastro "categorias" (preço base, km, minuto e mínimo ficam lá). */
-export interface TarifaPadraoExtra { metodo: MetodoTarifa; tabelaKm: FaixaTabelaKm[]; kmAdicional: number; limiteKm: number; bairros: TarifaBairro[]; valorHoraParada: number }
+export interface TarifaPadraoExtra { metodo: MetodoTarifa; tabelaKm: FaixaTabelaKm[]; kmAdicional: number; limiteKm: number; bairros: TarifaBairro[]; valorHoraParada: number; variarKm?: boolean; faixasKm?: FaixaTabelaKm[]; kmAPartir?: number }
 export interface ExtraCategoria {
   cidade: string; visivel: boolean; tipoFisico: "carro" | "moto" | "caminhao"; grupo: "Carro" | "Moto"; ordem: number; capacidade: number; raio: number;
   icone: { modo: "biblioteca" | "personalizado"; biblioteca: string; imagem: string };
@@ -57,7 +57,7 @@ export const EXTRA_PADRAO: ExtraCategoria = {
   compensacao: { ativo: false, faixas: [] },
   mostrarGanhoKm: false, permiteAgendamento: true, dinamicas: [],
   detalhes: "", ocultarCapacidade: false, macaneta: true, dinamicaAtiva: true, impulsionamentoAuto: false, valorExtraPassageiro: false, segurancaMulheres: false, solicitacoes: "ambas",
-  tarifa: { metodo: "km_minuto", tabelaKm: [], kmAdicional: 0, limiteKm: 0, bairros: [], valorHoraParada: 0 }, tarifasExtras: [],
+  tarifa: { metodo: "km_minuto", tabelaKm: [], kmAdicional: 0, limiteKm: 0, bairros: [], valorHoraParada: 0, variarKm: false, faixasKm: [], kmAPartir: 0 }, tarifasExtras: [],
   comissao: { usaFaixas: false, regras: [] },
 };
 
@@ -66,7 +66,7 @@ const CAD = () => cadastroPorId("categorias")!;
 
 function sanearTarifaPadrao(v: unknown, atual: TarifaPadraoExtra | undefined): TarifaPadraoExtra {
   const c = sanearCalculo(v, { ...CALCULO_PADRAO, ...(atual ?? {}) });
-  return { metodo: c.metodo, tabelaKm: c.tabelaKm, kmAdicional: c.kmAdicional, limiteKm: c.limiteKm, bairros: c.bairros, valorHoraParada: c.valorHoraParada };
+  return { metodo: c.metodo, tabelaKm: c.tabelaKm, kmAdicional: c.kmAdicional, limiteKm: c.limiteKm, bairros: c.bairros, valorHoraParada: c.valorHoraParada, variarKm: c.variarKm, faixasKm: c.faixasKm, kmAPartir: c.kmAPartir };
 }
 
 export function sanearExtra(e: unknown, atual: ExtraCategoria = EXTRA_PADRAO): ExtraCategoria {
@@ -157,6 +157,18 @@ export function salvarCategoria(empresaId: string, id: string | null, e: Entrada
   return completa(empresaId, listar(empresaId, CAD()).find((x) => x.id === r.id)!);
 }
 
+/** "Duplicar" do menu da categoria: cópia com outro nome, as mesmas tarifas (padrão e extras) e, se pedido, os mesmos motoristas. */
+export function duplicarCategoria(empresaId: string, id: string, nomeNovo: string, comMotoristas: boolean, por: string): CategoriaCompleta {
+  const o = categoriasCompletas(empresaId).find((c) => c.id === id);
+  if (!o) throw new Error("Categoria não encontrada.");
+  const nome = texto(nomeNovo, 60);
+  if (nome.length < 2) throw new Error("Informe o nome da nova categoria.");
+  if (categoriasCompletas(empresaId).some((c) => normal(c.nome) === normal(nome))) throw new Error("Já existe uma categoria com esse nome.");
+  const extra = structuredClone(o.extra);
+  extra.ordem = categoriasCompletas(empresaId).length + 1;
+  return salvarCategoria(empresaId, null, { ...o, nome, extra, vinculo: { modo: comMotoristas ? "copiar" : "nenhum", deCategoriaId: o.id } }, por);
+}
+
 const separar = (v: unknown) => String(v ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 
 /** Vincula motoristas à categoria nova (campo "categorias" do motorista, separado por vírgula). */
@@ -221,7 +233,7 @@ export function salvarTarifaPadrao(empresaId: string, id: string, entrada: unkno
   alterarCampos(empresaId, CAD(), id, { bandeirada: t.precoBase, valorKm: t.valorKm, valorMinuto: t.valorMinuto, valorMinimo: t.valorMinimo }, por);
   const novo: ExtraCategoria = {
     ...ex,
-    tarifa: { metodo: t.metodo, tabelaKm: t.tabelaKm, kmAdicional: t.kmAdicional, limiteKm: t.limiteKm, bairros: t.bairros, valorHoraParada: t.valorHoraParada },
+    tarifa: { metodo: t.metodo, tabelaKm: t.tabelaKm, kmAdicional: t.kmAdicional, limiteKm: t.limiteKm, bairros: t.bairros, valorHoraParada: t.valorHoraParada, variarKm: t.variarKm, faixasKm: t.faixasKm, kmAPartir: t.kmAPartir },
     paradas: { tipo: "fixo", valor: t.paradaAdicional }, deslocamento: { ...ex.deslocamento, ...t.bonusDeslocamento },
   };
   gravarConfig(empresaId, "categorias", { ...todos(empresaId), [id]: novo });

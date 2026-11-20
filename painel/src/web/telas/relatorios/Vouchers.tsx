@@ -53,10 +53,10 @@ export function FaixasVouchers() {
       </form>
       <div className="dm-cartao tabela-rola">
         <table>
-          <thead><tr><th>Empresa</th><th>Série</th><th>Número inicial</th><th>Número final</th><th /></tr></thead>
+          <thead><tr>{!f.empresa && <th>Empresa</th>}<th>Série</th><th>Número inicial</th><th>Número final</th><th /></tr></thead>
           <tbody>
             {!x ? <tr><td colSpan={5}><Carregando /></td></tr> : !x.faixas.length ? <tr><td colSpan={5} className="vazio">Nenhum resultado encontrado.</td></tr> : x.faixas.map((r: any) => (
-              <tr key={r.id}><td>{r.conveniada}</td><td>{r.serie}</td><td>{r.inicial}</td><td>{r.final}</td>
+              <tr key={r.id}>{!f.empresa && <td>{r.conveniada}</td>}<td>{r.serie}</td><td>{r.inicial}</td><td>{r.final}</td>
                 <td>{admin && <button className="icone" aria-label="Apagar faixa" onClick={() => confirm("Apagar esta faixa de vouchers?") && salvar(async () => { await pedirRel(`/vouchers/faixas/${r.id}`, "DELETE"); d.recarregar(); }, "Faixa apagada.")}><Trash2 size={15} /></button>}</td></tr>
             ))}
           </tbody>

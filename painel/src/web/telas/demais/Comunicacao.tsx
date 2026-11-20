@@ -50,7 +50,7 @@ export function Conversas() {
               </div>
             </span>
           </div>
-          <label className="dm-busca"><Search size={16} /><input placeholder="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversa" /></label>
+          <label className="dm-busca"><Search size={16} /><input placeholder={aba === "empresa" ? "Buscar empresa" : aba === "passageiro" ? "Buscar passageiro" : "Buscar motorista"} value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversa" /></label>
         </div>
         <div className="dm-esq-lista">
           {aba !== "empresa" && <button className="dm-item" onClick={() => setTransmissao(true)}><span className="dm-item-nome"><strong><Radio size={14} /> Mensagem Geral</strong></span></button>}
@@ -67,7 +67,7 @@ export function Conversas() {
       </aside>
       <section className="dm-direita">
         {sel ? <Chat key={`${sel.papel}${sel.chave}`} papel={sel.papel} chave={sel.chave} nome={atual?.nome ?? sel.nome ?? sel.chave} onFechar={() => setSel(null)} onMudou={lista.recarregar} /> : (
-          <div className="dm-vazio-grande"><div className="dm-circulo"><MessageSquare size={44} /></div><h3>Selecione uma conversa</h3><p>Sua caixa de entrada está pronta.</p><small className="dm-chat-status">--</small></div>
+          <div className="dm-vazio-grande"><div className="dm-circulo"><MessageSquare size={44} /></div><h3>{aba === "empresa" ? "Envie mensagens para as empresas" : aba === "passageiro" ? "Envie mensagens para os passageiros" : "Envie mensagens para os motoristas"}</h3><p>Sua caixa de entrada está pronta.</p><small className="dm-chat-status">--</small></div>
         )}
       </section>
       <Transmissao aberto={transmissao} onFechar={() => setTransmissao(false)} />
@@ -182,7 +182,7 @@ export function Notificacoes() {
         <Campo rotulo="Data inicial"><input type="date" value={rasc.dataIni} onChange={(e) => set("dataIni", e.target.value)} /></Campo>
         <Campo rotulo="Data final"><input type="date" value={rasc.dataFim} onChange={(e) => set("dataFim", e.target.value)} /></Campo>
         <Campo rotulo="Título"><input value={rasc.titulo} maxLength={40} onChange={(e) => set("titulo", e.target.value)} /></Campo>
-        <Campo rotulo="Mensagem"><textarea value={rasc.mensagem} maxLength={255} rows={3} onChange={(e) => set("mensagem", e.target.value)} /></Campo>
+        <Campo rotulo="Mensagem"><textarea value={rasc.mensagem} maxLength={255} rows={1} onChange={(e) => set("mensagem", e.target.value)} /></Campo>
         <button className="botao primario">Filtrar</button>
         <button type="button" className="botao" onClick={() => { setRasc(VAZIO_N); setF(VAZIO_N); setPagina(1); }}>Limpar filtros</button>
       </form>

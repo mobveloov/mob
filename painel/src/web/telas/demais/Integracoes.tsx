@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { BandeiraAbas } from "../grupoc/BandeiraAbas";
+import { ABAS_FORM } from "../../../comum/bandeira-form.ts";
 import { TransacoesFinanceiras } from "./TransacoesFinanceiras";
 import IntegracoesSistemas from "../../paginas/Integracoes";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
-type Aba = "transacoes" | "mp" | "app" | "met" | "fin" | "sistemas";
+type Aba = "iza" | "nilara" | "saque" | "marketplace" | "transacoes" | "mp" | "app" | "met" | "fin" | "sistemas";
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const MASCARA = "••••••";
 
@@ -23,8 +25,8 @@ export function Integracoes() {
   return (
     <>
       <Cab titulo="Integrações" sub="Configure gateways de pagamento e métodos." />
-      <Abas abas={[["transacoes", "Transações Financeiras"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
-      {aba === "sistemas" ? <IntegracoesSistemas /> : aba === "transacoes" ? <TransacoesFinanceiras /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
+      <Abas abas={[["iza", "Iza"], ["nilara", "Nilara"], ["transacoes", "Transações Financeiras"], ["saque", "Saque Automático"], ["marketplace", "Marketplace de Integradores"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
+      {aba === "sistemas" ? <IntegracoesSistemas /> : aba === "saque" ? <BandeiraAbas aba={ABAS_FORM.find((a) => a.id === "saque")!} /> : aba === "iza" || aba === "nilara" || aba === "marketplace" ? <ParceiroExterno aba={aba} /> : aba === "transacoes" ? <TransacoesFinanceiras /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
         <>
           <Aviso erro={msg?.erro} ok={msg?.ok} />
           {aba === "mp" && (
@@ -69,4 +71,14 @@ export function Integracoes() {
       )}
     </>
   );
+}
+
+const PARCEIROS = {
+  iza: ["Iza", "Assistente de atendimento por conversa. Para ligar, a central precisa de um contrato com o fornecedor e da chave de acesso dele; sem isso a integração fica desativada."],
+  nilara: ["Nilara", "Telefonia que esconde o número do passageiro do motorista. Para ligar, a central precisa de um contrato com o fornecedor e da chave de acesso dele; sem isso a integração fica desativada."],
+  marketplace: ["Marketplace de Integradores", "Lista de integradores parceiros que podem se conectar à central. Ainda não há integradores cadastrados."],
+} as const;
+function ParceiroExterno({ aba }: { aba: "iza" | "nilara" | "marketplace" }) {
+  const [nome, texto] = PARCEIROS[aba];
+  return <section className="dm-cartao dm-secao"><h2>{nome}</h2><p className="sub">Status da integração: <span className="selo">Desativada</span></p><p>{texto}</p></section>;
 }

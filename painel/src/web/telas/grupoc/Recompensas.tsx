@@ -44,7 +44,7 @@ export function Recompensas() {
         {f.periodo === "personalizado" && <><label className="dm-campo"><span>De</span><input type="date" value={f.inicio} onChange={(e) => setF({ ...f, inicio: e.target.value })} /></label><label className="dm-campo"><span>Até</span><input type="date" value={f.fim} onChange={(e) => setF({ ...f, fim: e.target.value })} /></label><button className="botao" onClick={() => aplicar(f)}>Aplicar</button></>}
         <label className="dm-campo"><span>Tipo do usuário</span><select value={tipo} onChange={(e) => { setTipo(e.target.value as "motorista" | "passageiro"); setPagina(1); }}><option value="motorista">Motorista</option><option value="passageiro">Cliente</option></select></label>
         <label className="dm-campo"><span>Status</span><select value={f.status} onChange={(e) => aplicar({ ...f, status: e.target.value })}>{STATUS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></label>
-        <form onSubmit={(e) => { e.preventDefault(); aplicar(f); }}><label className="dm-campo"><span>Buscar</span><input value={f.busca} placeholder="Quem indicou ou indicado" onChange={(e) => setF({ ...f, busca: e.target.value })} /></label></form>
+        <form onSubmit={(e) => { e.preventDefault(); aplicar(f); }}><label className="dm-campo"><span>Buscar</span><input value={f.busca} placeholder="Pesquisar recompensado" onChange={(e) => setF({ ...f, busca: e.target.value })} /></label></form>
       </div>
       <Aviso erro={erro ?? d.erro} />
       {!dados ? <Carregando /> : (
@@ -59,7 +59,9 @@ export function Recompensas() {
           </table>
           <div className="dm-linha dm-entre">
             <small>{dados.paginacao.totalItens} registro(s)</small>
-            <span className="dm-linha"><button className="botao" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)}>←</button><span>{dados.paginacao.atual} / {dados.paginacao.totalPaginas}</span><button className="botao" disabled={pagina >= dados.paginacao.totalPaginas} onClick={() => setPagina(pagina + 1)}>→</button></span>
+            <span className="dm-linha" role="navigation" aria-label="Páginas"><button className="botao" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)}>←</button>
+              {Array.from({ length: dados.paginacao.totalPaginas }, (_, i) => i + 1).filter((p) => p === 1 || p === dados.paginacao.totalPaginas || Math.abs(p - pagina) <= 3).map((p) => <button key={p} className={`botao ${p === pagina ? "primario" : ""}`} onClick={() => setPagina(p)}>{p}</button>)}
+              <button className="botao" disabled={pagina >= dados.paginacao.totalPaginas} onClick={() => setPagina(pagina + 1)}>→</button></span>
           </div>
         </div>
       )}
