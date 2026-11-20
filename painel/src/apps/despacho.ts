@@ -143,7 +143,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
       nome: c.motorista, veiculo: String(m?.veiculo ?? ""), placa: String(m?.placa ?? ""),
       // Telefone só enquanto a corrida está aberta, e só para quem está nela.
       telefone: aberta && papel === "passageiro" ? c.telefoneMotorista : "",
-      foto: urlDaFoto(empresaId, "motorista", c.motoristaId), cor: pessoa(empresaId, "motorista", c.motoristaId).veiculos.find((v) => v.ativo)?.cor ?? "",
+      foto: urlDaFoto(empresaId, "motorista", c.motoristaId), cor: String(listar(empresaId, cadastroPorId("veiculos")!).find((v) => v.motoristaId === c.motoristaId && v.emUso === true)?.cor ?? ""),
       ...estatisticas(empresaId, "motorista", c.motoristaId),
     } : null,
     passageiro: {

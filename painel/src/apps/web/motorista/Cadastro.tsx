@@ -206,7 +206,7 @@ export function FormVeiculo({ inicial, aoSalvar, botao }: { inicial?: Veiculo | 
 
 // ------------------------------------------------------------------ passo 5: documentos
 
-interface DadosDocumentos { tipos: Record<string, string>; documentos: Record<string, { situacao: "Enviado" | "Aprovado" | "Recusado"; motivo: string; em: string }> }
+interface DadosDocumentos { tipos: Record<string, string>; obrigatorios?: string[]; documentos: Record<string, { situacao: "Enviado" | "Aprovado" | "Recusado"; motivo: string; em: string }> }
 const ACEITOS = ["image/jpeg", "image/png", "application/pdf"];
 const SITUACAO: Record<string, [string, string]> = { Enviado: ["Em análise", "espera"], Aprovado: ["Aprovado", "ok"], Recusado: ["Recusado", "ruim"] };
 
@@ -232,7 +232,13 @@ export function FormDocumentos({ aoTerminar, botao }: { aoTerminar?: () => void;
   if (faltaRota) return <Vazio icone={FileText} titulo="Documentos" texto="O envio de documentos ainda não está disponível. Fale com a central." />;
   if (!d) return erro ? <Erro texto={erro} /> : <Carregando />;
   const tipos = Object.entries(d.tipos);
+  const obrig = d.obrigatorios ?? [];
   const faltam = tipos.filter(([t]) => !d.documentos[t]).length;
+  const faltamObrig = obrig.filter((t) => !d.documentos[t] || d.documentos[t].situacao === "Recusado").length;
+  const concluir = async () => {
+    setErroEnvio("");
+    try { await api("/cadastro/concluir", { corpo: {} }); aoTerminar?.(); } catch (e) { setErroEnvio(mensagemDeErro(e)); }
+  };
   return (
     <div className="formulario">
       <div><h2 className="titulo-secao">Gerencie sua documentação</h2><p className="dica">Mantenha seus documentos atualizados para continuar rodando.</p></div>
@@ -244,7 +250,7 @@ export function FormDocumentos({ aoTerminar, botao }: { aoTerminar?: () => void;
           <button key={tipo} type="button" className="cartao-doc" disabled={!!enviando || doc?.situacao === "Aprovado"} onClick={() => { tipoAtual.current = tipo; entrada.current?.click(); }}>
             <FileText size={22} className="doc-icone" />
             <span className="item-textos">
-              <strong>{rotulo}</strong>
+              <strong>{rotulo}{obrig.includes(tipo) && <span className="cor-perigo" title="Obrigatório"> *</span>}</strong>
               <small className={`situacao ${classe}`}>{doc?.situacao === "Aprovado" && <BadgeCheck size={13} />}{enviando === tipo ? "Enviando…" : texto}{doc?.em && doc.situacao !== "Aprovado" ? ` · ${diaHora(doc.em)}` : ""}</small>
               {doc?.situacao === "Recusado" && doc.motivo && <small className="situacao ruim">Motivo: {doc.motivo}</small>}
             </span>
@@ -253,8 +259,9 @@ export function FormDocumentos({ aoTerminar, botao }: { aoTerminar?: () => void;
         );
       })}
       <Erro texto={erroEnvio} />
-      {aoTerminar && <button type="button" className="botao-m" onClick={aoTerminar}>{botao}</button>}
-      {aoTerminar && faltam > 0 && <p className="dica centro">Faltam {faltam} documento{faltam > 1 ? "s" : ""}. Você pode mandar depois, em Meu cadastro.</p>}
+      {aoTerminar && <button type="button" className="botao-m" disabled={faltamObrig > 0} onClick={() => void concluir()}>{botao}</button>}
+      {aoTerminar && faltamObrig > 0 && <p className="dica centro">Envie os {faltamObrig} documento{faltamObrig > 1 ? "s" : ""} marcado{faltamObrig > 1 ? "s" : ""} com * para concluir o cadastro.</p>}
+      {aoTerminar && faltamObrig === 0 && faltam > 0 && <p className="dica centro">Os demais documentos você pode mandar depois, em Meu cadastro.</p>}
     </div>
   );
 }

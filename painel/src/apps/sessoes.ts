@@ -141,27 +141,33 @@ export function sessaoDoToken(empresaId: string, token: string): SessaoApp | nul
   const s = linha ? (JSON.parse(linha.dados) as SessaoApp) : undefined;
   if (!s || s.empresaId !== empresaId || s.expira < Date.now()) return null;
   if (impedimento(empresaId, s.papel, s.telefone)) return null;
-  registrarContato(empresaId, s.papel, s.chave);
   return s;
 }
 
-// ------------------------------------------------------------------ último contato do app (o painel decide "app instalado" por aqui)
-
-const contatoGravado = new Map<string, number>();
-/** Anota que o app falou com o servidor agora (no máximo uma gravação por minuto por pessoa). Qualquer pedido com token vale, e o app manda um "ping" ao abrir e de poucos em poucos minutos. */
-function registrarContato(empresaId: string, papel: PapelApp, chave: string) {
-  const k = `${empresaId}|${papel}|${chave}`, agora = Date.now();
-  if (agora - (contatoGravado.get(k) ?? 0) < 60_000) return;
-  contatoGravado.set(k, agora);
-  try {
-    banco().prepare("INSERT INTO app_contatos (empresa, papel, chave, em) VALUES (?, ?, ?, ?) ON CONFLICT (empresa, papel, chave) DO UPDATE SET em = excluded.em").run(empresaId, papel, chave, new Date(agora).toISOString());
-  } catch { /* estatística: não pode derrubar o pedido */ }
+// Último contato do app (a base do "APP ON/OFF" do diagnóstico): cada chamada autenticada marca a pessoa, mas só grava no banco
+// no máximo uma vez a cada 5 minutos por pessoa (a memória guarda quando foi a última gravação).
+const GRAVACAO_MS = 5 * 60_000;
+const ultimaGravacao = new Map<string, number>();
+export function registrarContato(empresaId: string, papel: PapelApp, chave: string, agora = Date.now()) {
+  const k = `${empresaId}|${papel}|${chave}`;
+  if (agora - (ultimaGravacao.get(k) ?? 0) < GRAVACAO_MS) return;
+  banco().prepare("INSERT INTO app_contato (empresa, papel, chave, em) VALUES (?, ?, ?, ?) ON CONFLICT (empresa, papel, chave) DO UPDATE SET em = excluded.em").run(empresaId, papel, chave, agora);
+  if (ultimaGravacao.size > 50_000) ultimaGravacao.clear();
+  ultimaGravacao.set(k, agora);
 }
-/** Quando o app de cada pessoa falou com o servidor pela última vez (chave → data ISO). */
-export function ultimosContatos(empresaId: string, papel: PapelApp): Map<string, string> {
-  try {
-    return new Map((banco().prepare("SELECT chave, em FROM app_contatos WHERE empresa = ? AND papel = ?").all(empresaId, papel) as Array<{ chave: string; em: string }>).map((r) => [r.chave, r.em]));
-  } catch { return new Map(); }
+
+/** Quando cada pessoa do papel falou com o servidor pelo app pela última vez (ms desde 1970). */
+export function ultimosContatos(empresaId: string, papel: PapelApp): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of banco().prepare("SELECT chave, em FROM app_contato WHERE empresa = ? AND papel = ?").all(empresaId, papel) as Array<{ chave: string; em: number }>) m.set(r.chave, r.em);
+  return m;
+}
+
+/** Quem tem sessão ainda válida aberta há menos de "desde" (ms): fez login recente no app. */
+export function comSessaoRecente(empresaId: string, papel: PapelApp, desde: number): Set<string> {
+  const agora = Date.now();
+  const l = banco().prepare("SELECT json_extract(dados, '$.chave') AS chave FROM app_sessoes WHERE empresa = ? AND expira > ? AND json_extract(dados, '$.papel') = ? AND json_extract(dados, '$.criadaEm') >= ?").all(empresaId, agora, papel, desde) as Array<{ chave: string }>;
+  return new Set(l.map((x) => x.chave));
 }
 
 export function sair(empresaId: string, token: string) {

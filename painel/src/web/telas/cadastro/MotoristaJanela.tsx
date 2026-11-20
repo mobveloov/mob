@@ -23,7 +23,7 @@ interface Detalhe {
   padrao: { saldoMinimo: number | null; avisoRecarga: number | null };
   cerca: { permissao: string | null; bloqueios: string[] };
   veiculos: Veiculo[];
-  documentos: Array<{ tipo: string; nome: string; situacao: string; motivo?: string; em?: string; enviado: boolean }>;
+  documentos: Array<{ tipo: string; nome: string; situacao: string; motivo?: string; em?: string; enviado: boolean; obrigatorio?: boolean }>;
   resumo: { finalizadas: number; versaoApp: string | null; aceitacao: number | null; online: boolean };
   creditos: { saldo: number; minimo: number | null; bloqueado: boolean; consumoAtivo: boolean };
 }
@@ -118,7 +118,7 @@ export default function MotoristaJanela({ id, onFechar, onSalvo, cidades, catego
   const st = det?.status;
 
   return (
-    <Janela aberta titulo={novo ? "Novo Motorista" : nome || "Motorista"} sub={novo ? "Criando Motorista" : "Alterando Motorista"} onFechar={onFechar} largura="grande"
+    <Janela cheia aberta titulo={novo ? "Novo Motorista" : nome || "Motorista"} sub={novo ? "Criando Motorista" : "Alterando Motorista"} onFechar={onFechar} largura="grande"
       abas={<Abas itens={abas} valor={aba} onChange={setAba} />}
       rodape={<>
         {!novo && <button className="cg-botao perigo" style={{ marginRight: "auto" }} onClick={() => void excluir()}>Excluir</button>}
@@ -255,7 +255,7 @@ export default function MotoristaJanela({ id, onFechar, onSalvo, cidades, catego
 
 // ---------------------------------------------------------------- veículos
 
-const VEICULO_VAZIO = { modelo: "", cor: "", corHex: "", placa: "", ano: "", anoExercicio: "", ufEmplacamento: "", cidadeEmplacamento: "", renavam: "", validadeLicenciamento: "", veiculoProprio: "Sim", categoria: "" };
+const VEICULO_VAZIO = { marca: "", modelo: "", cor: "", corHex: "", placa: "", ano: "", anoExercicio: "", ufEmplacamento: "", cidadeEmplacamento: "", renavam: "", validadeLicenciamento: "", veiculoProprio: "Sim", categoria: "" };
 
 function Veiculos({ motoristaId, lista, docs, recarregar }: { motoristaId: string; lista: Veiculo[]; docs: Detalhe["documentos"]; recarregar: () => Promise<void> }) {
   const { aviso, tentar } = useAviso();
@@ -293,6 +293,7 @@ function FormVeiculo({ inicial, onSalvar, rotuloSalvar, limpar }: { inicial: Rec
     <>
       <div className="cg-grade">
         <Campo rotulo="Placa *"><input value={f.placa} placeholder="ABC1D23" onChange={(e) => set("placa", e.target.value.toUpperCase())} /></Campo>
+        <Campo rotulo="Marca"><input value={f.marca} onChange={(e) => set("marca", e.target.value)} /></Campo>
         <Campo rotulo="Modelo *"><input value={f.modelo} onChange={(e) => set("modelo", e.target.value)} /></Campo>
         <Campo rotulo="Ano de fabricação *"><input type="number" value={f.ano} onChange={(e) => set("ano", e.target.value)} /></Campo>
         <Campo rotulo="Ano de exercício"><input type="number" value={f.anoExercicio} onChange={(e) => set("anoExercicio", e.target.value)} /></Campo>
@@ -337,7 +338,7 @@ function Documentos({ motoristaId, tipos, lista, recarregar, avaliar: podeAvalia
       {aviso}
       <div className="cg-docs">{mostrar.map((d) => (
         <div className="cg-doc" key={d.tipo}>
-          <header><span>{d.nome}</span><Selo tom={TOM_DOC[d.situacao] ?? "neutro"}>{d.situacao === "Recusado" ? "Rejeitado" : d.situacao === "Enviado" ? "Em análise" : d.situacao}</Selo></header>
+          <header><span>{d.nome}{d.obrigatorio && <b title="Documento obrigatório" style={{ color: "var(--cg-ruim)" }}> *</b>}</span><Selo tom={TOM_DOC[d.situacao] ?? "neutro"}>{d.situacao === "Recusado" ? "Rejeitado" : d.situacao === "Enviado" ? "Em análise" : d.situacao}</Selo></header>
           <div className="previa">{!d.enviado ? "(Sem arquivo)" : <a href={`/api/apps-central/documentos/${motoristaId}/${d.tipo}`} target="_blank" rel="noopener noreferrer">Ver arquivo</a>}</div>
           {d.motivo && d.situacao === "Recusado" && <small style={{ color: "var(--cg-ruim)" }}>Motivo: {d.motivo}</small>}
           {d.em && <small style={{ color: "var(--cg-suave)" }}>{dataHoraBr(d.em)}</small>}

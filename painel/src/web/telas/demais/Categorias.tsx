@@ -130,7 +130,7 @@ function JanelaCategoria({ inicial, outras, automacoes, dinamicas, regras, icone
     return <div><h4>{titulo}</h4>{!l.length ? <p className="sub">Nenhuma regra criada.</p> : l.map((r) => <label key={r.id} className="dm-check"><input type="checkbox" checked={ex.dinamicas.includes(r.id)} onChange={() => alternar("dinamicas", r.id)} /> {r.nome} <small>{r.cobranca === "percentual" ? `${r.valor}%` : dinheiro(r.valor)}</small></label>)}</div>;
   };
   return (
-    <Modal aberto onFechar={onFechar} titulo={c.id ? "Editar categoria" : "Criar categoria"} sub="Categorias" larga>
+    <Modal cheia aberto onFechar={onFechar} titulo={c.id ? "Editar categoria" : "Criar categoria"} sub="Categorias" larga>
       <div className="dm-abas" role="tablist">{passos.map(([p, n]) => <button key={p} role="tab" aria-selected={passo === p} className={passo === p ? "ativo" : ""} onClick={() => setPasso(p)}>{n}</button>)}</div>
       <form className="dm-form" onSubmit={(e) => { e.preventDefault(); void enviar(); }}>
         {passo === "basico" && (

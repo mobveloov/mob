@@ -106,7 +106,7 @@ export default function Motoristas() {
                     <td className="centro">
                       <div className="cg-diag">
                         <div className={m.diagnostico.online ? "on" : ""} title={m.diagnostico.online ? "Online" : "Offline"}><i />{m.diagnostico.online ? "ON" : "OFF"}</div>
-                        <div className={m.diagnostico.app ? "on" : "off"} title={m.diagnostico.app ? "App instalado" : "App desinstalado"}>{m.diagnostico.app ? <Wifi size={16} /> : <WifiOff size={16} />}{m.diagnostico.app ? "APP ON" : "APP OFF"}</div>
+                        <div className={m.diagnostico.app ? "on" : "off"} title={m.diagnostico.app ? "App em uso (contato recente)" : "Sem contato do app há dias: nunca instalou ou desinstalou"}>{m.diagnostico.app ? <Wifi size={16} /> : <WifiOff size={16} />}{m.diagnostico.app ? "APP ON" : "APP OFF"}</div>
                         {m.diagnostico.fantasma && <div className="roxo" title="Modo fantasma (oculto no mapa)"><Ghost size={16} />OCULTO</div>}
                         <div title="Versão do app"><Smartphone size={16} />{m.diagnostico.versao ? `v${m.diagnostico.versao}` : "v-"}</div>
                       </div>

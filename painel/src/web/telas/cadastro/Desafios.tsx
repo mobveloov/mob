@@ -117,7 +117,7 @@ function Detalhes({ id, onFechar, onMudou }: { id: string; onFechar: () => void;
   const lista = d.motoristas.filter((m) => (filtro === "Todos" || m.situacao === filtro) && (!busca || m.nome.toLowerCase().includes(busca.toLowerCase())));
   const fechado = x.situacao === "Cancelado" || x.situacao === "Finalizado";
   return (
-    <Janela aberta titulo={x.nome} sub="Desafios dos motoristas" onFechar={onFechar} largura="grande"
+    <Janela cheia aberta titulo={x.nome} sub="Desafios dos motoristas" onFechar={onFechar} largura="grande"
       abas={<Abas itens={[{ id: "config" as const, rotulo: "Configurações do desafio" }, { id: "relatorio" as const, rotulo: "Relatório de Desempenho" }]} valor={parte} onChange={setParte} />}
       rodape={!fechado ? <>
         <button className="cg-botao" onClick={() => void tentar(async () => { await chamar("POST", `/desafios/${id}/ativar`, {}); l.recarregar(); onMudou(); })}>{x.situacao === "Pausado" ? "Ativar" : "Pausar"}</button>
@@ -207,7 +207,7 @@ function Novo({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => void
   const passo2 = f.selecao === "T" || (f.corridasMin !== "" && f.corridasMax !== "" && !!f.periodo && (f.periodo !== "personalizado" || !!f.de));
   const podeAvancar = passo === 1 ? passo1 : passo === 2 ? passo2 : true;
   return (
-    <Janela aberta titulo="Novo desafio" sub={passo === 1 ? "Configurações do desafio" : passo === 2 ? "Quem vai receber o desafio?" : "Confirmar novo desafio:"} onFechar={onFechar}
+    <Janela cheia aberta titulo="Novo desafio" sub={passo === 1 ? "Configurações do desafio" : passo === 2 ? "Quem vai receber o desafio?" : "Confirmar novo desafio:"} onFechar={onFechar}
       rodape={<>
         <button className="cg-botao" onClick={passo === 1 ? onFechar : () => setPasso(passo - 1)}>{passo === 1 ? "Cancelar" : "Voltar"}</button>
         {passo < 3 ? <button className="cg-botao primario" disabled={!podeAvancar} onClick={() => setPasso(passo + 1)}>Próximo</button> : <button className="cg-botao verde" onClick={() => void salvar()}>Lançar desafio</button>}

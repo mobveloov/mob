@@ -129,6 +129,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     return () => { onlineRef.current = false; clearInterval(vivo); parar(); };
   }, [online]);
   useEffect(() => { void posicaoAgora().then((p) => setPosicao((a) => a ?? p)).catch(() => undefined); }, []);
+  useEffect(() => { void api("/ping", { corpo: {} }).catch(() => undefined); }, []); // avisa a central que o app está aberto
   useEffect(() => { void api<{ online: boolean }>("/eu").then((r) => { if (r.online) setOnline(true); }).catch(() => undefined); }, []);
 
   const ficarOnline = async () => {
