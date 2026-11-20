@@ -83,7 +83,7 @@ export const GERAIS_PADRAO: ConfigGerais = {
     motorista: { ativo: true, minutos: 5, reenvio: true, reenvioMinutos: 2, motivos: ["Passageiro não apareceu", "Local de embarque perigoso", "Problema no veículo", "Outro"] },
     rejeicao: { ativo: false, limite: 15, minutos: 60 },
   },
-  macaneta: { ativo: true, pedeNome: true, pedeTelefone: true, pedeCpf: false, pedeEmail: false, categorias: [] },
+  macaneta: { ativo: true, pedeNome: false, pedeTelefone: false, pedeCpf: false, pedeEmail: false, categorias: [] },
   banners: [],
 };
 
