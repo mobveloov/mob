@@ -50,7 +50,7 @@ export function Conversas() {
               </div>
             </span>
           </div>
-          <label className="dm-busca"><Search size={16} /><input placeholder="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversa" /></label>
+          <label className="dm-busca"><Search size={16} /><input placeholder={aba === "empresa" ? "Buscar empresa" : aba === "passageiro" ? "Buscar passageiro" : "Buscar motorista"} value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar conversa" /></label>
         </div>
         <div className="dm-esq-lista">
           {aba !== "empresa" && <button className="dm-item" onClick={() => setTransmissao(true)}><span className="dm-item-nome"><strong><Radio size={14} /> Mensagem Geral</strong></span></button>}
@@ -67,7 +67,7 @@ export function Conversas() {
       </aside>
       <section className="dm-direita">
         {sel ? <Chat key={`${sel.papel}${sel.chave}`} papel={sel.papel} chave={sel.chave} nome={atual?.nome ?? sel.nome ?? sel.chave} onFechar={() => setSel(null)} onMudou={lista.recarregar} /> : (
-          <div className="dm-vazio-grande"><div className="dm-circulo"><MessageSquare size={44} /></div><h3>Selecione uma conversa</h3><p>Sua caixa de entrada está pronta.</p><small className="dm-chat-status">--</small></div>
+          <div className="dm-vazio-grande"><div className="dm-circulo"><MessageSquare size={44} /></div><h3>{aba === "empresa" ? "Envie mensagens para as empresas" : aba === "passageiro" ? "Envie mensagens para os passageiros" : "Envie mensagens para os motoristas"}</h3><p>Sua caixa de entrada está pronta.</p><small className="dm-chat-status">--</small></div>
         )}
       </section>
       <Transmissao aberto={transmissao} onFechar={() => setTransmissao(false)} />
@@ -140,6 +140,7 @@ const SEG: Array<[string, string]> = [["todos", "Todos"], ["com_corridas", "Com 
 
 const DEST: Array<[string, string]> = [["", "Todos"], ["passageiro", "Clientes App"], ["motorista", "Motoristas"]];
 const VAZIO_N = { destinatario: "", dataIni: "", dataFim: "", titulo: "", mensagem: "" };
+const COLUNAS_N: Array<[string, string]> = [["criadoEm", "Data criação"], ["destinatario", "Destinatário"], ["titulo", "Título"], ["mensagem", "Mensagem"], ["status", "Status do envio"], ["enviadoEm", "Data do envio"]];
 const diaBr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
 /** Notificações app (Machine): lista com filtros e "Nova notificação" (disparo imediato ou agendado). */
@@ -149,19 +150,20 @@ export function Notificacoes() {
   const [rasc, setRasc] = useState(VAZIO_N);
   const [f, setF] = useState(VAZIO_N);
   const [pagina, setPagina] = useState(1);
+  const [ordem, setOrdem] = useState<{ campo: string; sentido: "asc" | "desc" } | null>(null);
   const [detalhe, setDetalhe] = useState<any>(null);
   const [menu, setMenu] = useState<string | null>(null);
-  const qs = new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), pagina: String(pagina) }).toString();
+  const qs = new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), pagina: String(pagina), ...(ordem ? { ordem: ordem.campo, sentido: ordem.sentido } : {}) }).toString();
   const lista = useCarregar(() => pedirConfig(`/notificacoes/lista?${qs}`), [qs, criando]);
   const x = lista.dados;
   if (criando) {
+    if (aba === "imediato") return <CriarNotificacao onVoltar={() => setCriando(false)} onEnviada={() => setCriando(false)} />;
     return (
       <>
-        <Cab titulo={aba === "imediato" ? "Nova notificação" : "Agendamento Inteligente"} sub={aba === "imediato" ? "Dispare mensagens PUSH para o celular de seus usuários na hora." : "Programe mensagens para rodarem sozinhas no piloto automático."}>
-          <button className="botao" onClick={() => setCriando(false)}>Voltar</button>
-          <Abas abas={[["imediato", "Disparo Imediato"], ["agendamento", "Agendar Notificações"]]} valor={aba} onChange={setAba} />
+        <Cab titulo="Agendamento Inteligente" sub="Programe mensagens para rodarem sozinhas no piloto automático.">
+          <button className="botao" onClick={() => { setAba("imediato"); setCriando(false); }}>Voltar</button>
         </Cab>
-        {aba === "imediato" ? <CriarNotificacao onVoltar={() => setCriando(false)} onEnviada={() => setCriando(false)} /> : <Formulario agendar />}
+        <Formulario agendar />
       </>
     );
   }
@@ -171,15 +173,16 @@ export function Notificacoes() {
   return (
     <>
       <Cab titulo="Notificações app" sub={'São mensagens rápidas que aparecem na tela do celular, normalmente chamadas de "Notificação Push".'}>
-        <button className="botao primario" onClick={() => setCriando(true)}>Nova notificação</button>
+        <button className="botao" onClick={() => { setAba("agendamento"); setCriando(true); }}>Agendamento inteligente</button>
+        <button className="botao primario" onClick={() => { setAba("imediato"); setCriando(true); }}>Nova notificação</button>
       </Cab>
       <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setPagina(1); setF(rasc); }}>
         <h3>Filtros</h3>
         <Campo rotulo="Destinatário"><select value={rasc.destinatario} onChange={(e) => set("destinatario", e.target.value)}>{DEST.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></Campo>
         <Campo rotulo="Data inicial"><input type="date" value={rasc.dataIni} onChange={(e) => set("dataIni", e.target.value)} /></Campo>
         <Campo rotulo="Data final"><input type="date" value={rasc.dataFim} onChange={(e) => set("dataFim", e.target.value)} /></Campo>
-        <Campo rotulo="Título"><input value={rasc.titulo} maxLength={80} onChange={(e) => set("titulo", e.target.value)} /></Campo>
-        <Campo rotulo="Mensagem"><input value={rasc.mensagem} maxLength={200} onChange={(e) => set("mensagem", e.target.value)} /></Campo>
+        <Campo rotulo="Título"><input value={rasc.titulo} maxLength={40} onChange={(e) => set("titulo", e.target.value)} /></Campo>
+        <Campo rotulo="Mensagem"><textarea value={rasc.mensagem} maxLength={255} rows={1} onChange={(e) => set("mensagem", e.target.value)} /></Campo>
         <button className="botao primario">Filtrar</button>
         <button type="button" className="botao" onClick={() => { setRasc(VAZIO_N); setF(VAZIO_N); setPagina(1); }}>Limpar filtros</button>
       </form>
@@ -188,18 +191,18 @@ export function Notificacoes() {
         {!x ? <Carregando /> : <>
           <p><small>{x.total ? `Exibindo ${de}-${ate} de ${x.total} ${x.total === 1 ? "resultado" : "resultados"}.` : ""}</small></p>
           <table>
-            <thead><tr><th>Data criação</th><th>Destinatário</th><th>Título</th><th>Mensagem</th><th>Status do envio</th><th>Data do envio</th><th /></tr></thead>
+            <thead><tr>{COLUNAS_N.map(([c, n]) => <th key={c}><button type="button" className="botao-tema" onClick={() => { setOrdem(ordem?.campo === c ? { campo: c, sentido: ordem.sentido === "asc" ? "desc" : "asc" } : { campo: c, sentido: "asc" }); setPagina(1); }}>{n}{ordem?.campo === c ? (ordem.sentido === "asc" ? " ▲" : " ▼") : ""}</button></th>)}<th /></tr></thead>
             <tbody>
               {!x.itens.length ? <tr><td colSpan={7} className="vazio">Nenhum resultado encontrado.</td></tr> : x.itens.map((n: any) => (
                 <tr key={n.id}>
                   <td>{diaBr(n.criadoEm)}</td><td>{n.destinatario}</td><td>{n.titulo}</td><td>{n.mensagem}</td><td>{n.status}</td><td>{diaBr(n.enviadoEm)}</td>
                   <td><div className="dm-dropdown"><button className="icone" aria-label={`Ações de ${n.titulo}`} onClick={() => setMenu(menu === n.id ? null : n.id)}>⋮</button>
-                    {menu === n.id && <div className="dm-dropdown-menu direita"><button onClick={() => { setMenu(null); setDetalhe(n); }}>Ver detalhes</button></div>}</div></td>
+                    {menu === n.id && <div className="dm-dropdown-menu direita"><button onClick={() => { setMenu(null); setDetalhe(n); }}>Ver detalhes</button>{n.agendamentoId && <button onClick={async () => { setMenu(null); if (confirm("Cancelar este envio agendado?")) { await pedirConfig(`/notificacoes/agendar/${n.agendamentoId}`, "DELETE"); lista.recarregar(); } }}>Cancelar envio</button>}</div>}</div></td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {x.paginas > 1 && (
+          {(
             <div className="dm-cab-acoes" style={{ marginTop: 10 }} role="navigation" aria-label="Páginas">
               <button className="botao" disabled={x.pagina <= 1} onClick={() => setPagina(x.pagina - 1)}>←</button>
               {paginas.map((p) => <button key={p} className={`botao ${p === x.pagina ? "primario" : ""}`} onClick={() => setPagina(p)}>{p}</button>)}

@@ -6,9 +6,9 @@ import { GRUPOS_MENU, menuLateral } from "../src/comum/menu-lateral.ts";
 
 const ids = (cargo: string) => menuLateral(funcoesDoCargo(cargo)).flatMap((g) => g.blocos.flatMap((b) => b.itens.map((f) => f.id)));
 
-test("os 6 grupos, na ordem e com cores diferentes", () => {
-  assert.deepEqual(GRUPOS_MENU.map((g) => g.nome), ["Operação", "Bot & Totem", "Clientes", "Gestão", "Configuração", "Ajuda"]);
-  assert.equal(new Set(GRUPOS_MENU.map((g) => g.cor)).size, 6);
+test("grupos da Machine na ordem, depois os nossos, cada um com cor diferente", () => {
+  assert.deepEqual(GRUPOS_MENU.map((g) => g.nome), ["Painel", "Cadastro", "Corridas", "Financeiro", "Comunicação", "Configurações", "Cobrança", "Avaliações", "Ajuda", "Bot & Totem", "CRM", "Mais telas"]);
+  assert.equal(new Set(GRUPOS_MENU.map((g) => g.cor)).size, GRUPOS_MENU.length);
 });
 
 test("administrador: todo item de funcoes.ts entra uma vez só (menos o menu do usuário)", () => {
@@ -24,17 +24,18 @@ test("operador não vê o que é só do administrador", () => {
   assert.ok(op.includes("painel") && op.includes("motoristas") && op.includes("juridico"));
   // Grupo sem nenhum item permitido some.
   const soAdminGrupo = menuLateral(funcoesDoCargo("operador").filter((f) => f.grupo === "Cobrança" || f.id === "painel"));
-  assert.deepEqual(soAdminGrupo.map((g) => g.id), ["operacao"]);
+  assert.deepEqual(soAdminGrupo.map((g) => g.id), ["painel"]);
 });
 
-test("Configurações tem o item \"Carteiras de crédito\" (rota própria; \"Carteiras\" continua em Financeiro)", () => {
+test("Configurações tem o item \"Carteiras de crédito\" direto (rota própria; em Financeiro > Créditos tem outro com o mesmo nome)", () => {
   const f = FUNCOES.find((x) => x.id === "carteiras-credito");
   assert.ok(f);
   assert.equal(f.grupo, "Configurações");
   assert.equal(f.nome, "Carteiras de crédito");
   assert.notEqual(f.rota, FUNCOES.find((x) => x.id === "carteiras")!.rota);
   assert.equal(FUNCOES.find((x) => x.id === "carteiras")!.grupo, "Financeiro");
-  const config = menuLateral(funcoesDoCargo("gestor")).find((g) => g.id === "configuracao")!;
+  const config = menuLateral(funcoesDoCargo("gestor")).find((g) => g.id === "configuracoes")!;
+  assert.ok(config.blocos.every((b) => !b.titulo), "Configurações não esconde itens em bloco recolhido");
   assert.ok(config.blocos.some((b) => b.itens.some((i) => i.id === "carteiras-credito")));
   assert.ok(!ids("operador").includes("carteiras-credito"));
 });

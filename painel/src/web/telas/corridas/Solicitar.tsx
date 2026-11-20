@@ -25,9 +25,9 @@ export default function Solicitar() {
   const [complemento, setComplemento] = useState("");
   const [paradas, setParadas] = useState<PontoEscolhido[]>([]);
   const [destino, setDestino] = useState<PontoEscolhido>(P0);
-  const [semDestino, setSemDestino] = useState(false);
+  const semDestino = !destino.texto.trim();
   const [referencia, setReferencia] = useState("");
-  const [motoristaId, setMotoristaId] = useState("");
+  const [motoristaId, setMotoristaId] = useState(""), [motoristaTxt, setMotoristaTxt] = useState("");
   const [categoria, setCategoria] = useState("");
   const [agendar, setAgendar] = useState(false);
   const [quando, setQuando] = useState("");
@@ -35,8 +35,9 @@ export default function Solicitar() {
   const [exigencias, setExigencias] = useState<string[]>([]);
   const [observacao, setObservacao] = useState("");
   const [empresaConv, setEmpresaConv] = useState(""), [centroCusto, setCentroCusto] = useState(""), [voucher, setVoucher] = useState("");
-  const [infoAntes, setInfoAntes] = useState(""), [infoDepois, setInfoDepois] = useState(""), [infoInterna, setInfoInterna] = useState("");
-  const [cpf, setCpf] = useState(""), [variosCarros, setVariosCarros] = useState(false), [favOrigem, setFavOrigem] = useState(false), [favDestino, setFavDestino] = useState(false);
+  const [infoTexto, setInfoTexto] = useState(""), [infoModo, setInfoModo] = useState<"antes" | "depois" | "interna">("antes");
+  const infoAntes = infoModo === "antes" ? infoTexto : "", infoDepois = infoModo === "depois" ? infoTexto : "", infoInterna = infoModo === "interna" ? infoTexto : "";
+  const [cpf, setCpf] = useState(""), [variosCarros, setVariosCarros] = useState(false), [favOrigem, setFavOrigem] = useState(true), [favDestino, setFavDestino] = useState(false);
   const [finalModo, setFinalModo] = useState<"livre" | "prefixado">("livre"), [prefixado, setPrefixado] = useState("");
   const [est, setEst] = useState<{ valor: number | null; distanciaKm: number | null } | null>(null);
   const [manual, setManual] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export default function Solicitar() {
   // Estimativa quando há categoria e rota (com coordenadas ou sem elas, pela base de tarifa).
   const chave = JSON.stringify([categoria, origem.lat, origem.lng, destino.lat, destino.lng, semDestino]);
   useEffect(() => {
-    if (!categoria || !origem.texto || (!semDestino && !destino.texto)) { setEst(null); return; }
+    if (!categoria || !origem.texto || semDestino) { setEst(null); return; }
     let vivo = true;
     const p = new URLSearchParams({ categoria });
     if (origem.lat != null) { p.set("latEmbarque", String(origem.lat)); p.set("lngEmbarque", String(origem.lng)); }
@@ -105,7 +106,6 @@ export default function Solicitar() {
     const tel = soDig(telCadastro || contato || (tipo === "tel" ? busca : ""));
     if (tel.length < 10) return setErro("Informe o telefone do passageiro (de cadastro ou contato manual).");
     if (!origem.texto.trim()) return setErro("Informe a origem.");
-    if (!semDestino && !destino.texto.trim()) return setErro("Informe o destino ou marque \"Sem Destino\".");
     if (agendar && !quando) return setErro("Escolha a data e a hora do agendamento.");
     if (!pagamento) return setErro("Escolha a forma de pagamento.");
     const fixo = Number(prefixado.replace(/\./g, "").replace(",", "."));
@@ -121,7 +121,7 @@ export default function Solicitar() {
         motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, exigencias, observacao, infoAntes, infoDepois, infoInterna, telefoneContato: contato || undefined, enviarVariosCarros: variosCarros, favoritarOrigem: favOrigem, favoritarDestino: favDestino, valorFinalModo: finalModo, valorPrefixado: finalModo === "prefixado" ? fixo : undefined, empresaConveniada: empresaConv || undefined, centroCusto: centroCusto || undefined, voucher: pagamento === "Voucher" ? voucher : undefined, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
       });
       setOk(`Corrida solicitada: OS ${r.corrida.os}${r.corrida.valor != null ? ` · ${reais(r.corrida.valor)}` : ""}.${r.avisos?.length ? ` ${r.avisos.join(" ")}` : ""}`);
-      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setInfoAntes(""); setInfoDepois(""); setInfoInterna(""); setCpf(""); setVariosCarros(false); setFavOrigem(false); setFavDestino(false); setFinalModo("livre"); setPrefixado(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
+      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setInfoTexto(""); setInfoModo("antes"); setCpf(""); setVariosCarros(false); setFavOrigem(true); setFavDestino(false); setFinalModo("livre"); setPrefixado(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setMotoristaTxt(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
       setBusca(""); setNome(""); setContato(""); setTelCadastro(""); setRecentes([]);
     } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
   }
@@ -140,7 +140,7 @@ export default function Solicitar() {
           </div>
           <label className="oc-l">{tipo === "tel" ? "Telefone de cadastro *" : "CPF do cliente *"}
             <span className="oc-fila" style={{ flexWrap: "nowrap" }}>
-              <input value={busca} onChange={(e) => setBusca(e.target.value)} onBlur={buscar} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscar())} placeholder={tipo === "tel" ? "+55" : ""} inputMode="numeric" />
+              <input value={busca} onChange={(e) => setBusca(e.target.value)} onBlur={buscar} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscar())} placeholder={tipo === "tel" ? "11 96123-4567" : "000.000.000-00"} maxLength={30} inputMode="numeric" />
               <button className="oc-btn" type="button" onClick={buscar} aria-label="Buscar passageiro">{buscando ? <Loader2 size={16} className="gira" /> : <Search size={16} />}</button>
             </span>
           </label>
@@ -148,13 +148,14 @@ export default function Solicitar() {
             <div className="oc-recentes"><span className="suave" style={{ fontWeight: 800, fontSize: 11 }}>FAVORITOS</span>
               {recentes.map((e, i) => <button key={i} type="button" onClick={() => setOrigem(e)} title="Usar como partida">{e.texto}</button>)}</div>
           )}
-          <label className="oc-l">Telefone para contato<input value={contato} onChange={(e) => setContato(e.target.value)} placeholder="+55" inputMode="tel" />{telCadastro && !contato && <small className="suave" style={{ textTransform: "none" }}>{fone(telCadastro)}</small>}</label>
-          <label className="oc-l">Nome *<input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={80} /></label>
+          <label className="oc-l">Telefone para contato<input value={contato} onChange={(e) => setContato(e.target.value)} placeholder="11 96123-4567" maxLength={30} inputMode="tel" />{telCadastro && !contato && <small className="suave" style={{ textTransform: "none" }}>{fone(telCadastro)}</small>}</label>
+          <label className="oc-l">Nome *<input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={100} /></label>
           <label className="oc-sw"><input type="checkbox" checked={agendar} onChange={(e) => setAgendar(e.target.checked)} /> Agendar corrida</label>
           {agendar && <input type="datetime-local" value={quando} min={minimo} onChange={(e) => setQuando(e.target.value)} aria-label="Data e hora do agendamento" />}
-          <label className="oc-l">Informação antes do aceite<textarea value={infoAntes} onChange={(e) => setInfoAntes(e.target.value)} maxLength={300} /></label>
-          <label className="oc-l">Informação após o aceite<textarea value={infoDepois} onChange={(e) => setInfoDepois(e.target.value)} maxLength={300} /></label>
-          <label className="oc-l">Informação interna<textarea value={infoInterna} onChange={(e) => setInfoInterna(e.target.value)} maxLength={500} /></label>
+          <label className="oc-l">{infoModo === "depois" ? "Informação após o aceite" : infoModo === "interna" ? "Informação interna" : "Informação antes do aceite"}
+            <textarea value={infoTexto} onChange={(e) => setInfoTexto(e.target.value)} maxLength={70} rows={2} placeholder="Será visualizada pelo motorista antes do aceite" /></label>
+          <label className="oc-sw"><input type="checkbox" checked={infoModo === "depois"} onChange={(e) => setInfoModo(e.target.checked ? "depois" : "antes")} /> Informação após o aceite</label>
+          <label className="oc-sw"><input type="checkbox" checked={infoModo === "interna"} onChange={(e) => setInfoModo(e.target.checked ? "interna" : "antes")} /> Informação interna</label>
           <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Forma de pagamento *</span>
             <div className="oc-pagto">{pagamentos.map((p) => <label key={p} className={pagamento === p ? "on" : ""}><input type="radio" name="forma_pagamento" checked={pagamento === p} onChange={() => setPagamento(p)} />{p}</label>)}</div></div>
           {conveniadas.length > 0 && (
@@ -169,15 +170,13 @@ export default function Solicitar() {
             <div className="oc-pagto">{EXIGENCIAS.map((x) => <label key={x} className={exigencias.includes(x) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x] : exigencias.filter((y) => y !== x))} />{x}</label>)}</div></div>
           <label className="oc-sw"><input type="checkbox" checked={variosCarros} onChange={(e) => setVariosCarros(e.target.checked)} /> Enviar mais de um carro</label>
           <label className="oc-l">Corridas apenas para o motorista:
-            <select value={motoristaId} onChange={(e) => setMotoristaId(e.target.value)}>
-              <option value="">Todos</option>
-              {(mots.dados?.motoristas ?? []).map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-            </select>
+            <input list="solic-motoristas" value={motoristaTxt} placeholder="Todos" onChange={(e) => { setMotoristaTxt(e.target.value); setMotoristaId((mots.dados?.motoristas ?? []).find((m) => m.nome === e.target.value)?.id ?? ""); }} />
+            <datalist id="solic-motoristas">{(mots.dados?.motoristas ?? []).map((m) => <option key={m.id} value={m.nome} />)}</datalist>
           </label>
           <CampoEndereco rotulo="Endereço de partida (com número) *" valor={origem} onChange={setOrigem} />
-          <input placeholder="Sala/Bloco/Apart" value={complemento} onChange={(e) => setComplemento(e.target.value)} maxLength={80} />
+          <label className="oc-l">Sala/Bloco/Apart<input value={complemento} onChange={(e) => setComplemento(e.target.value)} maxLength={100} /></label>
           <label className="oc-sw"><input type="checkbox" checked={favOrigem} onChange={(e) => setFavOrigem(e.target.checked)} /> Favoritar</label>
-          {!semDestino && (
+          {(
             <div className="oc-fila" style={{ flexWrap: "nowrap", alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}><CampoEndereco rotulo="Endereço de destino (com número)" valor={destino} onChange={setDestino} /></div>
               <button className="oc-btn" type="button" disabled={paradas.length >= 3} onClick={() => setParadas([...paradas, P0])} aria-label="Adicionar parada" title="Adicionar parada (até 3)"><Plus size={16} /></button>
@@ -191,10 +190,9 @@ export default function Solicitar() {
               <button className="oc-btn" type="button" onClick={() => setParadas(paradas.filter((_, j) => j !== i))} aria-label="Remover parada"><Trash2 size={16} /></button>
             </div>
           ))}
-          {!semDestino && <label className="oc-sw"><input type="checkbox" checked={favDestino} onChange={(e) => setFavDestino(e.target.checked)} /> Favoritar</label>}
-          <label className="oc-sw"><input type="checkbox" checked={semDestino} onChange={(e) => setSemDestino(e.target.checked)} /> Sem destino</label>
-          <label className="oc-l">Referência do endereço de partida<input value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} /></label>
-          <label className="oc-l">Valor estimado (R$)<input value={valorTexto} onChange={(e) => setManual(e.target.value)} inputMode="decimal" aria-label="Valor estimado" />
+          <label className="oc-sw"><input type="checkbox" checked={favDestino} onChange={(e) => setFavDestino(e.target.checked)} /> Favoritar</label>
+          <label className="oc-l">Referência do endereço de partida<textarea value={referencia} onChange={(e) => setReferencia(e.target.value)} maxLength={120} rows={2} placeholder="Esta informação refere-se apenas ao endereço de partida (para outros dados, use os campos à esquerda)" /></label>
+          <label className="oc-l">Valor estimado (R$)<input value={valorTexto || "0,00"} readOnly maxLength={10} aria-label="Valor estimado" />
             {est?.distanciaKm != null && <small className="suave" style={{ textTransform: "none" }}>{est.distanciaKm.toLocaleString("pt-BR")} km</small>}</label>
           <div className="oc-pagto">
             <label className={finalModo === "livre" ? "on" : ""}><input type="radio" name="valor_final" checked={finalModo === "livre"} onChange={() => setFinalModo("livre")} />Valor final livre</label>

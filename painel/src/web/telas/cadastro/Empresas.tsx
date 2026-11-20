@@ -151,6 +151,7 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
         <Campo rotulo="Endereço" className="larga"><input value={f.endereco} onChange={(x) => set("endereco", x.target.value)} /></Campo>
         <Campo rotulo="Número"><input value={f.enderecoNumero} onChange={(x) => set("enderecoNumero", x.target.value)} /></Campo>
         <Campo rotulo="Complemento"><input value={f.complemento} onChange={(x) => set("complemento", x.target.value)} /></Campo>
+        <p className="cg-suave" style={{ gridColumn: "1 / -1", margin: 0 }}><a href="/central-ajuda">Não achou o endereço?</a></p>
         <Campo rotulo="UF"><select value={f.uf} onChange={(x) => set("uf", x.target.value)}><option value="">Selecione</option>{opcoes.ufs.map((u) => <option key={u}>{u}</option>)}</select></Campo>
         <Campo rotulo="Cidade"><input list="emp-cidades" value={f.cidade} onChange={(x) => set("cidade", x.target.value)} /><datalist id="emp-cidades">{cidades.map((c) => <option key={c} value={c} />)}</datalist></Campo>
         <Campo rotulo="Bairro"><input value={f.bairro} onChange={(x) => set("bairro", x.target.value)} /></Campo>

@@ -6,7 +6,10 @@ import "./corridas.css";
 
 const hojeIso = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const somaDias = (n: number) => new Date(Date.now() - 3 * 3600_000 + n * 86_400_000).toISOString().slice(0, 10);
-const PERIODOS: Array<[string, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["7", "Últimos 7 dias"], ["30", "Últimos 30 dias"], ["todos", "Todos os períodos"], ["pers", "Personalizado"]];
+const PERIODOS: Array<[string, string]> = [["hoje", "Hoje"], ["semana", "Semana passada"], ["mes", "Mês passado"], ["7", "Últimos 7 dias"], ["30", "Últimos 30 dias"], ["pers", "Personalizado"]];
+/** Segunda a domingo da semana anterior. */
+const semanaPassada = () => { const h = new Date(Date.now() - 3 * 3600_000); const dow = (h.getUTCDay() + 6) % 7; return { dataIni: somaDias(-dow - 7), dataFim: somaDias(-dow - 1) }; };
+const mesPassado = () => { const h = new Date(Date.now() - 3 * 3600_000); const ini = new Date(Date.UTC(h.getUTCFullYear(), h.getUTCMonth() - 1, 1)); const fim = new Date(Date.UTC(h.getUTCFullYear(), h.getUTCMonth(), 0)); return { dataIni: ini.toISOString().slice(0, 10), dataFim: fim.toISOString().slice(0, 10) }; };
 const VAZIO = { os: "", motorista: "", passageiro: "" };
 
 export default function Objetos() {
@@ -19,7 +22,7 @@ export default function Objetos() {
   const [menu, setMenu] = useState<string | null>(null);
   const [passageiro, setPassageiro] = useState<any>(null);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
-  const faixa = periodo === "hoje" ? { dataIni: hojeIso(), dataFim: hojeIso() } : periodo === "ontem" ? { dataIni: somaDias(-1), dataFim: somaDias(-1) }
+  const faixa = periodo === "hoje" ? { dataIni: hojeIso(), dataFim: hojeIso() } : periodo === "semana" ? semanaPassada() : periodo === "mes" ? mesPassado()
     : periodo === "7" ? { dataIni: somaDias(-6), dataFim: hojeIso() } : periodo === "30" ? { dataIni: somaDias(-29), dataFim: hojeIso() }
     : periodo === "pers" ? { dataIni: de, dataFim: ate } : {};
   const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/objetos${qs({ status: aba, ...faixa, ...f, pagina })}`), [aba, JSON.stringify(faixa), JSON.stringify(f), pagina]);
@@ -43,6 +46,7 @@ export default function Objetos() {
         <div className="oc-fila">
           <select style={{ maxWidth: 200 }} value={periodo} onChange={(e) => { setPeriodo(e.target.value); setPagina(1); }} aria-label="Período">{PERIODOS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select>
           {periodo === "pers" && <><input type="date" value={de} onChange={(e) => setDe(e.target.value)} aria-label="Data inicial" /><input type="date" value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Data final" /></>}
+          <input id="nomeCliente_filter" name="nomeCliente" placeholder="Buscar passageiro" value={f.passageiro} onChange={(e) => { setF({ ...f, passageiro: e.target.value }); setPagina(1); }} style={{ maxWidth: 200 }} />
           <button className="oc-btn" onClick={() => { setRasc(f); setMaisAberto(true); }}><Filter size={16} /> Mais filtros</button>
         </div>
       </div>
@@ -72,12 +76,11 @@ export default function Objetos() {
         </>}
       </div>
       {maisAberto && (
-        <Janela onFechar={() => setMaisAberto(false)} titulo="Mais filtros" tamanho="estreita"
-          rodape={<><button className="oc-btn" type="button" onClick={() => { setRasc(VAZIO); setF(VAZIO); setPagina(1); setMaisAberto(false); }}>Limpar filtros</button><button className="oc-btn pri" type="button" onClick={() => { setF(rasc); setPagina(1); setMaisAberto(false); }}>Filtrar</button></>}>
+        <Janela onFechar={() => setMaisAberto(false)} titulo="Filtro de pesquisa" sub="Você pode filtrar um ou mais campos" tamanho="estreita"
+          rodape={<><button className="oc-btn" type="button" onClick={() => { setRasc(VAZIO); setF({ ...f, os: "", motorista: "" }); setPagina(1); setMaisAberto(false); }}>Limpar filtros</button><button className="oc-btn pri" type="button" onClick={() => { setF({ ...f, os: rasc.os, motorista: rasc.motorista }); setPagina(1); setMaisAberto(false); }}>Filtrar</button></>}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <label className="oc-l">Motorista<input value={rasc.motorista} onChange={(e) => setRasc({ ...rasc, motorista: e.target.value })} /></label>
-            <label className="oc-l">OS<input value={rasc.os} onChange={(e) => setRasc({ ...rasc, os: e.target.value })} inputMode="numeric" /></label>
-            <label className="oc-l">Passageiro<input value={rasc.passageiro} onChange={(e) => setRasc({ ...rasc, passageiro: e.target.value })} /></label>
+            <label className="oc-l">Nome/VTR do motorista<input id="nomeTaxista_filter" value={rasc.motorista} onChange={(e) => setRasc({ ...rasc, motorista: e.target.value })} /></label>
+            <label className="oc-l">Nº OS<input id="n_os" type="number" value={rasc.os} onChange={(e) => setRasc({ ...rasc, os: e.target.value })} /></label>
           </div>
         </Janela>
       )}

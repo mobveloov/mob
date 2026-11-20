@@ -17,7 +17,7 @@ import { categoriasCompletas, duplicarCategoria, ICONES, removerCategoria, remov
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
 import { listarProprias, pedidosRecentes } from "../corridas/index.ts";
 import { mapa as servicoMapa } from "../operacao/servico.ts";
-import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, previaDestinatarios, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { removerTaxa, salvarTaxa, taxas } from "./taxas.ts";
 import { FORMAS_TAXA } from "../comum/taxas.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
@@ -137,8 +137,9 @@ rotasConfig.post("/alertas/:id/encerrar", exigirPapel("admin", "operador"), ok((
 rotasConfig.get("/central-notificacoes", ok((req, res) => res.json(central(emp(req), quem(req), q(req, "somenteNaoLidas") === "1"))));
 rotasConfig.post("/central-notificacoes/lidas", ok((req, res) => res.json({ marcadas: marcarCentralLidas(emp(req), quem(req), req.body?.chaves, req.body?.todas === true), ...central(emp(req), quem(req), false) })));
 rotasConfig.get("/notificacoes", ok((req, res) => res.json({ historico: historicoNotificacoes(emp(req)), agendamentos: agendamentos(emp(req)) })));
-rotasConfig.get("/notificacoes/lista", ok((req, res) => res.json(listaNotificacoes(emp(req), { destinatario: q(req, "destinatario"), dataIni: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataIni")) ? q(req, "dataIni") : undefined, dataFim: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataFim")) ? q(req, "dataFim") : undefined, titulo: q(req, "titulo"), mensagem: q(req, "mensagem") }, Number(q(req, "pagina")) || 1))));
+rotasConfig.get("/notificacoes/lista", ok((req, res) => res.json(listaNotificacoes(emp(req), { destinatario: q(req, "destinatario"), dataIni: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataIni")) ? q(req, "dataIni") : undefined, dataFim: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataFim")) ? q(req, "dataFim") : undefined, titulo: q(req, "titulo"), mensagem: q(req, "mensagem"), ordem: q(req, "ordem"), sentido: q(req, "sentido") }, Number(q(req, "pagina")) || 1))));
 rotasConfig.get("/notificacoes/pessoas", ok((req, res) => res.json({ pessoas: buscarPessoas(emp(req), papelCart(q(req, "papel")), q(req, "busca")) })));
+rotasConfig.post("/notificacoes/previa", exigirPapel("admin", "operador"), ok((req, res) => res.json(previaDestinatarios(emp(req), sanearPedido(req.body)))));
 rotasConfig.post("/notificacoes", exigirPapel("admin", "operador"), ok(async (req, res) => res.json(await dispararNotificacao(emp(req), sanearPedido(req.body), quem(req)))));
 rotasConfig.post("/notificacoes/agendar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ agendamentos: criarAgendamento(emp(req), req.body) })));
 rotasConfig.post("/notificacoes/agendar/:id/pausar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ agendamentos: pausarAgendamento(emp(req), req.params.id, req.body?.ativo === true) })));
@@ -278,7 +279,7 @@ const papelNps = (v: string): PapelNps => (v === "motorista" ? "motorista" : "pa
 rotasConfig.get("/nps/:papel", ok((req, res) => res.json({ config: configNps(emp(req), papelNps(req.params.papel)), resumo: resumoNps(emp(req), papelNps(req.params.papel)) })));
 const filtroNps = (req: Request) => {
   const v = (k: string, max = 80) => String(req.query[k] ?? "").trim().slice(0, max);
-  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20) };
+  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20), nome: v("nome", 50) };
 };
 /** Avaliações (NPS): nota, promotores, neutros, detratores e a lista paginada, com filtros de período, tipo, e-mail e telefone. */
 rotasConfig.get("/nps/:papel/avaliacoes", ok((req, res) => res.json({ ...avaliacoesNps(emp(req), papelNps(req.params.papel), filtroNps(req), Number(req.query.pagina) || 1), periodos: PERIODOS_NPS, tipos: TIPOS_NPS })));

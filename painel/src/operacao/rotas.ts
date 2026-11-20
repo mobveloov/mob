@@ -197,7 +197,8 @@ rotasOperacao.get("/monitoramento", ok((req, res) => res.json({ ...S.monitoramen
 rotasOperacao.get("/mapa", ok((req, res) => res.json({ ...S.mapa(emp(req), filialPedida(req)), filiais: listaFiliais(req) })));
 rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   const h = Number(req.query.horas);
-  res.json(await S.ocorrencias(emp(req), h > 0 && h <= 72 ? h : 1, pag(req)));
+  const status = q(req, "status", 20).split(",").filter((x) => x in S.OCORRENCIAS_TIPOS);
+  res.json(await S.ocorrencias(emp(req), { horas: h > 0 && h <= 72 ? h : 24, empresa: q(req, "empresa", 80), categoria: q(req, "categoria", 60), nomeEmpresa: q(req, "nomeEmpresa", 80), status }, pag(req), empresasPorTelefone(emp(req))));
 }));
 
 const filtroProg = (req: Request): S.FiltroProgramadas => ({

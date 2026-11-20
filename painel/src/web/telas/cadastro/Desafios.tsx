@@ -6,11 +6,12 @@ import { Plus, Trophy } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { Abas, Cabecalho, Campo, chamar, consulta, dataBr, dataHoraBr, dinheiro, Janela, Selo, useAviso, Vazio } from "./base";
 
-interface Desafio { id: string; nome: string; tipo: string; meta: number; premio: number | null; inicio: string; fim: string; horaInicio?: string; horaFim?: string; aprovacao?: string; categorias?: string; criadoPor?: string; situacao: string; desafiados: number; participando: number; concluidos: number; gastoAtual: number; atualizadoPor?: string }
+interface Desafio { id: string; nome: string; tipo: string; meta: number; premio: number | null; inicio: string; fim: string; horaInicio?: string; horaFim?: string; aprovacao?: string; tipoRecompensa?: string; premioDescricao?: string; categorias?: string; criadoPor?: string; situacao: string; desafiados: number; participando: number; concluidos: number; gastoAtual: number; atualizadoPor?: string }
 interface Prog { id: string; nome: string; feito: number; meta: number; situacao: string; aceitoEm: string | null; finalizadoEm: string | null; pago: boolean; valorPago: number; aguardandoAprovacao: boolean; app: number; macaneta: number; pendencia: number }
 interface Detalhe { desafio: Desafio; motoristas: Prog[]; resumo: { desafiados: number; participando: number; concluidos: number; gastoMaximo: number; gastoEsperado: number; gastoReal: number } }
 const TOM: Record<string, "ok" | "info" | "ruim" | "neutro" | "alerta"> = { Ativo: "ok", Aguardando: "info", Pausado: "alerta", Cancelado: "ruim", Finalizado: "neutro" };
 const TIPOS = ["Desafio de corridas", "Corridas pendentes aceitas", "Corridas maçaneta"];
+const NOME_TIPO: Record<string, string> = { "Desafio de corridas": "Corridas finalizadas", "Corridas pendentes aceitas": "Corridas pendentes finalizadas" };
 const ABAS = ["Todos", "Ativos", "Aguardando", "Cancelados", "Finalizados"] as const;
 
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -69,7 +70,7 @@ export default function Desafios() {
             <select aria-label="Período" value={periodo} onChange={(e) => mudar(() => setPeriodo(e.target.value))}>{PERIODOS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select>
             {periodo === "CT" && <><input type="date" aria-label="Data inicial" value={de} onChange={(e) => mudar(() => setDe(e.target.value))} /><input type="date" aria-label="Data final" value={ate} onChange={(e) => mudar(() => setAte(e.target.value))} /></>}
             <select aria-label="Status" value={aba} onChange={(e) => mudar(() => setAba(e.target.value))}><option value="Todos">Status (todos)</option>{ABAS.slice(1).map((id) => <option key={id} value={id}>{id}</option>)}</select>
-            <select aria-label="Tipo do desafio" value={tipo} onChange={(e) => mudar(() => setTipo(e.target.value))}><option value="">Tipo do desafio</option>{TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+            <select aria-label="Tipo do desafio" value={tipo} onChange={(e) => mudar(() => setTipo(e.target.value))}><option value="">Tipo do desafio</option>{TIPOS.map((t) => <option key={t} value={t}>{NOME_TIPO[t] ?? t}</option>)}</select>
             <input placeholder="Buscar desafio" aria-label="Buscar desafio" value={busca} onChange={(e) => mudar(() => setBusca(e.target.value))} />
           </div>
           {!d ? <div className="cg-tabela-caixa"><Vazio titulo="Carregando..." /></div> : !todos.length ? <div className="cg-tabela-caixa"><Vazio titulo="Nenhum desafio encontrado." sub="Ajuste os filtros." /></div> : (
@@ -83,7 +84,7 @@ export default function Desafios() {
                 <div className="cg-desafio-dados">
                   <div><small>Motoristas desafiados</small><strong>{x.desafiados}</strong></div>
                   <div><small>Motoristas participando</small><strong>{x.participando}</strong></div>
-                  <div><small>Recompensa em créditos</small><strong>{dinheiro(x.premio)}</strong></div>
+                  <div><small>{x.tipoRecompensa === "Personalizada" ? "Recompensa" : "Recompensa em créditos"}</small><strong>{x.tipoRecompensa === "Personalizada" ? x.premioDescricao : dinheiro(x.premio)}</strong></div>
                   <div><small>Gasto total atual</small><strong>{dinheiro(x.gastoAtual)}</strong></div>
                 </div>
               </button>))}
@@ -172,57 +173,88 @@ function Detalhes({ id, onFechar, onMudou }: { id: string; onFechar: () => void;
   );
 }
 
+const PERIODOS_CORRIDAS: Array<[string, string]> = [["", "Selecione"], ["ontem", "Ontem"], ["esta_semana", "Esta semana"], ["semana_passada", "Semana passada"], ["este_mes", "Este mês"], ["mes_passado", "Mês passado"], ["personalizado", "Personalizado"]];
+function janelaCorridas(p: string, de: string, ate: string): [string, string] {
+  const hoje = new Date(), seg = somar(hoje, -((hoje.getDay() + 6) % 7));
+  if (p === "ontem") return [iso(somar(hoje, -1)), iso(somar(hoje, -1))];
+  if (p === "esta_semana") return [iso(seg), iso(hoje)];
+  if (p === "semana_passada") return [iso(somar(seg, -7)), iso(somar(seg, -1))];
+  if (p === "este_mes") return [iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), iso(hoje)];
+  if (p === "mes_passado") return [iso(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)), iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0))];
+  if (p === "personalizado") return [de, ate || de];
+  return ["", ""];
+}
+
+/** "Novo desafio" em 3 passos, como na Machine: configurações, quem recebe e confirmação. */
 function Novo({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => void }) {
   const [passo, setPasso] = useState(1);
-  const [f, setF] = useState({ nome: "", tipo: TIPOS[0], inicio: "", horaInicio: "00:00", fim: "", horaFim: "23:59", meta: "", premio: "", aprovacao: "Automático", corridasMin: "", corridasMax: "", categorias: [] as string[] });
+  const [f, setF] = useState({ nome: "", tipo: TIPOS[0], inicio: "", horaInicio: "", fim: "", horaFim: "", meta: "", tipoRecompensa: "Em créditos", premio: "", premioDescricao: "", aprovacao: "Automático", selecao: "T", corridasMin: "", corridasMax: "", periodo: "", de: "", ate: "", categorias: [] as string[] });
   const cats = useCarregar(() => chamar<{ categorias: string[] }>("GET", "/cidades"), []);
-  const previa = useCarregar(() => (passo >= 2 ? chamar<{ motoristas: number; gastoMaximo: number }>("GET", `/desafios-previa${consulta({ categorias: f.categorias.join(","), corridasMin: f.corridasMin, corridasMax: f.corridasMax, premio: f.premio })}`) : Promise.resolve(null)), [passo, f.categorias, f.corridasMin, f.corridasMax, f.premio]);
+  const [janelaDe, janelaAte] = f.selecao === "F" ? janelaCorridas(f.periodo, f.de, f.ate) : ["", ""];
+  const minMax = f.selecao === "F" ? { corridasMin: f.corridasMin, corridasMax: f.corridasMax } : { corridasMin: "", corridasMax: "" };
+  const credito = f.tipoRecompensa === "Em créditos";
+  const previa = useCarregar(() => (passo >= 2 ? chamar<{ motoristas: number; gastoMaximo: number }>("GET", `/desafios-previa${consulta({ categorias: f.categorias.join(","), ...minMax, corridasDe: janelaDe, corridasAte: janelaAte, premio: credito ? f.premio : "0" })}`) : Promise.resolve(null)), [passo, f.categorias, f.selecao, f.corridasMin, f.corridasMax, janelaDe, janelaAte, f.premio, f.tipoRecompensa]);
   const { aviso, tentar } = useAviso();
   const set = (k: string, v: string) => setF({ ...f, [k]: v });
   const n = (v: string) => (v === "" ? null : Number(v.replace(",", ".")));
+  const soNum = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
   const salvar = async () => {
-    const corpo = { ...f, categorias: f.categorias.join(","), meta: n(f.meta), premio: n(f.premio) ?? 0, corridasMin: n(f.corridasMin), corridasMax: n(f.corridasMax) };
+    const corpo = { nome: f.nome, tipo: f.tipo, inicio: f.inicio, horaInicio: f.horaInicio, fim: f.fim, horaFim: f.horaFim, aprovacao: f.aprovacao, tipoRecompensa: f.tipoRecompensa, premioDescricao: f.premioDescricao,
+      categorias: f.categorias.join(","), meta: n(f.meta), premio: credito ? n(f.premio) ?? 0 : 0, ...Object.fromEntries(Object.entries(minMax).map(([k, v]) => [k, n(v)])), corridasDe: janelaDe, corridasAte: janelaAte };
     if (await tentar(() => chamar("POST", "/desafios", corpo), "Desafio lançado.")) { onSalvo(); onFechar(); }
   };
-  const podeAvancar = passo === 1 ? !!(f.nome && f.inicio && f.fim && Number(f.meta) > 0) : true;
+  const passo1 = !!(f.nome && f.inicio && f.horaInicio && f.fim && f.horaFim && Number(f.meta) > 0 && (credito ? Number(f.premio.replace(",", ".")) > 0 : f.premioDescricao.trim()));
+  const passo2 = f.selecao === "T" || (f.corridasMin !== "" && f.corridasMax !== "" && !!f.periodo && (f.periodo !== "personalizado" || !!f.de));
+  const podeAvancar = passo === 1 ? passo1 : passo === 2 ? passo2 : true;
   return (
-    <Janela aberta titulo="Novo desafio" sub="Configurações do desafio" onFechar={onFechar}
+    <Janela aberta titulo="Novo desafio" sub={passo === 1 ? "Configurações do desafio" : passo === 2 ? "Quem vai receber o desafio?" : "Confirmar novo desafio:"} onFechar={onFechar}
       rodape={<>
         <button className="cg-botao" onClick={passo === 1 ? onFechar : () => setPasso(passo - 1)}>{passo === 1 ? "Cancelar" : "Voltar"}</button>
-        {passo < 3 ? <button className="cg-botao primario" disabled={!podeAvancar} onClick={() => setPasso(passo + 1)}>Próximo</button> : <button className="cg-botao primario" onClick={() => void salvar()}>Lançar desafio</button>}
+        {passo < 3 ? <button className="cg-botao primario" disabled={!podeAvancar} onClick={() => setPasso(passo + 1)}>Próximo</button> : <button className="cg-botao verde" onClick={() => void salvar()}>Lançar desafio</button>}
       </>}>
       {aviso}
       <div className="cg-etapas"><span className={passo === 1 ? "ativa" : ""}>1</span><span className={passo === 2 ? "ativa" : ""}>2</span><span className={passo === 3 ? "ativa" : ""}>3</span></div>
       {passo === 1 && (
         <div className="cg-grade">
           <Campo rotulo={`Nome do desafio * (${f.nome.length}/30)`} className="larga"><input maxLength={30} value={f.nome} onChange={(e) => set("nome", e.target.value)} /></Campo>
-          <Campo rotulo="Tipo do desafio *"><select value={f.tipo} onChange={(e) => set("tipo", e.target.value)}><option value={TIPOS[0]}>Corridas finalizadas</option><option value={TIPOS[1]}>Corridas pendentes aceitas</option><option value={TIPOS[2]}>Corridas maçaneta</option></select></Campo>
-          <Campo rotulo="Aprovação da recompensa *"><select value={f.aprovacao} onChange={(e) => set("aprovacao", e.target.value)}><option>Automático</option><option>Manual</option></select></Campo>
           <Campo rotulo="Data de início *"><input type="date" value={f.inicio} onChange={(e) => set("inicio", e.target.value)} /></Campo>
           <Campo rotulo="Hora de início *"><input type="time" value={f.horaInicio} onChange={(e) => set("horaInicio", e.target.value)} /></Campo>
           <Campo rotulo="Data final *"><input type="date" value={f.fim} onChange={(e) => set("fim", e.target.value)} /></Campo>
           <Campo rotulo="Hora final *"><input type="time" value={f.horaFim} onChange={(e) => set("horaFim", e.target.value)} /></Campo>
-          <Campo rotulo="Meta do desafio *"><input type="number" min={1} value={f.meta} onChange={(e) => set("meta", e.target.value)} /></Campo>
-          <Campo rotulo="Recompensa (R$) *"><input inputMode="decimal" value={f.premio} onChange={(e) => set("premio", e.target.value)} /></Campo>
+          <Campo rotulo="Meta de corridas finalizadas *"><input inputMode="numeric" maxLength={4} placeholder="Ex: 10" value={f.meta} onChange={(e) => set("meta", soNum(e.target.value, 4))} /></Campo>
+          <Campo rotulo="Tipo do desafio *"><select value={f.tipo} onChange={(e) => set("tipo", e.target.value)}><option value={TIPOS[0]}>Corridas finalizadas</option><option value={TIPOS[1]}>Corridas pendentes finalizadas</option><option value={TIPOS[2]}>Corridas maçaneta</option></select></Campo>
+          <Campo rotulo="Tipo de recompensa *"><select value={f.tipoRecompensa} onChange={(e) => set("tipoRecompensa", e.target.value)}><option>Em créditos</option><option>Personalizada</option></select></Campo>
+          {credito
+            ? <Campo rotulo="Recompensa em créditos *"><input inputMode="decimal" maxLength={10} placeholder="R$ 0,00" value={f.premio} onChange={(e) => set("premio", e.target.value)} /></Campo>
+            : <Campo rotulo={`Descrição da recompensa * (${f.premioDescricao.length}/100)`}><input maxLength={100} value={f.premioDescricao} onChange={(e) => set("premioDescricao", e.target.value)} /></Campo>}
+          <Campo rotulo="Aprovação da recompensa *"><select value={f.aprovacao} onChange={(e) => set("aprovacao", e.target.value)}><option>Automático</option><option>Manual</option></select></Campo>
         </div>
       )}
       {passo === 2 && (
         <>
-          <h4 className="cg-secao">Quem vai receber os desafios?</h4>
-          <p style={{ color: "var(--cg-suave)", margin: "0 0 8px" }}>Filtrar por corridas finalizadas. Motoristas que finalizaram entre:</p>
-          <div className="cg-duplo"><input type="number" min={0} placeholder="mínimo" value={f.corridasMin} onChange={(e) => set("corridasMin", e.target.value)} /><span>e</span><input type="number" min={0} placeholder="máximo" value={f.corridasMax} onChange={(e) => set("corridasMax", e.target.value)} /><span>corridas</span></div>
-          <h4 className="cg-secao">Categorias do motorista *</h4>
+          <p style={{ margin: "0 0 8px" }}><strong>Escolha como selecionar os motoristas *</strong></p>
+          <label style={{ display: "block", marginBottom: 6 }}><input type="radio" name="selecao" checked={f.selecao === "T"} onChange={() => set("selecao", "T")} /> Selecionar todos</label>
+          <label style={{ display: "block", marginBottom: 6 }}><input type="radio" name="selecao" checked={f.selecao === "F"} onChange={() => set("selecao", "F")} /> Filtrar por corridas finalizadas</label>
+          {f.selecao === "F" && (
+            <div className="cg-duplo" style={{ alignItems: "center", flexWrap: "wrap" }}>
+              <span>Motoristas que finalizaram entre</span>
+              <input inputMode="numeric" maxLength={5} placeholder="Ex: 10*" aria-label="Mínimo de corridas" value={f.corridasMin} onChange={(e) => set("corridasMin", soNum(e.target.value, 5))} /><span>e</span>
+              <input inputMode="numeric" maxLength={5} placeholder="Ex: 100*" aria-label="Máximo de corridas" value={f.corridasMax} onChange={(e) => set("corridasMax", soNum(e.target.value, 5))} /><span>corridas</span>
+              <select aria-label="Período" value={f.periodo} onChange={(e) => set("periodo", e.target.value)}>{PERIODOS_CORRIDAS.map(([c, nome]) => <option key={c} value={c}>{nome}</option>)}</select>
+              {f.periodo === "personalizado" && <><input type="date" aria-label="De" value={f.de} onChange={(e) => set("de", e.target.value)} /><input type="date" aria-label="Até" value={f.ate} onChange={(e) => set("ate", e.target.value)} /></>}
+            </div>
+          )}
+          <h4 className="cg-secao">Categorias do motorista</h4>
           <div className="cg-caixas">{(cats.dados?.categorias ?? []).map((c) => <label key={c}><input type="checkbox" checked={f.categorias.includes(c)} onChange={() => setF({ ...f, categorias: f.categorias.includes(c) ? f.categorias.filter((x) => x !== c) : [...f.categorias, c] })} />{c}</label>)}</div>
           <p style={{ color: "var(--cg-suave)", fontSize: 12 }}>Sem categoria marcada, o desafio vale para todas.</p>
         </>
       )}
       {passo === 3 && (
         <>
-          <h4 className="cg-secao">Confirmar novo desafio</h4>
-          <div className="cg-resumo-linha"><span>Motoristas desafiados</span><strong>{previa.dados ? previa.dados.motoristas : "Calculando..."}</strong></div>
-          <div className="cg-resumo-linha"><span>Recompensa</span><strong>{dinheiro(Number(f.premio.replace(",", ".")) || 0)}</strong></div>
-          <div className="cg-resumo-linha"><span>Expectativa de gasto máximo</span><strong>Até {dinheiro(previa.dados?.gastoMaximo)} (em créditos)</strong></div>
-          <p style={{ color: "var(--cg-suave)", fontSize: 12 }}>Após a conclusão do desafio e a aprovação da recompensa, o valor é depositado na carteira de créditos do motorista.</p>
+          <div className="cg-resumo-linha"><span>Motoristas desafiados</span><strong>{!previa.dados ? "Calculando..." : f.selecao === "T" && !f.categorias.length ? "Todos" : previa.dados.motoristas}</strong></div>
+          <div className="cg-resumo-linha"><span>Recompensa</span><strong>{credito ? dinheiro(Number(f.premio.replace(",", ".")) || 0) : f.premioDescricao}</strong></div>
+          {credito && <div className="cg-resumo-linha"><span>Expectativa de gasto máximo</span><strong>Até {dinheiro(previa.dados?.gastoMaximo)} (em créditos)</strong></div>}
+          <p style={{ color: "var(--cg-suave)", fontSize: 12 }}>{f.aprovacao === "Automático" ? "Ao concluir o desafio, a aprovação da recompensa é automática" : "Ao concluir o desafio, a recompensa espera a sua aprovação"}{credito ? " e o valor será depositado na carteira de créditos do motorista." : "."}</p>
         </>
       )}
     </Janela>

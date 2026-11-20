@@ -14,11 +14,12 @@ export default function Programadas() {
   const [rasc, setRasc] = useState<Filtros>(VAZIO);
   const [pagina, setPagina] = useState(1);
   const [sel, setSel] = useState<any>(null);
+  const [pronto, setPronto] = useState<string | null>(null);
   const [erroEx, setErroEx] = useState<string | null>(null);
   const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/programadas${qs({ ...f, pagina })}`), [JSON.stringify(f), pagina], 30_000);
   const o = dados?.opcoes;
-  const lista = (k: keyof Filtros, r: string, itens: Array<string | { id: string; nome: string }> = []) => (
-    <label className="oc-l">{r}<select value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })}><option value="">Selecione</option>
+  const lista = (k: keyof Filtros, r: string, itens: Array<string | { id: string; nome: string }> = [], semVazio = false) => (
+    <label className="oc-l">{r}<select value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })}>{!semVazio && <option value="">Selecione</option>}
       {itens.map((x) => typeof x === "string" ? <option key={x} value={x}>{x}</option> : <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
   );
   const campo = (k: keyof Filtros, r: string, tipo = "text") => <label className="oc-l">{r}<input type={tipo} value={rasc[k]} onChange={(e) => setRasc({ ...rasc, [k]: e.target.value })} /></label>;
@@ -29,8 +30,7 @@ export default function Programadas() {
     try {
       const r = await fetch(`/api/operacao/programadas/exportar${qs(f)}`, { credentials: "same-origin" });
       if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erro?: string }).erro || `Erro ${r.status}`);
-      const url = URL.createObjectURL(await r.blob());
-      const a = document.createElement("a"); a.href = url; a.download = "corridas-programadas.csv"; a.click(); URL.revokeObjectURL(url);
+      setPronto(URL.createObjectURL(await r.blob()));
     } catch (e) { setErroEx(msgErro(e)); }
   }
   return (
@@ -41,10 +41,16 @@ export default function Programadas() {
       </div>
       <Aviso texto={erro} erro />
       <Aviso texto={erroEx} erro />
+      {pronto && (
+        <Janela onFechar={() => { URL.revokeObjectURL(pronto); setPronto(null); }} titulo="Relatório gerado com sucesso" tamanho="estreita" nivel="centro"
+          rodape={<button className="oc-btn" onClick={() => { URL.revokeObjectURL(pronto); setPronto(null); }}>Fechar</button>}>
+          <a href={pronto} download="corridas-programadas.csv">Clique aqui</a> para realizar o download do arquivo.
+        </Janela>
+      )}
       <form className="oc-card" onSubmit={(e) => { e.preventDefault(); filtrar(); }}>
         <h3 style={{ marginTop: 0 }}>Filtros</h3>
         <div className="oc-grid3">
-          {lista("centralChamada", "Central chamada", o?.centrais)}{lista("empresa", "Empresa", o?.empresas)}{campo("os", "Nº OS")}
+          {lista("centralChamada", "Central chamada", o?.centrais, true)}{lista("empresa", "Empresa", o?.empresas)}{campo("os", "Nº OS")}
           {lista("categoria", "Categoria", o?.categorias)}{campo("passageiro", "Nome do passageiro")}{campo("motorista", "Nome/VTR do motorista")}
           {campo("dataIni", "Data inicial", "date")}{campo("dataFim", "Data final", "date")}{lista("pagamento", "Forma de pagamento", o?.pagamentos)}
           {lista("situacao", "Situação do disparo", o?.situacoes)}{!!o?.filiais?.length && lista("filial", "Filial", o.filiais)}

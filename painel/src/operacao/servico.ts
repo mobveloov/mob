@@ -324,17 +324,45 @@ export function mapa(empresaId: string, filial?: string) {
 
 // ====================================================================== ocorrências (falhas recentes)
 
-export async function ocorrencias(empresaId: string, horas: number, pagina: number) {
-  const r = await buscarCorridas(empresaId, { ultimasHoras: horas });
-  const l = r.corridas.filter((c) => c.grupo === "cancelada" || c.grupo === "nao_atendida")
-    .sort((a, b) => (b.solicitadaEm ?? "").localeCompare(a.solicitadaEm ?? ""))
-    .map((c) => ({
-      id: c.id, os: c.os, hora: c.solicitadaEm, grupo: c.grupo, statusTexto: c.statusTexto,
-      motivo: c.grupo === "nao_atendida" ? "Nenhum motorista aceitou a corrida" : `Cancelada${c.canceladaPor ? ` pelo ${c.canceladaPor.toLowerCase()}` : ""}${c.motivoCancelamento ? `: ${c.motivoCancelamento}` : ""}`,
-      passageiro: c.passageiro, telefone: c.telefonePassageiro, embarque: c.embarque, destino: c.destino, motorista: c.motorista, valorPerdido: c.valor ?? c.valorEstimado,
+/** Filtros de "Retorno e Ocorrências" (Machine): empresa, categoria, status marcados (C, N, P, A) e busca pelo nome da empresa. */
+export interface FiltroOcorrencias { empresa?: string; categoria?: string; status?: string[]; nomeEmpresa?: string; horas?: number }
+/** Tipos de ocorrência, na ordem da Machine: C Cancelada, N Não atendida, P Pendente, A Atrasada. */
+export const OCORRENCIAS_TIPOS: Record<string, string> = { C: "Cancelada", N: "Não atendida", P: "Pendente", A: "Atrasada" };
+/** Minutos sem motorista para a corrida contar como pendente, e minutos de espera para contar como atrasada. */
+export const PENDENTE_APOS_MIN = 3;
+export const ATRASADA_APOS_MIN = 10;
+
+export async function ocorrencias(empresaId: string, f: FiltroOcorrencias, pagina: number, empresas = new Map<string, string>()) {
+  const r = await buscarCorridas(empresaId, { ultimasHoras: f.horas ?? 24 });
+  const agora = agoraBr().getTime();
+  const minutos = (c: CorridaPainel) => (c.solicitadaEm ? Math.max(0, Math.round((agora - Date.parse(c.solicitadaEm)) / 60_000)) : 0);
+  const tipoDe = (c: CorridaPainel): string => {
+    if (c.grupo === "cancelada") return "C";
+    if (c.grupo === "nao_atendida") return "N";
+    if (c.grupo !== "aberta") return "";
+    if (!c.motorista) return minutos(c) >= PENDENTE_APOS_MIN ? "P" : "";
+    return /caminho|local/i.test(c.statusTexto) && minutos(c) >= ATRASADA_APOS_MIN ? "A" : "";
+  };
+  const marcados = new Set(f.status?.length ? f.status : Object.keys(OCORRENCIAS_TIPOS));
+  const emp = (c: CorridaPainel) => empresas.get(soDigitos(c.telefonePassageiro)) ?? "";
+  const l = r.corridas
+    .map((c) => ({ c, tipo: tipoDe(c) }))
+    .filter(({ tipo }) => tipo && marcados.has(tipo))
+    .filter(({ c }) => !f.categoria || normal(c.categoria) === normal(f.categoria))
+    .filter(({ c }) => !f.empresa || normal(emp(c)) === normal(f.empresa))
+    .filter(({ c }) => !f.nomeEmpresa || normal(emp(c)).includes(normal(f.nomeEmpresa)))
+    .sort((a, b) => (b.c.solicitadaEm ?? "").localeCompare(a.c.solicitadaEm ?? ""))
+    .map(({ c, tipo }) => ({
+      id: c.id, os: c.os, hora: c.solicitadaEm, grupo: c.grupo, statusTexto: c.statusTexto, tipo, ocorrencia: OCORRENCIAS_TIPOS[tipo],
+      motivo: c.grupo === "nao_atendida" ? "Nenhum motorista aceitou a corrida" : c.grupo === "cancelada" ? `Cancelada${c.canceladaPor ? ` pelo ${c.canceladaPor.toLowerCase()}` : ""}${c.motivoCancelamento ? `: ${c.motivoCancelamento}` : ""}` : tipo === "A" ? `Motorista a caminho há ${minutos(c)} min` : `Sem motorista há ${minutos(c)} min`,
+      passageiro: c.passageiro, telefone: c.telefonePassageiro, embarque: c.embarque, destino: c.destino, motorista: c.motorista, empresa: emp(c), categoria: c.categoria,
+      // Previsão de chegada do motorista (cerca de 3 min por km) e o aviso de pagamento que o motorista vê.
+      previsaoMin: c.distanciaMotoristaKm != null ? Math.max(1, Math.round(c.distanciaMotoristaKm * 3)) : null,
+      avisoMotorista: /^pix/i.test(c.pagamento) ? "Pgto por Pix" : /cart|cr[eé]dito|d[eé]bito/i.test(c.pagamento) ? `Pgto por ${c.pagamento}` : "",
+      valorPerdido: c.valor ?? c.valorEstimado,
     }));
   const p = paginar(l, pagina, 20);
-  return { avisos: r.avisos, ...p };
+  return { avisos: r.avisos, ...p, opcoes: { categorias: [...new Set(listar(empresaId, cadastroPorId("categorias")!).map((x) => String(x.nome ?? "")).filter(Boolean))].sort(), empresas: [...new Set(empresas.values())].sort(), tipos: Object.entries(OCORRENCIAS_TIPOS).map(([id, nome]) => ({ id, nome })) } };
 }
 
 // ====================================================================== programadas

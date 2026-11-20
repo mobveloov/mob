@@ -186,3 +186,20 @@
 .cg-desafio-dados small { color: var(--cg-suave); font-size: 11px; }
 .cg-paginas { display: flex; gap: 6px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
 @media (max-width: 860px) { .cg-desafios-grade { grid-template-columns: 1fr; } .cg-desafio-dados { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Ruas: lista de regras à esquerda e cartão com mapa e campos à direita (como na Machine). */
+.cg-ruas { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 16px; align-items: start; }
+.cg-ruas-lista { display: flex; flex-direction: column; gap: 8px; }
+.cg-ruas-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; color: var(--cg-txt); background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 14px; padding: 10px 12px; cursor: pointer; }
+.cg-ruas-item.ativa { border-color: #f97316; }
+.cg-ruas-item > svg:last-child { margin-left: auto; color: #3b82f6; }
+.cg-ruas-icone { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; border-radius: 50%; background: rgba(249, 115, 22, .15); color: #f97316; flex: none; }
+.cg-ruas-nome { display: flex; flex-direction: column; min-width: 0; }
+.cg-ruas-nome small { color: var(--cg-suave); }
+.cg-ruas-cartao { background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.cg-ruas-cartao h2 { margin: 0; font-size: 18px; }
+.cg-ruas-cartao header p { margin: 4px 0 0; color: var(--cg-suave); font-size: 13px; }
+.cg-ruas-passos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--cg-suave); }
+.cg-ruas-passos b { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; background: #f97316; color: #fff; margin-right: 6px; font-size: 12px; }
+.cg-ruas-campos { display: grid; gap: 10px; }
+@media (max-width: 800px) { .cg-ruas { grid-template-columns: 1fr; } }

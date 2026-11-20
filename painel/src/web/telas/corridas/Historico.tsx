@@ -11,6 +11,8 @@ import { JanelaCorrida, JanelaExterna } from "./JanelaCorrida";
 
 // Atalhos da Machine (15 minutos a 4 horas). "Hoje" é nosso, no fim, e é o padrão.
 const ATALHOS: Array<[string, string]> = [["15min", "15 minutos"], ["30min", "30 minutos"], ["1h", "1 hora"], ["2h", "2 horas"], ["3h", "3 horas"], ["4h", "4 horas"], ["hoje", "Hoje"]];
+/** Status da Machine que o nosso fluxo não usa: aparecem no filtro (como na Machine) e devolvem lista vazia. */
+const STATUS_SEM_FLUXO: Array<[string, string]> = [["aguardando_aceite", "Aguardando aceite"], ["aguardando_liberacao", "Aguardando liberação"], ["pagamento_pendente", "Pagamento pendente"], ["negociacao", "Em negociação"]];
 /** Ordem dos status no filtro da Machine. */
 const ORDEM_STATUS = ["distribuindo", "a_caminho", "nao_atendida", "cancelada", "cancelada_pax", "cancelada_mot", "andamento", "finalizada", "pendente", "espera"];
 const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "", filial: "" };
@@ -33,6 +35,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
   const [legenda, setLegenda] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [rel, setRel] = useState<Relatorio | null>(null);
+  const [pronto, setPronto] = useState<{ nome: string; csv: string } | null>(null);
   const [erroEx, setErroEx] = useState<string | null>(null);
   const [pergunta, setPergunta] = useState("");
   const [resposta, setResposta] = useState<{ texto: string; erro?: boolean } | null>(null);
@@ -51,8 +54,10 @@ export default function Historico({ programadas = false }: { programadas?: boole
   async function planilha() {
     setErroEx(null);
     try {
-      try { const r = await op<{ nome: string; csv: string }>(`/historico/exportar${qs(consulta)}`); baixar(r.nome, r.csv, "text/csv;charset=utf-8"); }
-      catch { baixar(`${nomeBase}.csv`, corridasCsv(await todas(), marca.mostrarOrigem), "text/csv;charset=utf-8"); }
+      let arq: { nome: string; csv: string };
+      try { arq = await op<{ nome: string; csv: string }>(`/historico/exportar${qs(consulta)}`); }
+      catch { arq = { nome: `${nomeBase}.csv`, csv: corridasCsv(await todas(), marca.mostrarOrigem) }; }
+      setPronto(arq);
     } catch (e) { setErroEx(msgErro(e)); }
   }
   async function exportar() {
@@ -145,14 +150,15 @@ export default function Historico({ programadas = false }: { programadas?: boole
             <div className="oc-grid2">{lista("centralChamada", "Central chamada", op_?.centrais, "Selecione")}{lista("centralCorrida", "Central da corrida", op_?.centrais, "Selecione")}</div>
             
             <div className="oc-grid2">{lista("empresa", "Empresa", op_?.empresas, "Selecione")}{lista("categoria", "Categoria", op_?.categorias, "Selecione")}</div>
-            <div className="oc-grid3">{campo("nomePax", "Nome do passageiro", "")}{campo("telPax", "Telefone do passageiro", "+55")}{campo("cpfPax", "CPF do passageiro", "")}</div>
+            <div className="oc-grid3">{campo("nomePax", "Nome do passageiro", "")}{campo("telPax", "Telefone do passageiro", "+55 11 96123-4567", "tel")}{campo("cpfPax", "CPF do passageiro", "000.000.000-00")}</div>
             {campo("endereco", "Endereço de partida", "")}
             {campo("motorista", "Nome/VTR/Placa do motorista", "")}
             <div className="oc-grid2">{campo("dataIni", "Data inicial", "", "date")}{campo("horaIni", "Hora inicial", "00:00", "time")}{campo("dataFim", "Data final", "", "date")}{campo("horaFim", "Hora final", "23:59", "time")}</div>
             <div className="oc-grid2">
               {lista("pagamento", "Forma de pagamento", op_?.pagamentos, "Selecione")}
               <label className="oc-l">Status<select value={rasc.status} onChange={(e) => setRasc({ ...rasc, status: e.target.value })}><option value="">Selecione</option>
-                {Object.entries<string>(dados?.status ?? {}).sort((a, b) => ORDEM_STATUS.indexOf(a[0]) - ORDEM_STATUS.indexOf(b[0])).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}</select></label>
+                {Object.entries<string>(dados?.status ?? {}).sort((a, b) => ORDEM_STATUS.indexOf(a[0]) - ORDEM_STATUS.indexOf(b[0])).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}
+                {STATUS_SEM_FLUXO.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select></label>
               {lista("urgencia", "Urgência", op_?.urgencias, "Selecione")}
               {lista("via", "Corrida via", op_?.vias, "Selecione")}
               {(op_?.filiais?.length ?? 0) > 0 && lista("filial", "Filial", op_.filiais, "Todas")}
@@ -162,6 +168,10 @@ export default function Historico({ programadas = false }: { programadas?: boole
             <label className="oc-sw"><input type="checkbox" checked={rasc.cashback === "1"} onChange={(e) => setRasc({ ...rasc, cashback: e.target.checked ? "1" : "" })} /> Corridas que geraram cashback</label>
           </form>
         </Janela>
+      )}
+      {pronto && (
+        <Janela onFechar={() => setPronto(null)} titulo="Relatório gerado com sucesso!" sub="O arquivo está pronto para download" tamanho="estreita" nivel="centro"
+          rodape={<button className="oc-btn pri" onClick={() => { baixar(pronto.nome, pronto.csv, "text/csv;charset=utf-8"); setPronto(null); }}>Baixar relatório</button>}><span /></Janela>
       )}
       {legenda && (
         <Janela onFechar={() => setLegenda(false)} titulo="Status das corridas" tamanho="estreita" nivel="centro">

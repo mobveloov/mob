@@ -14,7 +14,7 @@ interface Mapa {
   filtros: { situacoes: Array<{ id: string; rotulo: string; pct: number }>; categorias: Array<{ id: string; nome: string }> } | null;
 }
 interface Acao { id: string; em: string; por: string; papel: Papel; indicador: string; faixa: string; tipo: string; destinatarios: number; detalhe: string }
-const TIPOS: Record<string, string> = { notificacao: "Notificação", mensagem: "Mensagem", cupom: "Cupom", desafio: "Desafio", status: "Alteração de situação" };
+const TIPOS: Record<string, string> = { notificacao: "Notificação", mensagem: "Mensagem", cupom: "Cupom", desafio: "Desafio", status: "Alteração de situação", punir: "Punição" };
 
 /** Lista suspensa com caixas de marcar (situação e categoria), com Todos, Limpar e Aplicar. */
 function Multi({ rotulo, itens, marcados, onAplicar }: { rotulo: string; itens: Array<{ id: string; nome: string; extra?: string }>; marcados: string[]; onAplicar: (ids: string[]) => void }) {

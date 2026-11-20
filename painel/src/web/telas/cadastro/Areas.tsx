@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
-import { Cabecalho, Campo, chamar, ComFiltros, Interruptor, Janela, useAviso, Vazio } from "./base";
+import { Cabecalho, Campo, chamar, ComFiltros, Interruptor, useAviso, Vazio } from "./base";
 import MapaAreas, { type Ponto, type Vista } from "./MapaAreas";
 
 interface Horario { de: string; ate: string }
@@ -26,6 +26,8 @@ export default function Areas() {
   const mostradas = useMemo(() => areas.filter((a) => a.nome.toLowerCase().includes(aplicado.toLowerCase())).sort((x, y) => x.nome.localeCompare(y.nome, "pt-BR") * (ordem === "asc" ? 1 : -1)), [areas, aplicado, ordem]);
 
   if (tela === "geral") return <div className="cg-pagina-solta">{aviso}<VisaoGeral areas={areas} onVoltar={() => setTela("lista")} /></div>;
+  // Como na Machine, criar e alterar abrem uma página (não uma janela); "Voltar" leva de volta à lista.
+  if (editando) return <div className="cg-pagina-solta"><Formulario a={editando === "nova" ? null : editando} outras={areas} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} /></div>;
   return (
     <div className="cg-pagina-solta">
       {aviso}
@@ -53,7 +55,6 @@ export default function Areas() {
             </tr>))}</tbody>
         </table></div></div>
       </ComFiltros>
-      {editando && <Formulario a={editando === "nova" ? null : editando} outras={areas} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
     </div>
   );
 }
@@ -107,7 +108,8 @@ function Formulario({ a, outras, onFechar, onSalvo }: { a: Area | null; outras: 
   const mudarHorario = (i: number, campo: keyof Horario, v: string) => setHorarios(horarios.map((h, j) => (j === i ? { ...h, [campo]: v } : h)));
   const corDesenho = bloqueia ? "#ef4444" : CORES[cor] ?? "#22c55e";
   return (
-    <Janela aberta titulo={a ? "Alterando Área" : "Criando Área"} onFechar={onFechar} largura="grande" rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>{a ? "Salvar" : "Criar"}</button></>}>
+    <div>
+      <Cabecalho titulo={a ? "Alterando Área" : "Criando Área"} />
       {aviso}
       <p className="cg-info-bloco" style={{ margin: "0 0 10px" }}>Campos com <b>*</b> são obrigatórios.</p>
       <p className="cg-info-bloco" style={{ margin: "0 0 12px" }}><strong>Clique na área para entrar ou sair do modo de edição.</strong></p>
@@ -150,6 +152,10 @@ function Formulario({ a, outras, onFechar, onSalvo }: { a: Area | null; outras: 
           </div>
         )}
       </div>
-    </Janela>
+      <div className="cg-acoes" style={{ marginTop: 14 }}>
+        <button className="cg-botao" onClick={onFechar}>Voltar</button>
+        <button className="cg-botao primario" onClick={() => void salvar()}>{a ? "Salvar" : "Criar"}</button>
+      </div>
+    </div>
   );
 }

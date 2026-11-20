@@ -15,7 +15,10 @@ import type { LucideIcon } from "lucide-react";
 import { menuLateral, ROTULO_MENU, type CorMenu, type GrupoMenuVisivel } from "../../comum/menu-lateral.ts";
 import type { Funcao } from "../../comum/funcoes.ts";
 
-const ICONE_GRUPO: Record<string, LucideIcon> = { operacao: Radio, "bot-totem": Bot, clientes: Sparkles, gestao: Briefcase, configuracao: SlidersHorizontal, ajuda: LifeBuoy };
+const ICONE_GRUPO: Record<string, LucideIcon> = {
+  painel: LayoutDashboard, cadastro: Users, corridas: Car, financeiro: Wallet, comunicacao: MessagesSquare, configuracoes: SlidersHorizontal,
+  cobranca: Landmark, avaliacoes: Star, ajuda: LifeBuoy, "bot-totem": Bot, crm: Sparkles, mais: Briefcase,
+};
 
 const ICONES: Record<string, LucideIcon> = {
   painel: LayoutDashboard, conversas: MessagesSquare,
@@ -35,8 +38,14 @@ const ICONES: Record<string, LucideIcon> = {
   "config-gerais": Settings, "regras-credito": CreditCard, categorias: Layers, "tarifas-dinamicas": TrendingUp, descontos: Percent, "regras-despacho": Target,
   transbordos: Cone, integracoes: Plug, "config-nps": Star, "termos-app": ShieldCheck,
   juridico: Scale, "central-ajuda": CircleHelp,
+  "passe-livre": Ticket, "consulta-cartoes": CreditCard, "creditos-recargas-saques": Banknote, "creditos-extrato": Receipt,
+  "cartao-painel": Gauge, "cartao-transacoes": CreditCard, "cartao-saldo-central": Landmark, "cartao-saldo-motorista": Wallet,
+  "ultimo-boleto": FileText, "ajuda-termos": ScrollText, "central-suporte": LifeBuoy, ouvidoria: MessagesSquare,
 };
-const ICONE_BLOCO: Record<string, LucideIcon> = { Corridas: Car, Frota: Truck, Financeiro: Wallet, "Cobrança": Landmark, "Regras e integrações": SlidersHorizontal };
+const ICONE_BLOCO: Record<string, LucideIcon> = {
+  "Gestão de áreas": MapPin, Clientes: UserCheck, "Créditos": Wallet, "Cartão": CreditCard, Pix: Zap, "Contas a receber": Receipt, "Contas a pagar": Banknote,
+  "Relatórios": BarChart3, "Estatísticas": TrendingUp, "Poder público": Route, "Operação": Radio, Financeiro: Wallet, "Conta e plataforma": Settings,
+};
 const rotulo = (f: Funcao, assistente: string) => (f.id === "analise" ? `Análise com ${assistente}` : ROTULO_MENU[f.id] ?? f.nome);
 const iconeDe = (f: Funcao, grupo: string): LucideIcon => ICONES[f.id] ?? ICONE_GRUPO[grupo] ?? Eye;
 

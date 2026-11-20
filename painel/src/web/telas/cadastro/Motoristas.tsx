@@ -70,7 +70,7 @@ export default function Motoristas() {
           <Campo rotulo="CPF"><input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} /></Campo>
           <Campo rotulo="Número da viatura"><input value={form.viatura} onChange={(e) => setForm({ ...form, viatura: e.target.value })} /></Campo>
           <Campo rotulo="Placa"><input value={form.placa} onChange={(e) => setForm({ ...form, placa: e.target.value.toUpperCase() })} /></Campo>
-          <Campo rotulo="Telefone"><input value={form.telefone} placeholder="+55" onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></Campo>
+          <Campo rotulo="Telefone"><input value={form.telefone} placeholder="11 96123-4567" maxLength={30} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></Campo>
           <Campo rotulo="E-mail"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Campo>
           <Campo rotulo="Ano de fabricação do veículo"><div className="cg-duplo"><input type="number" placeholder="A partir de" value={form.anoDe} onChange={(e) => setForm({ ...form, anoDe: e.target.value })} /><span>-</span><input type="number" placeholder="Até" value={form.anoAte} onChange={(e) => setForm({ ...form, anoAte: e.target.value })} /></div></Campo>
           <Campo rotulo="Período de cadastro"><div className="cg-duplo"><input type="date" aria-label="Início" value={form.dataIni} onChange={(e) => setForm({ ...form, dataIni: e.target.value })} /><input type="date" aria-label="Fim" value={form.dataFim} onChange={(e) => setForm({ ...form, dataFim: e.target.value })} /></div></Campo>

@@ -1,58 +1,72 @@
-// Menu lateral: os mesmos itens, ids e rotas de funcoes.ts, arranjados em 6 grupos coloridos (como no painel de referência
-// do dono). Aqui só fica o arranjo; os ícones e a aparência ficam em src/web/menu/MenuLateral.tsx.
-// Todo item de FUNCOES (menos o menu do usuário) precisa aparecer aqui: o teste test/menu-lateral.test.ts confere.
+// Menu lateral: os mesmos itens, ids e rotas de funcoes.ts, nos MESMOS grupos, submenus, nomes e ordem do menu da Machine
+// (Painel, Cadastro, Corridas, Financeiro, Comunicação, Configurações, Cobrança, Avaliações, Ajuda), cada grupo com sua cor
+// como no painel de referência do dono. Depois vêm os grupos que só existem aqui (Bot & Totem, CRM, Mais telas).
+// Aqui só fica o arranjo; os ícones e a aparência ficam em src/web/menu/MenuLateral.tsx.
+// Todo item de FUNCOES precisa aparecer aqui: os testes test/menu-lateral.test.ts e test/menu-machine.test.ts conferem.
 
 import { FUNCOES, type Funcao } from "./funcoes.ts";
 
-export type CorMenu = "laranja" | "azul" | "verde" | "roxo" | "rosa" | "lima";
+export type CorMenu = "laranja" | "azul" | "verde" | "roxo" | "rosa" | "lima" | "ciano" | "ambar" | "indigo" | "teal" | "ardosia" | "fucsia";
 
 export interface BlocoMenu {
-  /** Título do bloco recolhível. Sem título, os itens ficam soltos no grupo. */
+  /** Título do submenu (recolhível), igual ao da Machine. Sem título, os itens ficam soltos no grupo. */
   titulo?: string;
   ids: string[];
 }
 export interface GrupoMenu { id: string; nome: string; cor: CorMenu; blocos: BlocoMenu[] }
 
 export const GRUPOS_MENU: GrupoMenu[] = [
+  { id: "painel", nome: "Painel", cor: "laranja", blocos: [{ ids: ["painel"] }] },
   {
-    id: "operacao", nome: "Operação", cor: "laranja", blocos: [
-      { ids: ["painel", "conversas"] },
-      { titulo: "Corridas", ids: ["solicitar", "monitoramento", "mapa", "historico", "programadas", "ocorrencias", "recuperacao", "pagamentos-pendentes", "taxas-cancelamento", "objetos", "entrega-voucher", "alterar-os"] },
-      { titulo: "Frota", ids: ["motoristas", "destravar", "veiculos", "plantao", "areas", "ruas", "punicoes", "desafios", "documentos"] },
+    id: "cadastro", nome: "Cadastro", cor: "verde", blocos: [
+      { ids: ["equipe", "cupons", "passe-livre", "empresas", "faixas-vouchers"] },
+      { titulo: "Gestão de áreas", ids: ["areas", "plantao"] },
+      { ids: ["motoristas", "punicoes"] },
+      { titulo: "Clientes", ids: ["passageiros", "consulta-cartoes"] },
+      { ids: ["ruas", "desafios"] },
     ],
   },
   {
-    id: "bot-totem", nome: "Bot & Totem", cor: "azul", blocos: [
-      { ids: ["bot", "totem", "app-totem", "notificacoes", "alertas-empresas", "apps", "enderecos"] },
+    id: "corridas", nome: "Corridas", cor: "azul", blocos: [
+      { ids: ["solicitar", "monitoramento", "ocorrencias", "historico", "mapa", "programadas", "taxas-cancelamento", "indice-relatorios", "alterar-os", "entrega-voucher", "objetos", "engajamento"] },
     ],
   },
   {
-    id: "clientes", nome: "Clientes", cor: "verde", blocos: [
-      { ids: ["passageiros", "empresas", "cupons", "indicacoes", "faixas-vouchers", "crm", "engajamento", "funil-clientes", "mapa-bairros", "avaliacoes"] },
+    id: "financeiro", nome: "Financeiro", cor: "roxo", blocos: [
+      { titulo: "Créditos", ids: ["carteiras", "creditos-recargas-saques", "creditos-extrato"] },
+      { titulo: "Cartão", ids: ["cartao-painel", "cartao-transacoes", "cartao-saldo-central", "cartao-saldo-motorista"] },
+      { titulo: "Pix", ids: ["transacao-pix"] },
+      { titulo: "Contas a receber", ids: ["faturamento-empresa", "faturamento-centro-custo", "faturamento-periodo"] },
+      { titulo: "Contas a pagar", ids: ["vouchers-motoristas", "pagamentos-pendentes"] },
+      { titulo: "Relatórios", ids: ["visao-geral", "relatorio-faturamento", "extrato-online"] },
+      { titulo: "Estatísticas", ids: ["os-motorista", "os-empresa", "os-bairro", "os-pagamento", "os-operador", "os-percentual-motorista"] },
+      { titulo: "Poder público", ids: ["km-rodados"] },
+      { ids: ["indicacoes"] },
     ],
   },
+  { id: "comunicacao", nome: "Comunicação", cor: "ciano", blocos: [{ ids: ["conversas", "notificacoes", "alertas-empresas"] }] },
   {
-    id: "gestao", nome: "Gestão", cor: "roxo", blocos: [
-      { ids: ["analise"] },
-      { titulo: "Financeiro", ids: ["visao-geral", "extrato-central", "extrato-online", "relatorio-faturamento", "transacao-pix", "indice-relatorios", "faturamento-empresa", "faturamento-centro-custo", "faturamento-periodo", "vouchers-motoristas", "os-motorista", "os-empresa", "os-bairro", "os-pagamento", "os-operador", "os-percentual-motorista", "km-rodados", "carteiras", "extrato", "saques", "recargas", "relatorios"] },
-      { titulo: "Cobrança", ids: ["demonstrativo-mensal", "meus-planos", "controle-centrais"] },
+    id: "configuracoes", nome: "Configurações", cor: "rosa", blocos: [
+      { ids: ["config-gerais", "personalizacao-app", "carteiras-credito", "taxas-central", "regras-despacho", "transbordos", "categorias", "tarifas-dinamicas", "descontos", "integracoes", "config-nps", "termos-app", "regras-credito"] },
     ],
   },
+  { id: "cobranca", nome: "Cobrança", cor: "ambar", blocos: [{ ids: ["ultimo-boleto", "demonstrativo-mensal", "meus-planos", "extrato-central", "controle-centrais"] }] },
+  { id: "avaliacoes", nome: "Avaliações", cor: "lima", blocos: [{ ids: ["avaliacoes"] }] },
+  { id: "ajuda", nome: "Ajuda", cor: "teal", blocos: [{ ids: ["ajuda-termos", "juridico", "central-suporte", "ouvidoria", "central-ajuda"] }] },
+  // Só existem aqui (não são da Machine).
+  { id: "bot-totem", nome: "Bot & Totem", cor: "indigo", blocos: [{ ids: ["bot", "totem", "app-totem", "apps", "enderecos"] }] },
+  { id: "crm", nome: "CRM", cor: "fucsia", blocos: [{ ids: ["crm", "recuperacao", "funil-clientes", "mapa-bairros"] }] },
   {
-    id: "configuracao", nome: "Configuração", cor: "rosa", blocos: [
-      { ids: ["marca", "equipe", "filiais", "superadmin", "alterar-senha"] },
-      { titulo: "Regras e integrações", ids: ["config-gerais", "personalizacao-app", "taxas-central", "carteiras-credito", "regras-credito", "categorias", "tarifas-dinamicas", "descontos", "regras-despacho", "transbordos", "integracoes", "config-nps", "termos-app"] },
-    ],
-  },
-  {
-    id: "ajuda", nome: "Ajuda", cor: "lima", blocos: [
-      { ids: ["juridico", "central-ajuda"] },
+    id: "mais", nome: "Mais telas", cor: "ardosia", blocos: [
+      { titulo: "Operação", ids: ["analise", "documentos", "destravar", "veiculos", "filiais"] },
+      { titulo: "Financeiro", ids: ["extrato", "saques", "recargas", "relatorios"] },
+      { titulo: "Conta e plataforma", ids: ["marca", "superadmin", "alterar-senha"] },
     ],
   },
 ];
 
 /** Nome mostrado no menu lateral quando difere do nome da tela. */
-export const ROTULO_MENU: Record<string, string> = { painel: "Visão Geral", marca: "Dados da Empresa" };
+export const ROTULO_MENU: Record<string, string> = { marca: "Dados da Empresa" };
 
 export interface GrupoMenuVisivel { id: string; nome: string; cor: CorMenu; blocos: Array<{ titulo?: string; itens: Funcao[] }> }
 
@@ -63,4 +77,14 @@ export function menuLateral(funcoes: Funcao[] = FUNCOES): GrupoMenuVisivel[] {
     id: g.id, nome: g.nome, cor: g.cor,
     blocos: g.blocos.map((b) => ({ titulo: b.titulo, itens: b.ids.map((i) => porId.get(i)).filter((f): f is Funcao => !!f) })).filter((b) => b.itens.length),
   })).filter((g) => g.blocos.length);
+}
+
+/** Uma tela do menu com o caminho "Grupo > Submenu" (usado pela busca e pela tabela de comparação). */
+export interface ItemBusca { id: string; nome: string; rota: string; caminho: string }
+
+export function itensParaBusca(funcoes: Funcao[] = FUNCOES, assistente = "IA"): ItemBusca[] {
+  return menuLateral(funcoes).flatMap((g) => g.blocos.flatMap((b) => b.itens.map((f) => {
+    const nome = f.id === "analise" ? `Análise com ${assistente}` : ROTULO_MENU[f.id] ?? f.nome;
+    return { id: f.id, nome, rota: f.rota, caminho: [g.nome, b.titulo].filter(Boolean).join(" > ") };
+  })));
 }

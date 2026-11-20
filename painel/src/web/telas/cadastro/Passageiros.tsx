@@ -48,7 +48,7 @@ export default function Passageiros() {
       <ComFiltros filtros={
         <form onSubmit={(e) => { e.preventDefault(); setPagina(1); setFiltro(form); }}>
           <Campo rotulo="Nome"><input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></Campo>
-          <Campo rotulo="Telefone"><input value={form.telefone} placeholder="+55" onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></Campo>
+          <Campo rotulo="Telefone"><input value={form.telefone} placeholder="11 96123-4567" maxLength={30} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></Campo>
           <Campo rotulo="CPF"><input value={form.cpf} inputMode="numeric" onChange={(e) => setForm({ ...form, cpf: e.target.value })} /></Campo>
           <Campo rotulo="E-mail"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Campo>
           <Campo rotulo="Período de data de nascimento"><input type="date" aria-label="Nascimento de" value={form.nascIni} onChange={(e) => setForm({ ...form, nascIni: e.target.value })} /><input type="date" aria-label="Nascimento até" value={form.nascFim} onChange={(e) => setForm({ ...form, nascFim: e.target.value })} /></Campo>
@@ -119,7 +119,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
       <h4 className="cg-secao">Dados pessoais</h4>
       <div className="cg-grade">
         <Campo rotulo="Nome *" className="larga"><input value={f.nome} onChange={(e) => set("nome", e.target.value)} /></Campo>
-        <Campo rotulo="Telefone *"><input value={f.telefone} placeholder="+55" onChange={(e) => set("telefone", e.target.value)} /></Campo>
+        <Campo rotulo="Telefone *"><input value={f.telefone} placeholder="11 96123-4567" maxLength={30} onChange={(e) => set("telefone", e.target.value)} /></Campo>
         <Campo rotulo="CPF"><input value={f.cpf} inputMode="numeric" onChange={(e) => set("cpf", e.target.value)} /></Campo>
         {!novo && <>
           <Campo rotulo="E-mail"><input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Campo>
