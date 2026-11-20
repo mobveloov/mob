@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-route
 import { ChevronDown, KeyRound, LogOut, Menu, Moon, Newspaper, Search, Sun, X } from "lucide-react";
 import { NOME_CARGO, podeCargo } from "../comum/cargos.ts";
 import { moduloDaFuncao } from "../comum/modulos.ts";
+import { imagemDaEmpresa } from "../comum/marca.ts";
 import { funcoesDoCargo, type Funcao } from "../comum/funcoes.ts";
 import { BotaoRecolher, MenuItens } from "./menu/MenuLateral";
 import { BuscaGlobal } from "./menu/BuscaGlobal";
@@ -64,7 +65,7 @@ const CARGO: Record<string, string> = NOME_CARGO;
 /** Foto da empresa (quadrado arredondado com anel dourado); sem foto, a inicial do nome. */
 function FotoEmpresa({ classe = "" }: { classe?: string }) {
   const { sessao, marca } = useSessao();
-  const arq = marca.arquivos.fotoEmpresa;
+  const arq = imagemDaEmpresa(marca.arquivos);
   return (
     <span className={`foto-empresa-mini ${classe}`}>
       {arq ? <img src={urlImagem(sessao.empresa.id, arq)} alt="" /> : <b>{iniciais(sessao.empresa.nome)}</b>}
