@@ -317,3 +317,49 @@ test("painel acha as duas fichas (passageiro e motorista) pelo mesmo telefone", 
   assert.equal(r.doisPapeis, true);
   assert.equal((await chamar("GET", "/api/apps-central/pessoas/123", undefined, undefined, cookie)).status, 400);
 });
+
+test("taxas da central: cada taxa configurada no painel aparece no extrato do motorista e no detalhe do passageiro; bruto − taxas = líquido; mudou no painel, muda no app", async () => {
+  const { salvarTaxa, removerTaxa, taxas } = await import("../src/config/taxas.ts");
+  const FORMAS = ["dinheiro", "debito", "credito", "cartao_app", "pix"];
+  const t1 = salvarTaxa(E.id, { nome: "Taxa APP", quemPaga: "motorista", categorias: ["Econômico"], pagamentos: FORMAS, faixas: [{ de: 0, ate: null, tipo: "porcentagem", valor: 10 }] }, "teste").find((t) => t.nome === "Taxa APP")!;
+  salvarTaxa(E.id, { nome: "Seguro", quemPaga: "motorista", categorias: ["Econômico"], pagamentos: FORMAS, faixas: [{ de: 0, ate: null, tipo: "fixo", valor: 1 }] }, "teste");
+  salvarTaxa(E.id, { nome: "Taxa de serviço", quemPaga: "passageiro", categorias: ["Econômico"], pagamentos: FORMAS, faixas: [{ de: 0, ate: null, tipo: "fixo", valor: 1.5 }] }, "teste");
+  try {
+    criar(E.id, cadastroPorId("motoristas")!, { nome: "Hugo Taxas", telefone: "11900000041", status: "Ativo", veiculo: "Sedã", placa: "HUG1A23" }, "teste");
+    const tokP = await entrar("passageiro", "11988885555");
+    const tokM = await entrar("motorista", "11900000041");
+    await chamar("POST", `${API}/online`, { lat: -23.9005, lng: -47.1 }, tokM);
+    const LONGE = { texto: "Rua do Sossego, 50", lat: -23.9, lng: -47.1 };
+    const pedido = await chamar("POST", `${API}/corridas`, { embarque: LONGE, destino: DESTINO, categoria: "Econômico", pagamento: "Dinheiro", pedidoId: "ponta-taxas" }, tokP);
+    const id = pedido.corpo.corrida.id as string;
+    let oferta = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta;
+    for (let i = 0; i < 12 && !oferta; i++) { await new Promise((r) => setTimeout(r, 300)); oferta = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta; }
+    assert.ok(oferta, "a oferta chega ao motorista");
+    await chamar("POST", `${API}/ofertas/${oferta.id}/aceitar`, {}, tokM);
+    for (const s of ["no_local", "em_andamento", "finalizada"]) await chamar("POST", `${API}/corridas/${id}/status`, { status: s }, tokM);
+    // Motorista: uma linha por taxa, com o nome do painel; bruto − taxas = líquido; resumo do período soma por nome.
+    const g = (await chamar("GET", `${API}/ganhos?periodo=semana`, undefined, tokM)).corpo;
+    const c = g.lista.find((x: any) => x.id === id);
+    assert.ok(c, "corrida no extrato");
+    assert.deepEqual(c.taxas.map((t: any) => t.nome).sort(), ["Seguro", "Taxa APP"]);
+    assert.equal(Math.round(c.taxas.find((t: any) => t.nome === "Taxa APP").valor * 100), Math.round(c.valorBruto * 10));
+    assert.equal(c.taxas.find((t: any) => t.nome === "Seguro").valor, 1);
+    const somaTaxas = c.taxas.reduce((s: number, t: any) => s + t.valor, 0);
+    assert.equal(Math.round(somaTaxas * 100), Math.round(c.taxaCentral * 100), "a soma das taxas é a taxa da central");
+    assert.equal(Math.round((c.valorBruto - somaTaxas) * 100), Math.round(c.valorLiquido * 100), "bruto − taxas = líquido");
+    assert.deepEqual(g.taxasPorNome.map((t: any) => t.nome).sort(), ["Seguro", "Taxa APP"]);
+    assert.ok(Math.abs(g.taxasPorNome.reduce((s: number, t: any) => s + t.valor, 0) - g.totalTaxa) < 0.01, "total de taxas do período");
+    // Passageiro: a taxa dele (à parte) e o total pago.
+    const pax = (await chamar("GET", `${API}/corridas/${id}`, undefined, tokP)).corpo.corrida;
+    assert.deepEqual(pax.taxas, [{ nome: "Taxa de serviço", valor: 1.5 }]);
+    assert.equal(pax.taxaServico, 1.5);
+    // Mudou no painel: o app reflete (sem valores copiados).
+    salvarTaxa(E.id, { id: t1.id, nome: "Taxa APP", quemPaga: "motorista", categorias: ["Econômico"], pagamentos: FORMAS, faixas: [{ de: 0, ate: null, tipo: "porcentagem", valor: 20 }] }, "teste");
+    const g2 = (await chamar("GET", `${API}/ganhos?periodo=semana`, undefined, tokM)).corpo;
+    const c2 = g2.lista.find((x: any) => x.id === id);
+    assert.equal(Math.round(c2.taxas.find((t: any) => t.nome === "Taxa APP").valor * 100), Math.round(c2.valorBruto * 20));
+    assert.equal(Math.round((c2.valorBruto - c2.taxas.reduce((s: number, t: any) => s + t.valor, 0)) * 100), Math.round(c2.valorLiquido * 100));
+  } finally {
+    for (const t of taxas(E.id)) removerTaxa(E.id, t.id);
+  }
+});

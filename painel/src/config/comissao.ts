@@ -32,6 +32,22 @@ export function regraDoMotorista(empresaId: string, motoristaId?: string) {
   return null;
 }
 
+/**
+ * O mesmo cálculo de calcularComissao, aberto por taxa (nome e valor), para o extrato do app do motorista. A soma é sempre a taxaCentral.
+ * Config › Taxas da central: uma linha por taxa aplicada; regra própria do motorista ou comissão da categoria: uma linha.
+ */
+export function taxasDoMotorista(empresaId: string, categoria: string, valorBruto: number, motoristaId?: string, pagamento?: string): Array<{ nome: string; valor: number }> {
+  const r = calcularComissao(empresaId, categoria, valorBruto, motoristaId, pagamento);
+  if (r.taxaCentral <= 0) return [];
+  const mot = regraDoMotorista(empresaId, motoristaId);
+  if (!mot && temTaxaDoMotorista(empresaId)) {
+    const l = cobrancas(empresaId, "motorista", { categoria, valor: r.valorBruto, forma: formaDaTaxa(pagamento) }).map((c) => ({ nome: c.nome, valor: c.valor }));
+    const soma = cent(l.reduce((s, c) => s + c.valor, 0));
+    if (l.length && soma === r.taxaCentral) return l;
+  }
+  return [{ nome: mot ? "Cobrança da central (regra do motorista)" : "Comissão da central", valor: r.taxaCentral }];
+}
+
 /** Quanto a central fica da corrida e quanto sobra para o motorista. Nunca passa do valor bruto; centavos arredondados. */
 export function calcularComissao(empresaId: string, categoria: string, valorBruto: number, motoristaId?: string, pagamento?: string): ResultadoComissao {
   const bruto = Number.isFinite(valorBruto) && valorBruto > 0 ? cent(valorBruto) : 0;
