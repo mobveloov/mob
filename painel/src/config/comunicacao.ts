@@ -139,6 +139,12 @@ const personalizar = (t: string, nome: string, usar: boolean, tituloDaMsg: boole
   return tituloDaMsg ? `${primeiro}, ${t.charAt(0).toLowerCase()}${t.slice(1)}` : t;
 };
 
+/** Prévia para a confirmação antes de enviar: quantos e quem recebe (nomes dos primeiros 50). */
+export function previaDestinatarios(empresaId: string, p: PedidoPush) {
+  const alvos = destinatarios(empresaId, p.papel, p.segmento, p.usuario, p.filtros);
+  return { total: alvos.length, nomes: alvos.slice(0, 50).map((a) => a.nome) };
+}
+
 export async function dispararNotificacao(empresaId: string, p: PedidoPush, por: string, agendamentoId = "") {
   const alvos = destinatarios(empresaId, p.papel, p.segmento, p.usuario, p.filtros);
   if (!alvos.length) throw new Error("Nenhum destinatário neste filtro.");
@@ -162,8 +168,9 @@ export function historicoNotificacoes(empresaId: string, limite = 50) {
   return bancoConfig().prepare("SELECT id, papel, titulo, mensagem, segmento, destinatarios, por, em FROM notificacoes_envios WHERE empresa = ? ORDER BY em DESC, rowid DESC LIMIT ?").all(empresaId, limite);
 }
 
-/** Lista da tela "Notificações app" (Machine): filtros por destinatário, datas, título e mensagem; 10 por página. */
-export interface FiltroListaNotif { destinatario?: string; dataIni?: string; dataFim?: string; titulo?: string; mensagem?: string }
+/** Lista da tela "Notificações app" (Machine): filtros por destinatário, datas, título e mensagem; ordenação por coluna; 10 por página.
+ *  Inclui os envios únicos ainda agendados (status "Agendada", data do envio = data marcada). */
+export interface FiltroListaNotif { destinatario?: string; dataIni?: string; dataFim?: string; titulo?: string; mensagem?: string; ordem?: string; sentido?: string }
 export function listaNotificacoes(empresaId: string, f: FiltroListaNotif, pagina: number) {
   const w = ["empresa = ?"]; const a: Array<string | number> = [empresaId];
   if (f.destinatario === "passageiro" || f.destinatario === "motorista") { w.push("papel = ?"); a.push(f.destinatario); }
@@ -171,15 +178,28 @@ export function listaNotificacoes(empresaId: string, f: FiltroListaNotif, pagina
   if (f.dataFim) { w.push("substr(em, 1, 10) <= ?"); a.push(f.dataFim); }
   const like = (campo: string, v?: string) => { if (v) { w.push(`${campo} LIKE ? ESCAPE '!'`); a.push(`%${v.replace(/[!%_]/g, "!$&")}%`); } };
   like("titulo", f.titulo); like("mensagem", f.mensagem);
-  const onde = w.join(" AND ");
-  const total = (bancoConfig().prepare(`SELECT COUNT(*) AS n FROM notificacoes_envios WHERE ${onde}`).get(...a) as { n: number }).n;
+  const linhas = bancoConfig().prepare(`SELECT id, papel, titulo, mensagem, segmento, destinatarios, por, em FROM notificacoes_envios WHERE ${w.join(" AND ")} ORDER BY em DESC, rowid DESC LIMIT 5000`).all(...a) as Array<{ id: string; papel: string; titulo: string; mensagem: string; segmento: string; destinatarios: number; por: string; em: string }>;
+  const dest = (p: string) => (p === "motorista" ? "Motorista" : "Cliente App");
+  let itens = linhas.map((l) => ({ ...l, agendamentoId: "", destinatario: dest(l.papel), status: "Concluído", criadoEm: l.em, enviadoEm: l.em }));
+  const nt = (v: string) => v.toLowerCase();
+  for (const g of agendamentos(empresaId)) {
+    if (g.regra !== "unico" || g.ultimoEnvio || !g.ativo) continue;
+    if (f.destinatario && f.destinatario !== g.papel) continue;
+    if (f.dataIni && g.data < f.dataIni) continue;
+    if (f.dataFim && g.data > f.dataFim) continue;
+    if (f.titulo && !nt(g.titulo).includes(nt(f.titulo))) continue;
+    if (f.mensagem && !nt(g.mensagem).includes(nt(f.mensagem))) continue;
+    const quando = `${g.data}T${g.hora}:00.000Z`;
+    itens.push({ id: g.id, agendamentoId: g.id, papel: g.papel, titulo: g.titulo, mensagem: g.mensagem, segmento: g.segmento, destinatarios: 0, por: "", em: quando, destinatario: dest(g.papel), status: "Agendada", criadoEm: quando, enviadoEm: quando });
+  }
+  const campos = ["criadoEm", "destinatario", "titulo", "mensagem", "status", "enviadoEm"] as const;
+  const campo = campos.find((c) => c === f.ordem);
+  if (campo) { const d = f.sentido === "desc" ? -1 : 1; itens = [...itens].sort((x, y) => String(x[campo]).localeCompare(String(y[campo]), "pt-BR") * d); }
+  else itens.sort((x, y) => y.em.localeCompare(x.em));
+  const total = itens.length;
   const paginas = Math.max(1, Math.ceil(total / 10));
   const p = Math.min(Math.max(1, Math.floor(pagina) || 1), paginas);
-  const linhas = bancoConfig().prepare(`SELECT id, papel, titulo, mensagem, segmento, destinatarios, por, em FROM notificacoes_envios WHERE ${onde} ORDER BY em DESC, rowid DESC LIMIT 10 OFFSET ?`).all(...a, (p - 1) * 10) as Array<{ id: string; papel: string; titulo: string; mensagem: string; segmento: string; destinatarios: number; por: string; em: string }>;
-  return {
-    total, pagina: p, paginas,
-    itens: linhas.map((l) => ({ ...l, destinatario: l.papel === "motorista" ? "Motorista" : "Cliente App", status: "Concluído", criadoEm: l.em, enviadoEm: l.em })),
-  };
+  return { total, pagina: p, paginas, itens: itens.slice((p - 1) * 10, p * 10) };
 }
 
 // ---- agendamento (Piloto Automático)

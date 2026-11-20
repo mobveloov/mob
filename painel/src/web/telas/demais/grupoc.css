@@ -21,3 +21,5 @@
 .pe-rodape { margin-top: auto; display: flex; justify-content: space-around; border-top: 1px solid #e5e7eb; padding-top: 6px; color: var(--pe-cor); }
 .pe-form input[type="color"] { width: 56px; height: 34px; padding: 2px; flex: none; }
 .dm-sep { margin: 22px 0 10px; font-size: 16px; color: var(--suave); }
+.dm-global { padding: 10px; margin-bottom: 8px; } .dm-global p { margin: 2px 0 6px; }
+.dm-tela-cheia { position: fixed; inset: 0; z-index: 60; background: var(--fundo); padding: 12px; overflow: auto; }

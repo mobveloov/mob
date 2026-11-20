@@ -13,6 +13,7 @@ import { Router, type Request, type Response } from "express";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { atualizar, listar } from "../cadastros/armazem.ts";
 import { dispararPara } from "./acoes.ts";
+import { punir } from "../gestao/regras.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { INDICADORES, PAPEIS, SITUACOES, historicoAcoes, lerConfig, listaDaFaixa, mapaEngajamento, registrarAcao, salvarConfig, type FiltroMotoristas, type Papel } from "./calculo.ts";
 
@@ -57,14 +58,23 @@ rotasEngajamento.post("/acao", ok(async (req, res) => {
   const papel = papelDe(b.papel);
   const indicador = String(b.indicador ?? "");
   const tipo = String(b.tipo ?? "");
-  const tiposOk = papel === "motoristas" ? ["notificacao", "mensagem", "desafio", "status"] : ["notificacao", "cupom", "mensagem"];
+  const tiposOk = papel === "motoristas" ? ["notificacao", "mensagem", "desafio", "status", "punir"] : ["notificacao", "cupom", "mensagem"];
   if (!tiposOk.includes(tipo)) throw new Error("Ação inválida para este grupo.");
   const alvo = listaDaFaixa(emp(req), papel, indicador, Number(b.faixa), filtroDe(b));
   if (!alvo.pessoas.length) throw new Error("Não há ninguém nesta faixa.");
   const por = req.ctx!.usuario.nome || req.ctx!.usuario.email;
   let detalhe = "";
   let enviados = 0;
-  if (tipo === "status") {
+  if (tipo === "punir") {
+    if (!podeCargo(req.ctx!.usuario.papel, "admin")) throw new Error("Só o administrador pune motoristas.");
+    const tempo = Number(b.tempo), unidade = b.unidade === "dias" ? "dias" : b.unidade === "minutos" ? "minutos" : "horas";
+    if (!Number.isFinite(tempo) || tempo <= 0) throw new Error("Informe o tempo da punição.");
+    const motivo = String(b.motivo ?? "").trim().slice(0, 200);
+    if (!motivo) throw new Error("Informe o motivo da punição.");
+    for (const p of alvo.pessoas) punir(emp(req), p.id, tempo, unidade, motivo, por);
+    enviados = alvo.pessoas.length;
+    detalhe = `Punição de ${tempo} ${unidade}: ${motivo}`;
+  } else if (tipo === "status") {
     const novo = String(b.status ?? "");
     if (!podeCargo(req.ctx!.usuario.papel, "admin")) throw new Error("Só o administrador altera a situação.");
     if (!["Ativo", "Bloqueado", "Inativo", "Em análise", "Fila de espera"].includes(novo)) throw new Error("Escolha a nova situação.");

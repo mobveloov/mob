@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { PlusCircle, X, Clock, CalendarDays } from "lucide-react";
-import { Aviso, Cab, Campo, pedirConfig, useSalvar } from "./comum";
+import { Aviso, Cab, Campo, Modal, pedirConfig, useSalvar } from "./comum";
 import "./alertas.css";
 
 type Destino = "" | "passageiro" | "motorista";
@@ -44,8 +44,8 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
   const [categorias, setCategorias] = useState<string[]>([]);
   const [status, setStatus] = useState<string[]>([]);
   const [todasCategorias, setTodas] = useState<string[]>([]);
-  const [confirmar, setConfirmar] = useState(false);
   const { msg, salvando, salvar } = useSalvar();
+  const [previa, setPrevia] = useState<{ total: number; nomes: string[] } | null>(null);
 
   useEffect(() => {
     fetch("/api/gestao/cidades", { credentials: "same-origin" }).then((r) => r.json()).then((j) => setTodas(Array.isArray(j?.categorias) ? j.categorias : [])).catch(() => setTodas([]));
@@ -68,11 +68,17 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
   });
   const pronto = destino !== "" && mensagem.trim().length > 0 && (!agendar || quando.length === 16);
 
-  async function enviar(e: React.FormEvent) {
+  // Para agora: "Avançar" mostra a confirmação com quem vai receber; só depois envia.
+  async function avancar(e: React.FormEvent) {
     e.preventDefault();
     if (!pronto) return;
-    if (!agendar && !confirmar) { setConfirmar(true); return; }
-    setConfirmar(false);
+    if (agendar) return void enviar();
+    const r = await salvar(async () => setPrevia(await pedirConfig("/notificacoes/previa", "POST", { papel: destino, segmento: "todos", titulo: titulo.trim(), tituloOpcional: true, mensagem: mensagem.trim(), filtros: filtros() })), "");
+    void r;
+  }
+  async function enviar() {
+    if (!pronto) return;
+    setPrevia(null);
     const base = { papel: destino, segmento: "todos", titulo: titulo.trim(), tituloOpcional: true, mensagem: mensagem.trim(), filtros: filtros() };
     const r = await salvar(
       () => (agendar ? pedirConfig("/notificacoes/agendar", "POST", { ...base, regra: "unico", data: quando.slice(0, 10), hora: quando.slice(11, 16) }) : pedirConfig("/notificacoes", "POST", base)),
@@ -84,7 +90,7 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
   return (
     <>
       <Cab titulo="Criando Notificação" />
-      <form className="dm-form dm-notif-criar" onSubmit={enviar}>
+      <form className="dm-form dm-notif-criar" onSubmit={avancar}>
         <div className="dm-cartao">
           <div className="dm-abas" role="group" aria-label="Quando enviar">
             <button type="button" className={!agendar ? "ativa" : ""} aria-pressed={!agendar} onClick={() => setAgendar(false)}><Clock size={15} /> Para agora</button>
@@ -135,23 +141,20 @@ export function CriarNotificacao({ onVoltar, onEnviada }: { onVoltar: () => void
           </div>
         </div>
 
-        {confirmar && (
-          <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, background: "#0008", display: "grid", placeItems: "center", zIndex: 60 }}>
-            <div className="dm-cartao" style={{ maxWidth: 440, width: "92%" }}>
-              <h3>Confirmar envio</h3>
-              <p className="sub">Para: {destino === "motorista" ? "Motoristas" : "Clientes App"}{ativos.length ? " (com filtros)" : " (todos)"}</p>
-              {titulo.trim() && <p><strong>{titulo}</strong></p>}
-              <p>{mensagem}</p>
-              <div className="dm-rodape-modal"><button type="button" className="botao" onClick={() => setConfirmar(false)}>Voltar</button><button type="button" className="botao primario" disabled={salvando} onClick={(ev) => void enviar(ev as unknown as React.FormEvent)}>Enviar notificação</button></div>
-            </div>
-          </div>
-        )}
         <Aviso erro={msg?.erro} ok={msg?.ok} />
         <div className="dm-rodape-modal">
           <button type="button" className="botao" onClick={onVoltar}>Voltar</button>
           <button className="botao primario" disabled={!pronto || salvando}>{agendar ? "Agendar notificação" : "Avançar"}</button>
         </div>
       </form>
+      <Modal aberto={!!previa} onFechar={() => setPrevia(null)} titulo="Confirmar envio" sub={previa ? `${previa.total} ${previa.total === 1 ? "destinatário" : "destinatários"}` : ""}>
+        {previa && <>
+          <p><strong>{titulo.trim() || "Aviso da central"}</strong></p>
+          <p style={{ whiteSpace: "pre-wrap" }}>{mensagem}</p>
+          {previa.total === 0 ? <p className="sub">Nenhum destinatário neste filtro.</p> : <ul className="dm-transacoes" style={{ maxHeight: 220, overflow: "auto" }}>{previa.nomes.map((n, i) => <li key={`${n}-${i}`}>{n}</li>)}{previa.total > previa.nomes.length && <li className="sub">e mais {previa.total - previa.nomes.length}…</li>}</ul>}
+          <div className="dm-rodape-modal"><button type="button" className="botao" onClick={() => setPrevia(null)}>Voltar</button><button type="button" className="botao primario" disabled={salvando || previa.total === 0} onClick={() => void enviar()}>Enviar notificação</button></div>
+        </>}
+      </Modal>
     </>
   );
 }

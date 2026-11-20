@@ -79,7 +79,13 @@ export default function MapaAreas({ areas = [], desenho, onDesenho, corDesenho =
     if (desenho?.length) {
       if (desenho.length >= 3) L.polygon(desenho, { color: corDesenho, weight: 3, fillOpacity: 0.2 }).addTo(g);
       else L.polyline(desenho, { color: corDesenho, weight: 3 }).addTo(g);
-      desenho.forEach((p, i) => L.circleMarker(p, { radius: 6, color: corDesenho, fillColor: "#fff", fillOpacity: 1 }).bindTooltip(String(i + 1)).addTo(g));
+      // Cada ponto se arrasta para ajustar o traçado; botão direito remove (como na Machine).
+      desenho.forEach((p, i) => {
+        const marca = L.marker(p, { draggable: !!aoDesenhar.current, icon: L.divIcon({ className: "cg-ponto-mapa", html: `<span style="display:block;width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid ${corDesenho};box-sizing:border-box"></span>`, iconSize: [14, 14], iconAnchor: [7, 7] }) }).bindTooltip(String(i + 1));
+        marca.on("dragend", () => { const c = marca.getLatLng(); const n = [...(desenhoAtual.current ?? [])]; n[i] = [Math.round(c.lat * 1e6) / 1e6, Math.round(c.lng * 1e6) / 1e6]; aoDesenhar.current?.(n); });
+        marca.on("contextmenu", (ev) => { L.DomEvent.stop(ev as unknown as Event); aoDesenhar.current?.((desenhoAtual.current ?? []).filter((_, j) => j !== i)); });
+        marca.addTo(g);
+      });
       limites.push(...desenho);
     }
     if (limites.length && (!onDesenho || !ajustou.current)) { m.fitBounds(L.latLngBounds(limites), { padding: [24, 24], maxZoom: 15 }); ajustou.current = true; } // ao desenhar, o mapa não pula a cada ponto

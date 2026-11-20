@@ -91,7 +91,7 @@ function OpcoesNps() {
 
 const PERIODOS_NPS: Array<[string, string]> = [["TD", "Hoje"], ["LW", "Semana passada"], ["LM", "Mês passado"], ["LS", "Últimos 7 dias"], ["LT", "Últimos 30 dias"], ["CT", "Personalizado"]];
 const TIPOS_NPS: Array<[string, string]> = [["T", "Tudo"], ["P", "Promotores"], ["N", "Neutros"], ["D", "Detratores"]];
-const FILTRO_NPS = { periodo: "LT", inicio: "", fim: "", tipo: "T", email: "", telefone: "" };
+const FILTRO_NPS = { periodo: "LT", inicio: "", fim: "", tipo: "T", email: "", telefone: "", nome: "" };
 const diaBr = (iso: string) => iso.split("-").reverse().join("/");
 const nomeDia = (em: string) => {
   const t = new Date(em).toLocaleDateString("pt-BR", { weekday: "long", timeZone: "UTC" });
@@ -104,6 +104,7 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
   const [mais, setMais] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [erroEx, setErroEx] = useState<string | null>(null);
+  const [sel, setSel] = useState<any>(null);
   const consulta = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
   const d = useCarregar(() => pedirConfig(`/nps/${papel}/avaliacoes?${consulta}&pagina=${pagina}`), [papel, consulta, pagina]);
   const x = d.dados;
@@ -121,7 +122,7 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
   const paginas = x?.lista.paginas ?? 1, atual = x?.lista.pagina ?? 1;
   const setPeriodo = (periodo: string) => { const n = { ...f, periodo }; setF(n); setRasc(n); setPagina(1); };
   const setTipo = (tipo: string) => { const n = { ...f, tipo }; setF(n); setRasc(n); setPagina(1); };
-  const filtrando = x ? `Período: ${diaBr(x.periodo.inicio)} até ${diaBr(x.periodo.fim)}${x.tipo !== "T" ? ` · ${TIPOS_NPS.find(([c]) => c === x.tipo)?.[1]}` : ""}${f.email ? ` · E-mail: ${f.email}` : ""}${f.telefone ? ` · Telefone: ${f.telefone}` : ""}` : "";
+  const filtrando = x ? `Período: ${diaBr(x.periodo.inicio)} até ${diaBr(x.periodo.fim)}${x.tipo !== "T" ? ` · ${TIPOS_NPS.find(([c]) => c === x.tipo)?.[1]}` : ""}${f.email ? ` · E-mail: ${f.email}` : ""}${f.telefone ? ` · Telefone: ${f.telefone}` : ""}${f.nome ? ` · Motorista: ${f.nome}` : ""}` : "";
   return (
     <>
       <div className="dm-cartao dm-secao">
@@ -129,12 +130,14 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
           <Campo rotulo="Período"><select value={f.periodo} onChange={(e) => setPeriodo(e.target.value)}>{PERIODOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
           {f.periodo === "CT" && <><Campo rotulo="De"><input type="date" value={rasc.inicio} onChange={(e) => setRasc({ ...rasc, inicio: e.target.value })} onBlur={() => setF({ ...f, inicio: rasc.inicio })} /></Campo><Campo rotulo="Até"><input type="date" value={rasc.fim} onChange={(e) => setRasc({ ...rasc, fim: e.target.value })} onBlur={() => setF({ ...f, fim: rasc.fim })} /></Campo></>}
           <Campo rotulo="Tipo"><select value={f.tipo} onChange={(e) => setTipo(e.target.value)}>{TIPOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
-          <button className="botao" type="button" onClick={() => setMais(!mais)} aria-expanded={mais}>Mais filtros</button>
+          {papel === "motorista"
+            ? <Campo rotulo="Buscar Motorista"><input value={rasc.nome} minLength={2} maxLength={50} placeholder="Buscar Motorista" onChange={(e) => setRasc({ ...rasc, nome: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") { setF({ ...f, nome: rasc.nome }); setPagina(1); } }} onBlur={() => { if (rasc.nome !== f.nome) { setF({ ...f, nome: rasc.nome }); setPagina(1); } }} /></Campo>
+            : <button className="botao" type="button" onClick={() => setMais(!mais)} aria-expanded={mais}>Mais filtros</button>}
           <button className="botao" type="button" onClick={exportar} disabled={!x?.total}><Download size={16} aria-hidden /> Exportar</button>
         </div>
         {x && <p className="sub" style={{ margin: "10px 0 0" }}>Filtrando por {filtrando} <button className="botao-tema" type="button" aria-label="Limpar filtros" onClick={limpar}>×</button></p>}
       </div>
-      {mais && (
+      {mais && papel !== "motorista" && (
         <aside className="dm-cartao dm-secao" aria-label="Filtro de pesquisa">
           <h3>Filtro de pesquisa</h3>
           <p className="sub">Você pode filtrar um ou mais campos</p>
@@ -142,8 +145,8 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
             <Campo rotulo="Período"><select value={rasc.periodo} onChange={(e) => setRasc({ ...rasc, periodo: e.target.value })}>{PERIODOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
             {rasc.periodo === "CT" && <><Campo rotulo="De"><input type="date" value={rasc.inicio} onChange={(e) => setRasc({ ...rasc, inicio: e.target.value })} /></Campo><Campo rotulo="Até"><input type="date" value={rasc.fim} onChange={(e) => setRasc({ ...rasc, fim: e.target.value })} /></Campo></>}
             <Campo rotulo="Tipo"><select value={rasc.tipo} onChange={(e) => setRasc({ ...rasc, tipo: e.target.value })}>{TIPOS_NPS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Campo>
-            <Campo rotulo="Email"><input value={rasc.email} minLength={2} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, email: e.target.value })} /></Campo>
-            <Campo rotulo="Telefone"><input value={rasc.telefone} minLength={2} placeholder={papel === "motorista" ? "Buscar motorista" : "Buscar passageiro"} onChange={(e) => setRasc({ ...rasc, telefone: e.target.value })} /></Campo>
+            <Campo rotulo="Email"><input value={rasc.email} minLength={2} placeholder="Buscar passageiro" onChange={(e) => setRasc({ ...rasc, email: e.target.value })} /></Campo>
+            <Campo rotulo="Telefone"><input value={rasc.telefone} minLength={2} placeholder="Buscar passageiro" onChange={(e) => setRasc({ ...rasc, telefone: e.target.value })} /></Campo>
           </div>
           <div className="dm-linha" style={{ marginTop: 10 }}>
             <button className="botao primario" type="button" onClick={() => { aplicar(); setMais(false); }}>Filtrar</button>
@@ -160,19 +163,20 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
             <div className="dm-kpi"><small>Promotores</small><strong>{x.promotores}</strong></div>
             <div className="dm-kpi"><small>Neutros</small><strong>{x.neutros}</strong></div>
             <div className="dm-kpi"><small>Detratores</small><strong>{x.detratores}</strong></div>
-            <div className="dm-kpi destaque"><small>Nota NPS</small><strong>{x.nps ?? "—"}</strong><small>{x.media != null ? `Média ${x.media} de 5` : "Sem avaliações no período"}</small></div>
+            <div className="dm-kpi destaque"><small>Nota NPS</small><strong>{x.nps ?? "—"}</strong><small>{x.media != null ? `Média ${x.media * 2} de 10` : "Sem avaliações no período"}</small></div>
             {resumo && <div className="dm-kpi"><small>Recusaram avaliar</small><strong>{resumo.recusaram}</strong></div>}
           </div>
+          {sel && <aside className="dm-cartao dm-secao" aria-label="Detalhe da avaliação"><h3>{sel.nome}</h3><p><strong>Nota {sel.nota * 2}</strong> · {sel.classe} · {nomeDia(sel.em)} às {sel.em.slice(11, 16)}</p>{sel.telefone && <p className="sub">Telefone: {sel.telefone}</p>}{sel.email && <p className="sub">E-mail: {sel.email}</p>}<p>{sel.comentario || "Sem comentário."}</p><button className="botao" type="button" onClick={() => setSel(null)}>Fechar</button></aside>}
           <div className="dm-cartao tabela-rola">
-            {!dias.length ? <p className="vazio">Nenhuma avaliação neste filtro.</p> : dias.map(([dia, itens]) => (
+            {!dias.length ? <div className="vazio"><p>Não encontramos nenhum resultado para a sua pesquisa.</p><div className="dm-linha" style={{ justifyContent: "center" }}><button className="botao primario" type="button" onClick={() => setMais(true)}>Editar filtro</button><button className="botao" type="button" onClick={limpar}>Limpar filtro</button></div></div> : dias.map(([dia, itens]) => (
               <div key={dia}>
                 <h4 style={{ margin: "12px 12px 4px" }}>{dia}</h4>
                 <table><tbody>
-                  {itens.map((i, n) => <tr key={`${i.em}-${n}`}><td className="forte" style={{ fontSize: 20, width: 56, textAlign: "center" }}>{i.nota}</td><td style={{ width: 70 }}>{i.em.slice(11, 16)}</td><td className="forte">{i.nome}{i.comentario && <><br /><small className="sub">{i.comentario}</small></>}</td><td><span className={`selo ${selo(i.classe)}`}>{i.classe}</span></td></tr>)}
+                  {itens.map((i, n) => <tr key={`${i.em}-${n}`} onClick={() => setSel(i)} style={{ cursor: "pointer" }} aria-selected={sel === i}><td className="forte" style={{ fontSize: 20, width: 56, textAlign: "center" }}>{i.nota * 2}</td><td style={{ width: 70 }}>{i.em.slice(11, 16)}</td><td className="forte">{i.nome}{i.comentario && <><br /><small className="sub">{i.comentario}</small></>}</td><td><span className={`selo ${selo(i.classe)}`}>{i.classe}</span></td></tr>)}
                 </tbody></table>
               </div>
             ))}
-            {paginas > 1 && (
+            {(
               <nav className="dm-linha" style={{ justifyContent: "center", padding: 12 }} aria-label="Páginas">
                 <button className="botao" disabled={atual <= 1} onClick={() => setPagina(atual - 1)} aria-label="Página anterior">«</button>
                 {Array.from({ length: paginas }, (_, k) => k + 1).filter((n) => n === 1 || n === paginas || Math.abs(n - atual) <= 2).map((n) => <button key={n} className={`botao ${n === atual ? "primario" : ""}`} onClick={() => setPagina(n)} aria-current={n === atual ? "page" : undefined}>{n}</button>)}
@@ -185,7 +189,7 @@ function PainelNps({ papel, resumo }: { papel: Papel; resumo?: { media: number |
       <section className="dm-cartao dm-secao">
         <h3>O que é NPS?</h3>
         <p>Net Promoter Score é uma métrica que tem como objetivo medir a satisfação e lealdade dos clientes com as empresas. <a href="https://pt.wikipedia.org/wiki/Net_Promoter_Score" target="_blank" rel="noreferrer">Saiba mais</a></p>
-        <p className="sub">No nosso painel as notas vão de 1 a 5: nota 5 é promotor, nota 4 é neutro e notas de 1 a 3 são detratores. A nota NPS é a porcentagem de promotores menos a de detratores.</p>
+        <p className="sub">Os apps pedem de 1 a 5 estrelas e o painel mostra a nota de 0 a 10 (cada estrela vale 2): 9 e 10 são promotores, 7 e 8 são neutros e até 6 são detratores. A nota NPS é a porcentagem de promotores menos a de detratores.</p>
       </section>
     </>
   );

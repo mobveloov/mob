@@ -226,7 +226,14 @@ export function situacaoDesafio(d: Registro, agora = new Date(Date.now() - 3 * 3
 function desafiados(empresaId: string, d: Record<string, unknown>, corridas: CorridaPropria[]) {
   const cats = String(d.categorias ?? "").split(",").map(normal).filter(Boolean);
   const fin = new Map<string, number>();
-  for (const c of corridas) if (c.status === "finalizada" && c.motoristaId) fin.set(c.motoristaId, (fin.get(c.motoristaId) ?? 0) + 1);
+  // "Filtrar por corridas finalizadas" pode olhar só um período (Ontem, Esta semana...): corridasDe/corridasAte em AAAA-MM-DD.
+  const de = /^\d{4}-\d{2}-\d{2}$/.test(String(d.corridasDe ?? "")) ? String(d.corridasDe) : "", ate = /^\d{4}-\d{2}-\d{2}$/.test(String(d.corridasAte ?? "")) ? String(d.corridasAte) : "";
+  for (const c of corridas) {
+    if (c.status !== "finalizada" || !c.motoristaId) continue;
+    const dia = (c.finalizadaEm ?? c.solicitadaEm).slice(0, 10);
+    if ((de && dia < de) || (ate && dia > ate)) continue;
+    fin.set(c.motoristaId, (fin.get(c.motoristaId) ?? 0) + 1);
+  }
   const min = d.corridasMin == null || d.corridasMin === "" ? null : Number(d.corridasMin), max = d.corridasMax == null || d.corridasMax === "" ? null : Number(d.corridasMax);
   return registros(empresaId, "motoristas").filter((m) => {
     if (m.status !== "Ativo") return false;
@@ -301,10 +308,12 @@ function rotasDesafios(r: Router) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.inicio)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(b.fim))) throw new Error("Informe as datas de início e fim.");
     if (`${b.fim}T${b.horaFim ?? "23:59"}` <= `${b.inicio}T${b.horaInicio ?? "00:00"}`) throw new Error("A data final precisa ser depois do início.");
     if (!(Number(b.meta) > 0)) throw new Error("Informe a meta do desafio.");
+    if (b.tipoRecompensa === "Personalizada" && !texto(b.premioDescricao, 100)) throw new Error("Descreva a recompensa.");
     const d = criar(emp(req), cad("desafios"), {
       nome, tipo: TIPOS_DESAFIO_CORRIDA.includes(String(b.tipo)) ? b.tipo : "Desafio de corridas", meta: b.meta, premio: b.premio, inicio: b.inicio, fim: b.fim,
       horaInicio: texto(b.horaInicio, 5) || "00:00", horaFim: texto(b.horaFim, 5) || "23:59", categorias: texto(b.categorias, 200), aprovacao: b.aprovacao === "Manual" ? "Manual" : "Automático",
-      corridasMin: b.corridasMin ?? null, corridasMax: b.corridasMax ?? null, ativo: true, cancelado: false, regras: texto(b.regras, 1000),
+      tipoRecompensa: b.tipoRecompensa === "Personalizada" ? "Personalizada" : "Em créditos", premioDescricao: b.tipoRecompensa === "Personalizada" ? texto(b.premioDescricao, 100) : "",
+      corridasMin: b.corridasMin ?? null, corridasMax: b.corridasMax ?? null, corridasDe: texto(b.corridasDe, 10), corridasAte: texto(b.corridasAte, 10), ativo: true, cancelado: false, regras: texto(b.regras, 1000),
     }, quem(req));
     res.json({ desafio: d });
   }));

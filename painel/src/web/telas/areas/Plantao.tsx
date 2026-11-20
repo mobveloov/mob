@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
-import { Cabecalho, Campo, ComFiltros, chamar as chamarBase, Janela, useAviso, Vazio } from "../cadastro/base";
+import { Cabecalho, Campo, ComFiltros, chamar as chamarBase, useAviso, Vazio } from "../cadastro/base";
 
 interface Plantao { id: string; inicio: string; fim: string; quantidade: number; valendo: boolean }
 interface Escalado { id: string; viatura: string; nome: string; telefone: string }
@@ -30,15 +30,28 @@ export default function PlantaoTela() {
   const [criando, setCriando] = useState<Plantao | "novo" | null>(null);
   const [gerenciando, setGerenciando] = useState<string | null>(null);
   const { aviso, tentar } = useAviso();
-  const lista = l.dados?.plantoes ?? [];
+  const [ordem, setOrdem] = useState<{ campo: "inicio" | "fim"; dir: 1 | -1 } | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const todos = l.dados?.plantoes ?? [];
+  const ordenados = ordem ? [...todos].sort((x, y) => x[ordem.campo].localeCompare(y[ordem.campo]) * ordem.dir) : todos;
+  const POR_PAGINA = 10;
+  const paginas = Math.max(1, Math.ceil(ordenados.length / POR_PAGINA));
+  const atual = Math.min(pagina, paginas);
+  const lista = ordenados.slice((atual - 1) * POR_PAGINA, atual * POR_PAGINA);
+  const de = (atual - 1) * POR_PAGINA + 1;
+  const ordenarPor = (campo: "inicio" | "fim") => setOrdem(ordem?.campo === campo ? { campo, dir: ordem.dir === 1 ? -1 : 1 } : { campo, dir: 1 });
+  const seta = (campo: "inicio" | "fim") => (ordem?.campo === campo ? (ordem.dir === 1 ? " ▲" : " ▼") : "");
 
+  // Como na Machine, Criar, Alterar e Gerenciar abrem uma página; "Voltar" leva de volta à lista.
+  if (criando) return <div className="cg-pagina-solta"><Criar existente={criando === "novo" ? null : criando} onFechar={() => setCriando(null)} onCriado={(id) => { setCriando(null); l.recarregar(); if (id) setGerenciando(id); }} /></div>;
+  if (gerenciando) return <div className="cg-pagina-solta"><Gerenciar id={gerenciando} onFechar={() => { setGerenciando(null); l.recarregar(); }} /></div>;
   return (
     <div className="cg-pagina-solta">
       {aviso}
       <Cabecalho titulo="Plantão"><button className="cg-botao primario" onClick={() => setCriando("novo")}><Plus size={16} /> Criar Plantão</button></Cabecalho>
       <p style={{ margin: "0 0 12px", color: "var(--cg-suave)", fontSize: 13 }}>Funcionalidade para cobrir horários em que há pouca demanda e menos motoristas trabalhando também. Motoristas que estão designados no plantão tem prioridade nas filas.</p>
       <ComFiltros filtros={
-        <form onSubmit={(e) => { e.preventDefault(); setAplicado(filtro); }}>
+        <form onSubmit={(e) => { e.preventDefault(); setAplicado(filtro); setPagina(1); }}>
           <Campo rotulo="Data Inicial"><input type="date" value={filtro.dataInicial} onChange={(e) => setFiltro({ ...filtro, dataInicial: e.target.value })} /></Campo>
           <Campo rotulo="Hora Inicial"><input type="time" value={filtro.horaInicial} onChange={(e) => setFiltro({ ...filtro, horaInicial: e.target.value })} /></Campo>
           <Campo rotulo="Data Final"><input type="date" value={filtro.dataFinal} onChange={(e) => setFiltro({ ...filtro, dataFinal: e.target.value })} /></Campo>
@@ -48,9 +61,9 @@ export default function PlantaoTela() {
         </form>
       }>
         {l.erro && <div className="cg-aviso erro">{String(l.erro)}</div>}
-        {l.dados && <div className="cg-resumo-lista">{lista.length ? `Exibindo 1-${lista.length} de ${lista.length} ${lista.length === 1 ? "resultado" : "resultados"}.` : ""}</div>}
+        {l.dados && <div className="cg-resumo-lista">{lista.length ? `Exibindo ${de}-${de + lista.length - 1} de ${ordenados.length} ${ordenados.length === 1 ? "resultado" : "resultados"}.` : ""}</div>}
         <div className="cg-tabela-caixa"><div className="cg-rolagem"><table className="cg-tabela">
-          <thead><tr><th className="centro">Motoristas</th><th>Data Hora Inicial</th><th>Data Hora Final</th><th /></tr></thead>
+          <thead><tr><th className="centro">Motoristas</th><th><button className="cg-ordenar" onClick={() => ordenarPor("inicio")} title="Ordenar">Data Hora Inicial{seta("inicio")}</button></th><th><button className="cg-ordenar" onClick={() => ordenarPor("fim")} title="Ordenar">Data Hora Final{seta("fim")}</button></th><th /></tr></thead>
           <tbody>{!l.dados ? <tr><td colSpan={4}><Vazio titulo="Carregando..." /></td></tr> : !lista.length ? <tr><td colSpan={4}><Vazio titulo="Nenhum resultado encontrado." /></td></tr> : lista.map((p) => (
             <tr key={p.id}>
               <td className="centro"><strong>{p.quantidade}</strong></td>
@@ -62,9 +75,14 @@ export default function PlantaoTela() {
               </div></td>
             </tr>))}</tbody>
         </table></div></div>
+        {paginas > 1 && (
+          <nav className="cg-paginas" aria-label="Páginas">
+            <button className="cg-botao" disabled={atual <= 1} onClick={() => setPagina(atual - 1)} aria-label="Página anterior">←</button>
+            {Array.from({ length: paginas }, (_, k) => k + 1).map((n) => <button key={n} className={`cg-botao ${n === atual ? "primario" : ""}`} onClick={() => setPagina(n)} aria-current={n === atual ? "page" : undefined}>{n}</button>)}
+            <button className="cg-botao" disabled={atual >= paginas} onClick={() => setPagina(atual + 1)} aria-label="Próxima página">→</button>
+          </nav>
+        )}
       </ComFiltros>
-      {criando && <Criar existente={criando === "novo" ? null : criando} onFechar={() => setCriando(null)} onCriado={(id) => { setCriando(null); l.recarregar(); if (id) setGerenciando(id); }} />}
-      {gerenciando && <Gerenciar id={gerenciando} onFechar={() => { setGerenciando(null); l.recarregar(); }} />}
     </div>
   );
 }
@@ -77,7 +95,8 @@ function Criar({ existente, onFechar, onCriado }: { existente: Plantao | null; o
     if (await tentar(async () => { if (existente) { await chamar("PUT", `/plantoes/${existente.id}`, f); } else id = (await chamar<{ plantao: { id: string } }>("POST", "/plantoes", f)).plantao.id; }, existente ? "Plantão salvo." : "Plantão criado.")) onCriado(id);
   };
   return (
-    <Janela aberta titulo={existente ? "Alterando Plantão" : "Criando Plantão"} onFechar={onFechar} largura="pequena" rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void criar()}>{existente ? "Salvar" : "Criar"}</button></>}>
+    <div>
+      <Cabecalho titulo={existente ? "Alterando Plantão" : "Criando Plantão"} />
       {aviso}
       <div className="cg-grade">
         <Campo rotulo="Data Inicial *"><input type="date" value={f.dataInicial} onChange={(e) => setF({ ...f, dataInicial: e.target.value })} /></Campo>
@@ -85,7 +104,11 @@ function Criar({ existente, onFechar, onCriado }: { existente: Plantao | null; o
         <Campo rotulo="Data Final *"><input type="date" value={f.dataFinal} onChange={(e) => setF({ ...f, dataFinal: e.target.value })} /></Campo>
         <Campo rotulo="Hora Final"><input type="time" value={f.horaFinal} title="Vazio = 23:59" onChange={(e) => setF({ ...f, horaFinal: e.target.value })} /></Campo>
       </div>
-    </Janela>
+      <div className="cg-acoes" style={{ marginTop: 14 }}>
+        <button className="cg-botao" onClick={onFechar}>Voltar</button>
+        <button className="cg-botao primario" onClick={() => void criar()}>{existente ? "Salvar" : "Criar"}</button>
+      </div>
+    </div>
   );
 }
 
@@ -110,7 +133,8 @@ function Gerenciar({ id, onFechar }: { id: string; onFechar: () => void }) {
   };
   const n = p?.escalados.length ?? 0;
   return (
-    <Janela aberta titulo="Gerenciar Plantão" onFechar={onFechar} largura="grande" rodape={<button className="cg-botao" onClick={onFechar}>Voltar</button>}>
+    <div>
+      <Cabecalho titulo="Gerenciar Plantão" />
       {aviso}
       <div className="cg-grade" style={{ marginBottom: 12 }}>
         <Campo rotulo="Data Inicial"><input disabled value={dia(i.data)} readOnly /></Campo>
@@ -121,6 +145,7 @@ function Gerenciar({ id, onFechar }: { id: string; onFechar: () => void }) {
       <div className="cg-duplo" style={{ marginBottom: 12, alignItems: "flex-end" }}>
         <Campo rotulo="Vtr / Motorista"><input value={escolhido ? `${escolhido.viatura ? `${escolhido.viatura} · ` : ""}${escolhido.nome}` : busca} maxLength={50} onChange={(e) => void procurar(e.target.value)} autoComplete="off" /></Campo>
         <button className="cg-botao primario" disabled={!escolhido} onClick={() => void adicionar()}>Adicionar Motorista</button>
+        <button className="cg-botao" onClick={onFechar}>Voltar</button>
       </div>
       {!escolhido && achados.length > 0 && (
         <div className="cg-caixas" style={{ marginBottom: 12 }}>
@@ -134,6 +159,6 @@ function Gerenciar({ id, onFechar }: { id: string; onFechar: () => void }) {
           <tr key={m.id}><td>{m.viatura || "—"}</td><td><strong>{m.nome}</strong></td><td>{m.telefone}</td>
             <td className="direita"><button className="cg-botao perigo" title="Remover" aria-label={`Remover ${m.nome} do plantão`} onClick={() => void tentar(() => chamar("DELETE", `/plantoes/${id}/motoristas/${m.id}`), "Motorista removido.").then((ok) => ok && d.recarregar())}><Trash2 size={15} /></button></td></tr>))}</tbody>
       </table></div></div>
-    </Janela>
+    </div>
   );
 }

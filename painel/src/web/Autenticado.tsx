@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { ChevronDown, KeyRound, LogOut, Menu, Moon, Sun, X } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, Menu, Moon, Newspaper, Search, Sun, X } from "lucide-react";
 import { NOME_CARGO, podeCargo } from "../comum/cargos.ts";
 import { moduloDaFuncao } from "../comum/modulos.ts";
 import { funcoesDoCargo, type Funcao } from "../comum/funcoes.ts";
 import { BotaoRecolher, MenuItens } from "./menu/MenuLateral";
+import { BuscaGlobal } from "./menu/BuscaGlobal";
+import { Atualizacoes } from "./menu/Atualizacoes";
 import { urlImagem } from "./api";
 import { useSessao } from "./App";
 import Painel from "./paginas/Painel";
@@ -74,12 +76,20 @@ export default function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { es
   const { sessao, marca } = useSessao();
   const local = useLocation();
   const [aberto, setAberto] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+  const [novidades, setNovidades] = useState(false);
   const [recolhido, setRecolhido] = useState(() => ler("menuLateral") === "recolhido");
   const admin = podeCargo(sessao.usuario.papel, "gestor"); // seletor de centrais (cobrança)
   const desligados = new Set(sessao.recursosDesligados ?? []);
   const funcoes = funcoesDoCargo(sessao.usuario.papel).filter((f) => { const m = moduloDaFuncao(f.id); return !m || !desligados.has(m); });
   const nomeUsuario = sessao.usuario.nome || sessao.usuario.email;
   useEffect(() => { window.scrollTo(0, 0); setAberto(false); }, [local.pathname]);
+  // Ctrl K (ou Cmd K) abre a busca de telas em qualquer lugar do painel.
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setBuscando((b) => !b); } };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, []);
   const alternarMenu = () => { const novo = !recolhido; gravar("menuLateral", novo ? "recolhido" : "aberto"); setRecolhido(novo); };
 
   const usuarioMenu = (
@@ -124,6 +134,8 @@ export default function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { es
         <header className="barra-topo">
           <Link to="/" className="topo-empresa" aria-label={sessao.empresa.nome}><FotoEmpresa classe="pequena" /><strong>{sessao.empresa.nome}</strong></Link>
           <div className="barra-lado">
+            <button className="botao-topo" onClick={() => setBuscando(true)} aria-label="Buscar configuração ou tela" title="Buscar configuração ou tela (Ctrl K)"><Search size={16} /><span>Buscar</span><kbd>Ctrl K</kbd></button>
+            <button className="botao-topo so-icone" onClick={() => setNovidades(true)} aria-label="Atualizações" title="Atualizações"><Newspaper size={18} /></button>
             {admin && <SeletorCentral key={sessao.empresa.id} empresaId={sessao.empresa.id} />}
             <Sino />
             <button className="botao-tema" onClick={trocarTema} aria-label="Alternar Tema" title="Alternar Tema">{escuro ? <Sun size={18} /> : <Moon size={18} />}</button>
@@ -135,9 +147,15 @@ export default function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { es
         <header className="barra-celular">
           <button className="hamburguer" onClick={() => setAberto(true)} aria-label="Abrir menu"><Menu size={24} /></button>
           <Link to="/" className="logo-topo" aria-label={sessao.empresa.nome}><FotoEmpresa classe="pequena" /></Link>
-          <Sino />
-          <Link to="/alterar-senha" className="avatar" aria-label="Minha conta">{iniciais(nomeUsuario)}</Link>
+          <div className="barra-lado">
+            <button className="botao-topo so-icone" onClick={() => setBuscando(true)} aria-label="Buscar configuração ou tela"><Search size={20} /></button>
+            <button className="botao-topo so-icone" onClick={() => setNovidades(true)} aria-label="Atualizações"><Newspaper size={20} /></button>
+            <Sino />
+            <Link to="/alterar-senha" className="avatar" aria-label="Minha conta">{iniciais(nomeUsuario)}</Link>
+          </div>
         </header>
+        <BuscaGlobal funcoes={funcoes} assistente={marca.assistente.nome} empresa={sessao.empresa} cargo={CARGO[sessao.usuario.papel] ?? sessao.usuario.papel} aberta={buscando} fechar={() => setBuscando(false)} />
+        <Atualizacoes aberta={novidades} fechar={() => setNovidades(false)} />
         {aberto && <div className="cortina" onClick={() => setAberto(false)} />}
         <aside className={`lateral ml-lateral-gaveta ${aberto ? "aberta" : ""}`} aria-hidden={!aberto}>
           <div className="lateral-topo">

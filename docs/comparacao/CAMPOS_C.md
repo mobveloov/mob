@@ -46,9 +46,13 @@ As 7 páginas de "Alterando Bandeira" são as 7 abas (Motorista, Passageiro, Des
 | Dinâmicas > guia "Navegue entre as dinâmicas" + Entendi | sim | sim | nada |
 | Dinâmicas > abas Automáticas, Manuais, Automações, Legenda (Último cálculo, faixas 1.1 a 1.5...), aviso Beta | sim | sim | nada |
 | Dinâmicas > etiqueta da área ("+R$ 5,00", "1.3x") | sim | sim | nada |
-| Dinâmicas > lista lateral > busca "Buscar por nome da área", abas "No embarque N / No destino N", filtro de ordem, tela cheia | não | não | ver "Não consegui igualar" |
-| Dinâmicas > cartão "DINÂMICA SEM ÁREA" (fator global com chave) | parcial (aba "Sem área" com regras de horário e demanda) | não | ver "Não consegui igualar" |
-| Dinâmicas > ficha de cada área (Motoristas livres, Disponível, Perdidas, Fator único) | não | não | ver "Não consegui igualar" |
+| Dinâmicas > lista lateral > busca "Buscar por nome da área" | não | sim | novo |
+| Dinâmicas > lista lateral > abas "No embarque N" e "No destino N" | não | sim | campo novo `aplicaEm` na regra (servidor); na janela da regra há "Aplicar quando a área estiver: No embarque / No destino"; o preço da corrida confere o ponto escolhido (embarque ou destino) |
+| Dinâmicas > lista lateral > filtro de ordem (nome / maior valor) e Tela cheia | não | sim | botões novos |
+| Dinâmicas > lista lateral > botão "Criar dinâmica" | parcial ("Nova regra" no topo) | sim | botão na lista, abre já no lado da aba aberta; o "Nova regra" do topo continua |
+| Dinâmicas > cartão "DINÂMICA SEM ÁREA" (fator, chave, editar) | parcial | sim | fator global gravado no servidor (padrão 1,1x, desligado) e somado ao preço das categorias com dinâmica ligada, respeitando a prioridade entre dinâmicas; a aba "Sem área" com horário e demanda continua |
+| Dinâmicas > ficha de cada área (N Motoristas livres, Disponível, Perdidas, Fator único) | não | quase | motoristas livres dentro da área (posição ao vivo), corridas pendentes com o ponto na área e corridas não atendidas nas últimas 24 h; o significado exato de "Disponível" e "Perdidas" na Machine foi inferido |
+| Dinâmicas > menu de três pontos de cada área | não | parcial | editar, ligar/desligar e remover em ícones |
 
 ## Descontos e Alterando Desconto
 
@@ -141,7 +145,7 @@ As 7 páginas de "Alterando Bandeira" são as 7 abas (Motorista, Passageiro, Des
 ## Não consegui igualar
 
 - **Simulador de tarifa** (Editar tarifa): precisa do serviço de mapas com chave para achar o trajeto entre dois endereços.
-- **Tarifas dinâmicas, lista lateral**: busca por nome da área, abas "No embarque" / "No destino" (a regra ainda não tem o campo "vale no embarque ou no destino"), ficha com Motoristas livres / Disponível / Perdidas, cartão "Dinâmica sem área" com fator global e tela cheia. Falta o campo no servidor e na conta do preço; fica para a próxima rodada.
+- **Tarifas dinâmicas**: o mapa usa os mapas do OpenStreetMap (internet) e mostra as áreas em lista ao lado, não como fichas sobre o mapa; "Disponível" e "Perdidas" foram inferidos.
 - **Recursos Premium**: seletor "Exibir nas centrais" (lista de centrais da rede), envio das imagens dos anúncios e da campanha (640x275 e 640x480), período e limite de corridas da campanha, cobranças (valores da Machine; não se aplicam aqui). Os anúncios com imagem continuam em Gerais > Banners.
 - **Saque Automático**: envio de certificado e chave e a conta ativa dependem de contrato e conta no banco; o resto grava, mas o saque ainda segue Integrações > Financeiro.
 - **Iza, Nilara, Marketplace**: dependem de contrato e chave dos fornecedores; sem conteúdo salvo da Machine.
@@ -155,7 +159,7 @@ Gerais: as 16 abas abrem sem erro (Motorista 184 campos, Passageiro 89, Despacho
 
 ## Testes
 
-`painel/test/bandeira-campos.test.ts` (6 testes: abas e campos, padrões, validação e permissão, formas de pagamento, tarifa variável e duplicar categoria).
+`painel/test/dinamica-campos.test.ts` (3 testes: área no embarque ou no destino, dinâmica sem área no preço, prioridade e fator global independentes) e `painel/test/bandeira-campos.test.ts` (6 testes: abas e campos, padrões, validação e permissão, formas de pagamento, tarifa variável e duplicar categoria).
 
 ## Linhas geradas: Gerais > Motorista, Passageiro, Financeiro e Filtros
 

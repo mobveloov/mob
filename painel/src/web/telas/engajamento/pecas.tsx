@@ -88,13 +88,13 @@ function Rosca({ pct, cor }: { pct: number; cor: string }) {
 
 // ------------------------------------------------------------------ cartões das três faixas
 
-type AcaoTipo = "ver" | "cupom" | "notificacao" | "mensagem" | "desafio" | "status";
-const ROTULO_ACAO: Record<AcaoTipo, string> = { ver: "Ver", cupom: "Enviar cupom", notificacao: "Enviar notificação", mensagem: "Enviar mensagem", desafio: "Lançar desafio", status: "Alterar status" };
+type AcaoTipo = "ver" | "cupom" | "notificacao" | "mensagem" | "desafio" | "status" | "punir";
+const ROTULO_ACAO: Record<AcaoTipo, string> = { ver: "Ver", cupom: "Enviar cupom", notificacao: "Enviar notificação", mensagem: "Enviar mensagem", desafio: "Lançar desafio", status: "Alterar status", punir: "Punir" };
 
 export function Cartoes({ papel, ind, filtro, podeAgir, onAcao, onFeito }: { papel: Papel; ind: Ind; filtro: Filtro; podeAgir: boolean; onAcao?: (t: AcaoTipo, faixa: number) => void; onFeito?: () => void }) {
   const [menu, setMenu] = useState<number | null>(null);
   const [acao, setAcao] = useState<{ tipo: AcaoTipo; faixa: number } | null>(null);
-  const itens: AcaoTipo[] = papel === "motoristas" ? ["ver", "desafio", "notificacao", "mensagem", "status"] : ["ver", "cupom", "notificacao"];
+  const itens: AcaoTipo[] = papel === "motoristas" ? ["ver", "desafio", "notificacao", "mensagem", "status", "punir"] : ["ver", "cupom", "notificacao"];
   useEffect(() => {
     if (menu == null) return;
     const fora = () => setMenu(null);
@@ -114,7 +114,7 @@ export function Cartoes({ papel, ind, filtro, podeAgir, onAcao, onFeito }: { pap
                 {menu === i && (
                   <div className="me-menu__painel">
                     {itens.map((t) => (
-                      <button key={t} type="button" className="me-menu__item" onClick={() => { setMenu(null); setAcao({ tipo: t, faixa: i }); onAcao?.(t, i); }}>
+                      <button key={t} type="button" className={`me-menu__item ${t === "punir" ? "me-menu__item--perigo" : ""}`} onClick={() => { setMenu(null); setAcao({ tipo: t, faixa: i }); onAcao?.(t, i); }}>
                         {t === "ver" ? (papel === "motoristas" ? "Ver motoristas" : "Ver passageiros") : ROTULO_ACAO[t]}
                       </button>
                     ))}
@@ -169,25 +169,32 @@ function ListaFaixa({ papel, ind, faixa, filtro, onFechar }: { papel: Papel; ind
 }
 
 function ModalAcao({ papel, ind, faixa, tipo, filtro, onFechar, onFeito }: { papel: Papel; ind: Ind; faixa: number; tipo: AcaoTipo; filtro: Filtro; onFechar: () => void; onFeito: () => void }) {
+  const [tempo, setTempo] = useState("1"), [unidade, setUnidade] = useState("horas"), [motivo, setMotivo] = useState("");
   const [titulo, setTitulo] = useState(""), [texto, setTexto] = useState(""), [cupom, setCupom] = useState(""), [status, setStatus] = useState("Inativo");
   const [erro, setErro] = useState(""), [enviando, setEnviando] = useState(false);
   const total = ind.contagem[faixa];
   async function enviar() {
     setErro(""); setEnviando(true);
-    try { await eng("/acao", { papel, indicador: ind.id, faixa, tipo, titulo, texto, cupom, status, situacao: filtro.situacao, categoria: filtro.categoria }); onFeito(); } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
+    try { await eng("/acao", { papel, indicador: ind.id, faixa, tipo, titulo, texto, cupom, status, tempo: Number(tempo), unidade, motivo, situacao: filtro.situacao, categoria: filtro.categoria }); onFeito(); } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
   }
   const nome = `${ind.nomes[faixa]} (${ind.limites[faixa]})`;
   return (
     <Janela onFechar={onFechar} titulo={ROTULO_ACAO[tipo]} sub={`${num(total, 0)} ${papel === "motoristas" ? "motoristas" : "passageiros"} · ${ind.rotulo}: ${nome}`} tamanho="media" nivel="alto"
-      rodape={<><button className="me-btn" onClick={onFechar}>Cancelar</button><button className="me-btn me-btn--primario" onClick={enviar} disabled={enviando || !total}>{enviando ? "Enviando..." : tipo === "status" ? "Alterar" : "Enviar"}</button></>}>
+      rodape={<><button className="me-btn" onClick={onFechar}>Cancelar</button><button className="me-btn me-btn--primario" onClick={enviar} disabled={enviando || !total}>{enviando ? "Enviando..." : tipo === "status" ? "Alterar" : tipo === "punir" ? "Punir" : "Enviar"}</button></>}>
       {erro && <p className="oc-aviso erro">{erro}</p>}
       <div className="me-form">
         {tipo === "status" && (
           <label>Nova situação<select value={status} onChange={(e) => setStatus(e.target.value)}>{["Ativo", "Bloqueado", "Inativo", "Em análise", "Fila de espera"].map((s) => <option key={s}>{s}</option>)}</select></label>
         )}
+        {tipo === "punir" && <>
+          <label>Tempo<input type="number" min={1} value={tempo} onChange={(e) => setTempo(e.target.value)} /></label>
+          <label>Unidade<select value={unidade} onChange={(e) => setUnidade(e.target.value)}><option value="minutos">Minutos</option><option value="horas">Horas</option><option value="dias">Dias</option></select></label>
+          <label>Motivo<textarea value={motivo} maxLength={200} rows={3} onChange={(e) => setMotivo(e.target.value)} /></label>
+          <p className="me-nota">{num(total, 0)} motoristas ficarão impedidos de receber corridas pelo tempo escolhido. Só o administrador pode fazer isto.</p>
+        </>}
         {(tipo === "notificacao" || tipo === "cupom" || tipo === "desafio") && <label>Título<input value={titulo} maxLength={60} onChange={(e) => setTitulo(e.target.value)} /></label>}
         {tipo === "cupom" && <label>Código do cupom<input value={cupom} maxLength={30} onChange={(e) => setCupom(e.target.value.toUpperCase())} /></label>}
-        {tipo !== "status" && <label>{tipo === "desafio" ? "Descrição do desafio" : "Mensagem"}<textarea value={texto} maxLength={500} rows={4} onChange={(e) => setTexto(e.target.value)} placeholder="Use {nome} para o primeiro nome." /></label>}
+        {tipo !== "status" && tipo !== "punir" && <label>{tipo === "desafio" ? "Descrição do desafio" : "Mensagem"}<textarea value={texto} maxLength={500} rows={4} onChange={(e) => setTexto(e.target.value)} placeholder="Use {nome} para o primeiro nome." /></label>}
         {tipo === "status" && <p className="me-nota">A situação de {num(total, 0)} motoristas será alterada. Só o administrador pode fazer isto.</p>}
       </div>
     </Janela>

@@ -15,8 +15,9 @@ import { central, marcarCentralLidas } from "./central-notificacoes.ts";
 import { ajuda, salvarAjuda } from "./ajuda.ts";
 import { categoriasCompletas, duplicarCategoria, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
-import { pedidosRecentes } from "../corridas/index.ts";
-import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, totalMensagens, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
+import { listarProprias, pedidosRecentes } from "../corridas/index.ts";
+import { mapa as servicoMapa } from "../operacao/servico.ts";
+import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, previaDestinatarios, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, totalMensagens, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
 import { removerTaxa, salvarTaxa, taxas } from "./taxas.ts";
 import { FORMAS_TAXA } from "../comum/taxas.ts";
 import { credito, removerRegraComissao, salvarCredito, salvarRegraComissao } from "./credito.ts";
@@ -24,7 +25,7 @@ import { descontos, removerDesconto, salvarDesconto } from "./descontos.ts";
 import { FORMAS_DESCONTO, matrizDescontos, salvarMatriz } from "./descontos-matriz.ts";
 import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, visaoIntegracao } from "./integracao-financeira.ts";
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
-import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
+import { dentroDoPoligono, dinamicaGlobal, salvarGlobal, areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
 import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoGeral, relatorioFaturamento, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
 import { csvExtratoCreditos, csvRecargasESaques, csvSaldoMotoristas, csvTransacoesCartao, extratoCreditos, listaTransacoesCartao, painelCartao, recargasESaques, saldoDaCentral, saldoDosMotoristas } from "./financeiro-credito.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
@@ -137,8 +138,9 @@ rotasConfig.post("/alertas/:id/encerrar", exigirPapel("admin", "operador"), ok((
 rotasConfig.get("/central-notificacoes", ok((req, res) => res.json(central(emp(req), quem(req), q(req, "somenteNaoLidas") === "1"))));
 rotasConfig.post("/central-notificacoes/lidas", ok((req, res) => res.json({ marcadas: marcarCentralLidas(emp(req), quem(req), req.body?.chaves, req.body?.todas === true), ...central(emp(req), quem(req), false) })));
 rotasConfig.get("/notificacoes", ok((req, res) => res.json({ historico: historicoNotificacoes(emp(req)), agendamentos: agendamentos(emp(req)) })));
-rotasConfig.get("/notificacoes/lista", ok((req, res) => res.json(listaNotificacoes(emp(req), { destinatario: q(req, "destinatario"), dataIni: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataIni")) ? q(req, "dataIni") : undefined, dataFim: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataFim")) ? q(req, "dataFim") : undefined, titulo: q(req, "titulo"), mensagem: q(req, "mensagem") }, Number(q(req, "pagina")) || 1))));
+rotasConfig.get("/notificacoes/lista", ok((req, res) => res.json(listaNotificacoes(emp(req), { destinatario: q(req, "destinatario"), dataIni: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataIni")) ? q(req, "dataIni") : undefined, dataFim: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "dataFim")) ? q(req, "dataFim") : undefined, titulo: q(req, "titulo"), mensagem: q(req, "mensagem"), ordem: q(req, "ordem"), sentido: q(req, "sentido") }, Number(q(req, "pagina")) || 1))));
 rotasConfig.get("/notificacoes/pessoas", ok((req, res) => res.json({ pessoas: buscarPessoas(emp(req), papelCart(q(req, "papel")), q(req, "busca")) })));
+rotasConfig.post("/notificacoes/previa", exigirPapel("admin", "operador"), ok((req, res) => res.json(previaDestinatarios(emp(req), sanearPedido(req.body)))));
 rotasConfig.post("/notificacoes", exigirPapel("admin", "operador"), ok(async (req, res) => res.json(await dispararNotificacao(emp(req), sanearPedido(req.body), quem(req)))));
 rotasConfig.post("/notificacoes/agendar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ agendamentos: criarAgendamento(emp(req), req.body) })));
 rotasConfig.post("/notificacoes/agendar/:id/pausar", exigirPapel("admin", "operador"), ok((req, res) => res.json({ agendamentos: pausarAgendamento(emp(req), req.params.id, req.body?.ativo === true) })));
@@ -186,9 +188,33 @@ rotasConfig.post("/categorias/:id/tarifas-extras", gestor, ok((req, res) => res.
 rotasConfig.put("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: salvarTarifaExtra(emp(req), req.params.id, { ...(req.body ?? {}), id: req.params.extra }) })));
 rotasConfig.delete("/categorias/:id/tarifas-extras/:extra", gestor, ok((req, res) => res.json({ categoria: removerTarifaExtra(emp(req), req.params.id, req.params.extra) })));
 
+/** Regras com a ficha de cada área de mapa: motoristas livres dentro dela, corridas pendentes e corridas perdidas (não atendidas nas últimas 24 h) com embarque ali. */
+function fichasDasAreas(empresaId: string) {
+  const regras = dinamicas(empresaId);
+  const mapaRegras = regras.filter((r) => r.tipo === "mapa");
+  const livres = mapaRegras.length ? servicoMapa(empresaId).motoristas.filter((m) => m.situacao === "livre" && m.lat != null && m.lng != null) : [];
+  const corridas = mapaRegras.length ? listarProprias(empresaId) : [];
+  const limite = Date.now() - 24 * 3600_000;
+  return regras.map((r) => {
+    const base = { ...r, nivel: nivelDinamica(r) };
+    if (r.tipo !== "mapa") return base;
+    const dentro = (p?: { lat?: number | null; lng?: number | null }) => p?.lat != null && p.lng != null && dentroDoPoligono(p.lat, p.lng, r.poligono);
+    const ponto = (c: any) => (r.aplicaEm === "destino" ? c.destino : c.embarque);
+    return {
+      ...base,
+      ficha: {
+        motoristasLivres: livres.filter((m) => dentro(m)).length,
+        disponiveis: corridas.filter((c) => c.status === "procurando" && dentro(ponto(c))).length,
+        perdidas: corridas.filter((c) => c.status === "nao_atendida" && Date.parse(c.solicitadaEm) >= limite && dentro(ponto(c))).length,
+      },
+    };
+  });
+}
+
 /** Tudo da tela Tarifas dinâmicas: regras manuais (com a faixa da legenda), automações, áreas automáticas abertas agora e a prioridade. */
 const painelDinamicas = (empresaId: string) => ({
-  regras: dinamicas(empresaId).map((r) => ({ ...r, nivel: nivelDinamica(r) })),
+  regras: fichasDasAreas(empresaId),
+  global: dinamicaGlobal(empresaId),
   automacoes: automacoes(empresaId).map((a) => ({ ...a, nivel: nivelDinamica(a) })),
   automaticas: areasAutomaticas(empresaId, pedidosRecentes(empresaId)),
   prioridade: prioridadeDinamicas(empresaId),
@@ -198,6 +224,7 @@ const painelDinamicas = (empresaId: string) => ({
 rotasConfig.get("/dinamicas", ok((req, res) => res.json(painelDinamicas(emp(req)))));
 rotasConfig.post("/dinamicas", gestor, ok((req, res) => { salvarDinamica(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.post("/dinamicas/:id/ativa", gestor, ok((req, res) => { ativarDinamica(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
+rotasConfig.put("/dinamicas-global", gestor, ok((req, res) => { salvarGlobal(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.put("/dinamicas-prioridade", gestor, ok((req, res) => { salvarPrioridade(emp(req), req.body?.prioridade); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.post("/dinamicas-automacoes", gestor, ok((req, res) => { salvarAutomacao(emp(req), req.body); res.json(painelDinamicas(emp(req))); }));
 rotasConfig.post("/dinamicas-automacoes/:id/ativa", gestor, ok((req, res) => { ativarAutomacao(emp(req), req.params.id, req.body?.ativa === true); res.json(painelDinamicas(emp(req))); }));
@@ -253,7 +280,7 @@ const papelNps = (v: string): PapelNps => (v === "motorista" ? "motorista" : "pa
 rotasConfig.get("/nps/:papel", ok((req, res) => res.json({ config: configNps(emp(req), papelNps(req.params.papel)), resumo: resumoNps(emp(req), papelNps(req.params.papel)) })));
 const filtroNps = (req: Request) => {
   const v = (k: string, max = 80) => String(req.query[k] ?? "").trim().slice(0, max);
-  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20) };
+  return { periodo: v("periodo", 2), inicio: v("inicio", 10), fim: v("fim", 10), tipo: v("tipo", 1), email: v("email"), telefone: v("telefone", 20), nome: v("nome", 50) };
 };
 /** Avaliações (NPS): nota, promotores, neutros, detratores e a lista paginada, com filtros de período, tipo, e-mail e telefone. */
 rotasConfig.get("/nps/:papel/avaliacoes", ok((req, res) => res.json({ ...avaliacoesNps(emp(req), papelNps(req.params.papel), filtroNps(req), Number(req.query.pagina) || 1), periodos: PERIODOS_NPS, tipos: TIPOS_NPS })));

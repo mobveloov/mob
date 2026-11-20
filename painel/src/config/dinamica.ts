@@ -13,6 +13,8 @@ export interface RegraDinamica {
   /** "percentual" = acréscimo em % sobre o preço (20 = +20%); "multiplicador" = vezes o preço (1,3 = 1,3x); "fixo" = reais a mais. */
   cobranca: CobrancaDinamica; valor: number; minimo: number;
   poligono: Array<[number, number]>; janelas: JanelaDia[]; gatilho: number;
+  /** Regra de área: vale quando o EMBARQUE ou o DESTINO da corrida cai dentro da área (abas "No embarque" e "No destino" da Machine). */
+  aplicaEm: "embarque" | "destino";
 }
 
 /** Quando duas ou mais dinâmicas valem para a mesma corrida: "somar" (acumula todas) ou quem ganha (como na Machine). */
@@ -44,6 +46,7 @@ export function sanearDinamica(e: unknown, tipoPadrao?: TipoDinamica): RegraDina
   return {
     id: texto(o.id, 20) || novoId(), tipo, nome, cidade: texto(o.cidade, 80), ativa: sim(o.ativa, true), cobranca, valor, minimo: centavos(numero(o.minimo, 0, 0, 1000)),
     poligono: tipo === "mapa" ? poligono : [], janelas: tipo === "horario" ? janelas : [], gatilho: tipo === "demanda" ? Math.round(numero(o.gatilho, 10, 1, 10_000)) : 0,
+    aplicaEm: umDe(o.aplicaEm, ["embarque", "destino"] as const, "embarque"),
   };
 }
 
@@ -92,8 +95,30 @@ export const prioridadeDinamicas = (empresaId: string): PrioridadeDinamica =>
   umDe(lerConfig<{ prioridade?: unknown }>(empresaId, "dinamicas-geral", {}).prioridade, PRIORIDADES, "somar");
 export function salvarPrioridade(empresaId: string, v: unknown): PrioridadeDinamica {
   if (!PRIORIDADES.includes(v as PrioridadeDinamica)) throw new Error("Escolha uma prioridade válida.");
-  gravarConfig(empresaId, "dinamicas-geral", { prioridade: v });
+  gravarConfig(empresaId, "dinamicas-geral", { ...lerConfig<object>(empresaId, "dinamicas-geral", {}), prioridade: v });
   return v as PrioridadeDinamica;
+}
+
+// ------------------------------------------------------------------ dinâmica sem área (fator global)
+
+/** "Dinâmica sem área" da Machine: um fator único aplicado em todas as regiões do mapa, nas categorias que usam tarifas dinâmicas. */
+export interface DinamicaGlobal { ativa: boolean; cobranca: CobrancaDinamica; valor: number; minimo: number }
+export const GLOBAL_PADRAO: DinamicaGlobal = { ativa: false, cobranca: "multiplicador", valor: 1.1, minimo: 0 };
+export function sanearGlobal(e: unknown, atual: DinamicaGlobal = GLOBAL_PADRAO): DinamicaGlobal {
+  const o = { ...atual, ...((e ?? {}) as object) } as Record<string, unknown>;
+  const cobranca = umDe(o.cobranca, ["percentual", "fixo", "multiplicador"] as const, "multiplicador");
+  const valor = centavos(numero(o.valor, 1.1, 0, cobranca === "percentual" ? 500 : cobranca === "multiplicador" ? 10 : 1000));
+  if (!(valor > 0)) throw new Error("Informe o valor da dinâmica sem área.");
+  if (cobranca === "multiplicador" && !(valor > 1)) throw new Error("O multiplicador precisa ser maior que 1 (exemplo: 1,1x).");
+  return { ativa: sim(o.ativa), cobranca, valor, minimo: centavos(numero(o.minimo, 0, 0, 1000)) };
+}
+export const dinamicaGlobal = (empresaId: string): DinamicaGlobal => {
+  try { return sanearGlobal(lerConfig<{ global?: unknown }>(empresaId, "dinamicas-geral", {}).global, GLOBAL_PADRAO); } catch { return GLOBAL_PADRAO; }
+};
+export function salvarGlobal(empresaId: string, entrada: unknown): DinamicaGlobal {
+  const g = sanearGlobal(entrada, dinamicaGlobal(empresaId));
+  gravarConfig(empresaId, "dinamicas-geral", { ...lerConfig<object>(empresaId, "dinamicas-geral", {}), global: g });
+  return g;
 }
 
 /** Faixa de cor da legenda do mapa: 1 = baixa, 2 = média, 3 = alta. */
@@ -203,7 +228,7 @@ export function areasAutomaticas(empresaId: string, pedidos: PedidoRecente[], ag
 // ------------------------------------------------------------------ preço
 
 export interface EntradaDinamica {
-  categoria: string; valor: number; embarque?: { lat?: number; lng?: number }; demanda?: number; quando?: Date;
+  categoria: string; valor: number; embarque?: { lat?: number; lng?: number }; destino?: { lat?: number; lng?: number }; demanda?: number; quando?: Date;
   /** Pedidos recentes da empresa (para as áreas automáticas). */
   pedidos?: PedidoRecente[];
 }
@@ -226,18 +251,24 @@ export function resolverPrioridade(c: CandidataDinamica[], prioridade: Prioridad
 
 /** Soma o acréscimo das regras ligadas à categoria que valem agora, ali e com esta demanda (respeitando a prioridade entre elas). */
 export function aplicarDinamica(empresaId: string, e: EntradaDinamica): { valor: number; adicional: number; regras: string[] } {
-  const ids = new Set(extraDaCategoria(empresaId, e.categoria).dinamicas);
-  if (!ids.size || !(e.valor > 0)) return { valor: e.valor, adicional: 0, regras: [] };
+  const extra = extraDaCategoria(empresaId, e.categoria);
+  const ids = new Set(extra.dinamicas);
+  const global = dinamicaGlobal(empresaId);
+  const usaGlobal = global.ativa && extra.dinamicaAtiva !== false;
+  if ((!ids.size && !usaGlobal) || !(e.valor > 0)) return { valor: e.valor, adicional: 0, regras: [] };
   const quando = e.quando ?? agoraBr();
   const tem = e.embarque?.lat != null && e.embarque.lng != null;
+  const temDestino = e.destino?.lat != null && e.destino.lng != null;
   const candidatas: CandidataDinamica[] = [];
   for (const r of dinamicas(empresaId)) {
     if (!r.ativa || !ids.has(r.id)) continue;
+    const ponto = r.aplicaEm === "destino" ? e.destino : e.embarque;
     const vale = r.tipo === "horario" ? noHorario(r, quando)
-      : r.tipo === "mapa" ? tem && dentroDoPoligono(e.embarque!.lat!, e.embarque!.lng!, r.poligono)
+      : r.tipo === "mapa" ? (r.aplicaEm === "destino" ? temDestino : tem) && dentroDoPoligono(ponto!.lat!, ponto!.lng!, r.poligono)
       : (e.demanda ?? 0) > r.gatilho;
     if (vale) candidatas.push({ nome: r.nome, adicional: adicionalDe(r, e.valor), grupo: r.tipo === "mapa" ? "manual" : "sem_area" });
   }
+  if (usaGlobal) candidatas.push({ nome: "Dinâmica sem área", adicional: adicionalDe(global, e.valor), grupo: "sem_area" });
   if (tem && e.pedidos?.length) {
     for (const a of areasAutomaticas(empresaId, e.pedidos, quando.getTime(), ids)) {
       if (dentroDoPoligono(e.embarque!.lat!, e.embarque!.lng!, a.poligono)) candidatas.push({ nome: a.nome, adicional: adicionalDe(a, e.valor), grupo: "automatica" });
