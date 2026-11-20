@@ -18,7 +18,7 @@ export function TaxasCentral() {
   const admin = useAdmin();
   const [aba, setAba] = useState<"taxa" | "automacoes">("taxa");
   const [aberto, setAberto] = useState(true);
-  const { msg, salvar } = useSalvar();
+  const { msg, salvar, setMsg } = useSalvar();
   const d = useCarregar(() => pedirConfig<{ taxas: Taxa[]; categorias: string[] }>("/taxas"), []);
   const [edit, setEdit] = useState<Rascunho | null>(null);
   const taxas = d.dados?.taxas ?? [];
@@ -44,7 +44,7 @@ export function TaxasCentral() {
             <div className="dm-linha dm-entre">
               <div><h3>Taxa da central</h3><p className="sub">Defina qual será o valor da taxa cobrada a cada corrida realizada. Você pode optar por um valor fixo ou percentual do total da corrida.</p></div>
             </div>
-            <Aviso erro={d.erro ?? msg?.erro} />
+            <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
             {!d.dados ? <Carregando /> : !taxas.length ? <div className="dm-vazio-pequeno"><h4>Nenhuma taxa criada</h4><p>Sem taxas, nada é cobrado por corrida além da comissão das categorias.</p></div> : (
               <ul className="dm-taxas">
                 {taxas.map((t) => (
@@ -68,12 +68,12 @@ export function TaxasCentral() {
         </>
       )}
       </section>
-      {edit && <EditorTaxa inicial={edit} categorias={d.dados?.categorias ?? []} admin={admin} onFechar={() => setEdit(null)} onMudou={() => { setEdit(null); d.recarregar(); }} />}
+      {edit && <EditorTaxa inicial={edit} categorias={d.dados?.categorias ?? []} admin={admin} onFechar={() => setEdit(null)} onMudou={(ok) => { setEdit(null); d.recarregar(); setMsg({ ok }); }} />}
     </>
   );
 }
 
-function EditorTaxa({ inicial, categorias, admin, onFechar, onMudou }: { inicial: Rascunho; categorias: string[]; admin: boolean; onFechar: () => void; onMudou: () => void }) {
+function EditorTaxa({ inicial, categorias, admin, onFechar, onMudou }: { inicial: Rascunho; categorias: string[]; admin: boolean; onFechar: () => void; onMudou: (ok: string) => void }) {
   const [t, setT] = useState<Rascunho>(inicial);
   const [aba, setAba] = useState<"config" | "aplicacoes">("config");
   const [valorSim, setValorSim] = useState("20");
@@ -93,7 +93,7 @@ function EditorTaxa({ inicial, categorias, admin, onFechar, onMudou }: { inicial
   const idsPag = FORMAS_TAXA.map((f) => f.id as string);
   return (
     <Modal aberto onFechar={onFechar} titulo={t.id ? "Editar taxa" : "Criar taxa"} larga>
-      <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); if (!admin) return; const r = await salvar(() => pedirConfig("/taxas", "POST", t), "Taxa salva."); if (r) onMudou(); }}>
+      <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); if (!admin) return; const r = await salvar(() => pedirConfig("/taxas", "POST", t), "Taxa gravada."); if (r) onMudou("Taxa gravada."); }}>
         <Campo rotulo="Nome *" dica="O nome da taxa será mostrado no extrato do motorista e no extrato de crédito."><input value={t.nome} maxLength={MAX_NOME_TAXA} required disabled={!admin} onChange={(e) => setT({ ...t, nome: e.target.value.replace(/[\p{Extended_Pictographic}]/gu, "").slice(0, MAX_NOME_TAXA) })} /></Campo>
         <Abas abas={[["config", "Configurações"], ["aplicacoes", "Aplicações"]]} valor={aba} onChange={setAba} />
         {aba === "config" ? (
@@ -146,7 +146,7 @@ function EditorTaxa({ inicial, categorias, admin, onFechar, onMudou }: { inicial
         )}
         <Aviso erro={msg?.erro} />
         <div className="dm-rodape-modal">
-          {admin && t.id && <button type="button" className="botao perigo" disabled={salvando} onClick={async () => { if (!confirm(`Excluir a taxa "${t.nome}"? As corridas já finalizadas não mudam.`)) return; const r = await salvar(() => pedirConfig(`/taxas/${t.id}`, "DELETE"), "Taxa excluída."); if (r) onMudou(); }}><Trash2 size={14} /> Excluir taxa</button>}
+          {admin && t.id && <button type="button" className="botao perigo" disabled={salvando} onClick={async () => { if (!confirm(`Excluir a taxa "${t.nome}"? As corridas já finalizadas não mudam.`)) return; const r = await salvar(() => pedirConfig(`/taxas/${t.id}`, "DELETE"), "Taxa excluída."); if (r) onMudou("Taxa excluída."); }}><Trash2 size={14} /> Excluir taxa</button>}
           <button type="button" className="botao" onClick={onFechar}>Cancelar</button>
           {admin && <button className="botao primario" disabled={salvando}>Salvar</button>}
         </div>

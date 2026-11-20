@@ -38,7 +38,7 @@ export function Categorias() {
   const [abertas, setAbertas] = useState<string[]>([]);
   const [tarifa, setTarifa] = useState<{ cat: any; extra: any } | null>(null);
   const arrastando = useRef<string | null>(null);
-  const { msg, salvar } = useSalvar();
+  const { msg, salvar, setMsg } = useSalvar();
   const todas: any[] = d.dados?.categorias ?? [];
   const cidades = [...new Set(todas.map((c) => c.extra.cidade).filter(Boolean))] as string[];
   const lista = todas.filter((c) => (!cidade || c.extra.cidade === cidade));
@@ -97,8 +97,8 @@ export function Categorias() {
           </form>
         </Modal>
       )}
-      {tarifa && <JanelaTarifa cat={tarifa.cat} extra={tarifa.extra} onFechar={() => setTarifa(null)} onSalvo={() => { setTarifa(null); d.recarregar(); }} />}
-      {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} outras={todas} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
+      {tarifa && <JanelaTarifa cat={tarifa.cat} extra={tarifa.extra} onFechar={() => setTarifa(null)} onSalvo={() => { setTarifa(null); d.recarregar(); setMsg({ ok: tarifa.extra === "nova" ? "Tarifa extra gravada." : "Tarifa gravada." }); }} />}
+      {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} outras={todas} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); setMsg({ ok: "Categoria gravada." }); }} />}
     </>
   );
 }

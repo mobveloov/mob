@@ -29,7 +29,7 @@ function CatalogoAba() {
   const l = useCarregar(() => chamar<Catalogo>("GET", "/passe-livre"), []);
   const [editando, setEditando] = useState<Oferta | "nova" | null>(null);
   const [previa, setPrevia] = useState(true);
-  const { aviso, tentar } = useAviso();
+  const { aviso, tentar, setAviso } = useAviso();
   const d = l.dados;
   const cheio = !!d && d.ofertas.length >= d.maximo;
   return (
@@ -60,7 +60,7 @@ function CatalogoAba() {
       )}
       <p style={{ margin: "14px 0 10px", color: "var(--cg-suave)" }}>Você tem {d?.ofertas.length ?? 0} de {d?.maximo ?? 3} ofertas ativas.</p>
       <button className="cg-botao primario" disabled={!d || cheio} title={cheio ? "Remova uma oferta para criar outra." : undefined} onClick={() => setEditando("nova")}><Plus size={16} /> Nova oferta</button>
-      {editando && <FormOferta oferta={editando === "nova" ? null : editando} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
+      {editando && <FormOferta oferta={editando === "nova" ? null : editando} onFechar={() => setEditando(null)} onSalvo={() => { l.recarregar(); setAviso({ texto: "Oferta gravada." }); }} />}
     </>
   );
 }
@@ -71,7 +71,7 @@ function FormOferta({ oferta, onFechar, onSalvo }: { oferta: Oferta | null; onFe
   const { aviso, tentar } = useAviso();
   const salvar = async () => {
     const corpo = { valor, horas };
-    if (await tentar(() => (oferta ? chamar("PUT", `/passe-livre/ofertas/${oferta.id}`, corpo) : chamar("POST", "/passe-livre/ofertas", corpo)), "Oferta salva.")) { onSalvo(); onFechar(); }
+    if (await tentar(() => (oferta ? chamar("PUT", `/passe-livre/ofertas/${oferta.id}`, corpo) : chamar("POST", "/passe-livre/ofertas", corpo)), "")) { onSalvo(); onFechar(); }
   };
   return (
     <Janela aberta titulo={oferta ? "Alterar oferta" : "Nova oferta"} onFechar={onFechar} largura="pequena"

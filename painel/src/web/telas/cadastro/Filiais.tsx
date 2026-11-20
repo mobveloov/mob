@@ -16,7 +16,7 @@ export default function Filiais() {
   const [editando, setEditando] = useState<Filial | "nova" | null>(null);
   const [pessoas, setPessoas] = useState<Filial | null>(null);
   const [busca, setBusca] = useState("");
-  const { aviso, tentar } = useAviso();
+  const { aviso, tentar, setAviso } = useAviso();
   const lista = (l.dados?.filiais ?? []).filter((f) => !busca || `${f.nome} ${f.cidade} ${f.responsavel}`.toLowerCase().includes(busca.toLowerCase()));
 
   return (
@@ -45,7 +45,7 @@ export default function Filiais() {
         </table></div>
         {l.dados && !lista.length && <Vazio titulo="Nenhuma filial cadastrada." sub="Crie a primeira em Nova filial." />}
       </div>
-      {editando && <FormFilial f={editando === "nova" ? null : editando} onFechar={() => setEditando(null)} onSalvo={() => l.recarregar()} />}
+      {editando && <FormFilial f={editando === "nova" ? null : editando} onFechar={() => setEditando(null)} onSalvo={() => { l.recarregar(); setAviso({ texto: "Filial gravada." }); }} />}
       {pessoas && <Pessoas f={pessoas} onFechar={() => { setPessoas(null); l.recarregar(); }} />}
     </div>
   );
@@ -54,7 +54,7 @@ export default function Filiais() {
 function FormFilial({ f, onFechar, onSalvo }: { f: Filial | null; onFechar: () => void; onSalvo: () => void }) {
   const [v, setV] = useState({ nome: f?.nome ?? "", cidade: f?.cidade ?? "", endereco: f?.endereco ?? "", responsavel: f?.responsavel ?? "", telefone: f?.telefone ?? "", ativa: f?.ativa ?? true });
   const { aviso, tentar } = useAviso();
-  const salvar = async () => { if (await tentar(() => (f ? api("PUT", `/${f.id}`, v) : api("POST", "", v)), "Filial salva.")) { onSalvo(); onFechar(); } };
+  const salvar = async () => { if (await tentar(() => (f ? api("PUT", `/${f.id}`, v) : api("POST", "", v)))) { onSalvo(); onFechar(); } };
   const set = (k: keyof typeof v, x: string | boolean) => setV({ ...v, [k]: x });
   return (
     <Janela aberta titulo={f ? "Editar filial" : "Nova filial"} sub="Preencha os dados abaixo" onFechar={onFechar} largura="pequena" rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar</button></>}>
