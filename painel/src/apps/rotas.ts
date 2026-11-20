@@ -324,6 +324,9 @@ r.get("/corridas/:id", ok((req, res) => {
   res.json({ corrida: P.corridaParaApp(empresaId, P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave), sessao.papel) });
 }));
 
+/** O app avisa que está aberto (ao abrir e de poucos em poucos minutos); o servidor guarda o último contato, e o painel usa isso para saber se o app está instalado. */
+r.get("/ping", ok((_req, res) => res.json({ ok: true, em: new Date().toISOString() })));
+
 r.post("/corridas/:id/cancelar", ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);

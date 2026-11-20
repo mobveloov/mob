@@ -385,3 +385,16 @@ test("recarga de saldo do motorista: o pedido chega à central, o depósito conf
   const rec = listaRecargas(E.id, "motorista", { inicio: hoje, fim: hoje });
   assert.ok(rec.itens.some((i: any) => i.valor === 50), "o painel enxerga a recarga em Recargas");
 });
+
+test("o app avisa que está aberto (ping) e o servidor guarda o último contato para o painel", async () => {
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Jo Contato", telefone: "11900000061", status: "Ativo", veiculo: "Hatch", placa: "JOC1A23" }, "teste");
+  const { listar } = await import("../src/cadastros/armazem.ts");
+  const { ultimosContatos } = await import("../src/apps/sessoes.ts");
+  const tokM = await entrar("motorista", "11900000061");
+  const r = await chamar("GET", `${API}/ping`, undefined, tokM);
+  assert.equal(r.status, 200);
+  const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000061")!;
+  const em = ultimosContatos(E.id, "motorista").get(m.id);
+  assert.ok(em && Date.now() - em < 60_000, "último contato registrado agora");
+  assert.equal((await chamar("GET", `${API}/ping`)).status, 401, "sem token não vale");
+});

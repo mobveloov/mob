@@ -65,7 +65,8 @@ const asset = (tipo) => {
   const p = n ? path.join(pastaEmpresa, "assets", path.basename(n)) : null;
   return p && fs.existsSync(p) ? p : null;
 };
-const icone = asset("iconeApp") ?? asset("favicon");
+// Ícone próprio de cada app (arquivos.iconeMotorista / iconePassageiro); sem ele, o ícone da empresa (iconeApp) vale para os dois (white-label).
+const icone = asset(papel === "motorista" ? "iconeMotorista" : "iconePassageiro") ?? asset("iconeApp") ?? asset("favicon");
 if (!icone) falhar("Falta o ícone do app (arquivos.iconeApp em assets/, de preferência PNG 1024×1024).");
 
 const saida = path.join(RAIZ, "build", "apps", `${empresa}-${papel}`);

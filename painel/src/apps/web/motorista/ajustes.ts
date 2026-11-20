@@ -45,7 +45,7 @@ export function aplicarTema() {
 }
 if (typeof matchMedia !== "undefined") matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", aplicarTema);
 
-export const NOMES_TEMA: Record<Tema, string> = { sistema: "Sistema", claro: "Claro", escuro: "Escuro" };
+export const NOMES_TEMA: Record<Tema, string> = { sistema: "Automático", claro: "Claro", escuro: "Escuro" };
 export const NOMES_NAVEGADOR: Record<Navegador, string> = { nativo: "GPS do app (passo a passo)", google: "Google Maps", waze: "Waze" };
 export const NOMES_SONS: Record<Sons, string> = { padrao: "Padrão", sirene: "Sirene", campainha: "Campainha" };
 const TONS: Record<Sons, { f: [number, number]; onda: OscillatorType; passo: number }> = {

@@ -13,6 +13,14 @@ const gravar = (k: string, v: string | null) => { try { if (v == null) localStor
 
 let cfg: Config = { empresaId: "", api: "", papel: "passageiro" };
 export const config = () => cfg;
+
+// Batida do app: avisa o servidor que está aberto (ao abrir e a cada 4 minutos). O painel usa o "último contato" para saber se o app está instalado.
+if (typeof window !== "undefined") {
+  const batida = () => { if (token() && document.visibilityState !== "hidden") void api("/ping").catch(() => undefined); };
+  setTimeout(batida, 4000);
+  setInterval(batida, 4 * 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") setTimeout(batida, 500); });
+}
 export const nativo = () => Capacitor.isNativePlatform();
 
 /** Só no APK de teste: guarda outro endereço de servidor (ou volta ao do build com ""). Recarrega o app. */
