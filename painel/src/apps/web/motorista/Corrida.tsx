@@ -12,6 +12,7 @@ import { Estrelas, mensagemDeErro, useConfigDoPainel, type MarcaApp } from "../c
 import { falar, linkNavegar, useAjustes } from "./ajustes";
 import { Mapa, type PontoMapa } from "./Mapa";
 import { textoMetros, useNavegacao } from "./Navegacao";
+import { enviarSos } from "../comum/sos";
 import { iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
 import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
@@ -127,7 +128,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
     } catch { /* cancelou o compartilhamento */ }
   };
   const sos = async () => {
-    try { await api(`/corridas/${c.id}/sos`, { corpo: posicao ?? {} }); avisar("A central foi avisada. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+    try { await enviarSos(c.id, posicao); } catch (e) { setErro(mensagemDeErro(e)); }
     setFolha("");
   };
 

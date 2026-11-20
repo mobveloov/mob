@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
+import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
 import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { ChatCorrida } from "./Conversa";
@@ -32,7 +33,7 @@ export default function App() {
   if (!logado) return cadastrando
     ? <Cadastro voltarAoLogin={() => setCadastrando(false)} concluir={() => { setCadastrando(false); setLogado(!!token()); }} />
     : <Entrar marca={marca} aoEntrar={() => setLogado(true)} cadastrar={() => setCadastrando(true)} />;
-  return <Logado marca={marca} sair={() => setLogado(false)} />;
+  return <><Logado marca={marca} sair={() => setLogado(false)} /><EmergenciaPerto ativo /><CartaoMeuSos /></>;
 }
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
@@ -88,6 +89,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   // Tempo real.
   useEffect(() => tempoReal((tipo, d) => {
     if (tipo === "oferta") { setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
+    else if (tipo === "sos") aoChegarSos(d as SosPerto);
+    else if (tipo === "sos_fim") aoFimDoSos(d as { id: string });
+    else if (tipo === "sos_estado") aoMudarSos();
     else if (tipo === "oferta_encerrada") { setOferta((o) => (o?.id === d.id ? null : o)); pararSons(); if (d.motivo) setAviso(String(d.motivo)); }
     else if (tipo === "corrida") {
       const c = d as Corrida;
@@ -143,7 +147,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   };
   const pedirAjuda = async () => {
     setDialogo("");
-    try { await api("/suporte", { corpo: { texto: `ALERTA: o motorista pediu ajuda${posicao ? ` (posição ${posicao.lat.toFixed(5)}, ${posicao.lng.toFixed(5)})` : ""}.` } }); setAviso("A central recebeu o seu alerta e vai falar com você. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+    try { await enviarSos(corrida?.id ?? null, posicao); } catch (e) { setErro(mensagemDeErro(e)); } // o cartão "Alerta enviado" mostra o resultado
   };
   const ficarOffline = async () => { setDialogo(""); setFolhaAberta(false); await api("/offline", { corpo: {} }).catch(() => undefined); setOnline(false); };
   const sairDaConta = async () => { await api("/sair", { corpo: {} }).catch(() => undefined); setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); };

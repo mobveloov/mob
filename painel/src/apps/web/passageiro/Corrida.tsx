@@ -11,6 +11,7 @@ import {
   type ContraOferta, type Corrida, type Endereco, type Ponto,
 } from "./apoio";
 import { Mapa } from "./Mapa";
+import { enviarSos } from "../comum/sos";
 import { pontosDaRota } from "./Opcoes";
 import { Avatar, Aviso, Dialogo, FolhaBaixo, FolhaModal, Nota, Placa, PrecoAjustavel } from "./pecas";
 
@@ -206,7 +207,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
   const sos = async () => {
     setJanela("");
     const p = await posicaoAgora().catch(() => null);
-    try { await api(`/corridas/${c.id}/sos`, { corpo: p ?? {} }); setAviso("A central foi avisada. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+    try { await enviarSos(c.id, p); } catch (e) { setErro(mensagemDeErro(e)); }
   };
 
   const podeCancelar = ["a_caminho", "no_local"].includes(c.status);
