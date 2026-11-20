@@ -312,6 +312,13 @@ export function estimarPreco(empresaId: string, p: { categoria: string; distanci
  * Taxa de serviço do passageiro (Config › Taxas da central) desta corrida: a mesma conta que a carteira usa ao finalizar
  * (valor depois do desconto, forma de pagamento da corrida). Os apps mostram à parte do valor da corrida.
  */
+/** Taxas da central cobradas do passageiro nesta corrida (nome e valor, como configuradas), à parte do valor da corrida. */
+export function taxasDoPassageiroDaCorrida(empresaId: string, c: CorridaPropria): Array<{ nome: string; valor: number }> {
+  const bruto = c.valor ?? c.valorOferecido ?? c.estimativa.valor;
+  if (bruto == null) return [];
+  const base = c.valor != null ? Math.max(0, c.valor) : Math.max(0, arred(bruto - (c.desconto ?? 0)));
+  return cobrancas(empresaId, "passageiro", { categoria: c.categoria, valor: base, forma: formaDaTaxa(c.pagamento) }).map((t) => ({ nome: t.nome, valor: t.valor }));
+}
 export function taxaServicoDaCorrida(empresaId: string, c: CorridaPropria): number {
   const bruto = c.valor ?? c.valorOferecido ?? c.estimativa.valor;
   if (bruto == null) return 0;

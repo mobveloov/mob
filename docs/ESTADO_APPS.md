@@ -172,3 +172,6 @@ cabeçalhos anti-clonagem do painel (arquivo `servidor/index.ts` é da sessão d
 
 ### 12. Cancelamento por culpa do passageiro
 Motivo do motorista que e culpa do passageiro ("Passageiro nao apareceu", "Passageiro pediu para cancelar"...) cancela a corrida de vez (status cancelada, motivo no painel), mesmo com o motorista a caminho: nao volta para "procurando" nem e reofertada. O passageiro ve "Corrida cancelada: voce nao apareceu" (app e notificacao) e pede outra se quiser. So desistencia do motorista por outro motivo volta para a fila. Teste: apps-painel.test.ts.
+
+### 13. Taxas da central no extrato
+Extrato do motorista: cada corrida traz `taxas` (uma linha por taxa de Config > Taxas da central, com o nome do painel; sem taxas configuradas, uma linha "Comissao da central"), total de taxas e liquido; o resumo do periodo traz `taxasPorNome`. Passageiro: detalhe da corrida com cada taxa dele e "Total pago". Tudo lido da configuracao (config/taxas.ts e comissao.ts), sem valores fixos. Teste: apps-painel.test.ts.
