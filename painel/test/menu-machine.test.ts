@@ -82,3 +82,15 @@ test("o cargo esconde o que não pode: operador não vê Configurações, Cartã
   for (const id of ["taxas-central", "config-gerais", "cartao-painel", "creditos-extrato", "ultimo-boleto", "equipe", "passe-livre"]) assert.ok(!op.includes(id), id);
   for (const id of ["painel", "solicitar", "conversas", "ajuda-termos", "ouvidoria"]) assert.ok(op.includes(id), id);
 });
+
+// Itens nossos, fora da Machine (não entram na lista MACHINE acima).
+test("Personalização app motorista é item nosso: logo depois da do passageiro, só admin", () => {
+  assert.ok(!MACHINE.some(([, , , id]) => id === "personalizacao-motorista"));
+  const f = FUNCOES.find((x) => x.id === "personalizacao-motorista")!;
+  assert.equal(f.rota, "/personalizacao-motorista");
+  assert.equal(f.minimo, "admin");
+  const ids = menuLateral(funcoesDoCargo("admin")).find((g) => g.nome === "Configurações")!.blocos.flatMap((b) => b.itens.map((i) => i.id));
+  assert.equal(ids.indexOf("personalizacao-motorista"), ids.indexOf("personalizacao-app") + 1);
+  const op = menuLateral(funcoesDoCargo("operador")).flatMap((g) => g.blocos.flatMap((b) => b.itens.map((i) => i.id)));
+  assert.ok(!op.includes("personalizacao-motorista"));
+});

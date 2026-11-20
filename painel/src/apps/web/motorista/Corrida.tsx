@@ -13,7 +13,7 @@ import { falar, linkNavegar, useAjustes } from "./ajustes";
 import { Mapa, type PontoMapa } from "./Mapa";
 import { textoMetros, useNavegacao } from "./Navegacao";
 import { enviarSos } from "../comum/sos";
-import { iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
+import { definirRetencao, iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
 import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
 
@@ -72,7 +72,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   // Gravação da corrida (áudio, ou vídeo se a empresa liberar): liga quando a corrida começa a andar e para ao fim.
   const [cfgGravacao, setCfgGravacao] = useState<ConfigGravacao | null>(null);
   const [gravandoAgora, setGravandoAgora] = useState(false);
-  useEffect(() => { void api<ConfigGravacao>("/gravacao/config").then(setCfgGravacao).catch(() => undefined); }, []);
+  useEffect(() => { void api<ConfigGravacao>("/gravacao/config").then((c) => { definirRetencao(c.diasNoAparelho); setCfgGravacao(c); }).catch(() => undefined); }, []);
   const querGravar = !!cfgGravacao?.ativa && (cfgGravacao.obrigatoria || ajustes.gravar);
   useEffect(() => {
     if (!querGravar) { pararGravacao(); setGravandoAgora(false); return; }
@@ -82,7 +82,8 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   }, [c.id, querGravar, ajustes.gravarVideo]); // eslint-disable-line react-hooks/exhaustive-deps
   // GPS do próprio app: instrução da próxima curva, rota pelas ruas, recálculo e voz.
   const nativo = ajustes.navegador === "nativo";
-  const nav = useNavegacao(posicao, alvo, nativo, ajustes.voz);
+  const regrasApp = useConfigDoPainel()?.motorista;
+  const nav = useNavegacao(posicao, alvo, nativo && (regrasApp?.mapaNavegacao ?? true), ajustes.voz, regrasApp?.distanciaRecalculo);
   const Seta = nav.passo?.modificador?.includes("left") ? CornerUpLeft : nav.passo?.modificador?.includes("right") ? CornerUpRight : nav.passo?.modificador === "uturn" ? Undo2 : nav.passo?.tipo === "arrive" ? Flag : ArrowUp;
 
   // Co-piloto de voz: avisa uma vez ao chegar perto do próximo ponto.
@@ -268,7 +269,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           </div>
         </Folha>
       )}
-      {folha === "finalizar" && <Finalizar corrida={c} taximetro={taximetro} valorSugerido={valor} ocupado={ocupado} erro={erro} fechar={() => setFolha("")} confirmar={(v) => void status("finalizada", v == null ? {} : { valor: v })} />}
+      {folha === "finalizar" && <Finalizar editarValor={regrasApp?.editarValorFinal ?? true} mostrarTaxas={regrasApp?.confirmarTaxas ?? false} corrida={c} taximetro={taximetro} valorSugerido={valor} ocupado={ocupado} erro={erro} fechar={() => setFolha("")} confirmar={(v) => void status("finalizada", v == null ? {} : { valor: v })} />}
       {folha === "cancelar" && (
         <Folha titulo={c.status === "a_caminho" ? "Desistir da corrida" : "Cancelar a corrida"} fechar={() => { setFolha(""); setMotivo(""); }}>
           <p className="dica">{c.status === "a_caminho" ? "A corrida volta a procurar outro motorista e você não recebe esta mesma de novo logo em seguida." : "O passageiro será avisado e a central registra o motivo."} Cancelamentos seguidos podem gerar punição, conforme as regras da central.</p>
@@ -290,8 +291,8 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   );
 }
 
-function Finalizar({ corrida: c, taximetro, valorSugerido, ocupado, erro, fechar, confirmar }: {
-  corrida: Corrida; taximetro: boolean; valorSugerido: number | null; ocupado: boolean; erro: string; fechar: () => void; confirmar: (v: number | null) => void;
+function Finalizar({ editarValor, mostrarTaxas, corrida: c, taximetro, valorSugerido, ocupado, erro, fechar, confirmar }: {
+  editarValor: boolean; mostrarTaxas: boolean; corrida: Corrida; taximetro: boolean; valorSugerido: number | null; ocupado: boolean; erro: string; fechar: () => void; confirmar: (v: number | null) => void;
 }) {
   const [valor, setValor] = useState(valorSugerido != null ? valorSugerido.toFixed(2).replace(".", ",") : "");
   const [recebido, setRecebido] = useState("");
@@ -301,8 +302,9 @@ function Finalizar({ corrida: c, taximetro, valorSugerido, ocupado, erro, fechar
     <Folha titulo="Finalizar corrida" fechar={fechar}>
       <form className="formulario" onSubmit={(e) => { e.preventDefault(); confirmar(taximetro ? null : v); }}>
         {taximetro ? <p className="dica centro">O valor sai do taxímetro: distância e tempo da viagem, pela tarifa da categoria.</p> : (
-          <label className="campo"><span className="campo-rotulo">Valor da corrida (R$)</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} /></span></label>
+          <label className="campo"><span className="campo-rotulo">Valor da corrida (R$)</span><span className="campo-caixa"><input inputMode="decimal" value={valor} readOnly={!editarValor} onChange={(e) => setValor(e.target.value)} /></span>{!editarValor && <small className="dica">A empresa não deixa mudar o valor final.</small>}</label>
         )}
+        {mostrarTaxas && c.taxaCentral != null && <p className="dica">Taxas da central: {reais(c.taxaCentral)}{c.valorLiquido != null ? `. Você recebe ${reais(c.valorLiquido)}.` : ""} Confira antes de finalizar.</p>}
         {c.desconto ? <p className="dica">Já com desconto de cupom de {reais(c.desconto)}.</p> : null}
         <div className="pilula-pagamento"><Banknote size={18} /> Pagamento: <strong>{c.pagamento}</strong></div>
         {c.pagamento === "Dinheiro" && !taximetro && (

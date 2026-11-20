@@ -93,7 +93,12 @@ export function ConfigGerais() {
             {sw(["motorista", "gravacao", "ativa"], "Gravar as corridas", "Liga a gravação de áudio nos aplicativos dos motoristas.")}
             {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "obrigatoria"], "Gravação obrigatória", "O motorista não consegue desligar a gravação.")}
             {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "video"], "Liberar gravação de vídeo", "Além do áudio, o motorista pode gravar vídeo (qualidade leve).")}
+            {g.motorista.gravacao.ativa && <Campo rotulo="Dias que a cópia fica no celular do motorista"><input type="number" min={1} max={30} value={g.motorista.gravacao.diasNoAparelho} disabled={!admin} onChange={(e) => set(["motorista", "gravacao", "diasNoAparelho"], Number(e.target.value))} /></Campo>}
             {g.motorista.gravacao.ativa && <Campo rotulo="Guardar as gravações por (dias)"><input type="number" min={1} max={365} value={g.motorista.gravacao.dias} disabled={!admin} onChange={(e) => set(["motorista", "gravacao", "dias"], Number(e.target.value))} /></Campo>}
+          </Secao>
+          <Secao titulo="Chamadas e negociação" sub="Tempos das ofertas de corrida para o motorista.">
+            <Campo rotulo="Validade da contra-oferta do motorista (segundos)"><input type="number" min={10} max={600} value={g.motorista.contraofertaSegundos} disabled={!admin} onChange={(e) => set(["motorista", "contraofertaSegundos"], Number(e.target.value))} /></Campo>
+            <Campo rotulo="Oferecer a mesma corrida de novo ao mesmo motorista depois de (minutos)"><input type="number" min={1} max={60} value={g.motorista.reofertaMinutos} disabled={!admin} onChange={(e) => set(["motorista", "reofertaMinutos"], Number(e.target.value))} /></Campo>
           </Secao>
           <ListaEditavel titulo="Avisos de conduta (mapa do motorista)" sub="Lembretes que aparecem para o motorista na tela do mapa. Lista vazia esconde o aviso." lista={g.motorista.avisosDeConduta} on={(l) => set(["motorista", "avisosDeConduta"], l)} admin={admin} nome="Aviso" />
           <ListaEditavel titulo="Problemas na corrida" sub="Opções do botão de avisar a central sobre um problema durante a corrida." lista={g.motorista.problemasNaCorrida} on={(l) => set(["motorista", "problemasNaCorrida"], l)} admin={admin} nome="Problema" />

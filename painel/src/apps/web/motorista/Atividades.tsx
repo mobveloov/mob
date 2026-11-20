@@ -238,7 +238,7 @@ function RecargaDeSaldo({ saldo, instrucao, minimo, voltar }: { saldo: number | 
 }
 
 export function CarteiraDoMotorista({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string; recargaRegras?: { ativa: boolean; minimo: number } }>("/carteira");
+  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string; recargaRegras?: { ativa: boolean; minimo: number }; avisoRecarga?: string; movimentos?: { recarga: boolean; saque: boolean; pix: boolean; presencial: boolean; telefone: string } }>("/carteira");
   const [tela, setTela] = useState<"" | "recarregar" | "retirar">("");
   if (tela === "retirar") return <CarteiraAntiga voltar={() => setTela("")} />;
   if (tela === "recarregar") return <RecargaDeSaldo saldo={dados?.saldo} instrucao={dados?.recarga ?? ""} minimo={dados?.recargaRegras?.minimo ?? 0} voltar={() => setTela("")} />;
@@ -250,10 +250,13 @@ export function CarteiraDoMotorista({ voltar }: Voltar) {
         <section className="cartao-m">
           <small className="dica">Saldo para taxas das corridas</small>
           <p className="valor-grande esquerda">{dados ? reais(dados.saldo) : "—"}</p>
+          {dados?.avisoRecarga && <p className="dica" role="alert">{dados.avisoRecarga}</p>}
           <div className="acoes-carteira">
-            <button type="button" onClick={() => setTela("recarregar")}><span className="quadro"><Plus size={22} /></span>Adicionar</button>
-            <button type="button" onClick={() => setTela("retirar")}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>
+            {(dados?.movimentos?.recarga ?? true) && <button type="button" onClick={() => setTela("recarregar")}><span className="quadro"><Plus size={22} /></span>Adicionar</button>}
+            {(dados?.movimentos?.saque ?? true) && <button type="button" onClick={() => setTela("retirar")}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>}
           </div>
+          {dados?.movimentos?.presencial && <p className="dica">Recarga e saque também podem ser feitos presencialmente na central.</p>}
+          {dados?.movimentos?.telefone && <p className="dica">Telefone para recarga ou saque: {dados.movimentos.telefone}</p>}
         </section>
         <section className="cartao-m">
           <h3 className="titulo-secao">Histórico da carteira</h3>
@@ -276,10 +279,10 @@ export function CarteiraDoMotorista({ voltar }: Voltar) {
 // ====================================================================== Taxa de aceitação
 
 export function TaxaDeAceitacao({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<{ ofertas: number; aceitas: number; rejeitadas: number; ignoradas: number; porcentagem: number; atualizadoEm: string | null }>("/aceitacao");
+  const { dados, erro } = useBuscar<{ janela?: number; ofertas: number; aceitas: number; rejeitadas: number; ignoradas: number; porcentagem: number; atualizadoEm: string | null }>("/aceitacao");
   const [aberto, setAberto] = useState<number | null>(null);
   const perguntas: Array<[string, string]> = [
-    ["O que é a taxa de aceitação?", "É a porcentagem de chamadas que você aceitou, entre as últimas 100 que a central mandou para você."],
+    ["O que é a taxa de aceitação?", `É a porcentagem de chamadas que você aceitou, entre as últimas ${dados?.janela ?? 100} que a central mandou para você.`],
     ["Como a taxa é calculada?", "Aceitas ÷ ofertas. Chamada recusada ou que passou sem resposta conta como não aceita. Quem fica offline no meio da chamada não é contado."],
     ["O que é uma oferta?", "É cada chamada de corrida que aparece na sua tela com o tempo para aceitar."],
   ];
@@ -289,7 +292,7 @@ export function TaxaDeAceitacao({ voltar }: Voltar) {
       <div className="conteudo">
         <Erro texto={erro} />
         {dados && <>
-          <section className="cartao-m ganhos-resumo"><p className="valor-grande">{dados.porcentagem}%</p><p className="centro">Taxa de aceitação</p><small className="dica centro">Baseado nas últimas 100 ofertas</small></section>
+          <section className="cartao-m ganhos-resumo"><p className="valor-grande">{dados.porcentagem}%</p><p className="centro">Taxa de aceitação</p><small className="dica centro">Baseado nas últimas {dados.janela ?? 100} ofertas</small></section>
           <section className="cartao-m">
             <h3 className="titulo-secao">Detalhamento</h3>
             <div className="linha-valor"><span>Ofertas</span><strong>{dados.ofertas}</strong></div>

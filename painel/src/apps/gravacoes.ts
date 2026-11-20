@@ -9,8 +9,8 @@ import { arquivo, idCorridaValido, ler, gravar } from "./armazem.ts";
 import { sosDaCorrida } from "./sos.ts";
 import { gerais } from "../config/gerais.ts";
 
-export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number }
-export const GRAVACAO_PADRAO: ConfigGravacao = { ativa: true, obrigatoria: false, video: false, dias: 30 };
+export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number; diasNoAparelho: number }
+export const GRAVACAO_PADRAO: ConfigGravacao = { ativa: true, obrigatoria: false, video: false, dias: 30, diasNoAparelho: 3 };
 
 /** Configuração da empresa: Configurações › Gerais › Regras do motorista (o arquivo ajustes.json › gravacao ainda vale, se existir, para quem já usava). */
 export function configGravacao(empresaId: string): ConfigGravacao {
@@ -21,6 +21,7 @@ export function configGravacao(empresaId: string): ConfigGravacao {
   return {
     ativa: a.ativa ?? GRAVACAO_PADRAO.ativa, obrigatoria: !!a.obrigatoria && (a.ativa ?? true), video: !!a.video,
     dias: Number.isFinite(dias) ? Math.min(365, Math.max(1, Math.round(dias))) : GRAVACAO_PADRAO.dias,
+    diasNoAparelho: Number.isFinite(Number(a.diasNoAparelho)) ? Math.min(30, Math.max(1, Math.round(Number(a.diasNoAparelho)))) : GRAVACAO_PADRAO.diasNoAparelho,
   };
 }
 

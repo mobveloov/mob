@@ -29,8 +29,10 @@ import * as P from "./despacho.ts";
 import { abrirSos, atenderSos, encerrarSos, listarSos, sosDaPessoa, sosPendentes, sosProximos, type Sos } from "./sos.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { gerais } from "../config/gerais.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
 import { ajustes, formasDePagamento } from "./ajustes.ts";
 import { dadosParaOApp } from "../config/personalizacao.ts";
+import { dadosParaOAppMotorista } from "../config/personalizacao-motorista.ts";
 import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { euCompleto } from "./perfil.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
@@ -136,6 +138,7 @@ r.use(rotasPublicasExtras);
 r.use(exigirApp);
 // Personalização do app do passageiro (Configurações do painel): cores, design, veículo no mapa, tela inicial e recursos. Aplique ao abrir, sem gerar APK.
 r.get("/personalizacao", ok((req, res) => res.json(dadosParaOApp(ctx(req).empresaId))));
+r.get("/personalizacao-motorista", so("motorista"), ok((req, res) => res.json(dadosParaOAppMotorista(ctx(req).empresaId))));
 r.use(rotasExtras);
 r.use(rotasV2);
 
@@ -297,6 +300,7 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
   const paradas = Array.isArray(b.paradas) ? b.paradas.slice(0, 4).map(ponto) : [];
   // Paradas: o painel liga/desliga e define o limite (Configurações › Gerais › Regras do passageiro).
   const regraParadas = (() => { try { const p = gerais(empresaId).passageiro; return p.paradasAtivo ? p.limiteParadas : 0; } catch { return 3; } })();
+  if (!b.destino?.texto && !(() => { try { return gerais(empresaId).passageiro.destinoLivre; } catch { return true; } })()) throw new Error("Informe o destino da corrida.");
   if (paradas.length > regraParadas) throw new Error(regraParadas ? `No máximo ${regraParadas} paradas.` : "A empresa não permite paradas na corrida.");
   const c = await umaVez(`${empresaId}:${sessao.telefone}:${pedidoId}`, async () => {
     if (pagamento === PAGAMENTO_SALDO) {
@@ -316,7 +320,7 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
       categoria: txt(b.categoria, 60), pagamento, canal: "app",
       observacao: txt(b.observacao, 300), cupom: txt(b.cupom, 30), paradas,
       agendadaPara: typeof b.agendadaPara === "string" && b.agendadaPara ? b.agendadaPara : undefined,
-      valorOferecido: num(b.valorOferecido) ?? undefined,
+      valorOferecido: extraDaCategoria(empresaId, txt(b.categoria, 60)).negociacao.ativo ? num(b.valorOferecido) ?? undefined : undefined,
       opcionais: Array.isArray(b.opcionais) ? b.opcionais.map((x: unknown) => txt(x, 20)).filter((x: string) => ajustes(empresaId).opcionais.some((o) => o.id === x)).slice(0, 8) : undefined,
     }, "app do passageiro");
   });
@@ -382,7 +386,17 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   let valor = num(req.body?.valor);
   if (valor != null && (valor < 0 || valor > 10_000)) throw new Error("Valor inválido.");
   // Maçaneta em taxímetro: o valor sai da distância e do tempo reais, pela tarifa da categoria.
-  if (novo === "finalizada") { const taxi = P.valorDoTaximetro(empresaId, c); if (taxi != null) valor = taxi; }
+  if (novo === "finalizada") {
+    const taxi = P.valorDoTaximetro(empresaId, c);
+    if (taxi != null) valor = taxi;
+    else {
+      // "Motorista pode editar o valor final" (Gerais › Regras do motorista): desligado, vale o valor combinado.
+      let editar = true;
+      try { editar = gerais(empresaId).motorista.editarValorFinal; } catch { /* padrão */ }
+      const combinado = c.valorOferecido ?? c.estimativa.valor;
+      if (!editar && combinado != null) valor = combinado;
+    }
+  }
   const feita = await mudarStatus(empresaId, c.id, novo as never, { valor }, "app do motorista");
   // pago com saldo: passa da carteira do passageiro para a do motorista. Se falhar, a corrida já está finalizada: não devolve erro.
   try { aposFinalizar(empresaId, feita); } catch (e) { console.error("[apps] após finalizar:", e instanceof Error ? e.message : e); }

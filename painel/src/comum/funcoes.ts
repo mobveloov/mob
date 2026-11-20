@@ -96,6 +96,7 @@ export const FUNCOES: Funcao[] = [
 
   { id: "config-gerais", grupo: "Configurações", nome: "Gerais", rota: "/config-gerais", minimo: "gestor" },
   { id: "personalizacao-app", grupo: "Configurações", nome: "Personalização app passageiro", rota: "/personalizacao-app", minimo: "admin" },
+  { id: "personalizacao-motorista", grupo: "Configurações", nome: "Personalização app motorista", rota: "/personalizacao-motorista", minimo: "admin" }, // item nosso: a Machine só personaliza o app do passageiro
   { id: "carteiras-credito", grupo: "Configurações", nome: "Carteiras de crédito", rota: "/carteiras-credito", minimo: "gestor" },
   { id: "taxas-central", grupo: "Configurações", nome: "Taxas da central", rota: "/taxas-central", minimo: "admin" },
   { id: "regras-despacho", grupo: "Configurações", nome: "Despacho", rota: "/regras-despacho", antigas: ["/despacho"], minimo: "gestor" },

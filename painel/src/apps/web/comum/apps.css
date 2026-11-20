@@ -90,3 +90,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--cor); outli
 .sos { background: var(--perigo); color: #fff; }
 .pulso { animation: pulso 1.6s ease-in-out infinite; }
 @keyframes pulso { 50% { transform: scale(1.04); } }
+
+.faixa-banners { display: flex; gap: .6rem; overflow-x: auto; padding: .4rem 0; scroll-snap-type: x mandatory; }
+.faixa-banners > * { flex: 0 0 100%; scroll-snap-align: center; }
+.faixa-banners img { width: 100%; max-height: 140px; object-fit: cover; border-radius: 12px; display: block; }

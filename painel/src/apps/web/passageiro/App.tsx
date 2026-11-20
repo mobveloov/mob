@@ -7,7 +7,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { aoMudarSos, CartaoMeuSos } from "../comum/sos";
 import { api, avisoDoMarco, manterTelaLigada, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
 import { Clock, House, User, Wallet } from "lucide-react";
-import { carregarPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
+import { acompanharPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
 import { Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 import { duracaoDaViagem, esperandoHorario, lerLugares, quandoAgendada, type Corrida, type Endereco, type Eu, type Lugares, type Ponto, type Rota } from "./apoio";
 import { Agendadas, CarteiraTela, Conta } from "./Conta";
@@ -32,14 +32,7 @@ export default function App() {
   const [logado, setLogado] = useState(!!token());
   useEffect(() => { personalizacaoDoCache(); }, []);
   // Logado: lê a personalização ao entrar, a cada minuto e ao voltar para o app (muda no painel, muda aqui, sem gerar APK).
-  useEffect(() => {
-    if (!logado) return;
-    void carregarPersonalizacao();
-    const t = setInterval(() => void carregarPersonalizacao(), 60000);
-    const f = () => { if (document.visibilityState === "visible") void carregarPersonalizacao(); };
-    document.addEventListener("visibilitychange", f);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", f); };
-  }, [logado]);
+  useEffect(() => (logado ? acompanharPersonalizacao() : undefined), [logado]);
   useEffect(() => { const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
   if (!marca) return <Carregando />;

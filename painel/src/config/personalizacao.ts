@@ -13,7 +13,7 @@ import { gravarConfig, lerConfig, lista, texto, umDe } from "./armazem.ts";
 export { VEICULOS_MAPA };
 export const MARCAS_TELA = ["texto", "imagem", "texto_imagem", "imagem_alongada"] as const;
 export const ESTILOS_TELA = ["flutuante", "neutro", "marcante"] as const;
-export const RECURSOS = ["mapa", "destino", "cupons", "anuncio", "desafio"] as const;
+export const RECURSOS = ["mapa", "selecao_destino", "aviso_cupons", "anuncio", "desafio"] as const;
 export type IdRecurso = (typeof RECURSOS)[number];
 export type MarcaTela = (typeof MARCAS_TELA)[number];
 export const MAX_IMAGEM_MARCA = 5 * 1024 * 1024;
@@ -33,24 +33,28 @@ export interface Personalizacao {
   /** nome do arquivo da imagem (vazio = sem imagem) */ marca: MarcaTela; imagemMarca: string; estiloTela: (typeof ESTILOS_TELA)[number];
   recursos: Array<{ id: IdRecurso; visivel: boolean }>;
 }
-export interface PersonalizacaoVista extends Personalizacao { imagemMarcaUrl: string }
+export interface PersonalizacaoVista extends Personalizacao { imagemMarcaUrl: string; desafioLiberado: boolean }
 
-const RECURSOS_PADRAO: Personalizacao["recursos"] = [{ id: "mapa", visivel: true }, { id: "destino", visivel: true }, { id: "cupons", visivel: false }, { id: "anuncio", visivel: true }, { id: "desafio", visivel: false }];
+const RECURSOS_PADRAO: Personalizacao["recursos"] = [{ id: "mapa", visivel: true }, { id: "selecao_destino", visivel: true }, { id: "aviso_cupons", visivel: false }, { id: "anuncio", visivel: true }, { id: "desafio", visivel: false }];
+const RECURSOS_ANTIGOS: Record<string, string> = { destino: "selecao_destino", cupons: "aviso_cupons" }; // nomes de antes
 const MARCAS_ANTIGAS: Record<string, MarcaTela> = { nome: "texto", nome_imagem: "texto_imagem" };
 
-export function sanearPersonalizacao(e: unknown, nomePadrao = "", corPadrao = "#2563eb"): Personalizacao {
+/** Desafio de cliente liberado? Hoje não existe desafio para clientes aqui (Cadastro > Desafios > Clientes), então fica bloqueado. */
+export const desafioLiberado = (_empresaId: string) => false;
+
+export function sanearPersonalizacao(e: unknown, nomePadrao = "", corPadrao = "#2563eb", liberaDesafio = false): Personalizacao {
   const o = (e ?? {}) as Record<string, unknown>;
   const cor = texto(o.corPrincipal, 9);
   const arq = typeof o.imagemMarca === "string" && /^personalizacaoMarca\.(png|jpg)$/.test(o.imagemMarca) ? o.imagemMarca : "";
   const estiloTela = umDe(o.estiloTela, ESTILOS_TELA, "flutuante");
   // Ordem pedida primeiro; o que faltar entra no fim. Desafio só existe quando há desafio para clientes (fica bloqueado aqui).
-  const pedidos = lista(o.recursos).map((r) => r as Record<string, unknown>).filter((r) => RECURSOS.includes(r?.id as IdRecurso));
+  const pedidos = lista(o.recursos).map((r) => { const x = { ...(r as Record<string, unknown>) }; x.id = RECURSOS_ANTIGOS[String(x.id)] ?? x.id; return x; }).filter((r) => RECURSOS.includes(r?.id as IdRecurso));
   const vistos = new Set<string>();
   const ordem: Personalizacao["recursos"] = [];
   for (const r of pedidos) { if (!vistos.has(String(r.id))) { vistos.add(String(r.id)); ordem.push({ id: r.id as IdRecurso, visivel: r.visivel !== false && r.visivel !== "false" }); } }
   for (const r of RECURSOS_PADRAO) if (!vistos.has(r.id)) ordem.push({ ...r });
   // O mapa não pode ser ocultado nem reordenado no estilo Flutuante.
-  const recursos = ordem.map((r) => (r.id === "desafio" ? { ...r, visivel: false } : r));
+  const recursos = ordem.map((r) => (r.id === "desafio" && !liberaDesafio ? { ...r, visivel: false } : r));
   if (estiloTela === "flutuante") { const i = recursos.findIndex((r) => r.id === "mapa"); const [m] = recursos.splice(i, 1); recursos.unshift({ ...m, visivel: true }); }
   const marcaPedida = MARCAS_ANTIGAS[String(o.marca)] ?? o.marca;
   return {
@@ -78,11 +82,11 @@ function ler(empresaId: string): Personalizacao {
   const m = marca(empresaId);
   const bruto = lerConfig<Record<string, unknown>>(empresaId, "personalizacao", {});
   migrarImagemAntiga(empresaId, bruto);
-  const p = sanearPersonalizacao(bruto, m.nomeExibido, m.cores.primaria);
+  const p = sanearPersonalizacao(bruto, m.nomeExibido, m.cores.primaria, desafioLiberado(empresaId));
   if (p.imagemMarca && !D.caminhoImagem(empresaId, p.imagemMarca)) p.imagemMarca = "";
   return p;
 }
-const vista = (empresaId: string, p: Personalizacao): PersonalizacaoVista => ({ ...p, imagemMarcaUrl: urlDaImagem(empresaId, p.imagemMarca) });
+const vista = (empresaId: string, p: Personalizacao): PersonalizacaoVista => ({ ...p, imagemMarcaUrl: urlDaImagem(empresaId, p.imagemMarca), desafioLiberado: desafioLiberado(empresaId) });
 
 export const personalizacao = (empresaId: string): PersonalizacaoVista => vista(empresaId, ler(empresaId));
 
@@ -91,7 +95,7 @@ export function salvarPersonalizacao(empresaId: string, entrada: unknown): Perso
   const atual = ler(empresaId);
   const o = (entrada ?? {}) as Record<string, unknown>;
   if (!texto(o.nome, 60)) throw new Error("Insira um nome.");
-  const novo = sanearPersonalizacao({ ...o, imagemMarca: atual.imagemMarca }, m.nomeExibido, m.cores.primaria); // a imagem só muda pelo envio
+  const novo = sanearPersonalizacao({ ...o, imagemMarca: atual.imagemMarca }, m.nomeExibido, m.cores.primaria, desafioLiberado(empresaId)); // a imagem só muda pelo envio
   if (novo.marca !== "texto" && !novo.imagemMarca) throw new Error("Envie uma imagem para salvar as alterações.");
   gravarConfig(empresaId, "personalizacao", novo);
   return vista(empresaId, novo);
@@ -117,12 +121,12 @@ export function removerImagemMarca(empresaId: string): PersonalizacaoVista {
 // ------------------------------------------------------------------ o que o app lê
 
 /** Escurece (fator < 1) ou clareia (fator > 1, mistura com branco) uma cor #rrggbb. */
-function ajustarCor(hex: string, fator: number): string {
+export function ajustarCor(hex: string, fator: number): string {
   const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   const f = (v: number) => Math.max(0, Math.min(255, Math.round(fator <= 1 ? v * fator : v + (255 - v) * (fator - 1))));
   return `#${c.map((v) => f(v).toString(16).padStart(2, "0")).join("")}`;
 }
-const luminosidade = (hex: string) => { const n = parseInt(hex.slice(1), 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
+export const luminosidade = (hex: string) => { const n = parseInt(hex.slice(1), 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
 
 export function dadosParaOApp(empresaId: string) {
   const m = marca(empresaId);
@@ -147,6 +151,7 @@ export function dadosParaOApp(empresaId: string) {
     },
     telaInicial: { estilo: p.estiloTela, recursos, ordemVisiveis: visiveis.map((r) => r.id), mapaFixo: p.estiloTela === "flutuante" },
     recursos: Object.fromEntries(p.recursos.map((r) => [r.id, r.visivel])) as Record<IdRecurso, boolean>,
+    desafioLiberado: desafioLiberado(empresaId),
   };
   const versao = crypto.createHash("sha1").update(JSON.stringify(dados)).digest("hex").slice(0, 12);
   return { versao, ...dados };

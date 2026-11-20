@@ -10,11 +10,14 @@
 
 import { token, urlApi } from "../comum/api";
 
-export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number }
+export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number; diasNoAparelho?: number }
 interface Pedaco { id: string; corridaId: string; n: number; blob: Blob; segundos: number; video: boolean; em: number; enviadoEm: number | null }
 
-export const DIAS_COPIA = 3;
-export const DIAS_LIMITE = 7;
+/** Quantos dias a cópia fica no celular: vem de Configurações › Gerais › Regras do motorista (/gravacao/config). */
+let diasCopia = 3;
+export const DIAS_COPIA = () => diasCopia;
+export const DIAS_LIMITE = () => diasCopia + 4;
+export function definirRetencao(dias: number | undefined) { if (dias && dias > 0) diasCopia = dias; }
 const DIA = 86_400_000;
 
 // ------------------------------------------------------------------ armazenamento no aparelho (IndexedDB)
@@ -96,7 +99,7 @@ export async function enviarPendentes() {
 async function limparCopias() {
   const agora = Date.now();
   for (const p of await todos()) {
-    if ((p.enviadoEm != null && agora - p.enviadoEm > DIAS_COPIA * DIA) || agora - p.em > DIAS_LIMITE * DIA) await apagar(p.id);
+    if ((p.enviadoEm != null && agora - p.enviadoEm > DIAS_COPIA() * DIA) || agora - p.em > DIAS_LIMITE() * DIA) await apagar(p.id);
   }
 }
 

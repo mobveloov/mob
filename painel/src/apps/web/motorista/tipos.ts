@@ -12,6 +12,7 @@ export interface Corrida {
   id: string; os: string; status: string; statusTexto: string; aberta: boolean; embarque: Ponto; destino: Ponto | null; categoria: string; pagamento: string; observacao: string;
   estimativa: Estimativa; valor: number | null; desconto: number | null; solicitadaEm: string; iniciadaEm?: string | null; finalizadaEm: string | null;
   passageiro: PassageiroCorrida;
+  taxaCentral?: number | null; valorLiquido?: number | null;
   paradas?: Ponto[]; agendadaPara?: string | null;
   /** Observação da empresa conveniada para o motorista (Cadastro › Empresas). */
   obsEmpresa?: string;
