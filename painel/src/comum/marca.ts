@@ -33,6 +33,10 @@ export interface Marca {
 }
 
 export type TipoArquivo = keyof Marca["arquivos"];
+/** Imagem única da empresa para o ícone do topo, o menu lateral e a aba do navegador: foto da empresa, depois ícone, favicon e logos. */
+export function imagemDaEmpresa(a: Marca["arquivos"]): string {
+  return a.fotoEmpresa || a.iconeApp || a.favicon || a.logoEscuro || a.logoClaro || "";
+}
 export const TIPOS_ARQUIVO: TipoArquivo[] = ["logoClaro", "logoEscuro", "favicon", "iconeApp", "abertura", "fotoEmpresa"];
 
 export const FONTES = ["Plus Jakarta Sans", "Inter", "Poppins", "Montserrat", "Nunito", "Roboto", "Open Sans", "Lato"];

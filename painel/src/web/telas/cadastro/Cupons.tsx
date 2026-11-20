@@ -135,7 +135,7 @@ function Formulario({ c, cidades, onFechar, onSalvo }: { c: Cupom | null; cidade
     if (await tentar(() => (c ? api.salvarRegistro("cupons", c.id, corpo) : api.criarRegistro("cupons", corpo)), "Cupom salvo.")) { onSalvo(); onFechar(); }
   };
   return (
-    <Janela aberta titulo={c ? "Editar Cupom" : "Novo Cupom"} sub="Configure as condições e o público-alvo" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar Cupom</button></>}>
+    <Janela cheia aberta titulo={c ? "Editar Cupom" : "Novo Cupom"} sub="Configure as condições e o público-alvo" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar Cupom</button></>}>
       {aviso}
       <div className="cg-grade">
         <Campo rotulo="Código do Cupom *"><input value={f.codigo} onChange={(e) => set("codigo", e.target.value.toUpperCase())} /></Campo>

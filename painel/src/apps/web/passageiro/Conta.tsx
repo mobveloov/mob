@@ -8,6 +8,7 @@ import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../com
 import { compartilharTexto, dataCurta, prepararFoto, quandoAgendada, type Eu, type Perfil } from "./apoio";
 import { GENEROS } from "./Entrar";
 import { Avatar, Campo, TextoDoPainel } from "./pecas";
+import { NOMES_TEMA_APP, useTemaApp, type TemaApp } from "../comum/tema";
 
 type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
 
@@ -74,6 +75,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
       <div className="conta-grupo">
         <ItemConta icone={<FileText size={22} />} cor="azul" titulo="Termos de uso" sub="Regras de uso do aplicativo" ir={() => setTexto("passageiro")} />
         <ItemConta icone={<ShieldCheck size={22} />} cor="verde" titulo="Política de privacidade" sub="Como seus dados são usados" ir={() => setTexto("privacidade")} />
+        <SeletorDeTema />
         {temAjuda && <ItemConta icone={<Headphones size={22} />} cor="verde" titulo="Central de Ajuda" sub="Suporte e dúvidas frequentes" ir={() => setTela("ajuda")} />}
         <ItemConta icone={<LogOut size={22} />} cor="vermelho" titulo="Sair da conta" sub="Encerrar sessão" ir={sair} />
       </div>
@@ -350,6 +352,16 @@ export function Agendadas({ pedir }: { pedir: () => void }) {
         </Cartao>
       ))}
       <button className="botao" onClick={pedir}>Agendar outra</button>
+    </div>
+  );
+}
+
+/** Aparência do app: Automático (segue o aparelho), Claro ou Escuro. A escolha fica salva. */
+function SeletorDeTema() {
+  const [tema, mudar] = useTemaApp();
+  return (
+    <div className="seletor-tema" role="radiogroup" aria-label="Aparência do aplicativo">
+      {(Object.keys(NOMES_TEMA_APP) as TemaApp[]).map((k) => <button key={k} type="button" role="radio" aria-checked={tema === k} className={tema === k ? "ativa" : ""} onClick={() => mudar(k)}>{NOMES_TEMA_APP[k]}</button>)}
     </div>
   );
 }

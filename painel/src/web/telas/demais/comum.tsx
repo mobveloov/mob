@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { dinheiro } from "../../api";
 import { useCarregar } from "../../componentes/ui";
+import { PaginaCheia } from "../../componentes/PaginaCheia";
 
 export { dinheiro, useCarregar };
 
@@ -14,8 +15,9 @@ export async function pedirConfig<T = any>(url: string, metodo = "GET", corpo?: 
   let emp = "";
   try { emp = localStorage.getItem("empresa") ?? ""; } catch { /* sem armazenamento */ }
   if (emp) h["X-Empresa"] = emp;
-  if (corpo !== undefined) h["Content-Type"] = "application/json";
-  const r = await fetch(`/api/config${url}`, { method: metodo, headers: h, credentials: "same-origin", body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+  const arquivo = typeof Blob !== "undefined" && corpo instanceof Blob; // envio de imagem: vai como veio, com o tipo do arquivo
+  if (corpo !== undefined) h["Content-Type"] = arquivo ? (corpo as Blob).type : "application/json";
+  const r = await fetch(`/api/config${url}`, { method: metodo, headers: h, credentials: "same-origin", body: corpo === undefined ? undefined : arquivo ? (corpo as Blob) : JSON.stringify(corpo) });
   const b = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error((b as { erro?: string }).erro || `Erro ${r.status}`);
   return b as T;
@@ -53,14 +55,16 @@ export function Aviso({ erro, ok }: { erro?: string | null; ok?: string | null }
   return null;
 }
 
-export function Modal({ aberto, onFechar, titulo, sub, children, larga }: { aberto: boolean; onFechar: () => void; titulo: string; sub?: string; children: ReactNode; larga?: boolean }) {
+/** Com `cheia`, abre em página inteira (PaginaCheia) em vez de janela. */
+export function Modal({ aberto, onFechar, titulo, sub, children, larga, cheia }: { cheia?: boolean; aberto: boolean; onFechar: () => void; titulo: string; sub?: string; children: ReactNode; larga?: boolean }) {
   useEffect(() => {
-    if (!aberto) return;
+    if (!aberto || cheia) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onFechar();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [aberto, onFechar]);
+  }, [aberto, cheia, onFechar]);
   if (!aberto) return null;
+  if (cheia) return <PaginaCheia escopo="dm" titulo={titulo} sub={sub} onFechar={onFechar}>{children}</PaginaCheia>;
   return (
     <div className="dm-fundo" onClick={onFechar}>
       <div className={`dm-modal ${larga ? "larga" : ""}`} role="dialog" aria-label={titulo} onClick={(e) => e.stopPropagation()}>

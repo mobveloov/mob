@@ -18,6 +18,8 @@
     "logoEscuro": "logo-escuro.svg",
     "favicon": "icone.svg",
     "iconeApp": "icone.png",
+    "iconeMotorista": "icone-motorista.png",
+    "iconePassageiro": "icone-passageiro.png",
     "abertura": "abertura.png"
   },
   "textos": {

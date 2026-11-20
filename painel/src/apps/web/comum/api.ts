@@ -13,6 +13,14 @@ const gravar = (k: string, v: string | null) => { try { if (v == null) localStor
 
 let cfg: Config = { empresaId: "", api: "", papel: "passageiro" };
 export const config = () => cfg;
+
+// Batida do app: avisa o servidor que está aberto (ao abrir e a cada 4 minutos). O painel usa o "último contato" para saber se o app está instalado.
+if (typeof window !== "undefined") {
+  const batida = () => { if (token() && document.visibilityState !== "hidden") void api("/ping").catch(() => undefined); };
+  setTimeout(batida, 4000);
+  setInterval(batida, 4 * 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") setTimeout(batida, 500); });
+}
 export const nativo = () => Capacitor.isNativePlatform();
 
 /** Só no APK de teste: guarda outro endereço de servidor (ou volta ao do build com ""). Recarrega o app. */
@@ -346,12 +354,16 @@ async function pegarTrava() {
 }
 if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => { if (querTelaLigada && document.visibilityState === "visible") void pegarTrava(); });
 /** Mantém a tela acesa (ou deixa apagar). No APK do motorista também liga a flag nativa; na web usa o Wake Lock e pede de novo ao voltar para o app. */
-export async function manterTelaLigada(ligar: boolean) {
+export async function manterTelaLigada(ligar: boolean, forcarDesligar = false) {
   querTelaLigada = ligar;
   if (ligar) await pegarTrava();
   else { try { await trava?.release(); } catch { /* já liberada */ } trava = null; }
-  try { if (flutuante.disponivel()) await FlutuanteNativo.manterTela?.({ ligar }); } catch { /* sem plugin */ }
+  // A Activity do APK já liga FLAG_KEEP_SCREEN_ON ao abrir e ao voltar do segundo plano (os dois apps). Aqui só se desliga de propósito
+  // (o motorista desligou "Manter a tela ligada"); o resto do tempo a flag fica acesa, mesmo se o Wake Lock da web falhar.
+  try { if (flutuante.disponivel() && (ligar || forcarDesligar)) await FlutuanteNativo.manterTela?.({ ligar }); } catch { /* sem plugin */ }
 }
+// Reforço: reaplica a trava a cada 30 s enquanto o app quer a tela acesa (o WebView pode soltar o Wake Lock sem avisar).
+if (typeof window !== "undefined") setInterval(() => { if (querTelaLigada && document.visibilityState === "visible") void pegarTrava(); }, 30_000);
 
 // ------------------------------------------------------------------ utilidades
 
@@ -361,7 +373,9 @@ export const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleString(
 export const vibrar = (ms: number | number[]) => { try { navigator.vibrate?.(ms); } catch { /* sem vibração */ } };
 
 /** Toque curto (chamada de corrida), sem arquivo de som. */
-export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado" | "buzina";
+export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado" | "buzina" | "iniciada" | "finalizada";
+/** Toques da chamada do motorista (3 à escolha em Ajustes). */
+export type Toque = "pulso" | "campanario" | "radar";
 const ARQUIVOS: Record<Som, string> = {
   chamada: new URL("./sons/chamada.wav", import.meta.url).href,
   mensagem: new URL("./sons/mensagem.wav", import.meta.url).href,
@@ -369,7 +383,26 @@ const ARQUIVOS: Record<Som, string> = {
   alerta: new URL("./sons/alerta.wav", import.meta.url).href,
   cancelado: new URL("./sons/cancelado.wav", import.meta.url).href,
   buzina: new URL("./sons/buzina.wav", import.meta.url).href,
+  iniciada: new URL("./sons/iniciada.wav", import.meta.url).href,
+  finalizada: new URL("./sons/finalizada.wav", import.meta.url).href,
 };
+const TOQUES: Record<Toque, string> = {
+  pulso: new URL("./sons/toque_pulso.wav", import.meta.url).href,
+  campanario: new URL("./sons/toque_campanario.wav", import.meta.url).href,
+  radar: new URL("./sons/toque_radar.wav", import.meta.url).href,
+};
+/** Toca o toque da chamada do motorista. Em laço (`laco`), repete até alguém chamar pararSons() (aceitou, recusou, expirou ou outro motorista pegou). */
+export function tocarToque(toque: Toque, laco: boolean) {
+  pararSons();
+  const minha = geracaoDeSom;
+  try {
+    const a = new Audio(TOQUES[toque] ?? TOQUES.pulso);
+    a.loop = laco; a.volume = 1;
+    tocando.add(a);
+    a.onended = () => tocando.delete(a);
+    void a.play().catch(() => { if (minha === geracaoDeSom) bipe(); });
+  } catch { bipe(); }
+}
 /** Toca um dos sons do app (arquivos em comum/sons, gerados por scripts/gerar-sons.mjs). `vezes` repete o som; sem `som`, escolhe pelo número de repetições. */
 export function tocarAlerta(vezes = 3, som?: Som) {
   const qual: Som = som ?? (vezes <= 1 ? "mensagem" : vezes === 2 ? "cancelado" : "chamada");
@@ -412,8 +445,8 @@ export function avisoDoMarco(status: string) {
   switch (status) {
     case "a_caminho": tocarAlerta(1, "aceite"); setTimeout(() => falarAviso("Seu motorista está a caminho."), 900); break;
     case "no_local": tocarAlerta(1, "buzina"); setTimeout(() => falarAviso("Seu motorista está no local."), 1500); vibrar([500, 200, 500, 200, 500]); break;
-    case "em_andamento": setTimeout(() => falarAviso("Sua corrida começou. Boa viagem."), 200); break;
-    case "finalizada": tocarAlerta(1, "aceite"); setTimeout(() => falarAviso("Corrida finalizada."), 900); break;
+    case "em_andamento": tocarAlerta(1, "iniciada"); setTimeout(() => falarAviso("Sua corrida começou. Boa viagem."), 1200); break;
+    case "finalizada": tocarAlerta(1, "finalizada"); setTimeout(() => falarAviso("Corrida finalizada."), 900); break;
     case "cancelada": case "nao_atendida": tocarAlerta(1, "cancelado"); setTimeout(() => falarAviso(status === "cancelada" ? "Sua corrida foi cancelada." : "Não encontramos motorista agora."), 900); break;
   }
 }

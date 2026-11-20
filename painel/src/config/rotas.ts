@@ -32,7 +32,7 @@ import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaqu
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
-import { personalizacao, salvarPersonalizacao } from "./personalizacao.ts";
+import { enviarImagemMarca, MAX_IMAGEM_MARCA, personalizacao, removerImagemMarca, salvarPersonalizacao } from "./personalizacao.ts";
 import { bandeira, salvarBandeira } from "./bandeira.ts";
 import { camposBandeira, salvarCamposBandeira } from "./bandeira-campos.ts";
 import { salvarTransbordo, transbordoDasParceiras } from "./transbordo.ts";
@@ -244,6 +244,10 @@ rotasConfig.get("/transbordo-bandeiras", ok((req, res) => res.json({ parceiras: 
 rotasConfig.put("/transbordo-bandeiras", gestor, ok((req, res) => res.json({ parceiras: salvarTransbordo(emp(req), req.body) })));
 rotasConfig.get("/personalizacao", ok((req, res) => res.json(personalizacao(emp(req)))));
 rotasConfig.put("/personalizacao", gestor, ok((req, res) => res.json(salvarPersonalizacao(emp(req), req.body))));
+rotasConfig.post("/personalizacao/imagem", gestor, express.raw({ type: "image/*", limit: MAX_IMAGEM_MARCA }), ok((req, res) => {
+  res.json(enviarImagemMarca(emp(req), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()));
+}));
+rotasConfig.delete("/personalizacao/imagem", gestor, ok((req, res) => res.json(removerImagemMarca(emp(req)))));
 const motoristasAtivos = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!).filter((m) => m.status === "Ativo").length;
 rotasConfig.get("/descontos-matriz", ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: matrizDescontos(emp(req)), motoristasAtivos: motoristasAtivos(emp(req)) })));
 rotasConfig.put("/descontos-matriz", gestor, ok((req, res) => res.json({ formas: FORMAS_DESCONTO, matriz: salvarMatriz(emp(req), req.body?.matriz ?? req.body), motoristasAtivos: motoristasAtivos(emp(req)) })));

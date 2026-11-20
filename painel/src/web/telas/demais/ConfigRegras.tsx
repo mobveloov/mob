@@ -105,7 +105,7 @@ function JanelaDesconto({ inicial, categorias, onFechar, onSalvo }: { inicial: a
   const { msg, salvando, salvar } = useSalvar();
   const set = (k: string, v: unknown) => setX({ ...x, [k]: v });
   return (
-    <Modal aberto onFechar={onFechar} titulo={x.id ? "Alterando Desconto" : "Novo Desconto"} sub="Configure as condições e o público-alvo">
+    <Modal cheia aberto onFechar={onFechar} titulo={x.id ? "Alterando Desconto" : "Novo Desconto"} sub="Configure as condições e o público-alvo">
       <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); const r = await salvar(() => pedirConfig("/descontos", "POST", x)); if (r) onSalvo(); }}>
         <Campo rotulo="Nome do Desconto *"><input value={x.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Ex: Promoção de Boas-Vindas" required maxLength={60} /></Campo>
         <div className="dm-grade3">

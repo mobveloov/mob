@@ -65,7 +65,8 @@ const asset = (tipo) => {
   const p = n ? path.join(pastaEmpresa, "assets", path.basename(n)) : null;
   return p && fs.existsSync(p) ? p : null;
 };
-const icone = asset("iconeApp") ?? asset("favicon");
+// Ícone próprio de cada app (arquivos.iconeMotorista / iconePassageiro); sem ele, o ícone da empresa (iconeApp) vale para os dois (white-label).
+const icone = asset(papel === "motorista" ? "iconeMotorista" : "iconePassageiro") ?? asset("iconeApp") ?? asset("favicon");
 if (!icone) falhar("Falta o ícone do app (arquivos.iconeApp em assets/, de preferência PNG 1024×1024).");
 
 const saida = path.join(RAIZ, "build", "apps", `${empresa}-${papel}`);
@@ -157,6 +158,12 @@ if (papel === "motorista") {
   if (!xml.includes("FlutuanteService")) xml = xml.replace("</application>", '    <service android:name=".FlutuanteService" android:exported="false" />\n    </application>');
   if (!xml.includes("PosicaoService")) xml = xml.replace("</application>", '    <service android:name=".PosicaoService" android:exported="false" android:foregroundServiceType="location" />\n    </application>');
   if (!xml.includes("showWhenLocked")) xml = xml.replace("<activity", '<activity android:showWhenLocked="true" android:turnScreenOn="true"');
+}
+// Passageiro: só a Activity com a tela sempre acesa (sem plugins nativos).
+if (papel === "passageiro") {
+  const pastaJava = path.join(saida, "android", "app", "src", "main", "java", ...pacote.split("."));
+  fs.mkdirSync(pastaJava, { recursive: true });
+  fs.writeFileSync(path.join(pastaJava, "MainActivity.java"), fs.readFileSync(path.join(RAIZ, "scripts", "nativo", "MainActivityPassageiro.java"), "utf8").replaceAll("__PACOTE__", pacote));
 }
 fs.writeFileSync(manifesto, xml);
 

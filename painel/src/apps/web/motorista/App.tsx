@@ -4,7 +4,7 @@
 // cadastro, carteira, documentos, preferências, suporte, diagnóstico e configurações.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
@@ -18,7 +18,7 @@ import { AvisoDoMotorista, BarraBaixo, Dialogo } from "./Pecas";
 import { LogoMarca } from "./Marca";
 import { Desafios, Notificacoes, PasseLivre, Preferencias } from "./Telas";
 import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
-import { aplicarTema, useAjustes } from "./ajustes";
+import { aplicarTema, NOMES_TEMA, useAjustes } from "./ajustes";
 import { usarSoWifi } from "./gravador";
 import type { Corrida, Eu, Oferta } from "./tipos";
 
@@ -68,7 +68,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     if (onlineRef.current && !s.online) ultimoEnvio.current = 0; // servidor reiniciou: a próxima posição religa
   }, []);
   useEffect(() => { usarSoWifi(ajustes.gravarSoWifi); }, [ajustes.gravarSoWifi]); // gravações esperam o Wi‑Fi (ou saem logo)
-  useEffect(() => { void manterTelaLigada(ajustes.manterTela && (online || !!corrida)); return () => { void manterTelaLigada(false); }; }, [ajustes.manterTela, online, !!corrida]); // tela acesa online ou em corrida
+  useEffect(() => { void manterTelaLigada(ajustes.manterTela, !ajustes.manterTela); return () => { void manterTelaLigada(false); }; }, [ajustes.manterTela, online, !!corrida]); // tela acesa online ou em corrida
   useEffect(() => { void rastrearEmSegundoPlano(online); return () => { void rastrearEmSegundoPlano(false); }; }, [online]); // online: serviço em primeiro plano manda a posição com a tela apagada
   const carregarGanhos = useCallback(() => { void api<{ hoje: { valor: number } }>("/ganhos").then((g) => setHoje(g.hoje.valor)).catch(() => undefined); }, []);
   useEffect(() => { void carregar().catch(() => undefined); carregarGanhos(); }, [carregar, carregarGanhos]);
@@ -130,6 +130,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     return () => { onlineRef.current = false; clearInterval(vivo); parar(); };
   }, [online]);
   useEffect(() => { void posicaoAgora().then((p) => setPosicao((a) => a ?? p)).catch(() => undefined); }, []);
+  useEffect(() => { void api("/ping", { corpo: {} }).catch(() => undefined); }, []); // avisa a central que o app está aberto
   useEffect(() => { void api<{ online: boolean }>("/eu").then((r) => { if (r.online) setOnline(true); }).catch(() => undefined); }, []);
 
   const ficarOnline = async () => {
@@ -249,6 +250,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
         <div className="direita">
           {online && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
+          <button type="button" className="mapa-botao" aria-label={`Aparência: ${NOMES_TEMA[ajustes.tema]}. Toque para trocar`} onClick={() => mudarAjustes({ tema: ajustes.tema === "sistema" ? "claro" : ajustes.tema === "claro" ? "escuro" : "sistema" })}>{ajustes.tema === "escuro" ? <Moon size={22} /> : <Sun size={22} />}</button>
           <button type="button" className="mapa-botao" aria-label="Centralizar no mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={22} /></button>
         </div>
         {!online && <button type="button" className="botao-onoff" onClick={() => setDialogo(analise ? "analise" : "online")}>INICIAR</button>}

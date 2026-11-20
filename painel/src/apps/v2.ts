@@ -21,7 +21,7 @@ import { marcarLida } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { pessoa, salvarPessoa } from "./extras.ts";
 import {
-  arquivoDaFoto, ativarVeiculo, cadastroDoMotorista, criarContaMotorista, criarContaPassageiro, definirSenha, estatisticas, euCompleto, excluirVeiculo, localizar, lugares,
+  arquivoDaFoto, ativarVeiculo, cadastroDoMotorista, concluirCadastroDoMotorista, criarContaMotorista, criarContaPassageiro, definirSenha, estatisticas, euCompleto, excluirVeiculo, localizar, lugares,
   mascarar, MAX_FOTO, pendenciasDoMotorista, removerLugar, salvarDadosDoMotorista, salvarEnderecoDoMotorista, salvarFoto, salvarLugar, salvarVeiculo, senhaConfere, temSenha, urlDaFoto, veiculos,
 } from "./perfil.ts";
 import * as D from "../servidor/dados.ts";
@@ -362,6 +362,7 @@ rotasV2.post("/macaneta", so("motorista"), ok(async (req, res) => {
 rotasV2.get("/cadastro", so("motorista"), ok((req, res) => res.json(cadastroDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave))));
 rotasV2.post("/cadastro/dados", so("motorista"), ok((req, res) => res.json(salvarDadosDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}))));
 rotasV2.post("/cadastro/endereco", so("motorista"), ok((req, res) => res.json(salvarEnderecoDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}))));
+rotasV2.post("/cadastro/concluir", so("motorista"), ok((req, res) => res.json(concluirCadastroDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave))));
 rotasV2.get("/cep/:cep", so("motorista"), ok((req, res) => {
   const r = buscarCep(ctx(req).empresaId, req.params.cep);
   if (!r) return res.status(404).json({ erro: "CEP não encontrado. Preencha à mão." });
@@ -383,6 +384,9 @@ rotasV2.post("/veiculos", so("motorista"), ok((req, res) => res.json({ veiculos:
 rotasV2.post("/veiculos/:id/ativar", so("motorista"), ok((req, res) => res.json({ veiculos: ativarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id/excluir", so("motorista"), ok((req, res) => res.json({ veiculos: excluirVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id", so("motorista"), ok((req, res) => res.json({ veiculos: salvarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}, req.params.id) })));
+
+/** Ping barato do app ao abrir: só marca o último contato (já feito pelo login do token). */
+rotasV2.post("/ping", ok((req, res) => res.json({ ok: true, em: new Date().toISOString() })));
 
 rotasV2.get("/aceitacao", so("motorista"), ok((req, res) => res.json(P.taxaDeAceitacao(ctx(req).empresaId, ctx(req).sessao.chave))));
 
@@ -429,7 +433,7 @@ function cartaoDoMotorista(empresaId: string, m: Record<string, unknown> & { id:
     id: m.id, nome: String(m.nome ?? ""), cpf: String(m.cpf ?? ""), telefone: String(m.telefone ?? ""), email: String(m.email ?? ""), nascimento: String(m.nascimento ?? ""),
     genero: String(m.genero ?? ""), chavePix: String(m.chavePix ?? ""), situacao: String(m.status ?? ""), cidade: String(m.cidade ?? ""),
     endereco: { cep: String(m.cep ?? ""), rua: String(m.rua ?? ""), numero: String(m.numero ?? ""), complemento: String(m.complemento ?? ""), bairro: String(m.bairro ?? ""), uf: String(m.uf ?? "") },
-    veiculos: p.veiculos, foto: !!p.foto, documentos: Object.fromEntries(Object.entries(p.documentos).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])),
+    veiculos: veiculos(empresaId, m.id), foto: !!p.foto, documentos: Object.fromEntries(Object.entries(p.documentos).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])),
     pendencias: pendenciasDoMotorista(empresaId, m.id),
   };
 }
@@ -463,9 +467,6 @@ rotasV2Central.post("/aprovacoes/:id/aprovar", exigirPapel("admin", "operador"),
   const pend = pendenciasDoMotorista(e, req.params.id);
   if (pend.length && req.body?.forcar !== true) throw new Error(`Faltam itens no cadastro: ${pend.join(", ")}. Marque "aprovar mesmo assim" se quiser.`);
   const m = alterarCampos(e, cadastroPorId("motoristas")!, req.params.id, { status: "Ativo" }, quem(req));
-  const p = pessoa(e, "motorista", req.params.id);
-  p.veiculos = p.veiculos.map((v) => ({ ...v, situacao: "Aprovado" }));
-  salvarPessoa(e, "motorista", req.params.id, p);
   responderPelaCentral(e, "motorista", req.params.id, "Seu cadastro foi aprovado! Você já pode ficar online e receber corridas.");
   res.json({ motorista: cartaoDoMotorista(e, m) });
 }));

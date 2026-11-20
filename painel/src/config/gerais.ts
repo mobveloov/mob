@@ -20,6 +20,8 @@ export interface ConfigGerais {
     avisosDeConduta: string[]; problemasNaCorrida: string[];
     /** Gravação das corridas pelo app do motorista (áudio e, se liberado, vídeo) e quantos dias a central guarda. */
     gravacao: { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number };
+    /** Dias sem nenhum contato do app para o diagnóstico mostrar APP OFF. */
+    diasSemContatoApp: number;
   };
   preferencias: Preferencia[];
   passageiro: {
@@ -59,7 +61,7 @@ export const GERAIS_PADRAO: ConfigGerais = {
     bonusCadastroAtivo: false, bonusCadastroValor: 0, editarValorFinal: false, confirmarTaxas: false, editarRota: false, cpfObrigatorio: true,
     descontarCupomNoToque: true, botaoPanico: true, mapaNavegacao: true, distanciaRecalculo: 150,
     mensagensRapidas: ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor.", "Bom dia", "Boa tarde", "Boa noite"],
-    documentos: DOCS_PADRAO,
+    documentos: DOCS_PADRAO, diasSemContatoApp: 7,
     gravacao: { ativa: true, obrigatoria: false, video: false, dias: 30 },
     avisosDeConduta: ["Carro limpo e organizado", "Ambiente agradável e cheiroso", "Não fume", "Atenção ao trânsito", "Não use o celular ao dirigir", "Seja respeitoso com todos", "Atendimento gentil faz a diferença"],
     problemasNaCorrida: ["Passageiro difícil ou agressivo", "Endereço errado ou local perigoso", "Problema no veículo", "Problema no aplicativo", "Cobrança ou pagamento", "Outro problema"],
@@ -112,6 +114,7 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
       editarValorFinal: sim(m.editarValorFinal), confirmarTaxas: sim(m.confirmarTaxas), editarRota: sim(m.editarRota), cpfObrigatorio: sim(m.cpfObrigatorio),
       descontarCupomNoToque: sim(m.descontarCupomNoToque), botaoPanico: sim(m.botaoPanico), mapaNavegacao: sim(m.mapaNavegacao),
       distanciaRecalculo: Math.round(numero(m.distanciaRecalculo, 150, 20, 5000)),
+      diasSemContatoApp: Math.round(numero(m.diasSemContatoApp, 7, 1, 365)),
       mensagensRapidas: lista(m.mensagensRapidas).map((x) => texto(x, 120)).filter(Boolean).slice(0, 20),
       gravacao: (() => { const o = { ...atual.motorista.gravacao, ...((m.gravacao ?? {}) as object) } as Record<string, unknown>; const ativa = sim(o.ativa, true); return { ativa, obrigatoria: ativa && sim(o.obrigatoria), video: sim(o.video), dias: Math.round(numero(o.dias, 30, 1, 365)) }; })(),
       avisosDeConduta: m.avisosDeConduta === undefined ? atual.motorista.avisosDeConduta : lista(m.avisosDeConduta).map((x) => texto(x, 80)).filter(Boolean).slice(0, 12),

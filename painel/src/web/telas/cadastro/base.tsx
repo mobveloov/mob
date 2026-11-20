@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { empresaEscolhidaAgora } from "../../api";
+import { PaginaCheia } from "../../componentes/PaginaCheia";
 import "./cadastro.css";
 
 export async function chamar<T = Record<string, unknown>>(metodo: "GET" | "POST" | "PUT" | "DELETE", caminho: string, corpo?: unknown, base = "/api/gestao"): Promise<T> {
@@ -101,16 +102,18 @@ export function Selo({ tom, children }: { tom: "ok" | "ruim" | "alerta" | "info"
   return <span className={`cg-selo ${tom}`}>{children}</span>;
 }
 
-export function Janela({ aberta, titulo, sub, onFechar, children, rodape, largura, abas }: {
-  aberta: boolean; titulo: string; sub?: string; onFechar: () => void; children: ReactNode; rodape?: ReactNode; largura?: "pequena" | "media" | "grande"; abas?: ReactNode;
+/** Com `cheia`, o cadastro abre em página inteira (PaginaCheia) em vez de janela. */
+export function Janela({ aberta, titulo, sub, onFechar, children, rodape, largura, abas, cheia }: {
+  cheia?: boolean; aberta: boolean; titulo: string; sub?: string; onFechar: () => void; children: ReactNode; rodape?: ReactNode; largura?: "pequena" | "media" | "grande"; abas?: ReactNode;
 }) {
   useEffect(() => {
-    if (!aberta) return;
+    if (!aberta || cheia) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onFechar();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [aberta, onFechar]);
+  }, [aberta, cheia, onFechar]);
   if (!aberta) return null;
+  if (cheia) return <PaginaCheia titulo={titulo} sub={sub} onFechar={onFechar} abas={abas} rodape={rodape}>{children}</PaginaCheia>;
   return (
     <div className="cg-fundo" onMouseDown={(e) => e.target === e.currentTarget && onFechar()}>
       <div className={`cg-janela ${largura ?? "media"}`} role="dialog" aria-label={titulo}>
