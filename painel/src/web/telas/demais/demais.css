@@ -235,3 +235,7 @@
 .dm-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 12px; }
 .dm-check { display: flex; gap: 8px; align-items: center; }
 @media (max-width: 760px) { .dm-taxa { grid-template-columns: 1fr; } }
+/* Taxas da central: interruptor de cada taxa na lista e aviso de versão mínima do app (como na Machine). */
+.dm-taxa-linha { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+.dm-taxa-linha.desligada .dm-taxa { opacity: .6; }
+.dm-versao-minima { display: flex !important; gap: 6px; align-items: center; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: #fff8e1; color: #666 !important; }

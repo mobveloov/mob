@@ -51,7 +51,7 @@ rotasRelatorios.delete("/modelos/:id", admin, ok((req, res) => { removerModelo(e
 
 rotasRelatorios.get("/relatorio/:id", ok((req, res) => res.json(gerarRelatorio(emp(req), req.params.id, filtrosDe(req), Number(q(req, "pagina")) || 1, q(req, "ordem"), q(req, "dir")))));
 rotasRelatorios.get("/relatorio/:id/csv", ok((req, res) => {
-  const csv = csvDoRelatorio(emp(req), req.params.id, filtrosDe(req));
+  const csv = csvDoRelatorio(emp(req), req.params.id, filtrosDe(req), q(req, "ordem"), q(req, "dir"));
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${req.params.id.replace(/[^a-z0-9-]/g, "")}-${agoraBr().toISOString().slice(0, 10)}.csv"`);
   res.send(csv);

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Download, Plus } from "lucide-react";
 import { api, empresaEscolhidaAgora } from "../../api";
 import { useCarregar } from "../../componentes/ui";
-import { Cabecalho, Campo, chamar, consulta, dataBr, dinheiro, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
+import { Abas, Cabecalho, Campo, chamar, consulta, dataBr, dinheiro, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
 
 type Cupom = Record<string, string | number | boolean | null> & { id: string; usos: number; descontoTotal: number; situacao: string };
 interface Resposta { cupons: Cupom[]; automaticos: Cupom[]; paginacao: { atual: number; totalPaginas: number }; kpis: { total: number; usos: number; economia: number } }
@@ -22,7 +22,8 @@ async function baixarPlanilha(tipo: string) {
 }
 
 export default function Cupons() {
-  const [tipo, setTipo] = useState("Todos");
+  const [tipo, setTipo] = useState("Resgatavel");
+  const [autoStatus, setAutoStatus] = useState("todos"), [autoBusca, setAutoBusca] = useState("");
   const [aba, setAba] = useState("Todos");
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
@@ -34,14 +35,16 @@ export default function Cupons() {
   const { aviso, tentar } = useAviso();
   const d = l.dados;
   useEffect(() => { if (!exportar) return; const f = () => setExportar(false); window.addEventListener("click", f); return () => window.removeEventListener("click", f); }, [exportar]);
-  const mostraAuto = tipo !== "Resgatavel", mostraResg = tipo !== "Automatico";
+  const mostraAuto = tipo === "Automatico", mostraResg = tipo === "Resgatavel";
 
   return (
     <div className="cg-pagina-solta">
       {aviso}
       <Cabecalho titulo="Cupons"><button className="cg-botao primario" onClick={() => setEditando("novo")}><Plus size={16} /> Criar cupom</button></Cabecalho>
       <div className="cg-linha-tab">
-        <label className="cg-campo" style={{ flex: "0 1 200px" }}><span>Tipo de cupom</span><select value={tipo} onChange={(e) => { setTipo(e.target.value); setPagina(1); }} aria-label="Tipo de cupom">{TIPOS.map(([id, r]) => <option key={id} value={id}>{r}</option>)}</select></label>
+        <Abas itens={[{ id: "Resgatavel" as const, rotulo: "Resgatável" }, { id: "Automatico" as const, rotulo: "Automático" }]} valor={tipo as "Resgatavel" | "Automatico"} onChange={(v) => { setTipo(v); setPagina(1); }} />
+        {!mostraResg && <label className="cg-campo" style={{ flex: "0 1 200px" }}><span>Situação</span><select value={autoStatus} onChange={(e) => setAutoStatus(e.target.value)} aria-label="Situação do automático"><option value="todos">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>}
+        {!mostraResg && <input placeholder="Pesquisar" value={autoBusca} onChange={(e) => setAutoBusca(e.target.value)} aria-label="Pesquisar" />}
         {mostraResg && <label className="cg-campo" style={{ flex: "0 1 200px" }}><span>Situação</span><select value={aba} onChange={(e) => { setAba(e.target.value); setPagina(1); }} aria-label="Situação">{SITUACOES.map(([id, r]) => <option key={id} value={id}>{r}</option>)}</select></label>}
         {mostraResg && <input placeholder="Buscar" value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(1); }} aria-label="Buscar" />}
         <div className="cg-menu-acoes">
@@ -54,7 +57,7 @@ export default function Cupons() {
       </div>
       {mostraAuto && <>
         <h2 className="cg-secao">Cupons automáticos</h2>
-        <div className="cg-autos">{d?.automaticos.map((c) => (
+        <div className="cg-autos">{d?.automaticos.filter((c) => (autoStatus === "todos" || (autoStatus === "ativo") === (c.ativo === true)) && (!autoBusca.trim() || `${c.codigo} ${c.descricao ?? ""}`.toLowerCase().includes(autoBusca.trim().toLowerCase()))).map((c) => (
           <div className="cg-auto" key={String(c.codigo)}>
             <strong>{String(c.codigo)}</strong>
             <span>{String(c.descricao)}</span>

@@ -57,7 +57,7 @@ export default function Pendentes() {
       <Aviso texto={erro} erro /><Aviso texto={erroAcao} erro />
       <div className="oc-card">
         {carregando && !dados && <Vazio>Carregando...</Vazio>}
-        {dados && !dados.total && <Vazio>Não encontramos nenhum resultado para a sua pesquisa.</Vazio>}
+        {dados && !dados.total && <Vazio>Não encontramos nenhum resultado para a sua pesquisa. <span className="oc-fila" style={{ justifyContent: "center", marginTop: 8 }}><button className="oc-btn" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Editar filtro</button><button className="oc-btn" onClick={() => { setTipo("todos"); setBusca(""); setB(""); setMotorista(""); setPer(PERIODO_HOJE); setPagina(1); }}>Limpar filtro</button></span></Vazio>}
         {!!dados?.total && <>
           <div className="oc-rola"><table><thead><tr><th>Data</th><th>Tipo</th><th>OS de origem</th><th>Passageiro</th><th>Motorista</th><th>Valor</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>{dados.itens.map((p: any) => (

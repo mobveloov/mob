@@ -16,11 +16,15 @@ export async function pedirRel<T = any>(url: string, metodo = "GET", corpo?: unk
 }
 
 /** Baixa um CSV do servidor (a proteção contra fórmula é feita lá). */
-export async function baixarCsvRel(url: string, nome: string) {
+export async function buscarCsvRel(url: string): Promise<Blob> {
   const emp = empresaEscolhida();
   const r = await fetch(`/api/relatorios${url}`, { credentials: "same-origin", headers: emp ? { "X-Empresa": emp } : {} });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erro?: string }).erro || `Erro ${r.status}`);
-  const blob = await r.blob();
+  return r.blob();
+}
+
+export async function baixarCsvRel(url: string, nome: string) {
+  const blob = await buscarCsvRel(url);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);

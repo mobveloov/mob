@@ -22,6 +22,7 @@ export default function Taxas() {
   useEffect(() => { const t = setTimeout(() => { setF({ os, motorista, cliente }); setPagina(1); }, 350); return () => clearTimeout(t); }, [os, motorista, cliente]);
   const filtro = { aba, ...f, ...paramsPeriodo(per) };
   const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/taxas-cancelamento${qs({ ...filtro, pagina })}`), [JSON.stringify(filtro), pagina]);
+  const limparTudo = () => { setOs(""); setMotorista(""); setCliente(""); setPer(PERIODO_30); setAba("todos"); setPagina(1); };
   async function agir(p: any, acao: string) {
     if (acao === "abonar" && !confirm("Abonar esta taxa? A cobrança será descartada.")) return;
     setErroAcao(null);
@@ -30,6 +31,7 @@ export default function Taxas() {
   return (
     <div className="oc">
       <div className="oc-topo"><div><h1>Gestão de taxas de cancelamento</h1><p className="suave" style={{ margin: "2px 0 0" }}>Taxas cobradas de passageiros que cancelaram depois do prazo</p></div></div>
+      <div className="oc-abas">{[["todos", "Todos"], ["pendentes", "Pendentes"], ["repassados", "Repassados"], ["resolvidos", "Resolvidos"], ["abonados", "Abonados"]].map(([k, r]) => <button key={k} className={aba === k ? "on" : ""} onClick={() => { setAba(k); setPagina(1); }}>{r}</button>)}</div>
       <div className="oc-card oc-fila">
         <input style={{ maxWidth: 150 }} placeholder="Buscar OS" value={os} onChange={(e) => setOs(e.target.value)} aria-label="Buscar OS" />
         <input style={{ maxWidth: 200 }} placeholder="Buscar motorista" value={motorista} onChange={(e) => setMotorista(e.target.value)} aria-label="Buscar motorista" />
@@ -49,7 +51,7 @@ export default function Taxas() {
       <Aviso texto={erro} erro /><Aviso texto={erroAcao} erro />
       <div className="oc-card">
         {carregando && !dados && <Vazio>Carregando...</Vazio>}
-        {dados && !dados.total && <Vazio>Não encontramos nenhum resultado para a sua pesquisa.</Vazio>}
+        {dados && !dados.total && <Vazio>Não encontramos nenhum resultado para a sua pesquisa. <span className="oc-fila" style={{ justifyContent: "center", marginTop: 8 }}><button className="oc-btn" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>Editar filtro</button><button className="oc-btn" onClick={limparTudo}>Limpar filtro</button></span></Vazio>}
         {!!dados?.total && <>
           <div className="oc-rola"><table><thead><tr><th>Data</th><th>Corrida de origem</th><th>Passageiro</th><th>Taxa</th><th>Motorista a receber</th><th>Motorista de coleta</th><th>Situação</th><th>Ações</th></tr></thead>
             <tbody>{dados.itens.map((p: any) => (

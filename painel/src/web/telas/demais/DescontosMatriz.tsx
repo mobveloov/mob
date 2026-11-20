@@ -23,8 +23,8 @@ export function DescontosMatriz() {
   const mudar = (f: string, c: string, v: string) => setM({ ...m, [f]: { ...m[f], [c]: num(v) } });
   const gravar = () => salvar(async () => { const r = await pedirConfig("/descontos-matriz", "PUT", { matriz: m }); setLido(r); setM(structuredClone(r.matriz)); setEditando(false); }, "Descontos gravados.");
   const voltar = () => { setM(structuredClone(d.dados.matriz)); setEditando(false); };
-  const campo = (f: string, c: string, rot: string) => (
-    <label key={c} className="dm-campo"><span>{rot}</span><span className="dm-linha"><input inputMode="decimal" value={txt(m[f][c])} placeholder="0" onChange={(e) => mudar(f, c, e.target.value)} style={{ width: "6rem" }} /><small>%</small></span></label>
+  const campo = (f: string, c: string, rot: string, desab = false) => (
+    <label key={c} className="dm-campo"><span>{rot}</span><span className="dm-linha"><input inputMode="decimal" value={txt(m[f][c])} placeholder="0" maxLength={c === "maximo" ? 5 : 2} disabled={desab} onChange={(e) => mudar(f, c, e.target.value.replace(/[^\d,]/g, ""))} style={{ width: "6rem" }} /><small>%</small></span></label>
   );
 
   if (editando) {
@@ -38,7 +38,7 @@ export function DescontosMatriz() {
             <h4>Site</h4>
             <div className="dm-grade3">{campo(f.id, "site", "Desconto pelo site")}</div>
             <h4>Aplicativo</h4>
-            <div className="dm-grade4">{APPS.map((a) => campo(f.id, a, `Desconto pelo app #${a.slice(3)}`))}</div>
+            <div className="dm-grade4">{APPS.map((a) => campo(f.id, a, `Desconto pelo app #${a.slice(3)}`, a !== "app1"))}</div>
             <h4>Desconto máximo por empresa</h4>
             <div className="dm-grade3">{campo(f.id, "maximo", "Máximo (%)")}</div>
           </section>

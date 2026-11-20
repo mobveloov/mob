@@ -8,10 +8,15 @@ export const FORMAS_TAXA = [
 export type FormaTaxa = (typeof FORMAS_TAXA)[number]["id"];
 export const MAX_FAIXAS = 10;
 export const MAX_TAXAS = 50;
+/** Tamanho máximo do nome da taxa (a Machine corta em 21 e tira emojis). */
+export const MAX_NOME_TAXA = 21;
+export const limparNomeTaxa = (n: string) => n.replace(/[\p{Extended_Pictographic}‍️]/gu, "").replace(/\s+/g, " ").trim().slice(0, MAX_NOME_TAXA).trim();
 
 export interface FaixaTaxa { de: number; ate: number | null; tipo: "porcentagem" | "fixo"; valor: number }
 export interface Taxa {
   id: string; nome: string; quemPaga: "motorista" | "passageiro"; categorias: string[]; pagamentos: FormaTaxa[]; faixas: FaixaTaxa[];
+  /** Interruptor da lista (Machine): taxa desligada fica guardada, mas não cobra. Ausente = ligada. */
+  ativa?: boolean;
   atualizadoPor: string; atualizadoEm: string;
 }
 
