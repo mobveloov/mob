@@ -6,6 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Pencil, Plus, Trash2, Zap } from "lucide-react";
 import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
+import { baseDoMapa } from "../../../comum/mapa-base.ts";
 
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
@@ -165,7 +166,7 @@ function MapaDinamicas({ aba, manuais, automaticas }: { aba: Aba; manuais: any[]
   useEffect(() => {
     if (!ref.current) return;
     const mapa = L.map(ref.current, { zoomControl: true }).setView([-15.8, -47.9], 4);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapa);
+    baseDoMapa(L, mapa);
     const lista = aba === "automaticas" ? automaticas.map((a) => ({ ...a, ativa: true })) : aba === "manuais" ? manuais.filter((r) => r.poligono.length >= 3) : [];
     const camadas = lista.map((r) => {
       const cor = r.ativa ? COR_NIVEL[r.nivel] ?? "#dc2626" : "#94a3b8";
@@ -185,7 +186,7 @@ function DesenhoArea({ pontos, onChange }: { pontos: Array<[number, number]>; on
   useEffect(() => {
     if (!ref.current) return;
     const mapa = L.map(ref.current).setView(pontos[0] ?? [-15.8, -47.9], pontos.length ? 13 : 4);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 19 }).addTo(mapa);
+    baseDoMapa(L, mapa);
     const grupo = L.layerGroup().addTo(mapa);
     const desenhar = () => { grupo.clearLayers(); const p = atual.current; if (p.length) { L.polygon(p, { color: "#ef4444" }).addTo(grupo); p.forEach((x) => L.circleMarker(x, { radius: 4, color: "#ef4444" }).addTo(grupo)); } };
     desenhar();

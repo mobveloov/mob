@@ -4,6 +4,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { baseDoMapa, type BaseDoMapa } from "../../../comum/mapa-base.ts";
 
 export type Ponto = [number, number];
 export interface AreaMapa { id: string; nome: string; poligono: Ponto[]; cor?: string; bloqueio?: boolean }
@@ -26,14 +27,12 @@ interface Props {
 }
 
 const CENTRO_BRASIL: Ponto = [-14.2, -51.9];
-const URL_MAPA = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const URL_SATELITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
 export default function MapaAreas({ areas = [], desenho, onDesenho, corDesenho = "#22c55e", grande, satelite, vistaInicial, onVista }: Props) {
   const caixa = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const camada = useRef<L.LayerGroup | null>(null);
-  const base = useRef<L.TileLayer | null>(null);
+  const base = useRef<BaseDoMapa | null>(null);
   const aoDesenhar = useRef(onDesenho);
   const aoMover = useRef(onVista);
   const desenhoAtual = useRef(desenho);
@@ -54,15 +53,14 @@ export default function MapaAreas({ areas = [], desenho, onDesenho, corDesenho =
     });
     m.on("moveend", () => { const c = m.getCenter(); aoMover.current?.({ lat: c.lat, lng: c.lng, zoom: m.getZoom() }); });
     mapa.current = m;
-    return () => { m.remove(); mapa.current = null; base.current = null; };
+    return () => { base.current?.remover(); m.remove(); mapa.current = null; base.current = null; };
   }, []);
 
   useEffect(() => {
     const m = mapa.current;
     if (!m) return;
-    base.current?.remove();
-    base.current = L.tileLayer(satelite ? URL_SATELITE : URL_MAPA, { maxZoom: satelite ? 18 : 19, attribution: satelite ? "Imagens © Esri" : "© OpenStreetMap" }).addTo(m);
-    base.current.bringToBack();
+    if (base.current) base.current.satelite(!!satelite);
+    else base.current = baseDoMapa(L, m, { satelite: !!satelite });
   }, [satelite]);
 
   useEffect(() => {

@@ -6,6 +6,8 @@ import { useEffect, useRef } from "react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useCaminho } from "../comum/rota";
+import { config } from "../comum/api";
+import { baseDoMapa } from "../../../comum/mapa-base.ts";
 
 export type TipoPonto = "eu" | "embarque" | "parada" | "destino";
 export interface PontoMapa { lat: number; lng: number; rotulo: string; tipo: TipoPonto }
@@ -50,7 +52,7 @@ export function Mapa({ pontos, caminho = [], ate, rotaNav, tema, centralizar = 0
     if (!caixa.current) return;
     const m = L.map(caixa.current, { zoomControl: false, attributionControl: true }).setView([-15.78, -47.93], 4);
     m.attributionControl.setPrefix(false);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
+    baseDoMapa(L, m, { api: config().api, empresaId: config().empresaId, app: true });
     camada.current = L.layerGroup().addTo(m);
     m.on("dragstart", () => { seguir.current = false; });
     mapa.current = m;

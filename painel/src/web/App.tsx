@@ -3,6 +3,7 @@ import { MARCA_PADRAO, imagemDaEmpresa, variaveisTema, type Marca } from "../com
 import { api, ErroApi, escolherEmpresa, urlImagem, type Sessao } from "./api";
 import Entrar from "./paginas/Entrar";
 import { useSecurityShield } from "./useSecurityShield";
+import { definirEmpresaDoMapa } from "../comum/mapa-base.ts";
 
 interface Ctx { sessao: Sessao; marca: Marca; setMarca: (m: Marca) => void; recarregar: () => void }
 const SessaoCtx = createContext<Ctx>(null as unknown as Ctx);
@@ -19,6 +20,7 @@ escolherEmpresa(ler("empresa") ?? "");
 
 /** Aplica a marca no documento: variáveis CSS, fonte, título e favicon. */
 export function aplicarMarca(m: Marca, empresaId: string | null, escuro: boolean) {
+  if (empresaId) definirEmpresaDoMapa(empresaId);
   const raiz = document.documentElement;
   for (const [k, v] of Object.entries(variaveisTema(m, escuro))) raiz.style.setProperty(k, v);
   raiz.dataset.theme = escuro ? "dark" : "light";

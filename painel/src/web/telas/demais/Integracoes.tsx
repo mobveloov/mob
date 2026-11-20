@@ -5,10 +5,11 @@ import { Eye, EyeOff } from "lucide-react";
 import { BandeiraAbas } from "../grupoc/BandeiraAbas";
 import { ABAS_FORM } from "../../../comum/bandeira-form.ts";
 import { TransacoesFinanceiras } from "./TransacoesFinanceiras";
+import { esquecerConfigDoMapa } from "../../../comum/mapa-base.ts";
 import IntegracoesSistemas from "../../paginas/Integracoes";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, pedirConfig, useAdmin, useCarregar, useSalvar } from "./comum";
 
-type Aba = "iza" | "nilara" | "saque" | "marketplace" | "transacoes" | "mp" | "app" | "met" | "fin" | "sistemas";
+type Aba = "mapas" | "iza" | "nilara" | "saque" | "marketplace" | "transacoes" | "mp" | "app" | "met" | "fin" | "sistemas";
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const MASCARA = "••••••";
 
@@ -25,8 +26,8 @@ export function Integracoes() {
   return (
     <>
       <Cab titulo="Integrações" sub="Configure gateways de pagamento e métodos." />
-      <Abas abas={[["iza", "Iza"], ["nilara", "Nilara"], ["transacoes", "Transações Financeiras"], ["saque", "Saque Automático"], ["marketplace", "Marketplace de Integradores"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
-      {aba === "sistemas" ? <IntegracoesSistemas /> : aba === "saque" ? <BandeiraAbas aba={ABAS_FORM.find((a) => a.id === "saque")!} /> : aba === "iza" || aba === "nilara" || aba === "marketplace" ? <ParceiroExterno aba={aba} /> : aba === "transacoes" ? <TransacoesFinanceiras /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
+      <Abas abas={[["iza", "Iza"], ["nilara", "Nilara"], ["transacoes", "Transações Financeiras"], ["saque", "Saque Automático"], ["marketplace", "Marketplace de Integradores"], ["mp", "Mercado Pago"], ["app", "Cartão App"], ["met", "Métodos"], ["fin", "Financeiro"], ["mapas", "Mapas"], ["sistemas", "Sistemas e IA"]]} valor={aba} onChange={setAba} />
+      {aba === "sistemas" ? <IntegracoesSistemas /> : aba === "mapas" ? <SecaoMapas /> : aba === "saque" ? <BandeiraAbas aba={ABAS_FORM.find((a) => a.id === "saque")!} /> : aba === "iza" || aba === "nilara" || aba === "marketplace" ? <ParceiroExterno aba={aba} /> : aba === "transacoes" ? <TransacoesFinanceiras /> : !p ? (d.erro ? <Aviso erro={d.erro} /> : <Carregando />) : (
         <>
           <Aviso erro={msg?.erro} ok={msg?.ok} />
           {aba === "mp" && (
@@ -81,4 +82,54 @@ const PARCEIROS = {
 function ParceiroExterno({ aba }: { aba: "iza" | "nilara" | "marketplace" }) {
   const [nome, texto] = PARCEIROS[aba];
   return <section className="dm-cartao dm-secao"><h2>{nome}</h2><p className="sub">Status da integração: <span className="selo">Desativada</span></p><p>{texto}</p></section>;
+}
+
+// ------------------------------------------------------------------ Mapas: de onde vêm as imagens dos mapas
+
+interface VisaoMapas { provedor: string; efetivo: string; chave: string; provedores: Array<{ id: string; nome: string; pedeChave: boolean }>; identificacao: string; temContato: boolean; ultimoErro: { em: string; motivo: string } | null }
+const DICA_PROVEDOR: Record<string, string> = {
+  osm: "Padrão. O servidor da central busca as imagens, guarda cópia e se identifica como a política do OpenStreetMap exige. Só tem mapa claro (no tema escuro a cor é ajustada).",
+  carto: "Sem chave. Tem mapa claro e escuro de verdade. Uso básico liberado; para muito volume o CARTO pede contrato.",
+  maptiler: "Pede chave da sua conta MapTiler. Claro e escuro.",
+  stadia: "Pede chave da sua conta Stadia Maps. Claro e escuro.",
+};
+
+function SecaoMapas() {
+  const admin = useAdmin();
+  const d = useCarregar(() => pedirConfig<VisaoMapas>("/mapas"), []);
+  const [v, setV] = useState<VisaoMapas | null>(null), [lido, setLido] = useState<unknown>(null);
+  const [provedor, setProvedor] = useState("osm"), [chave, setChave] = useState(""), [ver, setVer] = useState(false);
+  const { msg, salvando, salvar } = useSalvar();
+  if (d.dados && lido !== d.dados) { setLido(d.dados); setV(d.dados); setProvedor(d.dados.provedor); setChave(d.dados.chave); }
+  if (!v) return d.erro ? <Aviso erro={d.erro} /> : <Carregando />;
+  const atual = v.provedores.find((p) => p.id === provedor);
+  const gravar = () => salvar(async () => { const r = await pedirConfig<VisaoMapas>("/mapas", "PUT", { provedor, chave }); esquecerConfigDoMapa(); setV(r); setProvedor(r.provedor); setChave(r.chave); }, "Mapas salvos. Abra o mapa de novo para ver a mudança.");
+  return (
+    <section className="dm-cartao dm-secao">
+      <h2>Mapas</h2>
+      <p className="sub">De onde vêm as imagens dos mapas do painel e dos apps. O navegador nunca fala com o provedor: quem busca é o servidor da central, com cópia em disco e limite de pedidos.</p>
+      <Aviso erro={msg?.erro} ok={msg?.ok} />
+      {v.efetivo !== v.provedor && <Aviso erro={`${v.provedores.find((p) => p.id === v.provedor)?.nome ?? v.provedor} está sem chave: os mapas usam o OpenStreetMap até você salvar a chave.`} />}
+      {v.ultimoErro && <Aviso erro={`Último problema com o provedor (${new Date(v.ultimoErro.em).toLocaleString("pt-BR")}): ${v.ultimoErro.motivo}`} />}
+      {!v.temContato && <Aviso erro="Falta o e-mail ou site de suporte em Personalização (Marca). O OpenStreetMap exige um contato na identificação; sem isso o servidor dele pode bloquear." />}
+      <Campo rotulo="Provedor">
+        <select disabled={!admin} value={provedor} onChange={(e) => setProvedor(e.target.value)}>
+          {v.provedores.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+        </select>
+      </Campo>
+      <p className="sub">{DICA_PROVEDOR[provedor]}</p>
+      {atual?.pedeChave && (
+        <Campo rotulo="Chave do provedor">
+          <span className="dm-linha">
+            <input type={ver ? "text" : "password"} autoComplete="off" disabled={!admin} value={chave} placeholder="Cole a chave aqui"
+              onFocus={() => chave === MASCARA && setChave("")} onChange={(e) => setChave(e.target.value)} />
+            <button type="button" className="icone" aria-label={ver ? "Esconder" : "Mostrar"} onClick={() => setVer(!ver)}>{ver ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+          </span>
+          <span className="sub">A chave fica só no servidor e nunca volta para a tela.</span>
+        </Campo>
+      )}
+      <p className="sub">Identificação enviada ao provedor: <code>{v.identificacao}</code></p>
+      {admin ? <div className="dm-salvar"><button className="botao primario" disabled={salvando} onClick={gravar}>SALVAR</button></div> : <p className="sub">Só o administrador altera os mapas.</p>}
+    </section>
+  );
 }
