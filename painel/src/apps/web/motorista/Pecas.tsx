@@ -2,7 +2,7 @@
 // botão de deslizar, foto, itens de menu e a busca de dados com tratamento das rotas que ainda não existem.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Car, ChevronLeft, ChevronRight, ChevronsRight, MapPin, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Car, Check, ChevronLeft, ChevronRight, ChevronsRight, MapPin, TriangleAlert, type LucideIcon } from "lucide-react";
 import { api, config, ErroApi, token, urlArquivo } from "../comum/api";
 import { mensagemDeErro } from "../comum/ui";
 import { iniciais } from "./tipos";
@@ -37,10 +37,10 @@ export function Topo({ titulo, subtitulo, voltar, contador, direita, estilo = "m
 }
 
 /** Barra de baixo do início e das Corridas: Mapa | situação | Corridas (e o botão PARAR quando está online). */
-export function BarraBaixo({ ativa, online, procurando, aoMapa, aoCorridas, children }: { ativa: "mapa" | "corridas"; online: boolean; procurando?: boolean; aoMapa: () => void; aoCorridas: () => void; children?: ReactNode }) {
+export function BarraBaixo({ ativa, online, procurando, aoMapa, aoCorridas, aberta, alternar, children }: { ativa: "mapa" | "corridas"; online: boolean; procurando?: boolean; aoMapa: () => void; aoCorridas: () => void; aberta?: boolean; alternar?: () => void; children?: ReactNode }) {
   return (
-    <div className="folha-inicio">
-      <span className="puxador" />
+    <div className={`folha-inicio ${aberta ? "aberta" : ""}`}>
+      {alternar ? <button type="button" className="puxador-inicio" aria-label={aberta ? "Recolher" : "Mostrar mais"} aria-expanded={!!aberta} onClick={alternar}><span className="puxador" /></button> : <span className="puxador" />}
       {online ? <div className={`progresso ${procurando === false ? "parado" : ""}`} /> : null}
       <p className="dica-inicio">{online ? "Você está online" : "Toque em INICIAR para receber viagens"}</p>
       <div className="barra-baixo">
@@ -49,6 +49,18 @@ export function BarraBaixo({ ativa, online, procurando, aoMapa, aoCorridas, chil
         <button type="button" className={ativa === "corridas" ? "ativa" : ""} onClick={aoCorridas}><Car size={24} />Corridas</button>
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Faixa de aviso da folha aberta do mapa: lembretes de conduta da empresa (texto fixo; a empresa pode trocar depois). */
+export function AvisoDoMotorista() {
+  const itens = ["Carro limpo e organizado", "Ambiente agradável e cheiroso", "Não fume", "Atenção ao trânsito", "Não use o celular ao dirigir", "Seja respeitoso com todos", "Atendimento gentil faz a diferença"];
+  return (
+    <div className="aviso-motorista" role="note">
+      <div className="am-titulo"><TriangleAlert size={16} /> ATENÇÃO MOTORISTA!</div>
+      <strong>Seu cuidado faz a diferença na experiência.</strong>
+      <ul>{itens.map((t) => <li key={t}><Check size={13} />{t}</li>)}</ul>
     </div>
   );
 }

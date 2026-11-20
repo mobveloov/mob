@@ -4,7 +4,7 @@
 // cadastro, carteira, documentos, preferências, suporte, diagnóstico e configurações.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LayoutGrid, LocateFixed, Power, SlidersHorizontal } from "lucide-react";
+import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
@@ -14,7 +14,8 @@ import { DepoisDaCorrida, EmCorrida } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Mapa } from "./Mapa";
 import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
-import { BarraBaixo, Dialogo } from "./Pecas";
+import { AvisoDoMotorista, BarraBaixo, Dialogo } from "./Pecas";
+import { LogoMarca } from "./Marca";
 import { Desafios, Notificacoes, Preferencias } from "./Telas";
 import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
 import { aplicarTema, useAjustes } from "./ajustes";
@@ -47,7 +48,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [chat, setChat] = useState(false);
   const [tela, setTela] = useState("");
   const [menu, setMenu] = useState(false);
-  const [dialogo, setDialogo] = useState<"" | "online" | "offline" | "analise">("");
+  const [dialogo, setDialogo] = useState<"" | "online" | "offline" | "analise" | "alerta">("");
+  const [folhaAberta, setFolhaAberta] = useState(false); // folha de baixo do mapa: recolhida (barra) ou aberta (aviso + Desconectar)
   const [conectado, setConectado] = useState(false);
   const [hoje, setHoje] = useState<number | null>(null);
   const [centro, setCentro] = useState(0);
@@ -137,7 +139,11 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
       setPosicao(p); ultimoEnvio.current = Date.now(); setOnline(true);
     } catch (e) { setErro(mensagemDeErro(e)); }
   };
-  const ficarOffline = async () => { setDialogo(""); await api("/offline", { corpo: {} }).catch(() => undefined); setOnline(false); };
+  const pedirAjuda = async () => {
+    setDialogo("");
+    try { await api("/suporte", { corpo: { texto: `ALERTA: o motorista pediu ajuda${posicao ? ` (posição ${posicao.lat.toFixed(5)}, ${posicao.lng.toFixed(5)})` : ""}.` } }); setAviso("A central recebeu o seu alerta e vai falar com você. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+  };
+  const ficarOffline = async () => { setDialogo(""); setFolhaAberta(false); await api("/offline", { corpo: {} }).catch(() => undefined); setOnline(false); };
   const sairDaConta = async () => { await api("/sair", { corpo: {} }).catch(() => undefined); setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); };
 
   const aceitar = async (valor: number | null, contra: boolean) => {
@@ -193,14 +199,24 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   // Início: mapa, ganhos de hoje, INICIAR/PARAR e a barra de baixo (igual à referência).
   const analise = eu.aprovado === false;
   const barra = (ativa: "mapa" | "corridas") => (
-    <BarraBaixo ativa={ativa} online={online} procurando={conectado} aoMapa={() => setTela("")} aoCorridas={() => setTela("corridas")}>
-      {online && <button type="button" className="botao-onoff ligado" aria-label="Parar de receber corridas" onClick={() => setDialogo("offline")}><Power size={26} />PARAR</button>}
+    <BarraBaixo ativa={ativa} online={online} procurando={conectado} aoMapa={() => setTela("")} aoCorridas={() => setTela("corridas")} aberta={online && folhaAberta} alternar={online ? () => setFolhaAberta((v) => !v) : undefined}>
+      {online && folhaAberta && (
+        <>
+          <AvisoDoMotorista />
+          <button type="button" className="botao-desconectar" onClick={() => setDialogo("offline")}>Desconectar</button>
+        </>
+      )}
     </BarraBaixo>
   );
   const dialogos = (
     <>
       {dialogo === "online" && <Dialogo icone={Power} titulo="Ficar Online" texto="Deseja se conectar e começar a receber solicitações de viagens agora?" cancelar={() => setDialogo("")} rotulo="Iniciar" confirmar={() => void ficarOnline()} />}
       {dialogo === "offline" && <Dialogo icone={Power} perigo titulo="Ficar Offline" texto="Deseja parar de receber solicitações de viagens por enquanto?" cancelar={() => setDialogo("")} rotulo="Desligar" confirmar={() => void ficarOffline()} />}
+      {dialogo === "alerta" && (
+        <Dialogo icone={ShieldAlert} perigo titulo="Precisa de ajuda?" texto="A central recebe um alerta agora, com a sua posição. Se for grave, ligue 190 ou 192 antes." cancelar={() => setDialogo("")} rotulo="Avisar a central" confirmar={() => void pedirAjuda()}>
+          <a className="botao-ligar-emergencia" href="tel:190"><Phone size={18} /> Ligar 190 (Polícia)</a>
+        </Dialogo>
+      )}
       {dialogo === "analise" && <Dialogo icone={Hourglass} titulo="Cadastro em análise" texto="Você poderá ficar online depois que a central aprovar o seu cadastro. Confira se falta algum documento." cancelar={() => setDialogo("")} rotuloCancelar="Fechar" rotulo="Ver cadastro" confirmar={() => { setDialogo(""); setTela("cadastro"); }} />}
     </>
   );
@@ -209,7 +225,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     <div className="inicio-m">
       <Mapa pontos={posicao ? [{ ...posicao, rotulo: "Você", tipo: "eu" }] : []} centralizar={centro} className="cheia" />
       <div className="inicio-topo">
-        <button type="button" className="mapa-botao" aria-label="Menu" onClick={() => setMenu(true)}><LayoutGrid size={22} fill="currentColor" /></button>
+        <button type="button" className="pilula-menu" aria-label="Menu" onClick={() => setMenu(true)}><LogoMarca marca={marca} tamanho={40} /><IconeMenu size={24} /></button>
         <span className="pilula-ganhos">
           <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
           <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("atividades")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
@@ -224,6 +240,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
           {erro && <button type="button" className="aviso aviso-erro" style={{ background: "var(--m-card)" }} onClick={() => setErro("")}>{erro}</button>}
         </div>
       )}
+
+      <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>
 
       <div className="inicio-flutuantes">
         {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
