@@ -9,7 +9,7 @@ import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons
 import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { PermissoesPasso } from "./Permissoes";
-import { carregarPersonalizacao, personalizacaoDoCache } from "../comum/personalizacao";
+import { carregarPersonalizacao } from "../comum/personalizacao";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";

@@ -16,11 +16,11 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
   const primeiro = eu.nome.split(" ")[0];
   const pers = usePersonalizacao();
   const rec = pers?.recursos; // recursos ligados e desligados em Configurações > Personalização (sem a personalização, tudo como era)
-  const comMapa = rec?.mapa !== false, comDestino = rec?.destino !== false;
+  const comMapa = rec?.mapa !== false, comDestino = rec?.selecao_destino !== false;
   // Blocos opcionais da tela inicial (ordem e visibilidade vêm de Configurações > Personalização, recursos): cupons e desafio leem os dados reais do painel.
   const [cupons, setCupons] = useState<Array<{ codigo: string; tipo: string; valor: number }>>([]);
   const [desafio, setDesafio] = useState<{ nome: string; meta: number; feito: number } | null>(null);
-  const querCupons = rec?.cupons === true, querDesafio = rec?.desafio === true;
+  const querCupons = rec?.aviso_cupons === true, querDesafio = rec?.desafio === true;
   useEffect(() => { if (querCupons) void api<{ cupons: Array<{ codigo: string; tipo: string; valor: number }> }>("/cupons").then((r) => setCupons(r.cupons ?? [])).catch(() => setCupons([])); }, [querCupons]);
   useEffect(() => { if (querDesafio) void api<{ desafios: Array<{ nome: string; meta: number; feito: number }> }>("/desafios").then((r) => setDesafio(r.desafios?.[0] ?? null)).catch(() => setDesafio(null)); }, [querDesafio]);
   const ordem = pers?.telaInicial.ordemVisiveis ?? ["mapa", "destino"];
