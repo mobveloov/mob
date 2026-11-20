@@ -14,7 +14,6 @@ import { Mapa } from "./Mapa";
 import { pontosDaRota } from "./Opcoes";
 import { Avatar, Aviso, Dialogo, FolhaBaixo, FolhaModal, Nota, Placa, PrecoAjustavel } from "./pecas";
 
-const MOTIVOS_PADRAO = ["Motorista demorou muito", "Valor da corrida", "Pedi por engano", "Outro"];
 
 /** Cronômetro desde que a busca começou (guardado por corrida, para não zerar ao reabrir o app). */
 function useCronometro(id: string) {
@@ -154,7 +153,7 @@ export function Cancelar({ corrida: c, fechar, mudou }: { corrida: Corrida; fech
   const [motivo, setMotivo] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
-  useEffect(() => { void apiOu<{ motivos: string[] }>("/motivos-cancelamento", { motivos: MOTIVOS_PADRAO }).then((r) => setMotivos(r.motivos.length ? r.motivos : MOTIVOS_PADRAO)).catch(() => setMotivos(MOTIVOS_PADRAO)); }, []);
+  useEffect(() => { void apiOu<{ motivos: string[] }>("/motivos-cancelamento", { motivos: [] }).then((r) => setMotivos(r.motivos)).catch(() => setMotivos([])); }, []);
   const confirmar = async () => {
     setErro(""); setOcupado(true);
     try { mudou((await api<{ corrida: Corrida }>(`/corridas/${c.id}/cancelar`, { corpo: { motivo } })).corrida); fechar(); }

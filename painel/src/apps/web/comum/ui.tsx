@@ -323,3 +323,33 @@ export function Carregando({ texto = "Carregando…" }: { texto?: string }) { re
 export function Cartao({ children, className = "" }: { children: ReactNode; className?: string }) { return <section className={`cartao ${className}`}>{children}</section>; }
 
 export const mensagemDeErro = (e: unknown) => (e instanceof ErroApi || e instanceof Error ? e.message : "Erro.");
+
+// ------------------------------------------------------------------ regras do painel (rota /config)
+
+/** O que o painel manda para os apps (Configurações › Gerais, Categorias e Pagamentos). Só o que os apps usam. */
+export interface ConfigDoPainel {
+  passageiro: { paradasAtivo: boolean; limiteParadas: number; editarRota: boolean; destinoLivre: boolean; agendamentoMinutos: number; agendamentoDias: number };
+  motorista: { botaoPanico: boolean; avisosDeConduta: string[]; problemasNaCorrida: string[] };
+  assuntosDeOcorrencia: string[];
+  categorias: Array<{ nome: string; capacidade?: number | string; tipoFisico?: "carro" | "moto" | "caminhao"; permiteAgendamento?: boolean; ocultarCapacidade?: boolean }>;
+}
+let configDoPainel: ConfigDoPainel | null = null;
+let buscandoConfig: Promise<void> | null = null;
+const ouvintesConfig = new Set<() => void>();
+function carregarConfigDoPainel() {
+  buscandoConfig ??= api<ConfigDoPainel>("/config").then((c) => { configDoPainel = c; ouvintesConfig.forEach((f) => f()); }).catch(() => undefined).finally(() => { buscandoConfig = null; });
+  return buscandoConfig;
+}
+/** Regras do painel. Vem nulo até a primeira resposta (ou se o servidor não responder): quem usa deve ter um comportamento neutro. Atualiza ao voltar para o app. */
+export function useConfigDoPainel(): ConfigDoPainel | null {
+  const [c, setC] = useState(configDoPainel);
+  useEffect(() => {
+    const atualizar = () => setC(configDoPainel);
+    ouvintesConfig.add(atualizar);
+    void carregarConfigDoPainel();
+    const voltou = () => { if (document.visibilityState === "visible") void carregarConfigDoPainel(); };
+    document.addEventListener("visibilitychange", voltou);
+    return () => { ouvintesConfig.delete(atualizar); document.removeEventListener("visibilitychange", voltou); };
+  }, []);
+  return c;
+}

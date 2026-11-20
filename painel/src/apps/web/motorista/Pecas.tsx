@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Car, Check, ChevronLeft, ChevronRight, ChevronsRight, MapPin, TriangleAlert, type LucideIcon } from "lucide-react";
 import { api, config, ErroApi, token, urlArquivo } from "../comum/api";
-import { mensagemDeErro } from "../comum/ui";
+import { mensagemDeErro, useConfigDoPainel } from "../comum/ui";
 import { iniciais } from "./tipos";
 
 /** A rota ainda não existe neste servidor (o servidor novo está sendo feito ao mesmo tempo). */
@@ -53,9 +53,10 @@ export function BarraBaixo({ ativa, online, procurando, aoMapa, aoCorridas, aber
   );
 }
 
-/** Faixa de aviso da folha aberta do mapa: lembretes de conduta da empresa (texto fixo; a empresa pode trocar depois). */
+/** Faixa de aviso da folha aberta do mapa: lembretes de conduta da empresa (Configurações › Gerais › Motorista). */
 export function AvisoDoMotorista() {
-  const itens = ["Carro limpo e organizado", "Ambiente agradável e cheiroso", "Não fume", "Atenção ao trânsito", "Não use o celular ao dirigir", "Seja respeitoso com todos", "Atendimento gentil faz a diferença"];
+  const itens = useConfigDoPainel()?.motorista.avisosDeConduta ?? [];
+  if (!itens.length) return null;
   return (
     <div className="aviso-motorista" role="note">
       <div className="am-titulo"><TriangleAlert size={16} /> ATENÇÃO MOTORISTA!</div>
