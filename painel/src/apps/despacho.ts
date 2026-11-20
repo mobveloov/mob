@@ -13,6 +13,7 @@ import { listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, taxasDoPassageiroDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
 import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
+import { registrarEvento, registrarPonto } from "../corridas/registro.ts";
 import { ajustes } from "./ajustes.ts";
 import { gerais } from "../config/gerais.ts";
 import { extraDaCategoria } from "../config/categorias.ts";
@@ -88,8 +89,26 @@ export function taxaDeAceitacao(empresaId: string, motoristaId: string) {
   return { janela: JANELA_ACEITACAO, ofertas: l.length, aceitas, rejeitadas, ignoradas, porcentagem: l.length ? Math.round((aceitas / l.length) * 100) : 0, atualizadoEm: l[0]?.em ?? null };
 }
 
+/** Linha do "Histórico da OS": o que aconteceu com cada chamada enviada a um motorista. */
+function registrarOfertaNoLog(empresaId: string, o: Oferta, fim: FimOferta) {
+  const m = motoristas(empresaId).find((x) => x.id === o.motoristaId);
+  const nome = String(m?.nome ?? "Motorista");
+  const km = o.distanciaKm != null ? ` (a ${String(o.distanciaKm).replace(".", ",")} km do embarque)` : "";
+  const T: Record<FimOferta, { tipo: Parameters<typeof registrarEvento>[2]["tipo"]; texto: string; canal: string }> = {
+    oferecida: { tipo: "oferta_enviada", texto: `Chamada enviada para ${nome}${km}`, canal: "Despacho automático" },
+    aceitou: { tipo: "oferta_aceita", texto: `${nome} aceitou a chamada`, canal: "App do motorista" },
+    recusou: { tipo: "oferta_recusada", texto: `${nome} recusou a chamada`, canal: "App do motorista" },
+    expirou: { tipo: "oferta_expirada", texto: `${nome} deixou a chamada passar (sem resposta)`, canal: "App do motorista" },
+    saiu: { tipo: "oferta_saiu", texto: `${nome} ficou offline com a chamada aberta`, canal: "App do motorista" },
+    perdeu: { tipo: "oferta_perdida", texto: `Chamada de ${nome} encerrada: outro motorista aceitou`, canal: "Despacho automático" },
+  };
+  const x = T[fim];
+  registrarEvento(empresaId, o.corridaId, { tipo: x.tipo, descricao: x.texto, usuario: x.canal === "App do motorista" ? nome : "sistema", canal: x.canal, dados: { ofertaId: o.id, motoristaId: o.motoristaId, distanciaKm: o.distanciaKm } });
+}
+
 function avisarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
   anotarOferta(empresaId, o, fim);
+  registrarOfertaNoLog(empresaId, o, fim);
   for (const f of ouvintesOferta) { try { f(empresaId, o, fim); } catch (e) { console.error("[apps] ouvinte de oferta:", e instanceof Error ? e.message : e); } }
 }
 
@@ -223,6 +242,7 @@ export function atualizarPosicao(empresaId: string, motoristaId: string, lat: nu
   ficarOnline(empresaId, motoristaId, lat, lng);
   const c = corridaAtual(empresaId, "motorista", motoristaId);
   if (c && ABERTA_COM_MOTORISTA.has(c.status)) emitir(empresaId, passageiroAlvo(c), "posicao", { corridaId: c.id, lat, lng, em: Date.now() });
+  if (c && (c.status === "a_caminho" || c.status === "no_local" || c.status === "em_andamento")) registrarPonto(empresaId, c.id, lat, lng, c.status === "em_andamento" ? "viagem" : "embarque"); // trajeto real da corrida (Trajeto da OS)
   if (c?.macaneta?.modo === "taximetro" && c.status === "em_andamento") somarTaximetro(empresaId, c.id, lat, lng);
 }
 
@@ -333,6 +353,9 @@ function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: { li
   return (prioritarios.length ? prioritarios : ordenados).slice(0, Math.min(limite, Math.max(1, regras.prioritarios)));
 }
 
+/** Corridas que já avisaram "nenhum motorista disponível" (some quando aparece alguém). */
+const semMotoristaAvisado = new Set<string>();
+
 export function despachar(empresaId: string) {
   const e = estado(empresaId);
   if (!e.online.size) return 0;
@@ -397,7 +420,12 @@ export function despachar(empresaId: string) {
       };
       candidatos.push(cand);
     }
-    if (!candidatos.length) continue;
+    if (!candidatos.length) {
+      // Histórico da OS: avisa uma vez só que não havia motorista disponível (a verificação roda a cada 2 s).
+      if (!semMotoristaAvisado.has(c.id)) { semMotoristaAvisado.add(c.id); if (semMotoristaAvisado.size > 5000) semMotoristaAvisado.clear(); registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: "Nenhum motorista disponível por perto no momento", usuario: "sistema", canal: "Despacho automático" }); }
+      continue;
+    }
+    semMotoristaAvisado.delete(c.id);
     candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0));
     // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
     // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
@@ -412,6 +440,23 @@ export function despachar(empresaId: string) {
       continue;
     }
     e.rodadas.set(c.id, { ...rod, n: rod.n + 1 });
+    // Histórico da OS: quem foi consultado nesta rodada, a que distância (linha reta) e quem recebeu a chamada.
+    {
+      const raioKm = process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000;
+      const metodoTexto = regras.metodo === "fila_virtual" ? "fila virtual" : regras.metodo === "primeiro_aceitar" ? "grupo (primeiro a aceitar)" : "proximidade";
+      registrarEvento(empresaId, c.id, { tipo: "despacho_consulta", descricao: `Consultando motoristas por ${metodoTexto}`, usuario: "sistema", canal: "Despacho automático" });
+      registrarEvento(empresaId, c.id, {
+        tipo: "despacho_encontrados", usuario: "sistema", canal: "Despacho automático",
+        descricao: `Foram encontrados ${candidatos.length} ${candidatos.length === 1 ? "motorista" : "motoristas"} em até ${String(arred(raioKm, 1)).replace(".", ",")} km (${regras.metodo === "primeiro_aceitar" ? "Disputa sem eleição" : regras.metodo === "fila_virtual" ? "Fila virtual" : "Mais próximo"})`,
+        dados: {
+          metodo: regras.metodo, raioKm, rodada: rod.n + 1, embarque: { lat: c.embarque.lat ?? null, lng: c.embarque.lng ?? null },
+          candidatos: candidatos.slice(0, 30).map((x) => {
+            const cad = cadastro.get(x.id), pos = e.online.get(x.id);
+            return { id: x.id, nome: String(cad?.nome ?? ""), vtr: String(cad?.viatura ?? ""), kmReta: x.km != null ? arred(x.km, 3) : null, favorito: x.fav, recebeu: escolhidos.some((y) => y.id === x.id), lat: pos?.lat ?? null, lng: pos?.lng ?? null };
+          }),
+        },
+      });
+    }
     for (const melhor of escolhidos) {
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
