@@ -14,7 +14,7 @@ import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/
 import { exigirPapel } from "../servidor/sessao.ts";
 import { abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
-import { termos as termosDoPainel } from "../config/gerais.ts";
+import { gerais as geraisDoPainel, termos as termosDoPainel } from "../config/gerais.ts";
 import { ajustes, contatos } from "./ajustes.ts";
 import { arquivo, ler, limitador, num, soDigitos, txt } from "./armazem.ts";
 import { marcarLida } from "./chat.ts";
@@ -288,10 +288,14 @@ rotasV2.post("/corridas/:id/contraofertas/:oferta/aceitar", so("passageiro"), ok
 }));
 
 /** Edita a rota com a corrida aberta (paradas e destino): recalcula a estimativa e avisa o motorista. */
+const permiteEditarRota = (empresaId: string) => { try { return geraisDoPainel(empresaId).passageiro.editarRota; } catch { return true; } };
+
 rotasV2.post("/corridas/:id/rota", so("passageiro"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, "passageiro", sessao.chave);
   if (!ABERTA.has(c.status)) throw new Error("Esta corrida já terminou.");
+  // Liga/desliga em Configurações › Gerais › Regras do passageiro (Passageiro pode editar rota).
+  if (!permiteEditarRota(empresaId)) throw new Error("A empresa não permite mudar a rota depois de pedir.");
   const pedidas = req.body?.paradas !== undefined ? (Array.isArray(req.body.paradas) ? req.body.paradas : []) : c.paradas ?? [];
   const paradas = pedidas.map(ponto).filter((p: Ponto) => p.texto).slice(0, 3).map((p: Ponto) => completarPonto(empresaId, p)!);
   if (Array.isArray(req.body?.paradas) && req.body.paradas.filter((p: Ponto) => p?.texto).length > 3) throw new Error("No máximo 3 paradas.");

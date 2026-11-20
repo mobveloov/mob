@@ -5,7 +5,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Bike, CarFront, Clock, Flag, LocateFixed, MapPin, MessageSquareText, Moon, Pencil, Phone, Plus, Search, Share2, ShieldAlert, Sun, Tag, User, Wallet, X, XCircle } from "lucide-react";
 import { api, posicaoAgora, reais, vibrar, type Posicao } from "../comum/api";
-import { mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { mensagemDeErro, useConfigDoPainel, type MarcaApp } from "../comum/ui";
 import {
   apiOu, compartilharTexto, distanciaKm, ehMoto, faixaDaOferta, linhasDoEndereco, linkPublico, PASSO_OFERTA, rotaFaltando, ruaCurta, temCoord, valorDaCorrida,
   type ContraOferta, type Corrida, type Endereco, type Ponto,
@@ -185,6 +185,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
   const [aviso, setAviso] = useState("");
   const [erro, setErro] = useState("");
   const m = c.motorista;
+  const regras = useConfigDoPainel();
 
   // Distância e tempo do motorista: do servidor, ou calculados pela posição dele (≈ 25 km/h na cidade).
   const alvo = c.status === "em_andamento" ? c.destino : c.embarque;
@@ -259,7 +260,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
               <div className="ponto-rota"><span className="bola-rota" /><span><small className="cor-texto">Embarque</small><strong>{e1}</strong><small>{e2}</small></span></div>
               {(c.paradas ?? []).map((p, i) => { const [p1, p2] = linhasDoEndereco(p); return <Fragment key={i}><div className="ponto-rota"><span className="bola-rota parada">{i + 1}</span><span><small>Parada {i + 1}</small><strong>{p1}</strong><small>{p2}</small></span></div></Fragment>; })}
               {c.destino && (() => { const [d1, d2] = linhasDoEndereco(c.destino); return <div className="ponto-rota"><span className="bola-rota fim" /><span><small>Destino</small><strong>{d1}</strong><small>{d2}</small></span></div>; })()}
-              {c.status !== "finalizada" && <button className="botao-claro" onClick={() => setJanela("rota")}><Pencil size={16} /> Editar rota</button>}
+              {c.status !== "finalizada" && (regras?.passageiro.editarRota ?? true) && <button className="botao-claro" onClick={() => setJanela("rota")}><Pencil size={16} /> Editar rota</button>}
             </div>
             <div className="duas-colunas">
               <div className="mini-cartao"><Wallet size={22} /><span><small>Pagamento</small><strong>{c.pagamento}</strong></span></div>

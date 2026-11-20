@@ -128,3 +128,16 @@ test("termos de uso e privacidade do app são os escritos no painel (rota públi
   assert.equal((await chamar("GET", `${API}/termos/passageiro`)).corpo.texto, "");
   assert.equal((await chamar("GET", `${API}/termos/outro`)).status, 404);
 });
+
+test("editar a rota no meio da corrida segue o painel (Passageiro pode editar rota?)", async () => {
+  const tp = await entrar("passageiro", "11988880009");
+  const r = await chamar("POST", `${API}/corridas`, { pedidoId: "rota-edit-1", embarque: EMB, destino: { texto: "Fim", lat: -23.6, lng: -46.66 }, categoria: "Econômico", pagamento: "Dinheiro" }, tp);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  salvarGerais(E.id, { passageiro: { editarRota: false } });
+  const nao = await chamar("POST", `${API}/corridas/${r.corpo.corrida.id}/rota`, { destino: { texto: "Outro", lat: -23.61, lng: -46.67 } }, tp);
+  assert.equal(nao.status, 400);
+  assert.match(nao.corpo.erro, /não permite mudar a rota/);
+  salvarGerais(E.id, { passageiro: { editarRota: true } });
+  const sim = await chamar("POST", `${API}/corridas/${r.corpo.corrida.id}/rota`, { destino: { texto: "Outro", lat: -23.61, lng: -46.67 } }, tp);
+  assert.equal(sim.status, 200, JSON.stringify(sim.corpo));
+});
