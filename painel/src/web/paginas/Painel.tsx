@@ -35,30 +35,6 @@ interface Nps { nps: number | null; respondentes: number; detratores: number; ne
 interface Metricas { passageiros: Nps; motoristas: Nps }
 interface Serie { serie: Array<{ rotulo: string; solicitadas: number; finalizadas: number; naoAtendidas: number; canceladas: number; ganhos: number; nps: number | null }> }
 
-type ItemBanner = { id: string; titulo: ReactNode; descricao?: string; tom: "vermelho" | "amarelo"; acao?: { rotulo: string; para: string } };
-/** Faixa de alertas críticos no topo da página inicial: mostra o primeiro e, se houver mais, "Ver mais N alertas". */
-function BannerGlobal({ itens }: { itens: ItemBanner[] }) {
-  const [aberto, setAberto] = useState(false);
-  if (!itens.length) return null;
-  const mostrados = aberto ? itens : itens.slice(0, 1);
-  const extra = itens.length - 1;
-  return (
-    <section className={`banner-global${!aberto && extra > 0 ? " recolhido" : ""}`} aria-label="Alertas críticos">
-      {mostrados.map((i, n) => (
-        <div key={i.id} className={`banner-global-item ${i.tom}`} role="alert">
-          <AlertTriangle size={18} />
-          <div className="banner-global-texto">
-            <p className="banner-global-titulo">{i.titulo}</p>
-            {i.descricao && <p className="banner-global-desc">{i.descricao}</p>}
-            {n === 0 && extra > 0 && <button type="button" className="banner-global-alternar" onClick={() => setAberto(!aberto)}>{aberto ? "Ver menos" : `Ver mais ${extra} ${extra === 1 ? "alerta" : "alertas"}`}</button>}
-          </div>
-          {i.acao && <Link className="banner-global-acao" to={i.acao.para}>{i.acao.rotulo}</Link>}
-        </div>
-      ))}
-    </section>
-  );
-}
-
 /** Seletor suspenso que fecha ao clicar fora. */
 function Seletor({ classe, icone, rotulo, children }: { classe: string; icone: ReactNode; rotulo: string; children: (fechar: () => void) => ReactNode }) {
   const [aberto, setAberto] = useState(false);
@@ -253,7 +229,6 @@ export default function Painel() {
     serie: cmp.periodo, ...(cmp.periodo === "personalizado" ? { serieInicio: cmp.ini, serieFim: cmp.fim } : {}),
   } : null;
   const { dados, erro } = useCarregar(() => (pedido ? api.indicadores(pedido) : Promise.resolve(null)), [JSON.stringify(pedido)]);
-  const { dados: oc } = useCarregar(() => fetch("/api/operacao/ocorrencias?horas=1", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).catch(() => null), [], 300_000);
   const [cidades, setCidades] = useState<string[]>([]);
   useEffect(() => { if (dados?.cidades?.length) setCidades((c) => [...new Set([...c, ...dados.cidades])].sort((a, b) => a.localeCompare(b, "pt-BR"))); }, [dados]);
   const d = dados?.indicadores as Dados | undefined;
@@ -271,7 +246,6 @@ export default function Painel() {
   const ant = (n: number | undefined, casas = 0) => `Comparado com ${dados?.rotuloAnterior ?? "o período anterior"}: ${numero(n ?? 0, casas)}`;
   const taxa = c ? pc(c.finalizadas) : 0;
   const dicaCorridas = c && c.total ? (taxa >= 70 ? "Seu número de corridas finalizadas é considerado alto. Procure mantê-lo acima de 70%." : "Seu número de corridas finalizadas é considerado baixo. Procure mantê-lo acima de 70%.") : "Seu número de corridas finalizadas é considerado alto. Procure mantê-lo acima de 70%.";
-  const tem = (oc?.total ?? 0) > 0;
 
   return (
     <>
@@ -287,11 +261,7 @@ export default function Painel() {
           </Seletor>
         </div>
       </Titulo>
-      <BannerGlobal itens={[
-        ...(dados?.avisos ?? []).map((a: string) => ({ id: a, titulo: a, tom: "vermelho" as const })),
-        ...(tem ? [{ id: "ocorrencia_aberta", tom: "amarelo" as const, titulo: <>Há corridas que podem requerer atenção do operador. Acione a <Link to="/ocorrencias">tela de ocorrências</Link> e registre ciência nas corridas para liberar este alerta</> }] : []),
-      ]} />
-      <Avisos lista={[erro]} />
+      <Avisos lista={[...(dados?.avisos ?? []), erro]} />
 
       <div className="ind-secao-linha"><h3 className="ind-secao">Estatísticas da operação</h3><SeletorPeriodo opcoes={ESTATISTICAS} valor={est} onMudar={setEst} /></div>
       <div className="ind-linha3">
