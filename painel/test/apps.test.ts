@@ -266,7 +266,7 @@ test("central: motoristas online e alertas de SOS só da empresa do usuário", a
   assert.equal(al.alertas.length, 1);
   const res = await (await fetch(`${base}/api/apps-central/alertas/${al.alertas[0].id}/resolver`, { method: "POST", headers: { cookie } })).json();
   assert.equal(res.alerta.resolvido, true);
-  assert.equal(P.alertas(B.id).length, 0);
+  assert.equal((await import("../src/apps/sos.ts")).listarSos(B.id).length, 0);
 });
 
 test("corrida da central também é oferecida pelo app; motorista que desiste devolve para a busca", async () => {

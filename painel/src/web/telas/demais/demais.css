@@ -239,3 +239,7 @@
 .dm-taxa-linha { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
 .dm-taxa-linha.desligada .dm-taxa { opacity: .6; }
 .dm-versao-minima { display: flex !important; gap: 6px; align-items: center; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: #fff8e1; color: #666 !important; }
+
+.dm-sino-sos { color: #fff; background: var(--ruim); animation: dm-sos-pulso 1s ease-in-out infinite; }
+@keyframes dm-sos-pulso { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ruim) 35%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .dm-sino-sos { animation: none; } }

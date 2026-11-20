@@ -11,7 +11,7 @@ export interface Banner { id: string; arquivo: string; mime: string; link: strin
 export interface Indicacao { ativo: boolean; valorIndicado: number; valorIndicador: number; corridas: number }
 
 export interface ConfigGerais {
-  suporte: { whatsapp: string; telefone: string; linkAjuda: string };
+  suporte: { whatsapp: string; telefone: string; linkAjuda: string; /** Número que recebe o alerta de SOS pelo WhatsApp do bot (vazio = não envia). */ whatsappEmergencia: string };
   motorista: {
     bonusCadastroAtivo: boolean; bonusCadastroValor: number; editarValorFinal: boolean; confirmarTaxas: boolean; editarRota: boolean;
     cpfObrigatorio: boolean; descontarCupomNoToque: boolean; botaoPanico: boolean; mapaNavegacao: boolean; distanciaRecalculo: number;
@@ -22,6 +22,8 @@ export interface ConfigGerais {
     gravacao: { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number; /** Dias que a cópia fica no celular do motorista depois de enviada. */ diasNoAparelho: number };
     /** Dias sem nenhum contato do app para o diagnóstico mostrar APP OFF. */
     diasSemContatoApp: number;
+    /** Alerta de pânico: até quantos km os motoristas próximos são avisados (0 desliga) e por quantos minutos o alerta fica valendo. */
+    raioPanicoKm: number; duracaoPanicoMin: number;
     /** Quantos segundos a contra-oferta do motorista vale para o passageiro. */
     contraofertaSegundos: number;
     /** Minutos até a central oferecer a mesma corrida de novo a um motorista que a recusou ou deixou passar. */
@@ -60,12 +62,12 @@ const PREF_PADRAO: Preferencia[] = [
 const ind = (valorIndicado: number, valorIndicador: number, corridas: number, ativo = false): Indicacao => ({ ativo, valorIndicado, valorIndicador, corridas });
 
 export const GERAIS_PADRAO: ConfigGerais = {
-  suporte: { whatsapp: "", telefone: "", linkAjuda: "" },
+  suporte: { whatsapp: "", telefone: "", linkAjuda: "", whatsappEmergencia: "" },
   motorista: {
     bonusCadastroAtivo: false, bonusCadastroValor: 0, editarValorFinal: true, confirmarTaxas: false, editarRota: false, cpfObrigatorio: true,
     descontarCupomNoToque: true, botaoPanico: true, mapaNavegacao: true, distanciaRecalculo: 150,
     mensagensRapidas: ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor.", "Bom dia", "Boa tarde", "Boa noite"],
-    documentos: DOCS_PADRAO, diasSemContatoApp: 7, contraofertaSegundos: 60, reofertaMinutos: 2,
+    documentos: DOCS_PADRAO, diasSemContatoApp: 7, raioPanicoKm: 3, duracaoPanicoMin: 30, contraofertaSegundos: 60, reofertaMinutos: 2,
     gravacao: { ativa: true, obrigatoria: false, video: false, dias: 30, diasNoAparelho: 3 },
     avisosDeConduta: ["Carro limpo e organizado", "Ambiente agradável e cheiroso", "Não fume", "Atenção ao trânsito", "Não use o celular ao dirigir", "Seja respeitoso com todos", "Atendimento gentil faz a diferença"],
     problemasNaCorrida: ["Passageiro difícil ou agressivo", "Endereço errado ou local perigoso", "Problema no veículo", "Problema no aplicativo", "Cobrança ou pagamento", "Outro problema"],
@@ -112,13 +114,14 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
   const docs = Array.isArray(m.documentos) ? (m.documentos as unknown[]) : atual.motorista.documentos;
   const prefs = Array.isArray(e.preferencias) ? (e.preferencias as unknown[]) : atual.preferencias;
   return {
-    suporte: { whatsapp: texto(s.whatsapp, 20).replace(/[^\d+]/g, ""), telefone: texto(s.telefone, 30), linkAjuda: /^https?:\/\//i.test(texto(s.linkAjuda, 300)) ? texto(s.linkAjuda, 300) : "" },
+    suporte: { whatsapp: texto(s.whatsapp, 20).replace(/[^\d+]/g, ""), telefone: texto(s.telefone, 30), linkAjuda: /^https?:\/\//i.test(texto(s.linkAjuda, 300)) ? texto(s.linkAjuda, 300) : "", whatsappEmergencia: texto(s.whatsappEmergencia, 20).replace(/[^\d]/g, "") },
     motorista: {
       bonusCadastroAtivo: sim(m.bonusCadastroAtivo), bonusCadastroValor: centavos(numero(m.bonusCadastroValor, 0, 0, 10_000)),
       editarValorFinal: sim(m.editarValorFinal), confirmarTaxas: sim(m.confirmarTaxas), editarRota: sim(m.editarRota), cpfObrigatorio: sim(m.cpfObrigatorio),
       descontarCupomNoToque: sim(m.descontarCupomNoToque), botaoPanico: sim(m.botaoPanico), mapaNavegacao: sim(m.mapaNavegacao),
       distanciaRecalculo: Math.round(numero(m.distanciaRecalculo, 150, 20, 5000)),
       diasSemContatoApp: Math.round(numero(m.diasSemContatoApp, 7, 1, 90)),
+      raioPanicoKm: Math.round(numero(m.raioPanicoKm, 3, 0, 100) * 10) / 10, duracaoPanicoMin: Math.round(numero(m.duracaoPanicoMin, 30, 5, 1440)),
       contraofertaSegundos: Math.round(numero(m.contraofertaSegundos, 60, 10, 600)),
       reofertaMinutos: Math.round(numero(m.reofertaMinutos, 2, 1, 60)),
       mensagensRapidas: lista(m.mensagensRapidas).map((x) => texto(x, 120)).filter(Boolean).slice(0, 20),

@@ -28,7 +28,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   },
   {
     id: "corridas", nome: "Corridas", cor: "azul", blocos: [
-      { ids: ["solicitar", "monitoramento", "ocorrencias", "historico", "mapa", "programadas", "taxas-cancelamento", "indice-relatorios", "alterar-os", "entrega-voucher", "objetos", "engajamento"] },
+      { ids: ["solicitar", "monitoramento", "ocorrencias", "alertas-seguranca", "historico", "mapa", "programadas", "taxas-cancelamento", "indice-relatorios", "alterar-os", "entrega-voucher", "objetos", "engajamento"] },
     ],
   },
   {

@@ -848,30 +848,4 @@ export function motoristasOnline(empresaId: string) {
   }));
 }
 
-// ------------------------------------------------------------------ SOS
-
-export interface Alerta { id: string; corridaId: string; os: string; papel: PapelApp; nome: string; telefone: string; lat: number | null; lng: number | null; em: string; resolvido: boolean; resolvidoPor: string }
-const arqAlertas = (empresaId: string) => arquivo(empresaId, "alertas.json");
-export const alertas = (empresaId: string) => ler<Alerta[]>(arqAlertas(empresaId), []);
-
-export function registrarSos(empresaId: string, c: CorridaPropria, papel: PapelApp, lat?: number, lng?: number): Alerta {
-  const a: Alerta = {
-    id: crypto.randomUUID(), corridaId: c.id, os: c.os, papel,
-    nome: papel === "passageiro" ? c.passageiro.nome : c.motorista, telefone: papel === "passageiro" ? c.passageiro.telefone : c.telefoneMotorista,
-    lat: lat ?? null, lng: lng ?? null, em: new Date().toISOString(), resolvido: false, resolvidoPor: "",
-  };
-  gravar(arqAlertas(empresaId), [...alertas(empresaId).slice(-999), a]);
-  console.warn(`[apps] SOS na empresa ${empresaId}, OS ${c.os} (${papel})`);
-  return a;
-}
-
-export function resolverAlerta(empresaId: string, id: string, por: string) {
-  const l = structuredClone(alertas(empresaId)); // cópia: o cache é só leitura
-  const a = l.find((x) => x.id === id);
-  if (!a) throw new Error("Alerta não encontrado.");
-  a.resolvido = true; a.resolvidoPor = por.slice(0, 120);
-  gravar(arqAlertas(empresaId), l);
-  return a;
-}
-
 export const temAlguem = (empresaId: string) => temOuvinte(empresaId) || estado(empresaId).online.size > 0;

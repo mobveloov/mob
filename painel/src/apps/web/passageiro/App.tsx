@@ -4,6 +4,7 @@
 // avaliar com etiquetas, histórico, agendadas e conta.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { aoMudarSos, CartaoMeuSos } from "../comum/sos";
 import { api, avisoDoMarco, manterTelaLigada, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
 import { Clock, House, User, Wallet } from "lucide-react";
 import { acompanharPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
@@ -36,7 +37,7 @@ export default function App() {
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
   if (!marca) return <Carregando />;
   if (!logado) return <Entrar marca={marca} aoEntrar={() => setLogado(true)} />;
-  return <Logado marca={marca} sair={() => setLogado(false)} />;
+  return <><Logado marca={marca} sair={() => setLogado(false)} /><CartaoMeuSos /></>;
 }
 
 const avisoDaTaxa = (c: Corrida) => (c.status === "cancelada" && c.mensagemCancelamento ? c.mensagemCancelamento : c.status === "cancelada" && c.taxaCancelamento ? `Corrida cancelada. Foi cobrada uma taxa de cancelamento de ${reais(c.taxaCancelamento)}.` : "");
@@ -90,7 +91,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   useEffect(() => { void manterTelaLigada(true); return () => { void manterTelaLigada(false); }; }, []); // tela acesa enquanto acompanha a viagem
 
   useEffect(() => tempoReal((tipo, d) => {
-    if (tipo === "corrida") {
+    if (tipo === "sos_estado") aoMudarSos();
+    else if (tipo === "corrida") {
       const c = d as Corrida;
       if (esperandoHorario(c)) return; // agendada: aparece na aba Agendadas até chegar a hora
       const visto = statusVisto.current[c.id];

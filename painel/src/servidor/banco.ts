@@ -109,6 +109,14 @@ export function banco(): Banco {
       empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, de TEXT NOT NULL,
       texto TEXT, audio TEXT, em TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (empresa, id));
     CREATE INDEX IF NOT EXISTS app_suporte_conversa ON app_suporte (empresa, papel, chave, em);
+    CREATE TABLE IF NOT EXISTS sos_alertas (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '',
+      lat REAL, lng REAL, endereco TEXT NOT NULL DEFAULT '', corrida_id TEXT NOT NULL DEFAULT '', os TEXT NOT NULL DEFAULT '', motivo TEXT NOT NULL DEFAULT '',
+      em TEXT NOT NULL, situacao TEXT NOT NULL DEFAULT 'aberto', atendido_por TEXT NOT NULL DEFAULT '', atendido_em TEXT NOT NULL DEFAULT '',
+      encerrado_por TEXT NOT NULL DEFAULT '', encerrado_em TEXT NOT NULL DEFAULT '', observacao TEXT NOT NULL DEFAULT '',
+      notificados INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (empresa, id));
+    CREATE INDEX IF NOT EXISTS sos_alertas_situacao ON sos_alertas (empresa, situacao, em);
+    CREATE INDEX IF NOT EXISTS sos_alertas_pessoa ON sos_alertas (empresa, papel, chave, em);
     CREATE TABLE IF NOT EXISTS voucher_faixas (
       empresa TEXT NOT NULL, id TEXT NOT NULL, conveniada TEXT NOT NULL, serie TEXT NOT NULL DEFAULT '', inicial INTEGER NOT NULL, final INTEGER NOT NULL,
       em TEXT NOT NULL, por TEXT NOT NULL, PRIMARY KEY (empresa, id));
