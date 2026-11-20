@@ -6,7 +6,7 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor
 
 export type Papel = "passageiro" | "motorista";
 /** teste: APK de teste (build com APP_TESTE=1). Mostra o campo "Servidor" na entrada, para trocar o endereço temporário. */
-export interface Config { empresaId: string; api: string; papel: Papel; teste?: boolean }
+export interface Config { empresaId: string; api: string; papel: Papel; teste?: boolean; descoberta?: string }
 
 const ler = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const gravar = (k: string, v: string | null) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* sem armazenamento */ } };
@@ -20,7 +20,36 @@ export function trocarServidor(url: string) {
   const u = url.trim().replace(/\/+$/, "");
   if (u && !/^https?:\/\/[^\s"'<>]+$/.test(u)) throw new Error("Endereço inválido. Ex.: https://exemplo.trycloudflare.com");
   gravar("servidor-teste", u || null);
+  if (!u) gravar("api-descoberto", null);
   location.reload();
+}
+
+const httpsOuHttp = /^https?:\/\/[^\s"'<>]+$/;
+const semBarra = (u: string) => u.replace(/\/+$/, "");
+
+/** O servidor responde? (rota pública /api/saude, até 4 s) */
+async function servidorVivo(api: string): Promise<boolean> {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 4000);
+  try { return (await fetch(`${api}/api/saude`, { cache: "no-store", signal: ctl.signal })).ok; } catch { return false; } finally { clearTimeout(t); }
+}
+
+/**
+ * Endereço fixo sem gerar APK de novo: se o build trouxe "descoberta" (um endereço FIXO que devolve {"api": "https://..."}),
+ * o app confere o servidor que conhece; se não responder, pergunta à descoberta onde o servidor está agora e guarda a resposta.
+ * Sem "descoberta" no build, nada muda (usa o endereço do build, ou o digitado no APK de teste).
+ */
+async function escolherServidor(doBuild: string, descoberta: string | undefined, preferido: string | null): Promise<string> {
+  const base = semBarra(preferido || doBuild);
+  if (preferido || !descoberta || !httpsOuHttp.test(descoberta)) return base; // endereço digitado à mão no APK de teste manda
+  const guardado = ler("api-descoberto");
+  for (const c of [guardado, base]) if (c && await servidorVivo(semBarra(c))) return semBarra(c);
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 5000);
+    const r = await fetch(descoberta, { cache: "no-store", signal: ctl.signal }).finally(() => clearTimeout(t));
+    const novo = r.ok ? semBarra(String(((await r.json()) as { api?: string }).api ?? "")) : "";
+    if (httpsOuHttp.test(novo) && await servidorVivo(novo)) { gravar("api-descoberto", novo); return novo; }
+  } catch { /* sem rede ou descoberta fora do ar: segue com o que há */ }
+  return semBarra(guardado || base);
 }
 
 export async function carregarConfig(papel: Papel): Promise<Config> {
@@ -30,7 +59,8 @@ export async function carregarConfig(papel: Papel): Promise<Config> {
       const j = (await r.json()) as Partial<Config>;
       if (j.empresaId) {
         const outro = j.teste ? ler("servidor-teste") : null;
-        return (cfg = { empresaId: j.empresaId, api: (outro || j.api || "").replace(/\/+$/, ""), papel, teste: !!j.teste });
+        const api = await escolherServidor(j.api ?? "", j.descoberta, outro);
+        return (cfg = { empresaId: j.empresaId, api, papel, teste: !!j.teste, descoberta: j.descoberta });
       }
     }
   } catch { /* sem config.json: navegador */ }
