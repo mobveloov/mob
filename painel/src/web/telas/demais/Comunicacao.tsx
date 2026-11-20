@@ -197,7 +197,7 @@ export function Notificacoes() {
             <tbody>
               {!x.itens.length ? <tr><td colSpan={7} className="vazio">Nenhum resultado encontrado.</td></tr> : x.itens.map((n: any) => (
                 <tr key={n.id}>
-                  <td>{diaBr(n.criadoEm)}</td><td>{n.destinatario}</td><td>{n.titulo}</td><td>{n.mensagem}</td><td>{n.status}</td><td>{diaBr(n.enviadoEm)}</td>
+                  <td>{diaBr(n.criadoEm)}</td><td>{n.destinatario}</td><td>{n.titulo}</td><td>{n.mensagem}</td><td>{n.status}{n.app?.total ? <small style={{ display: "block" }}>{n.app.total} {n.app.total === 1 ? "pessoa" : "pessoas"}: {n.app.entregues + n.app.lidas} {n.app.entregues + n.app.lidas === 1 ? "entregue" : "entregues"} no app, {n.app.lidas} {n.app.lidas === 1 ? "lida" : "lidas"}{n.app.falhas ? `, ${n.app.falhas} com falha` : ""}{n.app.pushPendenteChave ? ". Push do sistema pendente de chave." : n.app.pushEnviado ? `. Push do sistema enviado a ${n.app.pushEnviado}.` : ""}</small> : null}</td><td>{diaBr(n.enviadoEm)}</td>
                   <td><div className="dm-dropdown"><button className="icone" aria-label={`Ações de ${n.titulo}`} onClick={() => setMenu(menu === n.id ? null : n.id)}>⋮</button>
                     {menu === n.id && <div className="dm-dropdown-menu direita"><button onClick={() => { setMenu(null); setDetalhe(n); }}>Ver detalhes</button>{n.agendamentoId && <button onClick={async () => { setMenu(null); if (confirm("Cancelar este envio agendado?")) { await pedirConfig(`/notificacoes/agendar/${n.agendamentoId}`, "DELETE"); lista.recarregar(); } }}>Cancelar envio</button>}</div>}</div></td>
                 </tr>
