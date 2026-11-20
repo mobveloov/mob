@@ -6,6 +6,7 @@ import "./grupoc.css";
 import { Carteiras, Extrato, Recargas, Relatorios, Saques } from "./Financeiro";
 import { ExtratoCentral, ExtratoOnline, VisaoGeral } from "./FinanceiroMachine";
 import { TransacaoPix } from "./Pix";
+import { ExtratoCreditos, PainelCartao, RecargasESaques, SaldoCentral, SaldoMotorista, TransacoesCartao, UltimoBoleto } from "./CreditosCartao";
 import { RelatorioFaturamento } from "./RelatorioFaturamento";
 import { AlertasEmpresas } from "./Alertas";
 import { Conversas, Notificacoes } from "./Comunicacao";
@@ -26,6 +27,13 @@ export const TELAS_DEMAIS: Record<string, JSX.Element> = {
   "extrato-central": <ExtratoCentral />,
   "extrato-online": <ExtratoOnline />,
   "transacao-pix": <TransacaoPix />,
+  "creditos-recargas-saques": <RecargasESaques />,
+  "creditos-extrato": <ExtratoCreditos />,
+  "cartao-painel": <PainelCartao />,
+  "cartao-transacoes": <TransacoesCartao />,
+  "cartao-saldo-central": <SaldoCentral />,
+  "cartao-saldo-motorista": <SaldoMotorista />,
+  "ultimo-boleto": <UltimoBoleto />,
   "alertas-empresas": <AlertasEmpresas />,
   carteiras: <Carteiras />,
   "carteiras-credito": <Carteiras />,
