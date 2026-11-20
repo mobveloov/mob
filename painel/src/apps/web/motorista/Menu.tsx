@@ -449,8 +449,11 @@ export function FaleConosco({ voltar, marca }: Voltar & { marca: MarcaApp }) {
 export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: MarcaApp; fechar: () => void; ir: (t: string) => void; sair: () => void }) {
   const c = useContatos(marca.suporte);
   const [confirmar, setConfirmar] = useState(false);
+  const [texto, setTexto] = useState<{ titulo: string; tipo: "motorista" | "privacidade" } | null>(null);
   const item = (icone: typeof Car, titulo: string, tela: string, texto?: string, selo?: string) => <ItemMenu icone={icone} titulo={titulo} texto={texto} selo={selo} aoTocar={() => { fechar(); ir(tela); }} />;
   return (
+    <>
+    {texto && <TextoDoPainel titulo={texto.titulo} tipo={texto.tipo} fechar={() => setTexto(null)} />}
     <div className="menu-lateral" onClick={fechar}>
       <div onClick={(e) => e.stopPropagation()}>
         <div className="menu-perfil">
@@ -475,8 +478,8 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
         {item(MessageSquare, "Chat com suporte", "suporte")}
         {item(Headset, "Fale conosco", "fale")}
         {item(Settings, "Configurações", "config")}
-        {c.termosUrl && <ItemMenu icone={FileText} titulo="Termos de uso" aoTocar={() => window.open(c.termosUrl, "_blank")} />}
-        {c.privacidadeUrl && <ItemMenu icone={ShieldCheck} titulo="Política de privacidade" aoTocar={() => window.open(c.privacidadeUrl, "_blank")} />}
+        <ItemMenu icone={FileText} titulo="Termos de uso" aoTocar={() => (c.termosUrl ? window.open(c.termosUrl, "_blank") : setTexto({ titulo: "Termos de uso", tipo: "motorista" }))} />
+        <ItemMenu icone={ShieldCheck} titulo="Política de privacidade" aoTocar={() => (c.privacidadeUrl ? window.open(c.privacidadeUrl, "_blank") : setTexto({ titulo: "Política de privacidade", tipo: "privacidade" }))} />
         <div className="menu-rodape">
           <ItemMenu icone={LogOut} perigo titulo="Sair da conta" aoTocar={() => setConfirmar(true)} direita={<span />} />
           <small>Versão {VERSAO}</small>
@@ -484,8 +487,20 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
       </div>
       {confirmar && <Dialogo icone={LogOut} perigo titulo="Sair da conta?" texto="Você vai ficar offline." cancelar={() => setConfirmar(false)} rotulo="Sair" confirmar={sair} />}
     </div>
+    </>
   );
 }
 
 // ajuda para o compilador: ícones usados só em texto de ajuda
 void [LifeBuoy, Navigation, SquareDashed, Bolt, ajustesAgora, telefoneBonito, hora, FileText];
+
+/** Termos de uso e privacidade escritos pela empresa no painel (Configurações › Termos de uso). */
+function TextoDoPainel({ titulo, tipo, fechar }: { titulo: string; tipo: "motorista" | "privacidade"; fechar: () => void }) {
+  const [t, setT] = useState<string | null>(null);
+  useEffect(() => { void api<{ texto: string }>(`/termos/${tipo}`).then((r) => setT(r.texto)).catch(() => setT("")); }, [tipo]);
+  return (
+    <Folha titulo={titulo} fechar={fechar}>
+      {t === null ? <p className="dica">Carregando…</p> : t ? <p style={{ whiteSpace: "pre-wrap", margin: 0, maxHeight: "60vh", overflow: "auto" }}>{t}</p> : <p className="dica">A empresa ainda não publicou este texto.</p>}
+    </Folha>
+  );
+}

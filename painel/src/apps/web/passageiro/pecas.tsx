@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, Minus, Plus, Star, UserRound } from "lucide-react";
-import { reais } from "../comum/api";
+import { api, reais } from "../comum/api";
 import { placaBonita, urlDaFoto } from "./apoio";
 
 export function Aviso({ texto, tipo = "erro" }: { texto: string; tipo?: "erro" | "ok" | "info" }) {
@@ -204,5 +204,16 @@ export function MenuBaixo<T extends string>({ itens, atual, mudar }: { itens: Ar
         </button>
       ))}
     </nav>
+  );
+}
+
+/** Termos de uso ou política de privacidade escritos pela empresa no painel (Configurações › Termos de uso). */
+export function TextoDoPainel({ tipo, fechar }: { tipo: "passageiro" | "privacidade"; fechar: () => void }) {
+  const [t, setT] = useState<string | null>(null);
+  useEffect(() => { void api<{ texto: string }>(`/termos/${tipo}`).then((r) => setT(r.texto)).catch(() => setT("")); }, [tipo]);
+  return (
+    <FolhaModal titulo={tipo === "privacidade" ? "Política de privacidade" : "Termos de uso"} fechar={fechar}>
+      {t === null ? <p className="dica">Carregando…</p> : t ? <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>{t}</p> : <p className="dica">A empresa ainda não publicou este texto.</p>}
+    </FolhaModal>
   );
 }

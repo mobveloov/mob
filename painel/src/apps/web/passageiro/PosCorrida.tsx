@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { api, reais } from "../comum/api";
-import { Aviso, Cartao, Estrelas, mensagemDeErro } from "../comum/ui";
+import { Aviso, Cartao, Estrelas, mensagemDeErro, useConfigDoPainel } from "../comum/ui";
 import type { Corrida, Perfil } from "./apoio";
 
-const ASSUNTOS = ["Cobrança", "Comportamento", "Atraso", "Rota", "Veículo", "Outro"] as const;
 
 /** Favorito do motorista (lido do perfil). Devolve o estado e a função para trocar. */
 export function useFavorito(corrida: Corrida | null) {
@@ -26,7 +25,8 @@ export function OpcoesDaCorrida({ corrida, soReclamar = false }: { corrida: Corr
   const { estado, mudar } = useFavorito(soReclamar ? null : corrida);
   const [aberto, setAberto] = useState<"" | "objeto" | "reclamar">("");
   const [descricao, setDescricao] = useState("");
-  const [assunto, setAssunto] = useState<(typeof ASSUNTOS)[number]>("Cobrança");
+  const assuntos = useConfigDoPainel()?.assuntosDeOcorrencia ?? [];
+  const [assunto, setAssunto] = useState("");
   const [erro, setErro] = useState("");
   const [ok, setOk] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -38,7 +38,7 @@ export function OpcoesDaCorrida({ corrida, soReclamar = false }: { corrida: Corr
   const abrir = (q: "objeto" | "reclamar") => { setAberto(aberto === q ? "" : q); setDescricao(""); setErro(""); setOk(""); };
   const enviar = () => fazer(async () => {
     if (aberto === "objeto") await api(`/corridas/${corrida.id}/objeto`, { corpo: { descricao } });
-    else await api(`/corridas/${corrida.id}/ocorrencia`, { corpo: { assunto, descricao } });
+    else await api(`/corridas/${corrida.id}/ocorrencia`, { corpo: { assunto: assunto || assuntos[0] || "", descricao } });
     setAberto(""); setDescricao("");
   }, aberto === "objeto" ? "Pronto. A central vai procurar o objeto e te avisar." : "Recebemos sua reclamação. A central vai analisar e responder.");
 
@@ -64,7 +64,7 @@ export function OpcoesDaCorrida({ corrida, soReclamar = false }: { corrida: Corr
         <form className="cartao" onSubmit={(e) => { e.preventDefault(); void enviar(); }}>
           {aberto === "reclamar" && (
             <label>Assunto
-              <select value={assunto} onChange={(e) => setAssunto(e.target.value as (typeof ASSUNTOS)[number])}>{ASSUNTOS.map((a) => <option key={a}>{a}</option>)}</select>
+              <select value={assunto || assuntos[0] || ""} onChange={(e) => setAssunto(e.target.value)}>{assuntos.map((a) => <option key={a}>{a}</option>)}</select>
             </label>
           )}
           <label>{aberto === "objeto" ? "O que você esqueceu?" : "Conte o que aconteceu"}
