@@ -351,13 +351,13 @@ export function Configuracoes({ voltar }: Voltar) {
         <Chave icone={Wifi} ligado={a.gravarSoWifi} mudar={(v) => mudar({ gravarSoWifi: v })} titulo="Enviar gravações só no Wi‑Fi" texto="A cópia fica no seu celular por 3 dias e sobe quando houver Wi‑Fi. Desligado, sobe também no 4G/5G." />
         <Chave icone={Smartphone} ligado={a.manterTela} mudar={(v) => mudar({ manterTela: v })} titulo="Manter a tela ligada" texto="Evita que a tela apague enquanto você está online ou em corrida" />
         <Chave icone={Mic} ligado={a.voz} mudar={(v) => mudar({ voz: v })} titulo="Assistente de Voz (Co-piloto)" texto="Avisos por voz ao chegar perto do destino" />
-        {linha(Music, "Pacote de Sons", undefined, NOMES_SONS[a.sons], () => setAbrir("sons"))}
+        {linha(Music, "Toque da chamada", undefined, NOMES_SONS[a.sons], () => setAbrir("sons"))}
         <Chave icone={Volume2} ligado={a.volume} mudar={(v) => mudar({ volume: v })} titulo="Volume Automático" texto="Ajustar volume da mídia ao tocar alarme" />
       </div>
       <p className="dica" style={{ textAlign: "center", padding: "1.4rem 1rem 2rem", fontSize: ".72rem" }}>Versão {VERSAO}</p>
       {abrir === "tema" && <Folha titulo="Tema do Aplicativo" fechar={() => setAbrir("")}>{(Object.keys(NOMES_TEMA) as Tema[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.tema === k ? "ativa" : ""}`} onClick={() => { mudar({ tema: k }); setAbrir(""); }}>{NOMES_TEMA[k]}{a.tema === k && <BadgeCheck size={20} />}</button>)}</Folha>}
       {abrir === "navegador" && <Folha titulo="Navegador Padrão" fechar={() => setAbrir("")}>{(Object.keys(NOMES_NAVEGADOR) as Navegador[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.navegador === k ? "ativa" : ""}`} onClick={() => { mudar({ navegador: k }); setAbrir(""); }}>{NOMES_NAVEGADOR[k]}{a.navegador === k && <BadgeCheck size={20} />}</button>)}</Folha>}
-      {abrir === "sons" && <Folha titulo="Pacote de Sons" fechar={() => setAbrir("")}>{(Object.keys(NOMES_SONS) as Sons[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.sons === k ? "ativa" : ""}`} onClick={() => { mudar({ sons: k }); tocar(2); }}>{NOMES_SONS[k]}{a.sons === k && <BadgeCheck size={20} />}</button>)}</Folha>}
+      {abrir === "sons" && <Folha titulo="Toque da chamada" fechar={() => setAbrir("")}>{(Object.keys(NOMES_SONS) as Sons[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.sons === k ? "ativa" : ""}`} onClick={() => { mudar({ sons: k }); tocar(2); }}>{NOMES_SONS[k]}{a.sons === k && <BadgeCheck size={20} />}</button>)}</Folha>}
     </Pagina>
   );
 }
