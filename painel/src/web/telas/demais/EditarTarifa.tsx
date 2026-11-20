@@ -76,7 +76,7 @@ export function JanelaTarifa({ cat, extra, onFechar, onSalvo }: { cat: any; extr
   };
   const campoValor = (rotulo: string, k: string, dica?: string) => <Campo rotulo={rotulo} dica={dica}><div className="dm-linha">R$ <input inputMode="decimal" value={txt(t[k])} placeholder="0,00" onChange={(e) => set(k, num(e.target.value))} /></div></Campo>;
   return (
-    <Modal aberto onFechar={onFechar} titulo={extra === "nova" ? "Criar tarifa extra" : "Editar tarifa"} sub={`Categoria: ${cat.nome}`} larga>
+    <Modal cheia aberto onFechar={onFechar} titulo={extra === "nova" ? "Criar tarifa extra" : "Editar tarifa"} sub={`Categoria: ${cat.nome}`} larga>
       <form className="dm-form" onSubmit={(e) => { e.preventDefault(); void enviar(); }}>
         <p className="sub">Campos com * são obrigatórios.</p>
         <h3>{ehExtra ? "Tarifa extra" : "Tarifa padrão"}</h3>

@@ -26,7 +26,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { overflow-x: hidden; }
+html { overflow-x: hidden; } body { overflow-x: clip; } /* clip (e não hidden) no body: com hidden o body vira área de rolagem e quebra o position: sticky */
 body { margin: 0; background: var(--fundo); color: var(--texto); font: 14px/1.5 var(--fonte, "Plus Jakarta Sans", system-ui, sans-serif); -webkit-font-smoothing: antialiased; transition: background-color .3s, color .3s; }
 a { color: var(--primaria-viva); }
 code { background: var(--fundo); padding: 1px 5px; border-radius: 4px; }
@@ -562,3 +562,6 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 .drop-fechar { background: transparent; color: #fff; border: 0; cursor: pointer; display: grid; place-items: center; }
 .girando { animation: giro 1s linear infinite; }
 @keyframes giro { to { transform: rotate(360deg); } }
+
+/* No celular o menu fixo some (a regra de cima perdia para .ml-lateral, declarada depois). */
+@media (max-width: 1023px) { .app > .ml-lateral { display: none; } }

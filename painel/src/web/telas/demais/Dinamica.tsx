@@ -208,7 +208,7 @@ function JanelaDinamica({ inicial, onFechar, onSalvo }: { inicial: any; onFechar
   const janela = (dia: number) => r.janelas.filter((j: any) => j.dia === dia);
   const setJanelas = (l: any[]) => set("janelas", l);
   return (
-    <Modal aberto onFechar={onFechar} titulo={r.id ? "Editar Regra" : "Nova Regra"} sub="Configure os parâmetros" larga={T !== "demanda"}>
+    <Modal cheia aberto onFechar={onFechar} titulo={r.id ? "Editar Regra" : "Nova Regra"} sub="Configure os parâmetros" larga={T !== "demanda"}>
       <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); const x = await salvar(() => pedirConfig("/dinamicas", "POST", r)); if (x) onSalvo(); }}>
         {!r.id && T !== "mapa" && <Campo rotulo="Tipo da dinâmica"><select value={T} onChange={(e) => set("tipo", e.target.value)}><option value="horario">Por horário</option><option value="demanda">Por alta demanda</option></select></Campo>}
         <Campo rotulo={T === "demanda" ? "Nome" : "Nome da Regra"}><input value={r.nome} onChange={(e) => set("nome", e.target.value)} placeholder={T === "mapa" ? "Ex: Zona Show" : T === "horario" ? "Ex: Rush Manhã" : ""} required maxLength={60} /></Campo>

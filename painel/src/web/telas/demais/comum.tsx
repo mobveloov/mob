@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { dinheiro } from "../../api";
 import { useCarregar } from "../../componentes/ui";
+import { PaginaCheia } from "../../componentes/PaginaCheia";
 
 export { dinheiro, useCarregar };
 
@@ -53,14 +54,16 @@ export function Aviso({ erro, ok }: { erro?: string | null; ok?: string | null }
   return null;
 }
 
-export function Modal({ aberto, onFechar, titulo, sub, children, larga }: { aberto: boolean; onFechar: () => void; titulo: string; sub?: string; children: ReactNode; larga?: boolean }) {
+/** Com `cheia`, abre em página inteira (PaginaCheia) em vez de janela. */
+export function Modal({ aberto, onFechar, titulo, sub, children, larga, cheia }: { cheia?: boolean; aberto: boolean; onFechar: () => void; titulo: string; sub?: string; children: ReactNode; larga?: boolean }) {
   useEffect(() => {
-    if (!aberto) return;
+    if (!aberto || cheia) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onFechar();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [aberto, onFechar]);
+  }, [aberto, cheia, onFechar]);
   if (!aberto) return null;
+  if (cheia) return <PaginaCheia escopo="dm" titulo={titulo} sub={sub} onFechar={onFechar}>{children}</PaginaCheia>;
   return (
     <div className="dm-fundo" onClick={onFechar}>
       <div className={`dm-modal ${larga ? "larga" : ""}`} role="dialog" aria-label={titulo} onClick={(e) => e.stopPropagation()}>

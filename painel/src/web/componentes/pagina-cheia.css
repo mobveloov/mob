@@ -1,0 +1,39 @@
+/* Página cheia: substitui a lista enquanto está aberta. O cabeçalho cola abaixo da barra do topo; o rodapé cola embaixo. */
+main.conteudo.pc-ativa > *:not(.pc-pagina) { display: none !important; }
+main.conteudo.pc-ativa { padding-top: 0; padding-bottom: 0; }
+main.conteudo .pc-pagina {
+  --pc-barra: 64px;
+  --pc-fundo: var(--fundo, #0b1121); --pc-cartao: var(--cartao, #151e32); --pc-borda: var(--borda, #2a3b55);
+  --pc-txt: var(--texto, #e6ebf3); --pc-suave: var(--suave, #93a1b8);
+  --cg-fundo: var(--pc-fundo); --cg-cartao: var(--pc-cartao); --cg-borda: var(--pc-borda); --cg-txt: var(--pc-txt); --cg-suave: var(--pc-suave);
+  --cg-marca: var(--primaria, #f97316); --cg-marca-txt: var(--primaria-txt, #fff);
+  --cg-ok: var(--ok, #4fd18b); --cg-ruim: var(--ruim, #ff7b70); --cg-alerta: var(--alerta, #ffbe55); --cg-info: var(--info, #8cb0ff);
+  display: block; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; box-shadow: none; background: transparent; overflow: visible;
+  color: var(--pc-txt);
+}
+.pc-topo {
+  position: sticky; top: var(--pc-barra); z-index: 30; display: flex; align-items: center; gap: 14px; padding: 14px 0 12px;
+  background: var(--pc-fundo); border-bottom: 1px solid var(--pc-borda);
+}
+.pc-voltar {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; font-weight: 800; color: var(--pc-txt);
+  background: var(--pc-cartao); border: 1px solid var(--pc-borda); border-radius: 12px; padding: 9px 14px; cursor: pointer; min-height: 40px;
+}
+.pc-voltar:hover { border-color: var(--cg-marca); }
+.pc-titulo { min-width: 0; }
+.pc-titulo h2 { margin: 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
+.pc-titulo p { margin: 2px 0 0; color: var(--pc-suave); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.pc-abas { position: sticky; top: calc(var(--pc-barra) + 69px); z-index: 29; background: var(--pc-fundo); padding: 10px 0 4px; }
+.pc-abas .cg-abas { margin: 0; }
+.pc-corpo { padding: 16px 0 24px; }
+.pc-rodape {
+  position: sticky; bottom: 0; z-index: 30; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; padding: 12px 0;
+  background: var(--pc-fundo); border-top: 1px solid var(--pc-borda);
+}
+@media (max-width: 640px) {
+  .pc-titulo h2 { font-size: 18px; }
+  .pc-voltar span { display: none; }
+  .pc-voltar { padding: 9px 11px; }
+  .pc-abas { top: calc(64px + 65px); }
+  .pc-rodape .cg-botao { flex: 1; justify-content: center; }
+}
