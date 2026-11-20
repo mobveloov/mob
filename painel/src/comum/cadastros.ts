@@ -100,6 +100,7 @@ export const CADASTROS: Cadastro[] = [
       { chave: "bancoConta", rotulo: "Número da conta", tipo: "texto" },
       { chave: "bancoContaDv", rotulo: "Dígito da conta", tipo: "texto" },
       { chave: "aceitaPagamentos", rotulo: "Aceita pagamento para", tipo: "texto", dica: "Separe por vírgula. Vazio = aceita todos." },
+      { chave: "cadastroConcluidoEm", rotulo: "Cadastro concluído no app em", tipo: "texto", calculado: false },
       { chave: "statusMudouEm", rotulo: "Última mudança de status", tipo: "texto" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
       { chave: "origem", rotulo: "Origem", tipo: "texto", calculado: true },

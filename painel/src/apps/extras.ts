@@ -13,6 +13,7 @@ import fs from "node:fs";
 import express, { type Request, type Response } from "express";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { configDosApps, tiposDeDocumento } from "../config/apps.ts";
+import { gerais } from "../config/gerais.ts";
 import { mensagensDaPessoa, receberDaPessoa } from "../config/comunicacao.ts";
 import { criar, listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, avaliarPassageiro, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
@@ -366,6 +367,20 @@ export const tiposDoApp = (empresaId: string): Record<string, string> => ({
   lateralEsquerda: "Foto da lateral esquerda do veículo", lateralDireita: "Foto da lateral direita do veículo",
   ...DOCUMENTOS_MACHINE,
 });
+/** Documentos marcados em Configurações Gerais > Motorista > Documentos padrão: o motorista TEM que enviar todos para concluir o cadastro. */
+export const documentosObrigatorios = (empresaId: string): string[] => gerais(empresaId).motorista.documentos.filter((d) => d.exigir && d.id !== "foto").map((d) => d.id);
+
+/** O que falta para concluir o cadastro: a foto do rosto (se exigida) e cada documento obrigatório que não foi enviado ou foi recusado. */
+export function documentosFaltando(empresaId: string, motoristaId: string): string[] {
+  const g = gerais(empresaId).motorista.documentos, p = pessoa(empresaId, "motorista", motoristaId), nomes = tiposDoApp(empresaId);
+  const falta: string[] = [];
+  if (g.some((d) => d.id === "foto" && d.exigir) && !p.foto) falta.push("Foto do rosto");
+  for (const id of documentosObrigatorios(empresaId)) {
+    const d = p.documentos[id];
+    if (!d || d.situacao === "Recusado") falta.push(nomes[id] ?? id);
+  }
+  return falta;
+}
 export const TIPOS_DOCUMENTO: Record<string, string> = {
   cnh: "CNH (frente e verso)", residencia: "Comprovante de residência", crlv: "CRLV do veículo",
   lateralEsquerda: "Foto da lateral esquerda do veículo", lateralDireita: "Foto da lateral direita do veículo",
@@ -675,7 +690,7 @@ rotasExtras.post("/saques", so("motorista"), ok((req, res) => {
 rotasExtras.get("/documentos", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const docs = pessoa(empresaId, "motorista", sessao.chave).documentos;
-  res.json({ tipos: tiposDoApp(empresaId), documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
+  res.json({ tipos: tiposDoApp(empresaId), obrigatorios: documentosObrigatorios(empresaId), documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
 }));
 rotasExtras.post("/documentos/:tipo", so("motorista"), (req, res, next) => {
   if (Number(req.headers["content-length"] ?? 0) > MAX_DOC) return res.status(413).json({ erro: "Arquivo maior que 5 MB." });

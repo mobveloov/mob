@@ -23,7 +23,7 @@ interface Detalhe {
   padrao: { saldoMinimo: number | null; avisoRecarga: number | null };
   cerca: { permissao: string | null; bloqueios: string[] };
   veiculos: Veiculo[];
-  documentos: Array<{ tipo: string; nome: string; situacao: string; motivo?: string; em?: string; enviado: boolean }>;
+  documentos: Array<{ tipo: string; nome: string; situacao: string; motivo?: string; em?: string; enviado: boolean; obrigatorio?: boolean }>;
   resumo: { finalizadas: number; versaoApp: string | null; aceitacao: number | null; online: boolean };
   creditos: { saldo: number; minimo: number | null; bloqueado: boolean; consumoAtivo: boolean };
 }
@@ -338,7 +338,7 @@ function Documentos({ motoristaId, tipos, lista, recarregar, avaliar: podeAvalia
       {aviso}
       <div className="cg-docs">{mostrar.map((d) => (
         <div className="cg-doc" key={d.tipo}>
-          <header><span>{d.nome}</span><Selo tom={TOM_DOC[d.situacao] ?? "neutro"}>{d.situacao === "Recusado" ? "Rejeitado" : d.situacao === "Enviado" ? "Em análise" : d.situacao}</Selo></header>
+          <header><span>{d.nome}{d.obrigatorio && <b title="Documento obrigatório" style={{ color: "var(--cg-ruim)" }}> *</b>}</span><Selo tom={TOM_DOC[d.situacao] ?? "neutro"}>{d.situacao === "Recusado" ? "Rejeitado" : d.situacao === "Enviado" ? "Em análise" : d.situacao}</Selo></header>
           <div className="previa">{!d.enviado ? "(Sem arquivo)" : <a href={`/api/apps-central/documentos/${motoristaId}/${d.tipo}`} target="_blank" rel="noopener noreferrer">Ver arquivo</a>}</div>
           {d.motivo && d.situacao === "Recusado" && <small style={{ color: "var(--cg-ruim)" }}>Motivo: {d.motivo}</small>}
           {d.em && <small style={{ color: "var(--cg-suave)" }}>{dataHoraBr(d.em)}</small>}

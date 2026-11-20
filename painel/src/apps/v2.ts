@@ -20,7 +20,7 @@ import { marcarLida } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { pessoa, salvarPessoa } from "./extras.ts";
 import {
-  arquivoDaFoto, ativarVeiculo, cadastroDoMotorista, criarContaMotorista, criarContaPassageiro, definirSenha, estatisticas, euCompleto, excluirVeiculo, localizar, lugares,
+  arquivoDaFoto, ativarVeiculo, cadastroDoMotorista, concluirCadastroDoMotorista, criarContaMotorista, criarContaPassageiro, definirSenha, estatisticas, euCompleto, excluirVeiculo, localizar, lugares,
   mascarar, MAX_FOTO, pendenciasDoMotorista, removerLugar, salvarDadosDoMotorista, salvarEnderecoDoMotorista, salvarFoto, salvarLugar, salvarVeiculo, senhaConfere, temSenha, urlDaFoto, veiculos,
 } from "./perfil.ts";
 import * as D from "../servidor/dados.ts";
@@ -349,6 +349,7 @@ rotasV2.post("/macaneta", so("motorista"), ok(async (req, res) => {
 rotasV2.get("/cadastro", so("motorista"), ok((req, res) => res.json(cadastroDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave))));
 rotasV2.post("/cadastro/dados", so("motorista"), ok((req, res) => res.json(salvarDadosDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}))));
 rotasV2.post("/cadastro/endereco", so("motorista"), ok((req, res) => res.json(salvarEnderecoDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}))));
+rotasV2.post("/cadastro/concluir", so("motorista"), ok((req, res) => res.json(concluirCadastroDoMotorista(ctx(req).empresaId, ctx(req).sessao.chave))));
 rotasV2.get("/cep/:cep", so("motorista"), ok((req, res) => {
   const r = buscarCep(ctx(req).empresaId, req.params.cep);
   if (!r) return res.status(404).json({ erro: "CEP não encontrado. Preencha à mão." });
@@ -370,6 +371,9 @@ rotasV2.post("/veiculos", so("motorista"), ok((req, res) => res.json({ veiculos:
 rotasV2.post("/veiculos/:id/ativar", so("motorista"), ok((req, res) => res.json({ veiculos: ativarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id/excluir", so("motorista"), ok((req, res) => res.json({ veiculos: excluirVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.params.id) })));
 rotasV2.post("/veiculos/:id", so("motorista"), ok((req, res) => res.json({ veiculos: salvarVeiculo(ctx(req).empresaId, ctx(req).sessao.chave, req.body ?? {}, req.params.id) })));
+
+/** Ping barato do app ao abrir: só marca o último contato (já feito pelo login do token). */
+rotasV2.post("/ping", ok((req, res) => res.json({ ok: true, em: new Date().toISOString() })));
 
 rotasV2.get("/aceitacao", so("motorista"), ok((req, res) => res.json(P.taxaDeAceitacao(ctx(req).empresaId, ctx(req).sessao.chave))));
 

@@ -3,6 +3,8 @@
 // Lista com filtros e contadores por situação, janela do motorista (Geral, Veículos, Financeiro, Documentos,
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
+import { gerais } from "../config/gerais.ts";
+import { comSessaoRecente, ultimosContatos } from "../apps/sessoes.ts";
 import { podeCargo } from "../comum/cargos.ts";
 import { espelharCamposDoMotorista, visaoDoMotorista } from "../comum/motorista-campos.ts";
 import express, { type Request as Req, type Router } from "express";
@@ -12,7 +14,7 @@ import { cancelarCorrida, listarProprias } from "../corridas/index.ts";
 import { estaOnline, ficarOffline } from "../apps/despacho.ts";
 import { ajustes } from "../apps/ajustes.ts";
 import { arquivo, ler } from "../apps/armazem.ts";
-import { enviarDocumento, extrato, lancar, pessoa, removerDocumento, salvarPessoa, saldo, saldos, TIPOS_DOCUMENTO, MAX_DOC } from "../apps/extras.ts";
+import { documentosObrigatorios, enviarDocumento, extrato, lancar, pessoa, removerDocumento, salvarPessoa, saldo, saldos, TIPOS_DOCUMENTO, MAX_DOC } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
 import { agoraBr, arred, celulaCsv, normal } from "../servidor/util.ts";
 import { conferir, cepValido, cpfValido, emailValido, placaValida, renavamValido, soDigitos, telefoneValido, UFS } from "./validacao.ts";
@@ -56,7 +58,7 @@ function veiculosPorMotorista(empresaId: string) {
   return m;
 }
 
-function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<string, Registro[]>; saldo: Map<string, number>; tokens: Set<string> }) {
+function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<string, Registro[]>; saldo: Map<string, number>; tokens: Set<string>; contatos: Map<string, number>; sessoes: Set<string>; desde: number }) {
   const doMot = ctx.veiculos.get(m.id) ?? [];
   const ativo = doMot.find((v) => v.emUso === true);
   return {
@@ -67,13 +69,15 @@ function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<str
     viatura: String(m.viatura ?? ""), categorias: String(m.categorias ?? ""), validadeCnh: m.validadeCnh ?? null, cnh: situacaoCnh(m.validadeCnh),
     validadeLicenciamento: (ativo?.validadeLicenciamento ?? m.validadeLicenciamento ?? null) as string | null, tipoVinculo: String(m.tipoVinculo ?? ""),
     criadoEm: m.criadoEm,
-    diagnostico: { online: estaOnline(empresaId, m.id), app: ctx.tokens.has(m.id), fantasma: m.fantasma === true, versao: null as string | null },
+    diagnostico: { online: estaOnline(empresaId, m.id), app: ctx.tokens.has(m.id) || ctx.sessoes.has(m.id) || (ctx.contatos.get(m.id) ?? 0) >= ctx.desde, ultimoContato: ctx.contatos.get(m.id) ? new Date(ctx.contatos.get(m.id)!).toISOString() : null, fantasma: m.fantasma === true, versao: null as string | null },
   };
 }
 
 function contexto(empresaId: string) {
+  const dias = gerais(empresaId).motorista.diasSemContatoApp, desde = Date.now() - dias * 86_400_000;
+  const contatos = ultimosContatos(empresaId, "motorista"), sessoes = comSessaoRecente(empresaId, "motorista", desde);
   const tokens = new Set(ler<Array<{ papel: string; chave: string }>>(arquivo(empresaId, "push.json"), []).filter((t) => t.papel === "motorista").map((t) => t.chave));
-  return { veiculos: veiculosPorMotorista(empresaId), saldo: new Map(saldos(empresaId).filter((s) => s.papel === "motorista").map((s) => [s.chave, s.saldo])), tokens };
+  return { veiculos: veiculosPorMotorista(empresaId), saldo: new Map(saldos(empresaId).filter((s) => s.papel === "motorista").map((s) => [s.chave, s.saldo])), tokens, contatos, sessoes, desde };
 }
 
 /** Lista de motoristas com os filtros da tela. */
@@ -225,7 +229,7 @@ export function rotasMotoristas(r: Router) {
       padrao: creditosPadrao(e),
       cerca: c.cerca,
       veiculos: veiculosPorMotorista(e).get(m.id) ?? [],
-      documentos: Object.entries(TIPOS_DOCUMENTO).map(([tipo, nome]) => ({ tipo, nome, ...(p.documentos[tipo] ? { situacao: p.documentos[tipo].situacao, motivo: p.documentos[tipo].motivo, em: p.documentos[tipo].em, enviado: true } : { situacao: "Pendente", enviado: false }) })),
+      documentos: Object.entries(TIPOS_DOCUMENTO).map(([tipo, nome]) => ({ tipo, nome, obrigatorio: documentosObrigatorios(e).includes(tipo), ...(p.documentos[tipo] ? { situacao: p.documentos[tipo].situacao, motivo: p.documentos[tipo].motivo, em: p.documentos[tipo].em, enviado: true } : { situacao: "Pendente", enviado: false }) })),
       resumo: { finalizadas: corridas.filter((x) => x.status === "finalizada").length, versaoApp: null, aceitacao: null, online: estaOnline(e, m.id) },
       creditos: situacaoCreditos(e, m.id),
     });

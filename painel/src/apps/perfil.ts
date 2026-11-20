@@ -15,7 +15,7 @@ import { cidadesAtendidas } from "../enderecos/index.ts";
 import { agoraBr } from "../servidor/util.ts";
 import { arquivo, num, soDigitos, txt } from "./armazem.ts";
 import { gerais } from "../config/gerais.ts";
-import { pessoa, salvarPessoa, tiposDoApp } from "./extras.ts";
+import { documentosFaltando, pessoa, salvarPessoa, tiposDoApp } from "./extras.ts";
 import { eu as euBase, telefoneValido, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
 export interface Lugares { casa: Ponto | null; trabalho: Ponto | null; favoritos: Array<{ id: string; nome: string; ponto: Ponto }> }
@@ -419,6 +419,15 @@ export function salvarEnderecoDoMotorista(empresaId: string, motoristaId: string
   const numero = semNumero ? "S/N" : txt(d.numero, 10);
   if (!numero) throw new Error("Informe o número ou marque \"sem número\".");
   alterarCampos(empresaId, MOT(), motoristaId, { cep, rua, endereco: rua, numero, semNumero, complemento: txt(d.complemento, 60) || null, bairro, cidade, uf }, "app do motorista");
+  return cadastroDoMotorista(empresaId, motoristaId);
+}
+
+/** Concluir o cadastro (último passo do app): só passa com todos os documentos marcados em Configurações Gerais enviados. */
+export function concluirCadastroDoMotorista(empresaId: string, motoristaId: string) {
+  motoristaDoCadastro(empresaId, motoristaId);
+  const falta = documentosFaltando(empresaId, motoristaId);
+  if (falta.length) throw new Error(`Faltam documentos obrigatórios: ${falta.join(", ")}. Envie todos para concluir o cadastro.`);
+  alterarCampos(empresaId, MOT(), motoristaId, { cadastroConcluidoEm: new Date().toISOString() }, "app do motorista");
   return cadastroDoMotorista(empresaId, motoristaId);
 }
 
