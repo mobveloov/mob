@@ -15,7 +15,7 @@ import readline from "node:readline";
 import zlib from "node:zlib";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { aplicarRegrasDeVia } from "../areas/ruas.ts";
-import { buscarNasCorrecoes, correcaoDoPonto, formatarTitulo, totalCorrecoes } from "./correcoes.ts";
+import { buscarNasCorrecoes, correcaoDoPonto, correcoesPerto, formatarTitulo, totalCorrecoes } from "./correcoes.ts";
 
 export interface Municipio { codigo: string; nome: string; uf: string }
 export interface Endereco { texto: string; rua: string; numero: string; bairro: string; cidade: string; uf: string; cep: string; lat: number; lng: number; exato: boolean }
@@ -359,7 +359,11 @@ export function casasPerto(empresaId: string, lat: number, lng: number, raioM = 
       }
     }
   }
-  return achadas.sort((a, b) => a.d - b.d).slice(0, limite).map(({ d: _d, ...c }) => c);
+  // Casas importadas (base própria) valem mais que o CNEFE: mesmo número a menos de 30 m, fica a importada.
+  const importadas = correcoesPerto(lerConfig(empresaId).municipios, lat, lng, raio);
+  const repetida = (c: { numero: number; lat: number; lng: number }) => importadas.some((i) => i.numero === c.numero && Math.hypot((i.lat - c.lat) * 111_320, (i.lng - c.lng) * 111_320 * cos) < 30);
+  const todas = [...importadas, ...achadas.filter((c) => !repetida(c))];
+  return todas.sort((a, b) => a.d - b.d).slice(0, limite).map(({ d: _d, ...c }) => c);
 }
 
 /** Endereço mais perto de um ponto, com as regras de via da empresa aplicadas. */
