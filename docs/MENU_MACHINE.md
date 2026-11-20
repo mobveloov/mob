@@ -9,14 +9,14 @@ Os nomes e a estrutura de submenus são os mesmos da Machine; o teste `painel/te
 
 | Machine (caminho) | Onde está no painel (menu lateral) | Existe? | Igual? | Abas, botões e observações |
 |---|---|---|---|---|
-| Painel | Painel > Painel (`/painel`) | sim | sim | Indicadores, período, mapa; igual, com adaptação (GRUPO_E, painel inicial). |
+| Painel | Painel > Painel (`/`) | sim | sim | Indicadores, período, mapa; igual, com adaptação (GRUPO_E, painel inicial). |
 | Cadastro > Minha equipe | Cadastro > Minha equipe (`/equipe`) | sim | quase | Lista de usuários e cargos (ADMIN, Gestor, Operador); nosso tem seletor de filial. Sem página de comparação própria. |
 | Cadastro > Cupons | Cadastro > Cupons (`/cupons`) | sim | quase | GRUPO_B: lista, criar, filtros. |
 | Cadastro > Passe Livre | Cadastro > Passe Livre (`/passe-livre`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
 | Cadastro > Empresas | Cadastro > Empresas (`/empresas`) | sim | quase | GRUPO_A: lista, Criar Empresa, abas do cadastro. |
 | Cadastro > Faixa de Vouchers | Cadastro > Faixa de Vouchers (`/faixas-vouchers`) | sim | sim | GRUPO_B: lista e Criar faixa. |
 | Cadastro > Gestão de áreas > Áreas | Cadastro > Gestão de áreas > Áreas (`/areas`) | sim | quase | GRUPO_D: lista, Criar Área, Visão geral no mapa. |
-| Cadastro > Gestão de áreas > Cidades | Cadastro > Gestão de áreas > Cidades (`/cidades`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
+| Cadastro > Gestão de áreas > Cidades | não existe (sem equivalente direto; ver Áreas) | não | não existe | O dono não achou essa tela na Machine e ela não foi criada. Equivalente: Áreas (polígonos com prioridade e bloqueio). |
 | Cadastro > Gestão de áreas > Plantão | Cadastro > Gestão de áreas > Plantão (`/plantao`) | sim | sim | GRUPO_D: lista, Criar, Gerenciar. |
 | Cadastro > Motoristas | Cadastro > Motoristas (`/motoristas`) | sim | quase | GRUPO_A: lista e Editar Motorista (abas). |
 | Cadastro > Punições | Cadastro > Punições (`/punicoes`) | sim | quase | GRUPO_C: Gerenciar Punição. |
@@ -37,12 +37,12 @@ Os nomes e a estrutura de submenus são os mesmos da Machine; o teste `painel/te
 | Corridas > Objetos perdidos | Corridas > Objetos perdidos (`/objetos`) | sim | quase | GRUPO_A. |
 | Corridas > Mapa de engajamento | Corridas > Mapa de engajamento (`/engajamento`) | sim | sim | GRUPO_D: já estava igual. |
 | Financeiro > Créditos > Carteiras de crédito | Financeiro > Créditos > Carteiras de crédito (`/carteiras`) | sim | quase | Carteiras de motoristas e passageiros; ajuste de saldo. Sem página de referência própria. |
-| Financeiro > Créditos > Recargas e Saques | Financeiro > Créditos > Recargas e Saques (`/creditos-recargas-saques`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente (já existem as telas nossas Recargas e Saques em Mais telas). |
-| Financeiro > Créditos > Extrato | Financeiro > Créditos > Extrato (`/creditos-extrato`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente (nosso Extrato Geral está em Mais telas). |
-| Financeiro > Cartão > Painel de Controle | Financeiro > Cartão > Painel de Controle (`/cartao-painel`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
-| Financeiro > Cartão > Transações | Financeiro > Cartão > Transações (`/cartao-transacoes`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
-| Financeiro > Cartão > Saldo da Central | Financeiro > Cartão > Saldo da Central (`/cartao-saldo-central`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
-| Financeiro > Cartão > Saldo do Motorista | Financeiro > Cartão > Saldo do Motorista (`/cartao-saldo-motorista`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
+| Financeiro > Créditos > Recargas e Saques | Financeiro > Créditos > Recargas e Saques (`/creditos-recargas-saques`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
+| Financeiro > Créditos > Extrato | Financeiro > Créditos > Extrato (`/creditos-extrato`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
+| Financeiro > Cartão > Painel de Controle | Financeiro > Cartão > Painel de Controle (`/cartao-painel`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
+| Financeiro > Cartão > Transações | Financeiro > Cartão > Transações (`/cartao-transacoes`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
+| Financeiro > Cartão > Saldo da Central | Financeiro > Cartão > Saldo da Central (`/cartao-saldo-central`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
+| Financeiro > Cartão > Saldo do Motorista | Financeiro > Cartão > Saldo do Motorista (`/cartao-saldo-motorista`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
 | Financeiro > Pix > Transações | Financeiro > Pix > Transações (`/transacao-pix`) | sim | quase | GRUPO_B: Transação com Pix; sem gateway, o admin registra à mão. |
 | Financeiro > Contas a receber > Faturamento por empresa | Financeiro > Contas a receber > Faturamento por empresa (`/faturamento-empresa`) | sim | quase | GRUPO_B. |
 | Financeiro > Contas a receber > Faturamento de centro de custo | Financeiro > Contas a receber > Faturamento de centro de custo (`/faturamento-centro-custo`) | sim | sim | GRUPO_B. |
@@ -75,7 +75,7 @@ Os nomes e a estrutura de submenus são os mesmos da Machine; o teste `painel/te
 | Configurações > Integrações | Configurações > Integrações (`/integracoes`) | sim | quase | GRUPO_C: Transações Financeiras. |
 | Configurações > NPS | Configurações > NPS (`/config-nps`) | sim | quase | GRUPO_D: ConfiguracaoNPS. |
 | Configurações > Termos de uso | Configurações > Termos de uso (`/termos-app`) | sim | sim | GRUPO_C: TermosUso. |
-| Cobrança > Último boleto | Cobrança > Último boleto (`/ultimo-boleto`) | em construção (outra frente) | não existe | Sem página de referência. Tela em construção por outra frente. |
+| Cobrança > Último boleto | Cobrança > Último boleto (`/ultimo-boleto`) | sim | sem página de referência | Tela simples feita sobre os dados do painel (carteiras, corridas pagas, cobrança); sem página da Machine para comparar. |
 | Cobrança > Demonstrativo Mensal | Cobrança > Demonstrativo Mensal (`/demonstrativo-mensal`) | sim | sim | GRUPO_B. |
 | Cobrança > Meus planos | Cobrança > Meus planos (`/meus-planos`) | sim | quase | GRUPO_B. |
 | Cobrança > Extrato da central | Cobrança > Extrato da central (`/extrato-central`) | sim | quase | GRUPO_B: Extrato da central. |

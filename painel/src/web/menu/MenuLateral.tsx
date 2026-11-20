@@ -38,7 +38,7 @@ const ICONES: Record<string, LucideIcon> = {
   "config-gerais": Settings, "regras-credito": CreditCard, categorias: Layers, "tarifas-dinamicas": TrendingUp, descontos: Percent, "regras-despacho": Target,
   transbordos: Cone, integracoes: Plug, "config-nps": Star, "termos-app": ShieldCheck,
   juridico: Scale, "central-ajuda": CircleHelp,
-  "passe-livre": Ticket, cidades: Building2, "consulta-cartoes": CreditCard, "creditos-recargas-saques": Banknote, "creditos-extrato": Receipt,
+  "passe-livre": Ticket, "consulta-cartoes": CreditCard, "creditos-recargas-saques": Banknote, "creditos-extrato": Receipt,
   "cartao-painel": Gauge, "cartao-transacoes": CreditCard, "cartao-saldo-central": Landmark, "cartao-saldo-motorista": Wallet,
   "ultimo-boleto": FileText, "ajuda-termos": ScrollText, "central-suporte": LifeBuoy, ouvidoria: MessagesSquare,
 };

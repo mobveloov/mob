@@ -23,7 +23,7 @@ const PERIGO = /excluir|apagar|remover|disparar|enviar|cancelar|desconectar|cone
 
 // Itens do menu (iguais aos da Machine) cujas telas ainda estão sendo feitas: "Em construção" é aceito aqui por enquanto.
 // Quando a tela existir, tire a rota da lista.
-const AINDA_SEM_TELA = new Set(["/passe-livre", "/cidades", "/consulta-cartoes", "/creditos-recargas-saques", "/creditos-extrato", "/cartao-painel", "/cartao-transacoes", "/cartao-saldo-central", "/cartao-saldo-motorista", "/ultimo-boleto", "/ajuda-termos", "/central-suporte", "/ouvidoria"]);
+const AINDA_SEM_TELA = new Set(["/passe-livre", "/consulta-cartoes", "/creditos-recargas-saques", "/creditos-extrato", "/cartao-painel", "/cartao-transacoes", "/cartao-saldo-central", "/cartao-saldo-motorista", "/ultimo-boleto", "/ajuda-termos", "/central-suporte", "/ouvidoria"]);
 const falhas = [];
 const visitadas = [];
 

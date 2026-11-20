@@ -5,12 +5,13 @@ import assert from "node:assert/strict";
 import { FUNCOES, funcoesDoCargo } from "../src/comum/funcoes.ts";
 import { itensParaBusca, menuLateral } from "../src/comum/menu-lateral.ts";
 
+// "Cadastro > Gestão de áreas > Cidades" não entra: o dono não achou essa tela na Machine.
 // [grupo, submenu ("" = solto no grupo), nome, id]
 const MACHINE: Array<[string, string, string, string]> = [
   ["Painel", "", "Painel", "painel"],
   ["Cadastro", "", "Minha equipe", "equipe"], ["Cadastro", "", "Cupons", "cupons"], ["Cadastro", "", "Passe Livre", "passe-livre"],
   ["Cadastro", "", "Empresas", "empresas"], ["Cadastro", "", "Faixa de Vouchers", "faixas-vouchers"],
-  ["Cadastro", "Gestão de áreas", "Áreas", "areas"], ["Cadastro", "Gestão de áreas", "Cidades", "cidades"], ["Cadastro", "Gestão de áreas", "Plantão", "plantao"],
+  ["Cadastro", "Gestão de áreas", "Áreas", "areas"], ["Cadastro", "Gestão de áreas", "Plantão", "plantao"],
   ["Cadastro", "", "Motoristas", "motoristas"], ["Cadastro", "", "Punições", "punicoes"],
   ["Cadastro", "Clientes", "Clientes", "passageiros"], ["Cadastro", "Clientes", "Consulta de cartões", "consulta-cartoes"],
   ["Cadastro", "", "Ruas", "ruas"], ["Cadastro", "", "Desafios", "desafios"],
@@ -40,8 +41,8 @@ const MACHINE: Array<[string, string, string, string]> = [
   ["Ajuda", "", "Termos de uso", "ajuda-termos"], ["Ajuda", "", "Política de privacidade", "juridico"], ["Ajuda", "", "Central de suporte", "central-suporte"], ["Ajuda", "", "Ouvidoria", "ouvidoria"],
 ];
 
-test("o menu da Machine tem 76 itens e todos estão em funcoes.ts, com rota /id", () => {
-  assert.equal(MACHINE.length, 76);
+test("o menu da Machine tem 75 itens e todos estão em funcoes.ts, com rota /id", () => {
+  assert.equal(MACHINE.length, 75);
   for (const [, , nome, id] of MACHINE) {
     const f = FUNCOES.find((x) => x.id === id);
     assert.ok(f, `falta ${id} (${nome}) em funcoes.ts`);

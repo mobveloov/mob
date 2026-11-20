@@ -20,7 +20,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   {
     id: "cadastro", nome: "Cadastro", cor: "verde", blocos: [
       { ids: ["equipe", "cupons", "passe-livre", "empresas", "faixas-vouchers"] },
-      { titulo: "Gestão de áreas", ids: ["areas", "cidades", "plantao"] },
+      { titulo: "Gestão de áreas", ids: ["areas", "plantao"] },
       { ids: ["motoristas", "punicoes"] },
       { titulo: "Clientes", ids: ["passageiros", "consulta-cartoes"] },
       { ids: ["ruas", "desafios"] },

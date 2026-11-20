@@ -8,10 +8,10 @@ import { agoraBr, normal } from "../servidor/util.ts";
 import { calcularComissao } from "./comissao.ts";
 import { pessoas, tipoDoLancamento } from "./financeiro.ts";
 
-const cent = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+export const cent = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const MS_DIA = 86_400_000;
-const hojeBr = () => agoraBr().toISOString().slice(0, 10);
-const diaDe = (s: string | null | undefined) => String(s ?? "").slice(0, 10);
+export const hojeBr = () => agoraBr().toISOString().slice(0, 10);
+export const diaDe = (s: string | null | undefined) => String(s ?? "").slice(0, 10);
 
 interface Per { inicio: string; fim: string }
 
@@ -54,10 +54,10 @@ export const montarCsv = (cabecalho: string[], linhas: unknown[][]) => "﻿" + [
 
 // ------------------------------------------------------------------ fontes de dados
 
-const ehPix = (p: string) => normal(p).includes("pix");
-const ehCartaoApp = (p: string) => { const n = normal(p); return n.includes("cartao") && n.includes("app"); };
+export const ehPix = (p: string) => normal(p).includes("pix");
+export const ehCartaoApp = (p: string) => { const n = normal(p); return n.includes("cartao") && n.includes("app"); };
 
-function corridasFinalizadas(empresaId: string, de: string, ate: string) {
+export function corridasFinalizadas(empresaId: string, de: string, ate: string) {
   return listarProprias(empresaId).filter((c) => c.status === "finalizada" && c.valor && diaDe(c.finalizadaEm ?? c.solicitadaEm) >= de && diaDe(c.finalizadaEm ?? c.solicitadaEm) <= ate);
 }
 
@@ -218,7 +218,7 @@ export type TipoTransacao = typeof TIPOS_TRANSACAO[number];
 export type StatusTransacao = typeof STATUS_TRANSACAO[number];
 export interface Transacao { id: string; codigo: string; em: string; dataRepasse: string | null; tipo: TipoTransacao; forma: string; repasse: string; status: StatusTransacao; valor: number; pessoa: string; detalhe: string; marcadoPor: string }
 
-const marcas = (empresaId: string) => new Map((banco().prepare("SELECT id, status, motivo, por FROM transacoes_marcas WHERE empresa = ?").all(empresaId) as unknown as Array<{ id: string; status: StatusTransacao; motivo: string; por: string }>).map((m) => [m.id, m]));
+export const marcas = (empresaId: string) => new Map((banco().prepare("SELECT id, status, motivo, por FROM transacoes_marcas WHERE empresa = ?").all(empresaId) as unknown as Array<{ id: string; status: StatusTransacao; motivo: string; por: string }>).map((m) => [m.id, m]));
 
 /** Transações do período: recargas Pix, pagamentos de corridas pelo app, repasses por saldo, saques e recargas de saldo da central. */
 export function transacoesOnline(empresaId: string, p: Per): Transacao[] {
