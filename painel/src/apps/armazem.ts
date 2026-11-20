@@ -2,7 +2,6 @@
 //
 //   sessoes.json            sessões dos apps (o token só como hash)
 //   push.json               tokens de notificação dos aparelhos
-//   alertas.json            pedidos de SOS
 //   chat/<corrida>.json     mensagens do chat de cada corrida
 //   chat/audio/<id>.<ext>   áudios do chat
 //   firebase-servico.json   (opcional) conta de serviço do Firebase da empresa, para o push. Nunca vai para o Git.

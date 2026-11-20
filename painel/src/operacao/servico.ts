@@ -7,7 +7,8 @@ import { GRUPO_TEXTO, type CorridaPainel, type Filtro } from "../comum/corrida.t
 import { sanearMarca } from "../comum/marca.ts";
 import { listar, atualizar, remover } from "../cadastros/armazem.ts";
 import { corridaDaFilial, pessoasDaFilial } from "../filiais/filiais.ts";
-import { alertas, estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
+import { estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
+import { sosPendentes } from "../apps/sos.ts";
 import { mensagens } from "../apps/chat.ts";
 import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
 import { linhaReta } from "../enderecos/index.ts";
@@ -101,7 +102,7 @@ export async function historico(empresaId: string, f: FiltroHistorico) {
   l = [...l].sort((a, b) => (b.solicitadaEm ?? "").localeCompare(a.solicitadaEm ?? ""));
   const moto = (c: CorridaPainel) => /moto/i.test(c.categoria);
   const abertas = l.filter((c) => c.grupo === "aberta");
-  const comAlerta = new Set(alertas(empresaId).filter((a) => !a.resolvido).map((a) => `propria:${a.corridaId}`));
+  const comAlerta = new Set(sosPendentes(empresaId).filter((a) => a.corridaId).map((a) => `propria:${a.corridaId}`));
   return {
     avisos: r.avisos, filtroBase: base, corridas: l,
     stats: { total: l.length, finalizadas: l.filter((c) => c.grupo === "finalizada").length, canceladas: l.filter((c) => c.grupo === "cancelada").length, andamento: abertas.length, andamentoMoto: abertas.filter(moto).length, andamentoCarro: abertas.filter((c) => !moto(c)).length },

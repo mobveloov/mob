@@ -4,6 +4,7 @@
 // Nada disso é gravado: cada aviso tem uma chave estável. O que cada pessoa já leu fica na tabela central_notif_lidas (empresa, e-mail, chave).
 
 import { saques } from "../apps/extras.ts";
+import { sosAbertos } from "../apps/sos.ts";
 import { listarProprias } from "../corridas/index.ts";
 import { todasPendencias } from "../operacao/pendencias.ts";
 import { pixDasCorridas } from "../operacao/pix.ts";
@@ -21,6 +22,7 @@ const POR_FONTE = 30;
 
 function montar(empresaId: string): Omit<Notificacao, "lida">[] {
   const n: Omit<Notificacao, "lida">[] = [];
+  for (const s of sosAbertos(empresaId).slice(0, POR_FONTE)) n.push({ chave: `sos:${s.id}`, nivel: "urgente", titulo: `SOS: ${s.papel === "motorista" ? "motorista" : "passageiro"} pediu ajuda`, texto: `${s.nome || "Sem nome"}${s.telefone ? ` (${s.telefone})` : ""}${s.os ? `, OS ${s.os}` : ""}${s.endereco ? `. ${s.endereco}` : ""}`, em: s.em, rota: "/alertas-seguranca" });
   for (const a of alertasAtivos(empresaId).slice(0, POR_FONTE)) n.push({ chave: `alerta:${a.id}`, nivel: NIVEL_ALERTA[a.tipo] ?? "aviso", titulo: `Alerta ${a.tipo.toLowerCase()} (${a.empresaAlvo})`, texto: a.conteudo, em: a.inicioEm, rota: "/alertas-empresas" });
   for (const s of saques(empresaId).filter((x) => x.situacao === "Pendente").slice(0, POR_FONTE)) n.push({ chave: `saque:${s.id}`, nivel: "atencao", titulo: "Saque aguardando pagamento", texto: `${s.nome} pediu ${reais(s.valor)}.`, em: s.em, rota: "/saques" });
   for (const p of pedidosRecarga(empresaId).filter((x) => x.situacao === "Solicitado").slice(0, POR_FONTE)) n.push({ chave: `recarga:${p.id}`, nivel: "info", titulo: "Pedido de recarga de saldo", texto: `${reais(p.valor)} aguardando confirmação${p.observacao ? ` (${p.observacao})` : ""}.`, em: p.em, rota: "/extrato-central" });

@@ -11,6 +11,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import express, { type Request, type Response } from "express";
+import { sosProximos } from "./sos.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { assuntosDeOcorrencia, configDosApps, tiposDeDocumento } from "../config/apps.ts";
 import { pagamentos as pagamentosDoPainel } from "../config/pagamentos.ts";
@@ -718,7 +719,12 @@ rotasExtras.get("/desafios", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   res.json({ codigo: pessoa(empresaId, sessao.papel, sessao.chave).codigo, desafios: desafios(empresaId, sessao.papel, sessao.chave) });
 }));
-rotasExtras.get("/notificacoes", ok((req, res) => res.json({ notificacoes: notificacoes(ctx(req).empresaId, ctx(req).sessao.papel) })));
+rotasExtras.get("/notificacoes", ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  // Emergências por perto (SOS de outros motoristas e passageiros) vão no topo, mesmo sem push do Firebase.
+  const sos = sessao.papel === "motorista" ? sosProximos(empresaId, sessao.chave).map((s) => ({ id: `sos-${s.id}`, titulo: "EMERGÊNCIA perto de você", texto: s.texto, em: s.em.slice(0, 10), emergencia: true, lat: s.lat, lng: s.lng, sosId: s.id })) : [];
+  res.json({ notificacoes: [...sos, ...notificacoes(empresaId, sessao.papel)] });
+}));
 
 // Objeto perdido e reclamação/contestação: viram registros nos cadastros da central.
 rotasExtras.post("/corridas/:id/objeto", ok((req, res) => {

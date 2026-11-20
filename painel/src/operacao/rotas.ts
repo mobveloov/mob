@@ -23,7 +23,7 @@ import { aposCancelar, aposFinalizar } from "../apps/extras.ts";
 import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { alterarCampos, listar } from "../cadastros/armazem.ts";
-import { alertas } from "../apps/despacho.ts";
+import { sosPendentes } from "../apps/sos.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
@@ -93,7 +93,7 @@ rotasOperacao.get("/historico", ok(async (req, res) => {
   if (soProprias(req, f) && req.query.todas !== "1") {
     const r = consultarProprias(emp(req), f, pag(req), porPagina, nomeDaCentral(req));
     const empresas = empresasPorTelefone(emp(req));
-    const comAlerta = new Set(alertas(emp(req)).filter((a) => !a.resolvido).map((a) => `propria:${a.corridaId}`));
+    const comAlerta = new Set(sosPendentes(emp(req)).filter((a) => a.corridaId).map((a) => `propria:${a.corridaId}`));
     return res.json({
       avisos: [], stats: r.stats, filtroBase: base, pagina: r.pagina, paginas: r.paginas, total: r.total, status: S.STATUS_FILTRO,
       corridas: r.itens.map((c) => ({ ...paraLinha(c, empresas), alerta: comAlerta.has(`propria:${c.id}`) })),

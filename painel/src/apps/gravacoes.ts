@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { arquivo, idCorridaValido, ler, gravar } from "./armazem.ts";
-import { alertas } from "./despacho.ts";
+import { sosDaCorrida } from "./sos.ts";
 import { gerais } from "../config/gerais.ts";
 
 export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number }
@@ -88,7 +88,7 @@ export function marcarParaGuardar(empresaId: string, corridaId: string, guardar:
 /** Apaga as gravações mais velhas que o prazo da empresa, menos as de corrida com SOS/ocorrência ou marcadas para guardar. */
 export function limparGravacoes(empresaId: string, agora = Date.now()): number {
   const limite = agora - configGravacao(empresaId).dias * 86_400_000;
-  const comOcorrencia = new Set(alertas(empresaId).map((a) => a.corridaId));
+  const comOcorrencia = sosDaCorrida(empresaId);
   let apagadas = 0;
   for (const idx of listarGravacoes(empresaId)) {
     const ultima = Date.parse(idx.partes.at(-1)?.em ?? idx.consentimento.em);
