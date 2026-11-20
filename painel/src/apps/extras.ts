@@ -26,6 +26,7 @@ import type { Lugares, Veiculo } from "./perfil.ts";
 import type { PapelApp, SessaoApp } from "./sessoes.ts";
 import { calcularComissao, regraDoMotorista } from "../config/comissao.ts";
 import { cobrancas, formaDaTaxa, temTaxaDoMotorista } from "../config/taxas.ts";
+import { comprarPasse, comRotulo, ofertas as ofertasDePasse, passeVigente, registrarIsencao } from "../config/passe-livre.ts";
 import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
 
 const arred = (n: number) => Math.round(n * 100) / 100;
@@ -261,14 +262,21 @@ export function aposFinalizar(empresaId: string, c: CorridaPropria) {
   const base = Math.max(0, valor); // c.valor já é o que o passageiro pagou, com o desconto
   // Motorista com regra própria (Personalizado ou Isento) não paga as taxas da central.
   const regraPropria = regraDoMotorista(empresaId, motoristaId);
+  // Passe Livre (Cadastro › Passe Livre): com passe vigente na hora em que a corrida terminou, o motorista não paga a taxa da central;
+  // o que seria cobrado vira "taxa não cobrada" (uma linha por corrida, atualizada se a OS for corrigida).
+  const passe = passeVigente(empresaId, motoristaId, c.finalizadaEm ?? agoraBr().toISOString());
+  let naoCobrada = 0;
   if (!regraPropria) {
-    for (const t of cobrancas(empresaId, "motorista", { categoria: c.categoria, valor: base, forma })) linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} · OS ${c.os}`]);
+    for (const t of cobrancas(empresaId, "motorista", { categoria: c.categoria, valor: base, forma })) {
+      if (passe) naoCobrada += t.valor; else linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} · OS ${c.os}`]);
+    }
   }
   // Comissão "antiga" da categoria (ou regra própria do motorista): só quando as taxas do motorista não a substituem.
   if (regraPropria || !temTaxaDoMotorista(empresaId)) {
     const comissao = calcularComissao(empresaId, c.categoria, base, motoristaId, c.pagamento).taxaCentral;
-    if (comissao > 0) linhas.push(["motorista", motoristaId, -comissao, `Comissão da central · OS ${c.os}`]);
+    if (comissao > 0) { if (passe) naoCobrada += comissao; else linhas.push(["motorista", motoristaId, -comissao, `Comissão da central · OS ${c.os}`]); }
   }
+  if (passe) registrarIsencao(empresaId, c.id, motoristaId, passe.id, naoCobrada, c.finalizadaEm ?? agoraBr().toISOString());
   for (const t of cobrancas(empresaId, "passageiro", { categoria: c.categoria, valor: base, forma })) {
     if (c.pagamento === PAGAMENTO_SALDO) linhas.push(["passageiro", c.passageiro.telefone, -t.valor, `${t.nome} · OS ${c.os}`]);
     else if (forma !== "cartao_app") linhas.push(["motorista", motoristaId, -t.valor, `${t.nome} (do passageiro) · OS ${c.os}`]);
@@ -645,6 +653,17 @@ rotasExtras.get("/carteira", ok((req, res) => {
     saques: sessao.papel === "motorista" ? saques(empresaId, sessao.chave) : undefined,
     recarga: `Para pôr saldo, fale com a central${m.textos.suporteTelefone ? ` (${m.textos.suporteTelefone})` : ""}. O valor entra na hora em que a central confirmar.`,
   });
+}));
+// Passe Livre do motorista: ofertas da central, passe em vigor e compra (debita a carteira; a chave evita cobrar duas vezes).
+const resumoDoPasse = (empresaId: string, motoristaId: string) => {
+  const v = passeVigente(empresaId, motoristaId);
+  return { ofertas: ofertasDePasse(empresaId).map(comRotulo), vigente: v ? { fim: v.fim, restanteMs: v.restanteMs } : null, saldo: saldo(empresaId, "motorista", motoristaId) };
+};
+rotasExtras.get("/passe-livre", so("motorista"), ok((req, res) => { const { empresaId, sessao } = ctx(req); res.json(resumoDoPasse(empresaId, sessao.chave)); }));
+rotasExtras.post("/passe-livre/comprar", so("motorista"), ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const r = comprarPasse(empresaId, sessao.chave, String(req.body?.ofertaId ?? ""), String(req.body?.chave ?? ""));
+  res.json({ repetido: r.repetido, ...resumoDoPasse(empresaId, sessao.chave) });
 }));
 rotasExtras.post("/saques", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);

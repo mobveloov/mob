@@ -214,3 +214,57 @@ export function Notificacoes({ voltar }: { voltar: () => void }) {
     </Pagina>
   );
 }
+
+// ====================================================================== Passe Livre
+
+interface DadosPasse {
+  ofertas: Array<{ id: string; valor: number; horas: number; rotulo: string }>;
+  vigente: { fim: string; restanteMs: number } | null; saldo: number;
+}
+const chaveDoPedido = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
+/** "2 dias e 3 h", "5 h 20 min", "12 min". */
+function tempoRestante(ms: number): string {
+  const min = Math.max(1, Math.round(ms / 60_000)), d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+  if (d) return `${d} ${d === 1 ? "dia" : "dias"}${h ? ` e ${h} h` : ""}`;
+  return h ? `${h} h${m ? ` ${m} min` : ""}` : `${m} min`;
+}
+
+export function PasseLivre({ voltar }: { voltar: () => void }) {
+  const { dados: d, erro, recarregar } = useBuscar<DadosPasse>("/passe-livre");
+  const [msg, setMsg] = useState<{ texto: string; ok: boolean } | null>(null);
+  const [ocupado, setOcupado] = useState("");
+  const [chaves] = useState<Record<string, string>>({}); // uma chave por oferta: repetir o toque (ou a rede) não cobra de novo
+  const comprar = async (id: string, rotulo: string) => {
+    setMsg(null); setOcupado(id);
+    chaves[id] ??= chaveDoPedido();
+    try {
+      await api("/passe-livre/comprar", { corpo: { ofertaId: id, chave: chaves[id] } });
+      delete chaves[id];
+      setMsg({ texto: `Passe de ${rotulo} comprado. Enquanto ele valer, você não paga a taxa da central.`, ok: true });
+      await recarregar();
+    } catch (e) { setMsg({ texto: mensagemDeErro(e), ok: false }); } finally { setOcupado(""); }
+  };
+  if (!d) return <Pagina><Topo titulo="Passe Livre" voltar={voltar} />{erro ? <div className="conteudo"><Erro texto={erro} /></div> : <Carregando />}</Pagina>;
+  return (
+    <Pagina>
+      <Topo titulo="Passe Livre" voltar={voltar} />
+      <div className="conteudo">
+        <p className="dica">Com um passe, você não paga a taxa da central nas corridas enquanto ele estiver valendo. O valor sai do saldo da sua carteira.</p>
+        <div className="cartao-ganhos"><div className="linha-topo"><span>{d.vigente ? "Passe em vigor" : "Sem passe em vigor"}</span></div>
+          <p className="valor">{d.vigente ? `${tempoRestante(d.vigente.restanteMs)} restantes` : "—"}</p>
+          <small className="dica">Saldo da carteira: {reais(d.saldo)}</small>
+        </div>
+        <Info texto={msg?.ok ? msg.texto : ""} tipo="ok" /><Erro texto={msg && !msg.ok ? msg.texto : ""} />
+        <div className="rotulo-lista">OFERTAS</div>
+        {!d.ofertas.length && <Vazio icone={Wallet} titulo="Nenhum passe à venda" texto="A central ainda não criou ofertas de passe." />}
+        {d.ofertas.map((o) => (
+          <div key={o.id} className="cartao-viagem" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <span><strong>{o.rotulo}</strong><br /><small className="dica">{reais(o.valor)}</small></span>
+            <button type="button" className="botao-m" style={{ width: "auto", padding: "0 1.2rem" }} disabled={!!ocupado || d.saldo < o.valor} onClick={() => void comprar(o.id, o.rotulo)}>{ocupado === o.id ? "COMPRANDO..." : d.saldo < o.valor ? "SALDO BAIXO" : "COMPRAR"}</button>
+          </div>
+        ))}
+        {d.vigente && !!d.ofertas.length && <p className="dica">Comprar outro passe agora faz ele começar quando o atual terminar.</p>}
+      </div>
+    </Pagina>
+  );
+}

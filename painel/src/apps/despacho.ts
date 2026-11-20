@@ -272,7 +272,7 @@ export function ofertaDoMotorista(empresaId: string, motoristaId: string) {
 export function valoresDaCorrida(empresaId: string, c: CorridaPropria, motoristaId?: string) {
   const base = c.valorOferecido ?? c.estimativa.valor;
   if (base == null) return { valorBruto: null as number | null, taxaCentral: null as number | null, valorLiquido: null as number | null, ganhoPorKm: null as number | null };
-  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(base - (c.desconto ?? 0))), motoristaId, c.pagamento);
+  const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(base - (c.desconto ?? 0))), motoristaId, c.pagamento, true);
   const km = c.estimativa.distanciaKm;
   return { valorBruto: co.valorBruto, taxaCentral: co.taxaCentral, valorLiquido: co.valorLiquido, ganhoPorKm: km && km > 0 ? arred(co.valorLiquido / km) : null };
 }
@@ -289,7 +289,7 @@ function tabelaLiquido(empresaId: string, c: CorridaPropria, motoristaId?: strin
   for (let k = -5; k <= 10; k++) {
     const v = arred(base + k);
     if (v < Math.max(1, minimo)) continue;
-    const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(v - (c.desconto ?? 0))), motoristaId, c.pagamento);
+    const co = calcularComissao(empresaId, c.categoria, Math.max(0, arred(v - (c.desconto ?? 0))), motoristaId, c.pagamento, true);
     l.push({ valor: v, bruto: co.valorBruto, taxa: co.taxaCentral, liquido: co.valorLiquido });
   }
   return l;
