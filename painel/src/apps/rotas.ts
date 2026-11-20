@@ -31,6 +31,7 @@ import { gerais } from "../config/gerais.ts";
 import { extraDaCategoria } from "../config/categorias.ts";
 import { ajustes, formasDePagamento } from "./ajustes.ts";
 import { dadosParaOApp } from "../config/personalizacao.ts";
+import { dadosParaOAppMotorista } from "../config/personalizacao-motorista.ts";
 import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { euCompleto } from "./perfil.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
@@ -136,6 +137,7 @@ r.use(rotasPublicasExtras);
 r.use(exigirApp);
 // Personalização do app do passageiro (Configurações do painel): cores, design, veículo no mapa, tela inicial e recursos. Aplique ao abrir, sem gerar APK.
 r.get("/personalizacao", ok((req, res) => res.json(dadosParaOApp(ctx(req).empresaId))));
+r.get("/personalizacao-motorista", so("motorista"), ok((req, res) => res.json(dadosParaOAppMotorista(ctx(req).empresaId))));
 r.use(rotasExtras);
 r.use(rotasV2);
 

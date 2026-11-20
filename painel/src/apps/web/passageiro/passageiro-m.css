@@ -256,3 +256,4 @@ html[data-tema="escuro"] .conta-secao { color: var(--suave); }
 .inicio.estilo-neutro, .inicio.estilo-marcante { background: #fff; }
 .inicio.estilo-neutro .inicio-topo { background: #fff; color: #111827; }
 .inicio.estilo-marcante .inicio-topo { background: var(--cor); color: var(--cor-texto); }
+.inicio-marca { display: flex; align-items: center; gap: .5rem; min-height: 32px; } .inicio-marca img { height: 32px; max-width: 120px; object-fit: contain; border-radius: 6px; } .inicio-marca.imagem_alongada img { max-width: 184px; } .inicio-marca strong { font-size: 1.05rem; }
