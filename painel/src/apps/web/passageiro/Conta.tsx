@@ -2,12 +2,12 @@
 // Também a lista de corridas agendadas.
 
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
+import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, FileText, ShieldCheck, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
 import { api, reais, telefoneBonito } from "../comum/api";
 import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { compartilharTexto, dataCurta, prepararFoto, quandoAgendada, type Eu, type Perfil } from "./apoio";
 import { GENEROS } from "./Entrar";
-import { Avatar, Campo } from "./pecas";
+import { Avatar, Campo, TextoDoPainel } from "./pecas";
 import { NOMES_TEMA_APP, useTemaApp, type TemaApp } from "../comum/tema";
 
 type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
@@ -26,6 +26,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
   const [tela, setTela] = useState<Tela>("");
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [saldo, setSaldo] = useState<number | null>(null);
+  const [texto, setTexto] = useState<"passageiro" | "privacidade" | null>(null);
   const temAjuda = !!(marca.suporte.email || marca.suporte.telefone);
   const carregar = () => {
     void api<Perfil>("/perfil").then(setPerfil).catch(() => undefined);
@@ -72,10 +73,13 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
       </div>
       <h3 className="conta-secao">CONTA</h3>
       <div className="conta-grupo">
+        <ItemConta icone={<FileText size={22} />} cor="azul" titulo="Termos de uso" sub="Regras de uso do aplicativo" ir={() => setTexto("passageiro")} />
+        <ItemConta icone={<ShieldCheck size={22} />} cor="verde" titulo="Política de privacidade" sub="Como seus dados são usados" ir={() => setTexto("privacidade")} />
         <SeletorDeTema />
         {temAjuda && <ItemConta icone={<Headphones size={22} />} cor="verde" titulo="Central de Ajuda" sub="Suporte e dúvidas frequentes" ir={() => setTela("ajuda")} />}
         <ItemConta icone={<LogOut size={22} />} cor="vermelho" titulo="Sair da conta" sub="Encerrar sessão" ir={sair} />
       </div>
+      {texto && <TextoDoPainel tipo={texto} fechar={() => setTexto(null)} />}
     </div>
   );
 }
@@ -112,11 +116,13 @@ function Cupons() {
 
 /** Meus Cartões: hoje o app não guarda cartões; mostra as formas de pagamento que existem. */
 function Cartoes() {
+  const [formas, setFormas] = useState<string[] | null>(null);
+  useEffect(() => { void api<{ pagamentos: string[] }>("/opcoes").then((r) => setFormas(r.pagamentos)).catch(() => setFormas([])); }, []);
   return (
     <>
       <Cartao>
         <strong>Cartões salvos no app</strong>
-        <p className="dica" style={{ margin: 0 }}>Ainda não é possível salvar cartão no app. Você paga no dinheiro, no Pix, no cartão na maquininha do motorista ou com o saldo da carteira.</p>
+        <p className="dica" style={{ margin: 0 }}>Ainda não é possível salvar cartão no app.{formas?.length ? ` Formas de pagamento disponíveis: ${formas.join(", ")}.` : ""}</p>
       </Cartao>
     </>
   );

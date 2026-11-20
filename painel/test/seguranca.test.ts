@@ -92,6 +92,7 @@ const PUBLICAS: Array<[string, string, string]> = [
   ["GET", "/api/apps/:empresa/marca", "app: marca"],
   ["GET", "/api/apps/:empresa/personalizacao/icone/:veiculo/:estado.svg", "app: desenho do carro do mapa (só um SVG fixo, sem dado da empresa)"],
   ["GET", "/api/apps/:empresa/cidades", "app: cidades atendidas"],
+  ["GET", "/api/apps/:empresa/termos/:tipo", "app: termos de uso e privacidade (texto público da empresa, visto antes de criar a conta)"],
   ["POST", "/api/apps/:empresa/conta/existe", "app: conta existe?"],
   ["POST", "/api/apps/:empresa/conta/entrar", "app: login com senha"],
   ["POST", "/api/apps/:empresa/conta/criar", "app: criar conta"],

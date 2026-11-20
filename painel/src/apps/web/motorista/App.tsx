@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
-import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { PermissoesPasso } from "./Permissoes";
 import { carregarPersonalizacao, personalizacaoDoCache } from "../comum/personalizacao";
@@ -50,6 +50,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [chat, setChat] = useState(false);
   const [tela, setTela] = useState("");
   const [menu, setMenu] = useState(false);
+  const regras = useConfigDoPainel();
   const [dialogo, setDialogo] = useState<"" | "online" | "offline" | "analise" | "alerta">("");
   const [folhaAberta, setFolhaAberta] = useState(false); // folha de baixo do mapa: recolhida (barra) ou aberta (aviso + Desconectar)
   const [conectado, setConectado] = useState(false);
@@ -260,7 +261,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         </div>
       )}
 
-      <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>
+      {(regras?.motorista.botaoPanico ?? true) && <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>}
 
       <div className="inicio-flutuantes">
         {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
