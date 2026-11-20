@@ -20,3 +20,5 @@
 .modelo-menu li button:hover { background: rgba(128,128,128,.15); }
 @media (max-width: 760px) { .est-layout { grid-template-columns: 1fr; } }
 @media print { .est-filtros, .est-paginas { display: none; } .est-layout { display: block; } }
+/* No celular a tabela vira cartões com o nome da coluna ao lado do valor (como a Machine) */
+@media (max-width: 480px) { .est-tabela table, .est-tabela tbody, .est-tabela tr, .est-tabela td { display: block; } .est-tabela thead { position: absolute; left: -9999px; } .est-tabela tr { border: 1px solid var(--borda, rgba(128,128,128,.3)); border-radius: 8px; margin-bottom: 8px; } .est-tabela td { position: relative; padding-left: 50%; text-align: right; border: 0; border-bottom: 1px solid rgba(128,128,128,.15); } .est-tabela td::before { content: attr(data-rotulo); position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-weight: 600; text-align: left; } .est-tabela td.vazio::before { content: none; } .est-tabela td.vazio { padding-left: 8px; text-align: center; } }
