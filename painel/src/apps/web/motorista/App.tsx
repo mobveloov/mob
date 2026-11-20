@@ -16,7 +16,7 @@ import { Mapa } from "./Mapa";
 import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
 import { AvisoDoMotorista, BarraBaixo, Dialogo } from "./Pecas";
 import { LogoMarca } from "./Marca";
-import { Desafios, Notificacoes, Preferencias } from "./Telas";
+import { Desafios, Notificacoes, PasseLivre, Preferencias } from "./Telas";
 import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
 import { aplicarTema, useAjustes } from "./ajustes";
 import { usarSoWifi } from "./gravador";
@@ -193,6 +193,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     preferencias: <Preferencias voltar={voltar} />,
     desafios: <Desafios voltar={voltar} marca={marca} />,
     notificacoes: <Notificacoes voltar={voltar} />,
+    passelivre: <PasseLivre voltar={voltar} />,
   };
   if (tela && telas[tela]) return <>{telas[tela]}{chamada}</>;
 

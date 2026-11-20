@@ -1,5 +1,6 @@
 // Central de notificações: o sino do topo, com a lista, "Somente não lidas" e seleção para marcar como lidas.
 // Também mostra, acima do conteúdo, a faixa do alerta para empresas mais grave que estiver valendo.
+import { BannerGlobal, type ItemBanner } from "../../componentes/BannerGlobal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Check, CheckCircle2, RefreshCw, X } from "lucide-react";
@@ -74,21 +75,23 @@ export function Sino() {
   );
 }
 
-/** Faixa no topo do conteúdo com o alerta para empresas mais grave que está valendo. */
+/** Faixa no topo do conteúdo: alertas para empresas valendo agora e, se houver, o aviso de corridas que pedem atenção do operador. */
 export function FaixaAlerta() {
-  const [a, setA] = useState<{ id: string; tipo: string; conteudo: string; empresaAlvo: string } | null>(null);
-  const [fechado, setFechado] = useState<string | null>(null);
+  const [alertas, setAlertas] = useState<Array<{ id: string; tipo: string; conteudo: string; empresaAlvo: string }>>([]);
+  const [ocorrencias, setOcorrencias] = useState(0);
+  const [fechados, setFechados] = useState<string[]>([]);
   useEffect(() => {
     let vivo = true;
-    const ler = () => pedirConfig<{ alertas: any[] }>("/alertas/ativos").then((r) => vivo && setA(r.alertas[0] ?? null)).catch(() => undefined);
+    const ler = () => {
+      pedirConfig<{ alertas: any[] }>("/alertas/ativos").then((r) => vivo && setAlertas(r.alertas ?? [])).catch(() => undefined);
+      fetch("/api/operacao/ocorrencias?horas=1", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((r) => vivo && setOcorrencias(r?.total ?? 0)).catch(() => undefined);
+    };
     ler(); const t = setInterval(ler, 300_000);
     return () => { vivo = false; clearInterval(t); };
   }, []);
-  if (!a || fechado === a.id) return null;
-  return (
-    <div className={`aviso ${a.tipo === "Urgente" ? "erro" : ""} dm-faixa`} role="alert">
-      <span><strong>{a.tipo}{a.empresaAlvo !== "Todos" ? ` (${a.empresaAlvo})` : ""}:</strong> {a.conteudo}</span>
-      <button className="botao-tema" onClick={() => setFechado(a.id)} aria-label="Dispensar alerta"><X size={14} /></button>
-    </div>
-  );
+  const itens: ItemBanner[] = [
+    ...alertas.filter((a) => !fechados.includes(a.id)).map((a) => ({ id: a.id, tom: (a.tipo === "Urgente" ? "vermelho" : "amarelo") as "vermelho" | "amarelo", titulo: <><strong>{a.tipo}{a.empresaAlvo !== "Todos" ? ` (${a.empresaAlvo})` : ""}:</strong> {a.conteudo}</> })),
+    ...(ocorrencias > 0 ? [{ id: "ocorrencia_aberta", tom: "amarelo" as const, titulo: <>Há corridas que podem requerer atenção do operador. Acione a <Link to="/ocorrencias">tela de ocorrências</Link> e registre ciência nas corridas para liberar este alerta</> }] : []),
+  ].sort((a, b) => (a.tom === b.tom ? 0 : a.tom === "vermelho" ? -1 : 1));
+  return <BannerGlobal itens={itens} aoFechar={(id) => id !== "ocorrencia_aberta" && setFechados((f) => [...f, id])} />;
 }
