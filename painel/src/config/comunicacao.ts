@@ -2,8 +2,9 @@
 
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
-import { criar, listar } from "../cadastros/armazem.ts";
+import { listar } from "../cadastros/armazem.ts";
 import { avisar } from "../apps/push.ts";
+import { entregar, resumoDaOrigem } from "../apps/avisos.ts";
 import { emitir } from "../apps/eventos.ts";
 import type { PapelApp } from "../apps/sessoes.ts";
 import { listarProprias } from "../corridas/index.ts";
@@ -148,20 +149,16 @@ export function previaDestinatarios(empresaId: string, p: PedidoPush) {
 export async function dispararNotificacao(empresaId: string, p: PedidoPush, por: string, agendamentoId = "") {
   const alvos = destinatarios(empresaId, p.papel, p.segmento, p.usuario, p.filtros);
   if (!alvos.length) throw new Error("Nenhum destinatário neste filtro.");
-  // Caixa de notificações do app: só quando é para todos (vale para quem abrir o app depois).
-  if (p.segmento === "todos" && !p.filtros) {
-    const hoje = agoraBr().toISOString().slice(0, 10);
-    const fim = new Date(agoraBr().getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
-    criar(empresaId, cadastroPorId("notificacoes")!, { titulo: p.titulo, texto: p.mensagem.replace(/\{nome\}/g, ""), publico: p.papel === "motorista" ? "Motoristas" : "Passageiros", inicio: hoje, fim, ativa: true }, por);
-  }
-  let aceitos = 0;
-  for (const a of alvos) {
-    aceitos += await avisar(empresaId, { papel: p.papel, chave: a.chave }, { titulo: personalizar(p.titulo, a.nome, !!p.usarNome, true), texto: personalizar(p.mensagem, a.nome, !!p.usarNome, false), canal: "geral", dados: { tipo: "notificacao" } });
-  }
   const id = novoId();
   bancoConfig().prepare("INSERT INTO notificacoes_envios (empresa, id, papel, titulo, mensagem, segmento, destinatarios, por, em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .run(empresaId, id, p.papel, p.titulo, p.mensagem, p.segmento + (agendamentoId ? ` (agendada)` : ""), alvos.length, por, agoraBr().toISOString());
-  return { id, destinatarios: alvos.length, aparelhos: aceitos };
+  // Cada pessoa recebe na caixa de avisos do app (lida/não lida) e, havendo chave do Firebase e aparelho, o push do sistema.
+  let aceitos = 0, semChave = 0;
+  for (const a of alvos) {
+    const r = await entregar(empresaId, { papel: p.papel, chave: a.chave }, { titulo: personalizar(p.titulo, a.nome, !!p.usarNome, true), texto: personalizar(p.mensagem, a.nome, !!p.usarNome, false), origem: "notificacao", origemId: id });
+    if (r.push === "enviado") aceitos++; else if (r.push === "sem_chave") semChave++;
+  }
+  return { id, destinatarios: alvos.length, aparelhos: aceitos, pushPendenteDeChave: semChave };
 }
 
 export function historicoNotificacoes(empresaId: string, limite = 50) {
@@ -180,7 +177,8 @@ export function listaNotificacoes(empresaId: string, f: FiltroListaNotif, pagina
   like("titulo", f.titulo); like("mensagem", f.mensagem);
   const linhas = bancoConfig().prepare(`SELECT id, papel, titulo, mensagem, segmento, destinatarios, por, em FROM notificacoes_envios WHERE ${w.join(" AND ")} ORDER BY em DESC, rowid DESC LIMIT 5000`).all(...a) as Array<{ id: string; papel: string; titulo: string; mensagem: string; segmento: string; destinatarios: number; por: string; em: string }>;
   const dest = (p: string) => (p === "motorista" ? "Motorista" : "Cliente App");
-  let itens = linhas.map((l) => ({ ...l, agendamentoId: "", destinatario: dest(l.papel), status: "Concluído", criadoEm: l.em, enviadoEm: l.em }));
+  const vazio = { total: 0, enviadas: 0, entregues: 0, lidas: 0, falhas: 0, pushEnviado: 0, pushPendenteChave: 0 };
+  let itens = linhas.map((l) => ({ ...l, agendamentoId: "", destinatario: dest(l.papel), status: "Concluído", criadoEm: l.em, enviadoEm: l.em, app: resumoDaOrigem(empresaId, "notificacao", l.id) }));
   const nt = (v: string) => v.toLowerCase();
   for (const g of agendamentos(empresaId)) {
     if (g.regra !== "unico" || g.ultimoEnvio || !g.ativo) continue;
@@ -190,7 +188,7 @@ export function listaNotificacoes(empresaId: string, f: FiltroListaNotif, pagina
     if (f.titulo && !nt(g.titulo).includes(nt(f.titulo))) continue;
     if (f.mensagem && !nt(g.mensagem).includes(nt(f.mensagem))) continue;
     const quando = `${g.data}T${g.hora}:00.000Z`;
-    itens.push({ id: g.id, agendamentoId: g.id, papel: g.papel, titulo: g.titulo, mensagem: g.mensagem, segmento: g.segmento, destinatarios: 0, por: "", em: quando, destinatario: dest(g.papel), status: "Agendada", criadoEm: quando, enviadoEm: quando });
+    itens.push({ id: g.id, agendamentoId: g.id, papel: g.papel, titulo: g.titulo, mensagem: g.mensagem, segmento: g.segmento, destinatarios: 0, por: "", em: quando, destinatario: dest(g.papel), status: "Agendada", criadoEm: quando, enviadoEm: quando, app: vazio });
   }
   const campos = ["criadoEm", "destinatario", "titulo", "mensagem", "status", "enviadoEm"] as const;
   const campo = campos.find((c) => c === f.ordem);

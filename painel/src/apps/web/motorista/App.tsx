@@ -9,6 +9,7 @@ import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons
 import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
 import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
+import { avisarNovoAviso, useNaoLidos } from "../comum/Avisos";
 import { PermissoesPasso } from "./Permissoes";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
@@ -59,6 +60,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [chat, setChat] = useState(false);
   const [tela, setTela] = useState("");
+  const { naoLidos } = useNaoLidos();
   const [menu, setMenu] = useState(false);
   const regras = useConfigDoPainel();
   const [dialogo, setDialogo] = useState<"" | "online" | "offline" | "analise" | "alerta">("");
@@ -99,7 +101,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   // Tempo real.
   useEffect(() => tempoReal((tipo, d) => {
-    if (tipo === "oferta") { setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
+    if (tipo === "aviso") { avisarNovoAviso(d); vibrar(120); return; }
+    if (tipo === "oferta") { if (document.visibilityState === "hidden") void permissoesNativas.ofertaTelaCheia("Nova corrida", "Toque para ver a chamada"); setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
     else if (tipo === "sos") aoChegarSos(d as SosPerto);
     else if (tipo === "sos_fim") aoFimDoSos(d as { id: string });
     else if (tipo === "sos_estado") aoMudarSos();
@@ -250,7 +253,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
           <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
           <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("atividades")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
         </span>}
-        {rec("notificacoes") && <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>}
+        {rec("notificacoes") && <button type="button" className="mapa-botao" aria-label={naoLidos ? `Notificações, ${naoLidos} não lidas` : "Notificações"} style={{ position: "relative" }} onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" />{naoLidos > 0 && <span aria-hidden style={{ position: "absolute", top: 4, right: 4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: "#e5484d", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "16px", textAlign: "center" }}>{naoLidos > 9 ? "9+" : naoLidos}</span>}</button>}
       </div>
 
       {(aviso || erro || analise) && (

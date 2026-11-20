@@ -65,7 +65,8 @@ export type EstadoCampanha = "rascunho" | "agendada" | "enviando" | "pausada" | 
 export interface Campanha {
   id: string;
   nome: string;
-  canal: "whatsapp";
+  /** "whatsapp" ou "app" (caixa de avisos do app + push do sistema). */
+  canal: "whatsapp" | "app";
   publico: Regras;
   texto: string;
   /** Variações do texto (uma por pessoa, sorteada de forma fixa). O texto principal também entra no sorteio. */
@@ -88,6 +89,7 @@ export interface Jornada {
   id: string;
   nome: string;
   ativa: boolean;
+  canal?: "whatsapp" | "app";
   gatilho: { tipo: TipoGatilho; dias: number };
   publico: Regras;
   texto: string;
@@ -103,6 +105,8 @@ export type EstadoItem = "pendente" | "enviado" | "falha" | "cancelado";
 export interface ItemFila {
   id: string;
   origem: { tipo: "campanha" | "jornada" | "teste"; id: string };
+  /** Ausente = whatsapp. */
+  canal?: "whatsapp" | "app";
   chave: string;
   nome: string;
   telefone: string;

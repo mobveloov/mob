@@ -2,6 +2,7 @@
 // Equivale à tabela crm_send_logs do sistema de referência.
 
 import crypto from "node:crypto";
+import { statusPorEnvio, type StatusApp } from "../apps/avisos.ts";
 import { banco } from "../servidor/banco.ts";
 
 export type OrigemEnvio = "campaign" | "trigger" | "journey" | "manual" | "behavior" | "automation" | "regua";
@@ -10,6 +11,8 @@ export type EstadoEnvio = "sent" | "failed" | "skipped";
 export interface EnvioLog {
   id: string; origem: OrigemEnvio; origem_id: string; canal: string; estado: EstadoEnvio; em: number; telefone: string; nome: string;
   titulo: string; previa: string; erro: string; variante: string; faixa: number | null;
+  /** Só no canal "app": situação do aviso no app da pessoa (enviada, entregue, lida, falha) e do push do sistema. */
+  app?: StatusApp;
 }
 
 export function registrar(e: string, p: Partial<EnvioLog> & Pick<EnvioLog, "origem" | "estado" | "telefone">): EnvioLog {
@@ -48,6 +51,8 @@ export function listarEnvios(e: string, f: FiltroEnvios) {
   const por = Math.min(200, Math.max(1, f.porPagina ?? 50)), pag = Math.max(0, f.pagina ?? 0);
   const total = (banco().prepare(`SELECT COUNT(*) AS n FROM crm_envios WHERE ${sql}`).get(...args) as { n: number }).n;
   const linhas = banco().prepare(`SELECT id, origem, origem_id, canal, estado, em, telefone, nome, titulo, previa, erro, variante, faixa FROM crm_envios WHERE ${sql} ORDER BY em DESC, seq DESC LIMIT ? OFFSET ?`).all(...args, por, pag * por) as unknown as EnvioLog[];
+  const refs = linhas.filter((l) => l.canal === "app").map((l) => l.id);
+  if (refs.length) { const st = statusPorEnvio(e, refs); for (const l of linhas) if (l.canal === "app") l.app = st.get(l.id); }
   return { total, linhas };
 }
 

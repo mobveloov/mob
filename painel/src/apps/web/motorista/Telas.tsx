@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BellOff, Check, Gift, Share2, SlidersHorizontal, Wallet } from "lucide-react";
 import { api, reais } from "../comum/api";
 import { mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { ListaDeAvisos } from "../comum/Avisos";
 import { Erro, Info, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
 import { diaHora } from "./tipos";
 
@@ -193,27 +194,26 @@ export function Desafios({ voltar, marca }: { voltar: () => void; marca: MarcaAp
 // ====================================================================== notificações
 
 export function Notificacoes({ voltar }: { voltar: () => void }) {
-  const { dados: d, erro } = useBuscar<{ notificacoes: Array<{ id?: string; titulo: string; texto: string; em: string }> }>("/notificacoes");
+  const { dados: fixas } = useBuscar<{ notificacoes: Array<{ id?: string; titulo: string; texto: string; em: string }> }>("/notificacoes");
   return (
     <Pagina>
       <Topo estilo="escuro" titulo="Notificações" voltar={voltar} />
-      {!d ? (erro ? <div className="conteudo"><Erro texto={erro} /></div> : <Carregando />) : !d.notificacoes.length ? (
-        <div className="vazio-centro" style={{ background: "var(--m-bg)" }}>
-          <span className="vazio-icone"><BellOff size={44} /></span>
-          <strong style={{ color: "var(--m-tx)", fontSize: "1.2rem" }}>Sem notificações</strong>
-          <span style={{ maxWidth: "24ch" }}>Você ainda não possui avisos ou mensagens importantes.</span>
-        </div>
-      ) : (
-        <div className="conteudo">
-          {d.notificacoes.map((n, i) => (
-            <div key={n.id ?? i} className="cartao-m">
-              <strong>{n.titulo}</strong>
-              {n.em && <small className="dica">{dataCurta(n.em)}</small>}
-              <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{n.texto}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="conteudo">
+        <ListaDeAvisos classeCartao="cartao-m" vazio={!fixas?.notificacoes.length && (
+          <div className="vazio-centro" style={{ background: "var(--m-bg)" }}>
+            <span className="vazio-icone"><BellOff size={44} /></span>
+            <strong style={{ color: "var(--m-tx)", fontSize: "1.2rem" }}>Sem notificações</strong>
+            <span style={{ maxWidth: "24ch" }}>Você ainda não possui avisos ou mensagens importantes.</span>
+          </div>
+        )} />
+        {fixas?.notificacoes.map((n, i) => (
+          <div key={n.id ?? i} className="cartao-m">
+            <strong>{n.titulo}</strong>
+            {n.em && <small className="dica">{dataCurta(n.em)}</small>}
+            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{n.texto}</p>
+          </div>
+        ))}
+      </div>
     </Pagina>
   );
 }

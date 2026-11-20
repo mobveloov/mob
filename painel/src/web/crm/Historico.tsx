@@ -3,6 +3,7 @@ import { History, PauseCircle, RefreshCw } from "lucide-react";
 import { infoGatilho } from "../../crm/catalogo.ts";
 import { Cartao, useCarregar } from "../componentes/ui";
 import { automacao } from "./api-automacao";
+import { classeApp, ROTULO_APP, StatusApp } from "./status-app";
 import { ate, classeEnvio, Contagem, hora, Paginador, ROTULO_ENVIO } from "./automacao-comum";
 
 const FASE: Record<string, string> = { pre_janela: "Pré-janela", meio_janela: "Meio-janela" };
@@ -11,15 +12,15 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}h`;
 
 /** CRM › Comunicação › Histórico de Disparos: comportamentais, automações por gatilho e pausas e retomadas. */
 export default function Historico() {
-  const [fonte, setFonte] = useState<"behavior" | "automation" | "pausas">("behavior");
+  const [fonte, setFonte] = useState<"behavior" | "automation" | "app" | "pausas">("behavior");
   return (
     <div className="pilha">
       <div className="periodo">
-        {([["behavior", "Comportamentais"], ["automation", "Automações por gatilho"], ["pausas", "Pausas e retomadas"]] as const).map(([k, l]) => (
+        {([["behavior", "Comportamentais"], ["automation", "Automações por gatilho"], ["app", "Push do app"], ["pausas", "Pausas e retomadas"]] as const).map(([k, l]) => (
           <button key={k} className={fonte === k ? "chip ativo" : "chip"} onClick={() => setFonte(k)}>{l}</button>
         ))}
       </div>
-      {fonte === "behavior" ? <Comportamentais /> : fonte === "pausas" ? <Pausas /> : <PorGatilho />}
+      {fonte === "behavior" ? <Comportamentais /> : fonte === "pausas" ? <Pausas /> : fonte === "app" ? <PushDoApp /> : <PorGatilho />}
     </div>
   );
 }
@@ -62,6 +63,44 @@ function Comportamentais() {
             <small className="sub">{d.nome || "Sem nome"} · {d.telefone}{d.hora_pref != null ? ` · hora preferida ${hh(d.hora_pref)}` : ""} · {d.estado === "pending" ? `sai ${hora(d.agendado_para)}` : hora(d.enviado_em ?? d.criado_em)}</small>
           </p>
           {d.erro && <small style={{ color: "var(--alerta)" }}>{d.erro}</small>}
+        </Cartao>
+      ))}
+      {dados && <Paginador pagina={pagina} total={dados.total} onPagina={setPagina} />}
+    </>
+  );
+}
+
+/** Tudo o que o CRM mandou pelo canal "Push do app": enviada, entregue no app, lida ou falha, por mensagem. */
+function PushDoApp() {
+  const [dias, setDias] = useState(7);
+  const [pagina, setPagina] = useState(0);
+  useEffect(() => { setPagina(0); }, [dias]);
+  const { dados, erro, recarregar } = useCarregar(() => automacao.notificacoes({ de: Date.now() - dias * 86_400_000, ate: Date.now() + 60_000, canal: "app", pagina }), [dias, pagina]);
+  const linhas = dados?.linhas ?? [];
+  const conta = (e: string) => linhas.filter((l) => l.app?.estado === e).length;
+  return (
+    <>
+      <div className="linha-filtro">
+        <div className="periodo">{[1, 7, 30].map((d) => <button key={d} className={dias === d ? "chip ativo" : "chip"} onClick={() => setDias(d)}>{d === 1 ? "Hoje" : `${d} dias`}</button>)}</div>
+        <button className="icone" aria-label="Atualizar" onClick={recarregar}><RefreshCw size={14} /></button>
+      </div>
+      {erro && <div className="aviso erro">{erro}</div>}
+      <div className="kpis">
+        <Contagem rotulo="Mensagens (canal app)" valor={dados?.total ?? 0} />
+        <Contagem rotulo="Enviadas (nesta página)" valor={conta("enviada")} tom="alerta" />
+        <Contagem rotulo="Entregues no app" valor={conta("entregue")} tom="ok" />
+        <Contagem rotulo="Lidas" valor={conta("lida")} tom="ok" />
+        <Contagem rotulo="Falhas" valor={linhas.filter((l) => l.estado === "failed").length} tom="ruim" />
+      </div>
+      {dados && !linhas.length && <Cartao><p className="vazio"><History size={16} /> Nada foi enviado pelo push do app nesse período.</p></Cartao>}
+      {linhas.map((l) => (
+        <Cartao key={l.id}>
+          <p style={{ margin: 0 }}>
+            <span className={`selo ${l.estado === "failed" ? "ruim" : classeApp(l.app?.estado ?? "enviada")}`}>{l.estado === "failed" ? "Falha" : ROTULO_APP[l.app?.estado ?? "enviada"]}</span> {l.titulo ? <strong>{l.titulo} </strong> : null}<small className="sub">{l.previa}</small><br />
+            <small className="sub">{l.nome || "Sem nome"} · {l.telefone} · {hora(l.em)}</small>
+          </p>
+          {l.erro && <small style={{ color: "var(--alerta)" }}>{l.erro}</small>}
+          {l.estado === "sent" && <StatusApp app={l.app} />}
         </Cartao>
       ))}
       {dados && <Paginador pagina={pagina} total={dados.total} onPagina={setPagina} />}

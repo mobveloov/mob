@@ -51,7 +51,7 @@ async function pedir<T>(url: string, metodo = "GET", corpo?: unknown): Promise<T
 }
 
 export interface CorpoGatilho {
-  name: string; template_id: string; trigger_type: string; trigger_config: Record<string, unknown>; send_channel: "whatsapp";
+  name: string; template_id: string; trigger_type: string; trigger_config: Record<string, unknown>; send_channel: "whatsapp" | "app";
   mensagem?: { titulo: string; texto: string; copia: boolean };
 }
 
