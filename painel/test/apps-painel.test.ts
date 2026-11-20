@@ -395,6 +395,6 @@ test("o app avisa que está aberto (ping) e o servidor guarda o último contato 
   assert.equal(r.status, 200);
   const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000061")!;
   const em = ultimosContatos(E.id, "motorista").get(m.id);
-  assert.ok(em && Date.now() - Date.parse(em) < 60_000, "último contato registrado agora");
+  assert.ok(em && Date.now() - em < 60_000, "último contato registrado agora");
   assert.equal((await chamar("GET", `${API}/ping`)).status, 401, "sem token não vale");
 });
