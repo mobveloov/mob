@@ -553,3 +553,20 @@ html[data-tema="escuro"] { --m-bg: #0b0e14; --m-card: #161b26; --m-card2: #222a3
 .cartao-m.perm-item { display: flex; flex-direction: row; align-items: center; text-align: left; }
 .cartao-m.perm-resumo { display: flex; flex-direction: row; text-align: left; }
 .perm-texto strong { display: block; }
+
+/* Cabeçalho do menu: foto redonda inteira, nome sem cortar, chip do veículo quebrando linha */
+.menu-perfil { padding: 1.1rem 1rem; gap: .9rem; }
+.menu-perfil .avatar { width: 64px; height: 64px; min-width: 64px; max-width: 64px; aspect-ratio: 1 / 1; flex: none; overflow: visible; }
+.menu-perfil .avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.menu-perfil .nome strong { font-size: 1.15rem; line-height: 1.2; overflow-wrap: anywhere; white-space: normal; }
+.menu-perfil .nome span { white-space: normal; max-width: 100%; line-height: 1.3; }
+.menu-perfil .fechar { width: 40px; height: 40px; }
+.menu-titulo { padding: 1.1rem 1.1rem .4rem; }
+.menu-lateral .menu-item, .menu-lateral button { min-height: 52px; }
+
+/* Chat no modo escuro: fundo menos preto e bolhas claras e contrastantes (recebidas e enviadas) */
+html[data-tema="escuro"] .chat-m { background: #1c2433; }
+html[data-tema="escuro"] .chat-m-topo, html[data-tema="escuro"] .chat-m-entrada { background: #253044; }
+html[data-tema="escuro"] .balao { background: #37455c; color: #f4f7fb; }
+html[data-tema="escuro"] .balao.meu { background: var(--cor); color: var(--cor-texto); }
+html[data-tema="escuro"] .chat-m-entrada input { background: #37455c; color: #f4f7fb; }

@@ -58,6 +58,26 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
     }, 350);
   };
 
+  // Rua escolhida sem número: pede o número da casa e resolve pela base de casas do painel (com número: a casa; sem número: a rua).
+  const [semNumero, setSemNumero] = useState<Endereco | null>(null);
+  const [numeroDigitado, setNumeroDigitado] = useState("");
+  const escolherSugestao = (s: Endereco) => {
+    if (!s.numero && s.rua) { setSemNumero(s); setNumeroDigitado(""); setSugestoes([]); return; }
+    void escolher({ texto: s.texto, lat: s.lat, lng: s.lng });
+  };
+  const confirmarNumero = async (usarRua: boolean) => {
+    const s = semNumero; if (!s) return;
+    const n = numeroDigitado.replace(/\D/g, "");
+    setSemNumero(null);
+    if (usarRua || !n) { void escolher({ texto: s.texto, lat: s.lat, lng: s.lng }); return; }
+    try {
+      const r = await api<{ enderecos: Endereco[] }>(`/enderecos?q=${encodeURIComponent(`${s.rua}, ${n}, ${s.cidade}`)}&lat=${s.lat}&lng=${s.lng}`);
+      const casa = r.enderecos.find((e) => e.numero === n && e.rua === s.rua) ?? r.enderecos.find((e) => e.numero === n);
+      if (casa) { void escolher({ texto: casa.texto, lat: casa.lat, lng: casa.lng }); return; }
+    } catch { /* sem a base de casas: usa a rua com o número digitado */ }
+    void escolher({ texto: `${s.rua}, ${n}${s.bairro ? ` - ${s.bairro}` : ""}, ${s.cidade}/${s.uf}`, lat: s.lat, lng: s.lng });
+  };
+
   /** Escolheu um endereço para o campo ativo. Com tudo preenchido, segue para as opções. */
   const escolher = async (p: Ponto) => {
     setSugestoes([]); setAviso(""); setErro("");
@@ -136,11 +156,19 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
         <Aviso texto={erro} />
         {aviso && <p className="dica">{aviso}</p>}
 
+        {semNumero && (
+          <div className="pedir-numero">
+            <strong>{semNumero.rua}{semNumero.bairro ? ` - ${semNumero.bairro}` : ""}</strong>
+            <label>Número da casa<input inputMode="numeric" autoFocus value={numeroDigitado} maxLength={6} onChange={(e) => setNumeroDigitado(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 120" /></label>
+            <button type="button" className="botao largo" disabled={!numeroDigitado} onClick={() => void confirmarNumero(false)}>USAR ESTE NÚMERO</button>
+            <button type="button" className="botao secundario largo" onClick={() => void confirmarNumero(true)}>Sem número (só a rua)</button>
+          </div>
+        )}
         {sugestoes.length > 0 ? (
           <ul className="sugestoes">
             {sugestoes.map((s, i) => {
               const [l1, l2] = linhasDoEndereco(s);
-              return <li key={i}><button onClick={() => void escolher({ texto: s.texto, lat: s.lat, lng: s.lng })}><span className="icone-redondo claro"><MapPin size={18} /></span><span><strong>{l1}</strong><small>{l2}</small></span></button></li>;
+              return <li key={i}><button onClick={() => escolherSugestao(s)}><span className="icone-redondo claro"><MapPin size={18} /></span><span><strong>{l1}</strong><small>{l2}</small></span></button></li>;
             })}
           </ul>
         ) : !digitando && (

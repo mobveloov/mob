@@ -81,16 +81,16 @@ public class FlutuantePlugin extends Plugin {
         call.resolve();
     }
 
+    /** Liga a bolha para quando o app for minimizado (quem mostra e esconde é a MainActivity, no onStop/onStart). Dentro do app ela nunca aparece. */
     @PluginMethod
     public void mostrar(PluginCall call) {
-        if (Settings.canDrawOverlays(getContext())) {
-            getContext().startService(new Intent(getContext(), FlutuanteService.class));
-        }
+        getContext().getSharedPreferences("flutuante", Context.MODE_PRIVATE).edit().putBoolean("bolha", true).apply();
         call.resolve();
     }
 
     @PluginMethod
     public void esconder(PluginCall call) {
+        getContext().getSharedPreferences("flutuante", Context.MODE_PRIVATE).edit().putBoolean("bolha", false).apply();
         getContext().stopService(new Intent(getContext(), FlutuanteService.class));
         call.resolve();
     }

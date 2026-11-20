@@ -43,14 +43,20 @@ public class FlutuanteService extends Service {
             Drawable icone = getPackageManager().getApplicationIcon(getPackageName());
             img.setImageDrawable(icone);
         } catch (Exception e) { /* sem ícone: a bolinha fica vazia */ }
-        img.setPadding(dp(4), dp(4), dp(4), dp(4));
         img.setElevation(dp(6));
+        // Bolha redonda e pequena (o ícone do app é um quadrado grande): recorta em círculo.
+        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        img.setClipToOutline(true);
+        img.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline o) { o.setOval(0, 0, v.getWidth(), v.getHeight()); }
+        });
 
         int tipo = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
         final WindowManager.LayoutParams p = new WindowManager.LayoutParams(
-                dp(56), dp(56), tipo,
+                dp(48), dp(48), tipo,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         p.gravity = Gravity.TOP | Gravity.START;

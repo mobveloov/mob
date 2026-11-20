@@ -398,3 +398,37 @@ test("o app avisa que está aberto (ping) e o servidor guarda o último contato 
   assert.ok(em && Date.now() - em < 60_000, "último contato registrado agora");
   assert.equal((await chamar("GET", `${API}/ping`)).status, 401, "sem token não vale");
 });
+
+test("Meus veículos: o veículo que já está no cadastro do motorista (painel ou cadastro antigo do app) aparece no app", async () => {
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Kaique Veiculo", telefone: "11900000071", status: "Ativo", veiculo: "Gol Branco", placa: "QND9J38", anoVeiculo: 2018 }, "teste");
+  const tokM = await entrar("motorista", "11900000071");
+  const r = await chamar("GET", `${API}/veiculos`, undefined, tokM);
+  assert.equal(r.status, 200);
+  const lista = r.corpo.veiculos as Array<{ modelo: string; placa: string; ano: number | null }>;
+  assert.ok(lista.some((v) => v.placa === "QND9J38"), `veículo do cadastro aparece: ${JSON.stringify(lista)}`);
+  assert.ok(lista.some((v) => /Gol/.test(v.modelo)));
+});
+
+test("fotos enviadas pelos apps viram WebP (qualidade 80, até 1600 px): foto de perfil e documento", async () => {
+  const sharp = (await import("sharp")).default;
+  const { arquivoDaFoto } = await import("../src/apps/perfil.ts");
+  const png = await sharp({ create: { width: 2400, height: 1800, channels: 3, background: { r: 200, g: 120, b: 30 } } }).png().toBuffer();
+  const tokP = await entrar("passageiro", "11988889999");
+  const r = await fetch(`${base}${API}/foto`, { method: "POST", headers: { authorization: `Bearer ${tokP}`, "content-type": "image/png" }, body: png });
+  assert.equal(r.status, 200, await r.text());
+  const f = arquivoDaFoto(E.id, "passageiro", "11988889999");
+  assert.ok(f, "foto gravada");
+  assert.equal(f!.mime, "image/webp");
+  const info = await sharp(f!.caminho).metadata();
+  assert.equal(info.format, "webp");
+  assert.ok(Math.max(info.width ?? 0, info.height ?? 0) <= 1600, `lado maior limitado: ${info.width}x${info.height}`);
+  // Documento do motorista (CNH): também em WebP.
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Lia Documento", telefone: "11900000081", status: "Ativo", veiculo: "Hatch", placa: "LIA1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000081");
+  const d = await fetch(`${base}${API}/documentos/cnh`, { method: "POST", headers: { authorization: `Bearer ${tokM}`, "content-type": "image/png" }, body: png });
+  assert.equal(d.status, 200, await d.text());
+  const { arquivoDoDocumento } = await import("../src/apps/extras.ts");
+  const { listar } = await import("../src/cadastros/armazem.ts");
+  const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000081")!;
+  assert.equal(arquivoDoDocumento(E.id, m.id, "cnh")?.mime, "image/webp");
+});

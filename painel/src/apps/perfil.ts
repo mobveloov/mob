@@ -172,17 +172,18 @@ export function estatisticas(empresaId: string, papel: PapelApp, chave: string):
 
 // ------------------------------------------------------------------ foto
 
-const FOTOS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png" };
+const FOTOS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 export const MAX_FOTO = 3 * 1024 * 1024;
-const MIME_DA_EXT: Record<string, string> = { jpg: "image/jpeg", png: "image/png" };
+const MIME_DA_EXT: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 const chaveValida = (c: string) => /^[\w-]{6,64}$/.test(c);
 const nomeFoto = (papel: PapelApp, chave: string, ext: string) => `${papel}-${chave}.${ext}`;
 
 export function salvarFoto(empresaId: string, papel: PapelApp, chave: string, mime: string, bytes: Uint8Array): string {
   const ext = FOTOS[String(mime).split(";")[0].trim().toLowerCase()];
-  if (!ext) throw new Error("Envie uma foto JPG ou PNG.");
+  if (!ext) throw new Error("Envie uma foto JPG, PNG ou WEBP.");
   if (!bytes?.length || bytes.length > MAX_FOTO) throw new Error("Foto vazia ou maior que 3 MB.");
-  const certo = ext === "jpg" ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff : bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  const b = bytes;
+  const certo = ext === "jpg" ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff : ext === "webp" ? b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 : bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
   if (!certo) throw new Error("O arquivo não é uma foto válida.");
   if (!chaveValida(chave)) throw new Error("Conta inválida.");
   fs.mkdirSync(arquivo(empresaId, "fotos"), { recursive: true });
@@ -306,8 +307,23 @@ function migrarVeiculosAntigos(empresaId: string, motoristaId: string) {
 
 const doMotorista = (empresaId: string, motoristaId: string) => listar(empresaId, VEI()).filter((v) => v.motoristaId === motoristaId);
 
+/**
+ * O veículo que está só nos campos do cadastro do motorista (veiculo, placa, anoVeiculo: preenchido no painel ou no cadastro antigo do app)
+ * vira um registro do cadastro Veículos, para aparecer em "Meus veículos" no app. Só quando o motorista ainda não tem nenhum veículo.
+ */
+function adotarVeiculoDoCadastro(empresaId: string, motoristaId: string) {
+  if (doMotorista(empresaId, motoristaId).length) return;
+  const m = motoristaDoCadastro(empresaId, motoristaId);
+  const placa = String(m.placa ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const modelo = String(m.veiculo ?? "").trim();
+  if (!placaValida(placa) || !modelo) return;
+  const ano = Number(m.anoVeiculo);
+  try { criar(empresaId, VEI(), { placa, modelo, cor: "", ano: Number.isFinite(ano) && ano > 1950 ? ano : null, motorista: m.nome, motoristaId, emUso: true, status: "Ativo" }, "cadastro do motorista"); } catch { /* placa já está em outro veículo */ }
+}
+
 export function veiculos(empresaId: string, motoristaId: string): Veiculo[] {
   migrarVeiculosAntigos(empresaId, motoristaId);
+  adotarVeiculoDoCadastro(empresaId, motoristaId);
   const m = motoristaDoCadastro(empresaId, motoristaId);
   return doMotorista(empresaId, motoristaId).map((v) => veiculoDoApp(v, m));
 }
