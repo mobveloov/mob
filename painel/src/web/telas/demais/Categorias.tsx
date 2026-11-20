@@ -1,7 +1,7 @@
 // Config › Categorias (Tarifas e categorias): lista, filtros e a janela de 4 passos (Básico, Tarifas & Negociação, Dinâmica, Comissão).
 
 import { useRef, useState } from "react";
-import { ArrowUpDown, GripVertical, MoreVertical, Pencil, Plus, Smartphone, Trash2 } from "lucide-react";
+import { ArrowUpDown, Copy, GripVertical, MoreVertical, Pencil, Plus, Smartphone, Trash2 } from "lucide-react";
 import { valorDinamica } from "./Dinamica";
 import { DetalhesTarifas, JanelaTarifa } from "./EditarTarifa";
 import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
@@ -34,6 +34,7 @@ export function Categorias() {
   const [cidade, setCidade] = useState("");
   const [edit, setEdit] = useState<any>(null);
   const [reordenar, setReordenar] = useState(false);
+  const [dup, setDup] = useState<{ cat: any; nome: string; comMotoristas: boolean } | null>(null);
   const [abertas, setAbertas] = useState<string[]>([]);
   const [tarifa, setTarifa] = useState<{ cat: any; extra: any } | null>(null);
   const arrastando = useRef<string | null>(null);
@@ -52,7 +53,7 @@ export function Categorias() {
     <>
       <Cab titulo="Tarifas e categorias">
         {admin && <button className="botao" aria-pressed={reordenar} onClick={() => setReordenar(!reordenar)}><ArrowUpDown size={14} /> Reordenar categorias</button>}
-        {admin && <button className="botao primario" onClick={() => setEdit(structuredClone(VAZIA))}><Plus size={14} /> Criar categoria</button>}
+        {admin && <button className="botao primario" onClick={() => { const n = structuredClone(VAZIA); n.extra.ordem = todas.length + 1; n.extra.ocultarCapacidade = true; setEdit(n); }}><Plus size={14} /> Criar categoria</button>}
       </Cab>
       {cidades.length > 1 && <div className="dm-cartao dm-filtros"><Campo rotulo="Cidade"><select value={cidade} onChange={(e) => setCidade(e.target.value)}><option value="">Todas as cidades</option>{cidades.map((c) => <option key={c}>{c}</option>)}</select></Campo></div>}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
@@ -71,7 +72,8 @@ export function Categorias() {
                   <details className="dm-menu-pontos">
                     <summary aria-label={`Mais opções de ${c.nome}`}><MoreVertical size={16} /></summary>
                     <div className="dm-menu-pontos-lista">
-                      <button onClick={() => setEdit(structuredClone(c))}><Pencil size={14} /> Editar categoria</button>
+                      <button onClick={() => setEdit(structuredClone(c))}><Pencil size={14} /> Configurações</button>
+                      <button onClick={() => setDup({ cat: c, nome: "", comMotoristas: false })}><Copy size={14} /> Duplicar</button>
                       <button onClick={async () => { if (confirm(`Remover a categoria "${c.nome}"?`)) { await salvar(async () => { await pedirConfig(`/categorias/${c.id}`, "DELETE"); d.recarregar(); }, "Categoria removida."); } }}><Trash2 size={14} /> Excluir categoria</button>
                     </div>
                   </details>
@@ -84,6 +86,16 @@ export function Categorias() {
             </article>
           ))}
         </div>
+      )}
+      {dup && (
+        <Modal aberto onFechar={() => setDup(null)} titulo="Duplicar categoria" sub={`Cópia de ${dup.cat.nome}`}>
+          <form className="dm-form" onSubmit={async (e) => { e.preventDefault(); await salvar(async () => { await pedirConfig(`/categorias/${dup.cat.id}/duplicar`, "POST", { nome: dup.nome, comMotoristas: dup.comMotoristas }); setDup(null); d.recarregar(); }, "Categoria duplicada."); }}>
+            <Campo rotulo="Nome da nova categoria *"><input value={dup.nome} maxLength={21} required onChange={(e) => setDup({ ...dup, nome: e.target.value })} /></Campo>
+            <label className="dm-check"><input type="checkbox" checked={dup.comMotoristas} onChange={(e) => setDup({ ...dup, comMotoristas: e.target.checked })} /> Copiar também os motoristas vinculados</label>
+            <p className="sub">As tarifas (padrão e extras) e as configurações são copiadas.</p>
+            <div className="dm-rodape-modal"><button type="button" className="botao" onClick={() => setDup(null)}>Voltar</button><button className="botao primario">Duplicar</button></div>
+          </form>
+        </Modal>
       )}
       {tarifa && <JanelaTarifa cat={tarifa.cat} extra={tarifa.extra} onFechar={() => setTarifa(null)} onSalvo={() => { setTarifa(null); d.recarregar(); }} />}
       {edit && <JanelaCategoria inicial={edit} automacoes={d.dados?.automacoes ?? []} outras={todas} dinamicas={d.dados?.dinamicas ?? []} regras={d.dados?.regras ?? []} icones={d.dados?.icones ?? []} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
@@ -126,11 +138,11 @@ function JanelaCategoria({ inicial, outras, automacoes, dinamicas, regras, icone
             <h3>Personalizar</h3>
             <p className="sub">Defina nome e descrição para a categoria. Os detalhes adicionais estão disponíveis apenas a partir da versão 16.0 no Android e 14.0 no iOS.</p>
             <div className="dm-duplo">
-              <Campo rotulo="Nome *"><input value={c.nome} onChange={(e) => set("nome", e.target.value)} required maxLength={60} /></Campo>
-              <Campo rotulo="Descrição *"><input value={c.descricao} onChange={(e) => set("descricao", e.target.value)} required maxLength={120} /></Campo>
+              <Campo rotulo="Nome *"><input value={c.nome} onChange={(e) => set("nome", e.target.value)} required maxLength={21} /></Campo>
+              <Campo rotulo="Descrição *"><input value={c.descricao} onChange={(e) => set("descricao", e.target.value)} required maxLength={32} /></Campo>
             </div>
             <Campo rotulo="Detalhes adicionais" dica={`${ex.detalhes.length}/140`}><textarea value={ex.detalhes} maxLength={140} rows={2} onChange={(e) => setEx("detalhes", e.target.value)} /></Campo>
-            <Campo rotulo="Ordem da categoria" dica="Defina a ordem da categoria."><select value={ex.ordem} onChange={(e) => setEx("ordem", Number(e.target.value))}>{Array.from({ length: Math.max(16, ex.ordem) }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></Campo>
+            <Campo rotulo="Ordem da categoria" dica="Defina a ordem da categoria."><select value={ex.ordem} onChange={(e) => setEx("ordem", Number(e.target.value))}>{Array.from({ length: Math.max(outras.length + (c.id ? 0 : 1), ex.ordem, 1) }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></Campo>
             <Campo rotulo="Ícone da categoria" dica="Defina um ícone para representar essa categoria. As cores mudam de acordo com a cor utilizada no aplicativo.">
               <select value={ex.icone.modo === "personalizado" ? "personalizado" : ex.icone.biblioteca} onChange={(e) => { const v = e.target.value; setEx("icone", v === "personalizado" ? { ...ex.icone, modo: "personalizado" } : { ...ex.icone, modo: "biblioteca", biblioteca: v }); }}>
                 {!ICONES.some(([k]) => k === ex.icone.biblioteca) && ex.icone.modo !== "personalizado" && <option value={ex.icone.biblioteca}>Selecione</option>}
@@ -139,7 +151,7 @@ function JanelaCategoria({ inicial, outras, automacoes, dinamicas, regras, icone
               </select>
             </Campo>
             {ex.icone.modo === "personalizado" && <div>{ex.icone.imagem && <img src={ex.icone.imagem} alt="Prévia do ícone" width={80} height={80} />}<label className="botao">Adicionar PNG<input type="file" hidden accept="image/png" onChange={(e) => lerPng(e.target.files?.[0])} /></label><p className="sub"><strong>Atenção:</strong> a imagem deve ter fundo transparente e tamanho exato de 360x360 pixels.</p></div>}
-            <Campo rotulo="Capacidade de pessoas no veículo" dica="Defina a quantidade máxima de pessoas no veículo para essa categoria."><input type="number" min={1} disabled={ex.ocultarCapacidade} value={ex.capacidade} onChange={(e) => setEx("capacidade", Number(e.target.value))} /></Campo>
+            <Campo rotulo="Capacidade de pessoas no veículo" dica="Defina a quantidade máxima de pessoas no veículo para essa categoria."><input type="number" min={1} max={99} disabled={ex.ocultarCapacidade} value={ex.capacidade} onChange={(e) => setEx("capacidade", Number(e.target.value))} /></Campo>
             <label className="dm-check"><input type="checkbox" checked={ex.ocultarCapacidade} onChange={(e) => setEx("ocultarCapacidade", e.target.checked)} /> Não exibir capacidade de pessoas</label>
             <h3>Outras configurações</h3>
             <Opcao titulo="Exibir categoria" desc="Exibir categoria no aplicativo passageiro" valor={ex.visivel} onChange={(v) => setEx("visivel", v)} ligado="Categoria exibida no aplicativo" desligado="Categoria oculta no aplicativo" />
@@ -154,12 +166,15 @@ function JanelaCategoria({ inicial, outras, automacoes, dinamicas, regras, icone
                 {([["ambas", "Permitir solicitações imediatas e agendamentos", "Permite que as solicitações para esta categoria sejam imediatas ou agendadas no aplicativo passageiro."], ["imediatas", "Permitir apenas solicitações imediatas", "Permite que as solicitações para esta categoria sejam apenas imediatas no aplicativo passageiro."], ["agendadas", "Permitir apenas agendamentos", "Permite que as solicitações para esta categoria sejam apenas agendadas no aplicativo passageiro."]] as const).map(([v, t, d]) => <label key={v}><input type="radio" name="solicitacoes" checked={ex.solicitacoes === v} onChange={() => setEx("solicitacoes", v)} /> <span><strong>{t}</strong><small className="bloco">{d}</small></span></label>)}
               </div></fieldset>
             {!c.id && (
-              <fieldset><legend>Gestão: Vinculação de motoristas</legend>
+              <>
+              <h3>Gestão</h3>
+              <fieldset><legend>Vinculação de motoristas</legend>
                 <div className="dm-radios dm-radios-col">
                   {([["nenhum", "Não vincular agora", "A categoria será criada sem motoristas. O vínculo pode ser feito manualmente depois."], ["todos", "Vincular todos os motoristas", "Todos os motoristas da operação passarão a atender esta categoria, incluindo os inativos e bloqueados."], ["copiar", "Copiar motoristas de outra categoria", "Copia a lista de motoristas de uma categoria existente. Eles atenderão ambas as categorias."]] as const).map(([v, t, d]) => <label key={v}><input type="radio" name="vinculo" checked={c.vinculo?.modo === v} onChange={() => set("vinculo", { ...c.vinculo, modo: v })} /> <span><strong>{t}</strong><small className="bloco">{d}</small></span></label>)}
                 </div>
                 {c.vinculo?.modo === "copiar" && <select aria-label="Categoria de origem" value={c.vinculo.deCategoriaId} onChange={(e) => set("vinculo", { ...c.vinculo, deCategoriaId: e.target.value })}><option value="">Escolha a categoria</option>{outras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}</select>}
               </fieldset>
+              </>
             )}
           </>
         )}

@@ -8,7 +8,7 @@ import { centavos, lista, numero, sim, texto, umDe } from "./armazem.ts";
 export const METODOS = ["km_minuto", "tabela_km", "bairro", "hora_parada"] as const;
 export type MetodoTarifa = (typeof METODOS)[number];
 export const ROTULO_METODO: Record<MetodoTarifa, string> = {
-  km_minuto: "Por tarifa inicial, km e minuto", tabela_km: "Por tabela de KM", bairro: "Por bairro de destino", hora_parada: "Por tarifa inicial, km e hora parada",
+  km_minuto: "Por KM e minuto", tabela_km: "Por tabela de KM", bairro: "Por bairro de destino", hora_parada: "Por tarifa inicial, km e hora parada",
 };
 
 export interface FaixaTabelaKm { ate: number; valor: number }
@@ -23,6 +23,8 @@ export interface TarifaCalculo {
   tabelaKm: FaixaTabelaKm[]; kmAdicional: number;
   /** Maior percurso aceito (0 = sem limite): acima disso a corrida não pode ser solicitada. */
   limiteKm: number;
+  /** "Variar valor pela distância": o valor por km depende da distância total (cada faixa vale até "ate" km; passando da última vale kmAPartir). */
+  variarKm?: boolean; faixasKm?: FaixaTabelaKm[]; kmAPartir?: number;
   bairros: TarifaBairro[];
   paradaAdicional: number;
   bonusDeslocamento: BonusDeslocamento;
@@ -37,7 +39,7 @@ const reg = (v: unknown) => (v ?? {}) as Record<string, unknown>;
 export const BONUS_PADRAO: BonusDeslocamento = { ativo: false, minKm: 0, tipo: "fixo", valor: 0, teto: 0 };
 export const CALCULO_PADRAO: TarifaCalculo = {
   metodo: "km_minuto", precoBase: 0, valorKm: 0, valorMinuto: 0, valorHoraParada: 0, valorMinimo: 0,
-  tabelaKm: [], kmAdicional: 0, limiteKm: 0, bairros: [], paradaAdicional: 0, bonusDeslocamento: BONUS_PADRAO,
+  tabelaKm: [], kmAdicional: 0, limiteKm: 0, variarKm: false, faixasKm: [], kmAPartir: 0, bairros: [], paradaAdicional: 0, bonusDeslocamento: BONUS_PADRAO,
 };
 
 export function sanearBonus(e: unknown, atual: BonusDeslocamento = BONUS_PADRAO): BonusDeslocamento {
@@ -72,6 +74,9 @@ export function sanearCalculo(e: unknown, atual: TarifaCalculo = CALCULO_PADRAO)
     tabelaKm: tem("tabelaKm") ? sanearTabelaKm(o.tabelaKm) : atual.tabelaKm,
     kmAdicional: tem("kmAdicional") ? centavos(numero(o.kmAdicional, 0, 0, 1000)) : atual.kmAdicional,
     limiteKm: tem("limiteKm") ? numero(o.limiteKm, 0, 0, 10_000) : atual.limiteKm,
+    variarKm: tem("variarKm") ? sim(o.variarKm) : atual.variarKm ?? false,
+    faixasKm: tem("faixasKm") ? sanearTabelaKm(o.faixasKm) : atual.faixasKm ?? [],
+    kmAPartir: tem("kmAPartir") ? centavos(numero(o.kmAPartir, 0, 0, 1000)) : atual.kmAPartir ?? 0,
     bairros: tem("bairros") ? sanearBairros(o.bairros) : atual.bairros,
     paradaAdicional: tem("paradaAdicional") ? centavos(numero(o.paradaAdicional, 0, 0, 1000)) : atual.paradaAdicional,
     bonusDeslocamento: sanearBonus(o.bonusDeslocamento, atual.bonusDeslocamento),
@@ -84,6 +89,11 @@ export function conferirCalculo(t: TarifaCalculo): void {
     if (!t.tabelaKm.length) throw new Error("Adicione ao menos uma faixa na tabela de KM.");
     if (t.tabelaKm.some((f) => !(f.valor > 0))) throw new Error("Informe o valor fixo de cada faixa da tabela de KM.");
     if (t.limiteKm > 0 && t.limiteKm < t.tabelaKm[0].ate) throw new Error("O percurso máximo não pode ser menor que a primeira faixa da tabela de KM.");
+  }
+  if (t.variarKm && t.metodo !== "tabela_km" && t.metodo !== "bairro") {
+    const fk = t.faixasKm ?? [];
+    if (!fk.length) throw new Error("Adicione ao menos uma distância para variar o valor do km.");
+    if (fk.some((f) => !(f.valor > 0)) || !((t.kmAPartir ?? 0) > 0)) throw new Error("Informe o valor por km de cada distância e o valor a partir da última.");
   }
   if (t.metodo === "bairro" && !t.bairros.length && !(t.precoBase || t.valorKm || t.valorMinuto)) throw new Error("Cadastre ao menos um bairro com valor.");
   if (t.metodo === "km_minuto" && !(t.precoBase || t.valorKm || t.valorMinuto || t.valorMinimo)) throw new Error("Informe o preço base, o valor do km ou o do minuto.");
@@ -150,7 +160,12 @@ export function calcularTarifa(t: TarifaCalculo, e: EntradaCalculo): ResultadoCa
   if (!tarifaPreenchida(t)) return r(null);
   let sub: number | null;
   let faixa: number | undefined;
-  const porKm = () => t.precoBase + (km ?? 0) * t.valorKm;
+  const valorKm = () => {
+    if (!t.variarKm || !t.faixasKm?.length || km == null) return t.valorKm;
+    const f = [...(t.faixasKm ?? [])].sort((a, b) => a.ate - b.ate).find((x) => km <= x.ate);
+    return f ? f.valor : t.kmAPartir ?? t.valorKm;
+  };
+  const porKm = () => t.precoBase + (km ?? 0) * valorKm();
   if (t.metodo === "tabela_km") {
     if (km == null) return r(null);
     const l = [...t.tabelaKm].sort((a, b) => a.ate - b.ate);
