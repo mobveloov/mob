@@ -57,7 +57,10 @@ export async function logDaOs(empresaId: string, c: CorridaPropria) {
   const ondas = ondasDaCorrida(empresaId, c.id);
   const gravados = eventosDaCorrida(empresaId, c.id);
   const antiga = !gravados.length;
-  const eventos = antiga ? eventosDeCorridaAntiga(c, ondas) : gravados;
+  // Na mesma hora, a ordem lógica: criada, consulta do despacho, chamadas, aceite do motorista, atribuição e o resto.
+  const ORDEM: Partial<Record<EventoCorrida["tipo"], number>> = { criada: 0, despacho_consulta: 1, despacho_encontrados: 2, sem_motorista: 2, oferta_enviada: 3, oferta_recusada: 4, oferta_expirada: 4, oferta_saiu: 4, oferta_aceita: 5, oferta_perdida: 6, atribuida: 7, a_caminho: 8 };
+  const doSegundo = (e: EventoCorrida) => e.em.slice(0, 19);
+  const eventos = [...(antiga ? eventosDeCorridaAntiga(c, ondas) : gravados)].sort((a, b) => doSegundo(a).localeCompare(doSegundo(b)) || (ORDEM[a.tipo] ?? 9) - (ORDEM[b.tipo] ?? 9) || a.em.localeCompare(b.em) || a.id - b.id);
   const rodadas = new Set(eventos.filter((e) => e.tipo === "despacho_encontrados").map((e) => e.id));
   const vencedor = c.motoristaId;
   const linhas = await Promise.all(eventos.map(async (e) => {

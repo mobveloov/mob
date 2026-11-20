@@ -1,6 +1,6 @@
 // Nova Solicitação: a central pede a corrida pelo passageiro (telefone ou CPF), com rota, paradas, agendamento, motorista e valor manual.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, CheckCircle2, Loader2, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { api } from "../../api";
 import { pedirConfig } from "../demais/comum";
@@ -14,6 +14,7 @@ const P0: PontoEscolhido = { texto: "" };
 
 export default function Solicitar() {
   const navegar = useNavigate();
+  const [params] = useSearchParams();
   const [tipo, setTipo] = useState<"tel" | "cpf">("tel");
   const [busca, setBusca] = useState("");
   const [buscando, setBuscando] = useState(false);
@@ -54,6 +55,26 @@ export default function Solicitar() {
   const mapa = useDados<any>(() => op("/mapa"), [], 15_000);
   const categorias = (cats.dados?.registros ?? []).filter((c) => c.ativa !== false);
   useEffect(() => { if (!categoria && categorias.length) setCategoria(String(categorias[0].nome)); }, [categorias.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Criar cópia" (Consultar corridas): abre a solicitação com os dados de uma corrida anterior, pronta para conferir e enviar.
+  const copiarDe = params.get("copiar");
+  useEffect(() => {
+    if (!copiarDe) return;
+    let vivo = true;
+    op<any>(`/corridas/${encodeURIComponent(copiarDe)}`).then((d) => {
+      if (!vivo) return;
+      const c = d.corrida;
+      setNome(c.passageiro.nome); setTelCadastro(c.passageiro.telefone); setBusca(c.passageiro.telefone); setTipo("tel");
+      setOrigem({ texto: c.embarque.texto, lat: c.embarque.lat, lng: c.embarque.lng });
+      setDestino(c.destino ? { texto: c.destino.texto, lat: c.destino.lat, lng: c.destino.lng } : P0);
+      setParadas((c.paradas ?? []).map((p: any) => ({ texto: p.texto, lat: p.lat, lng: p.lng })));
+      if (c.categoria) setCategoria(c.categoria);
+      if (c.pagamento) setPagamento(c.pagamento);
+      if (c.observacao) setObservacao(c.observacao);
+      setOk(`Dados copiados da OS ${c.os}. Confira e clique em Solicitar.`);
+    }).catch((e) => vivo && setErro(msgErro(e)));
+    return () => { vivo = false; };
+  }, [copiarDe]);
 
   async function buscar() {
     const v = busca.trim();
