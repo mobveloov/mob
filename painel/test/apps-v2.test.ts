@@ -181,7 +181,7 @@ test("motorista novo: cadastro em análise, completa os passos, só fica online 
 
   // Passo 2: foto do rosto (e ela só abre para a própria pessoa).
   assert.match((await chamar("POST", `${API}/foto`, new Uint8Array([1, 2, 3, 4]), tokNovo, { "content-type": "image/png" })).corpo.erro, /não é uma foto/);
-  assert.match((await chamar("POST", `${API}/foto`, PNG(), tokNovo, { "content-type": "image/gif" })).corpo.erro, /JPG ou PNG/);
+  assert.match((await chamar("POST", `${API}/foto`, PNG(), tokNovo, { "content-type": "image/gif" })).corpo.erro, /JPG, PNG ou WEBP/);
   const f = await chamar("POST", `${API}/foto`, PNG(), tokNovo, { "content-type": "image/png" });
   assert.equal(f.status, 200); assert.equal(f.corpo.foto, `${API}/foto/motorista/${idNovo}`);
   assert.equal((await chamar("GET", f.corpo.foto, undefined, tokNovo)).status, 200);

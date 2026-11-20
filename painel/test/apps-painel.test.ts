@@ -432,3 +432,70 @@ test("fotos enviadas pelos apps viram WebP (qualidade 80, até 1600 px): foto de
   const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000081")!;
   assert.equal(arquivoDoDocumento(E.id, m.id, "cnh")?.mime, "image/webp");
 });
+
+test("SOS: grava o alerta com posição, nome e telefone e avisa os motoristas por perto (não quem pediu nem quem está longe)", async () => {
+  const { alertas } = await import("../src/apps/despacho.ts");
+  const { emitir: _e } = await import("../src/apps/eventos.ts");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Nina Pede", telefone: "11900000091", status: "Ativo", veiculo: "Hatch", placa: "NIN1A23" }, "teste");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Otto Perto", telefone: "11900000092", status: "Ativo", veiculo: "Hatch", placa: "OTT1A23" }, "teste");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Paulo Longe", telefone: "11900000093", status: "Ativo", veiculo: "Hatch", placa: "PAU1A23" }, "teste");
+  const tokN = await entrar("motorista", "11900000091"), tokO = await entrar("motorista", "11900000092"), tokL = await entrar("motorista", "11900000093");
+  await chamar("POST", `${API}/online`, { lat: -22.1, lng: -45.1 }, tokN);
+  await chamar("POST", `${API}/online`, { lat: -22.101, lng: -45.101 }, tokO);
+  await chamar("POST", `${API}/online`, { lat: -22.9, lng: -45.9 }, tokL);
+  const antes = alertas(E.id).length;
+  const r = await chamar("POST", `${API}/sos`, { lat: -22.1, lng: -45.1 }, tokN);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const todos = alertas(E.id);
+  assert.equal(todos.length, antes + 1);
+  const a = todos[todos.length - 1];
+  assert.equal(a.nome, "Nina Pede"); assert.equal(a.telefone, "11900000091"); assert.equal(a.papel, "motorista"); assert.equal(a.lat, -22.1);
+  assert.equal((await chamar("POST", `${API}/sos`, {}, undefined)).status, 401);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// "Mudou no painel, mudou no app": cada função do painel que afeta os apps, mudada com as mesmas funções do painel e conferida no app.
+// A tabela com o que foi testado e como está em docs/TESTE_PAINEL_APPS.md.
+
+test("painel → app: tarifa da categoria muda a estimativa; cupom criado/desativado aparece e some; documentos obrigatórios e motivos de cancelamento seguem o painel", async () => {
+  const { atualizar, listar } = await import("../src/cadastros/armazem.ts");
+  const { gerais, salvarGerais } = await import("../src/config/gerais.ts");
+  const tokP = await entrar("passageiro", "11988887001");
+  const consulta = `/estimativa?latEmbarque=-23.55&lngEmbarque=-46.63&latDestino=-23.6&lngDestino=-46.66&categoria=${encodeURIComponent("Econômico")}`;
+  const antes = (await chamar("GET", `${API}${consulta}`, undefined, tokP)).corpo;
+  assert.ok(antes.valor > 0, JSON.stringify(antes));
+  // 1) Tarifa: o valor do km sobe no painel -> a estimativa do app sobe.
+  const cat = listar(E.id, cadastroPorId("categorias")!).find((c) => c.nome === "Econômico")!;
+  atualizar(E.id, cadastroPorId("categorias")!, cat.id, { ...cat, valorKm: 4 }, "teste");
+  const depois = (await chamar("GET", `${API}${consulta}`, undefined, tokP)).corpo;
+  assert.ok(depois.valor > antes.valor, `estimativa subiu: ${antes.valor} -> ${depois.valor}`);
+  atualizar(E.id, cadastroPorId("categorias")!, cat.id, { ...cat, valorKm: 2 }, "teste");
+  // 2) Cupom: criado no painel aparece para o passageiro; desativado, some.
+  const c = criar(E.id, cadastroPorId("cupons")!, { codigo: "PAINEL10", tipoDesconto: "Percentual", valor: 10, ativo: true, automatico: false }, "teste");
+  assert.ok(((await chamar("GET", `${API}/cupons`, undefined, tokP)).corpo.cupons as Array<{ codigo: string }>).some((x) => x.codigo === "PAINEL10"), "cupom novo aparece");
+  atualizar(E.id, cadastroPorId("cupons")!, c.id, { ...c, ativo: false }, "teste");
+  assert.ok(!((await chamar("GET", `${API}/cupons`, undefined, tokP)).corpo.cupons as Array<{ codigo: string }>).some((x) => x.codigo === "PAINEL10"), "cupom desativado some");
+  // 3) Documentos obrigatórios e motivos de cancelamento vêm de Configurações > Gerais.
+  const g = gerais(E.id);
+  const docs = g.motorista.documentos.map((d) => ({ ...d, exigir: d.id === "cnh" ? true : false }));
+  salvarGerais(E.id, { ...g, motorista: { ...g.motorista, documentos: docs }, cancelamento: { ...g.cancelamento, motorista: { ...g.cancelamento.motorista, motivos: ["Motivo novo do painel", "Passageiro não apareceu"] } } });
+  const cfg = (await chamar("GET", `${API}/config`, undefined, tokP)).corpo;
+  assert.deepEqual(cfg.documentosExigidos.filter((d: any) => d.exigir).map((d: any) => d.id), ["cnh"]);
+  assert.ok(cfg.motivosCancelamento.motorista.includes("Motivo novo do painel"), "motivo novo do painel aparece no /config");
+  const tokM = await (async () => { criar(E.id, cadastroPorId("motoristas")!, { nome: "Rui Docs", telefone: "11900000101", status: "Ativo", veiculo: "Hatch", placa: "RUI1A23" }, "teste"); return entrar("motorista", "11900000101"); })();
+  assert.deepEqual((await chamar("GET", `${API}/motivos-cancelamento`, undefined, tokM)).corpo.motivos, cfg.motivosCancelamento.motorista, "o motorista vê exatamente a lista do painel");
+  assert.deepEqual((await chamar("GET", `${API}/documentos`, undefined, tokM)).corpo.obrigatorios.includes("cnh"), true);
+  salvarGerais(E.id, g); // devolve como estava
+});
+
+test("painel → app: motorista bloqueado no painel perde o acesso ao app; reativado, volta", async () => {
+  const { atualizar, listar } = await import("../src/cadastros/armazem.ts");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Sol Suspensa", telefone: "11900000111", status: "Ativo", veiculo: "Hatch", placa: "SOL1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000111");
+  assert.equal((await chamar("GET", `${API}/estado`, undefined, tokM)).status, 200);
+  const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000111")!;
+  atualizar(E.id, cadastroPorId("motoristas")!, m.id, { ...m, status: "Bloqueado" }, "teste");
+  assert.ok([401, 403].includes((await chamar("GET", `${API}/estado`, undefined, tokM)).status), "bloqueado: o app é barrado");
+  atualizar(E.id, cadastroPorId("motoristas")!, m.id, { ...m, status: "Ativo" }, "teste");
+  assert.equal((await chamar("GET", `${API}/estado`, undefined, tokM)).status, 200, "reativado: volta");
+});

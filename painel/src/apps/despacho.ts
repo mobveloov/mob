@@ -114,6 +114,8 @@ export const limparDespacho = () => estados.clear();
 
 const motoristas = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!);
 const motorista = (empresaId: string, id: string) => motoristas(empresaId).find((m) => m.id === id);
+/** Nome e telefone de um motorista (para o alerta de emergência). */
+export const dadosDoMotorista = (empresaId: string, id: string) => { const m = motorista(empresaId, id); return { nome: String(m?.nome ?? ""), telefone: String(m?.telefone ?? "") }; };
 const passageiroAlvo = (c: CorridaPropria): Alvo => ({ papel: "passageiro", chave: c.passageiro.telefone });
 const motoristaAlvo = (id: string): Alvo => ({ papel: "motorista", chave: id });
 
@@ -415,7 +417,7 @@ export function despachar(empresaId: string) {
     emitir(empresaId, motoristaAlvo(melhor.id), "oferta", ofertaParaApp(empresaId, o));
     void avisar(empresaId, motoristaAlvo(melhor.id), {
       titulo: "Nova corrida", texto: `${c.embarque.texto}${o.distanciaKm != null ? ` · ${o.distanciaKm} km de você` : ""}`,
-      dados: { tipo: "oferta", ofertaId: o.id, corridaId: c.id }, canal: "corridas",
+      dados: { tipo: "oferta", ofertaId: o.id, corridaId: c.id }, canal: "corridas", somenteDados: true, // vira chamada em tela cheia pelo serviço nativo do APK
     });
     n++;
     }
@@ -845,15 +847,46 @@ export interface Alerta { id: string; corridaId: string; os: string; papel: Pape
 const arqAlertas = (empresaId: string) => arquivo(empresaId, "alertas.json");
 export const alertas = (empresaId: string) => ler<Alerta[]>(arqAlertas(empresaId), []);
 
-export function registrarSos(empresaId: string, c: CorridaPropria, papel: PapelApp, lat?: number, lng?: number): Alerta {
+/** Raio (km) em que os outros motoristas online recebem o alerta de emergência. */
+export const RAIO_SOS_KM = 5;
+
+/**
+ * Pedido de ajuda (botão de pânico). Grava o alerta (OS, posição, quem é e o telefone) para o painel e avisa na hora os motoristas online
+ * por perto (tempo real + push de alta prioridade). `c` é a corrida, quando há; o pedido de ajuda do mapa (sem corrida) passa `null`.
+ */
+export function registrarSos(empresaId: string, c: CorridaPropria | null, papel: PapelApp, lat?: number, lng?: number, quem?: { id: string; nome: string; telefone: string }): Alerta {
   const a: Alerta = {
-    id: crypto.randomUUID(), corridaId: c.id, os: c.os, papel,
-    nome: papel === "passageiro" ? c.passageiro.nome : c.motorista, telefone: papel === "passageiro" ? c.passageiro.telefone : c.telefoneMotorista,
+    id: crypto.randomUUID(), corridaId: c?.id ?? "", os: c?.os ?? "", papel,
+    nome: quem?.nome ?? (c ? (papel === "passageiro" ? c.passageiro.nome : c.motorista) : ""), telefone: quem?.telefone ?? (c ? (papel === "passageiro" ? c.passageiro.telefone : c.telefoneMotorista) : ""),
     lat: lat ?? null, lng: lng ?? null, em: new Date().toISOString(), resolvido: false, resolvidoPor: "",
   };
   gravar(arqAlertas(empresaId), [...alertas(empresaId).slice(-999), a]);
-  console.warn(`[apps] SOS na empresa ${empresaId}, OS ${c.os} (${papel})`);
+  console.warn(`[apps] SOS na empresa ${empresaId}, OS ${a.os || "—"} (${papel})`);
+  void distribuirSos(empresaId, a, quem?.id);
   return a;
+}
+
+/** Avisa os motoristas online dentro de RAIO_SOS_KM (menos quem pediu) e, quando a corrida tem motorista, ele também. Nunca lança erro. */
+async function distribuirSos(empresaId: string, a: Alerta, excluirId?: string) {
+  try {
+    const e = estado(empresaId);
+    const c = a.corridaId ? listarProprias(empresaId).find((x) => x.id === a.corridaId) : undefined;
+    const alvos = new Map<string, number | null>();
+    for (const [id, p] of e.online) {
+      if (id === excluirId) continue;
+      const km = a.lat != null && a.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: a.lat, lng: a.lng }) : null;
+      if (km != null && km <= RAIO_SOS_KM) alvos.set(id, arred(km, 1));
+    }
+    if (c?.motoristaId && c.motoristaId !== excluirId && !alvos.has(c.motoristaId)) alvos.set(c.motoristaId, null);
+    for (const [id, km] of alvos) {
+      const dados = { id: a.id, nome: a.nome, papel: a.papel, os: a.os, lat: a.lat, lng: a.lng, km };
+      emitir(empresaId, motoristaAlvo(id), "sos", dados);
+      void avisar(empresaId, motoristaAlvo(id), {
+        titulo: "ALERTA DE EMERGÊNCIA", texto: `${a.nome || "Um colega"} pediu ajuda${km != null ? ` a ${km.toString().replace(".", ",")} km de você` : ""}. Se puder, ajude e avise a central.`,
+        dados: { tipo: "sos", alertaId: a.id }, canal: "corridas",
+      });
+    }
+  } catch (err) { console.error("[apps] distribuir SOS:", err instanceof Error ? err.message : err); }
 }
 
 export function resolverAlerta(empresaId: string, id: string, por: string) {

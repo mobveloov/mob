@@ -89,6 +89,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   // Tempo real.
   useEffect(() => tempoReal((tipo, d) => {
     if (tipo === "oferta") { if (document.visibilityState === "hidden") void permissoesNativas.ofertaTelaCheia("Nova corrida", "Toque para ver a chamada"); setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
+    else if (tipo === "sos") { tocarAlerta(3, "alerta"); vibrar([500, 200, 500, 200, 500]); setAviso(`ALERTA DE EMERGÊNCIA: ${String(d.nome || "um colega")} pediu ajuda${d.km != null ? ` a ${String(d.km).replace(".", ",")} km de você` : ""}.`); }
     else if (tipo === "oferta_encerrada") { setOferta((o) => (o?.id === d.id ? null : o)); pararSons(); if (d.motivo) setAviso(String(d.motivo)); }
     else if (tipo === "corrida") {
       const c = d as Corrida;
@@ -159,7 +160,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   };
   const pedirAjuda = async () => {
     setDialogo("");
-    try { await api("/suporte", { corpo: { texto: `ALERTA: o motorista pediu ajuda${posicao ? ` (posição ${posicao.lat.toFixed(5)}, ${posicao.lng.toFixed(5)})` : ""}.` } }); setAviso("A central recebeu o seu alerta e vai falar com você. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+    try { await api("/sos", { corpo: posicao ?? {} }); setAviso("Alerta enviado: a central e os motoristas por perto foram avisados. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
   };
   const ficarOffline = async () => { setDialogo(""); setFolhaAberta(false); await api("/offline", { corpo: {} }).catch(() => undefined); setOnline(false); };
   const sairDaConta = async () => { await api("/sair", { corpo: {} }).catch(() => undefined); setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); };

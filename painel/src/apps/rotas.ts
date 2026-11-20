@@ -390,7 +390,15 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
 r.post("/corridas/:id/sos", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
-  res.json({ alerta: P.registrarSos(empresaId, c, sessao.papel, num(req.body?.lat), num(req.body?.lng)) });
+  const quem = sessao.papel === "motorista" ? { id: sessao.chave, nome: c.motorista, telefone: c.telefoneMotorista } : undefined;
+  res.json({ alerta: P.registrarSos(empresaId, c, sessao.papel, num(req.body?.lat), num(req.body?.lng), quem) });
+}));
+
+/** Pedido de ajuda sem corrida (botão vermelho do mapa do motorista): grava o alerta e avisa quem está por perto. */
+r.post("/sos", so("motorista"), ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  const eu = P.dadosDoMotorista(empresaId, sessao.chave);
+  res.json({ alerta: P.registrarSos(empresaId, null, "motorista", num(req.body?.lat), num(req.body?.lng), { id: sessao.chave, nome: eu.nome, telefone: eu.telefone }) });
 }));
 
 // ------------------------------------------------------------------ chat
