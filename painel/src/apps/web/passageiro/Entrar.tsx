@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Building2, Camera, ChevronLeft, CircleHelp, Contact, Eye, EyeOff, Image as Imagem, Lock, Mail, MessageCircle, Search, ShieldCheck, Smartphone, UserRound, Users } from "lucide-react";
 import { api, guardarToken, urlArquivo } from "../comum/api";
+import { logoDaPersonalizacao, usePersonalizacao } from "../comum/personalizacao";
 import { mensagemDeErro, ServidorTeste, type MarcaApp } from "../comum/ui";
 import { apiOu, linkWhatsapp, prepararFoto, rotaFaltando } from "./apoio";
 import { Aviso, Campo, Carregando, FolhaModal, TextoDoPainel } from "./pecas";
@@ -24,7 +25,8 @@ export function mascaraTelefone(v: string) {
 }
 
 function Logo({ marca }: { marca: MarcaApp }) {
-  const src = urlArquivo(marca.logoEscuro || marca.logoClaro || marca.icone);
+  const pers = usePersonalizacao(); // a imagem da Personalização manda; sem ela, o logo da marca da empresa
+  const src = urlArquivo(logoDaPersonalizacao(pers) || marca.logoEscuro || marca.logoClaro || marca.icone);
   return src ? <img className="login-logo" src={src} alt={marca.nome} /> : <div className="login-logo-texto">{marca.nome}</div>;
 }
 

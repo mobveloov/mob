@@ -2,9 +2,9 @@
 // Recentes, e o mapa com a minha posição.
 
 import { Briefcase, Gift, History, House, Search } from "lucide-react";
-import type { Posicao } from "../comum/api";
 import { saudacao, type Eu, type Lugares } from "./apoio";
-import { usePersonalizacao } from "../comum/personalizacao";
+import { urlArquivo, type Posicao } from "../comum/api";
+import { logoDaPersonalizacao, usePersonalizacao } from "../comum/personalizacao";
 import { Mapa } from "./Mapa";
 import { Avatar } from "./pecas";
 
@@ -20,6 +20,12 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
     <div className={`inicio estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
       {comMapa && <Mapa eu={aqui} perto={aqui} controles className="fundo" />}
       <div className="inicio-topo">
+        {pers && (pers.design.mostrarImagem || pers.design.mostrarNome) && (
+          <div className={`inicio-marca ${pers.design.marca}`}>
+            {pers.design.mostrarImagem && <img src={urlArquivo(logoDaPersonalizacao(pers))} alt="" />}
+            {pers.design.mostrarNome && <strong>{pers.empresa.nome}</strong>}
+          </div>
+        )}
         <div className="inicio-ola">
           <Avatar foto={eu.foto} nome={eu.nome} tamanho={52} />
           <div><small>{saudacao()}</small><strong>{primeiro}! <span aria-hidden="true">👋</span></strong></div>

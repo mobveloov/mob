@@ -49,3 +49,35 @@
 .dm-sep { margin: 22px 0 10px; font-size: 16px; color: var(--suave); }
 .dm-global { padding: 10px; margin-bottom: 8px; } .dm-global p { margin: 2px 0 6px; }
 .dm-tela-cheia { position: fixed; inset: 0; z-index: 60; background: var(--fundo); padding: 12px; overflow: auto; }
+
+/* Personalização: página em 3 colunas (menu lateral, formulário, pré-visualização) e detalhes das capturas da Machine */
+.pe-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+@media (max-width: 1200px) { .pe-layout { grid-template-columns: minmax(0, 1fr) 320px; } .pe-menu { display: none; } }
+@media (max-width: 900px) { .pe-layout { grid-template-columns: 1fr; } }
+.pe-menu { position: sticky; top: 70px; } .pe-indice { display: flex; flex-direction: column; gap: 14px; }
+.pe-indice-secao { display: flex; flex-direction: column; gap: 2px; } .pe-indice-secao h2 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; color: var(--suave); letter-spacing: .04em; }
+.pe-indice-secao a { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; color: inherit; text-decoration: none; font-size: 14px; } .pe-indice-secao a:hover { background: var(--fundo); } .pe-indice-secao a.is-active { background: var(--fundo); font-weight: 700; box-shadow: inset 3px 0 0 var(--primaria, #2563eb); }
+.pe-aviso { color: #b45309; display: flex; gap: 4px; align-items: center; }
+.pe-tela .pe-cabeca { z-index: 3; } .pe-tela.neutro .pe-cabeca, .pe-tela.marcante .pe-cabeca { padding-bottom: 6px; }
+.pe-tela.marcante .pe-cabeca { background: var(--pe-cor); color: var(--pe-sobre); } .pe-tela.marcante .pe-topo { background: none; color: inherit; } .pe-tela.marcante .pe-cabeca .pe-ola { color: inherit; }
+.pe-cabeca .pe-ola { padding: 0 12px 4px; }
+.pe-tela.contraste-escuro.marcante .pe-sino, .pe-tela.contraste-escuro.marcante .pe-cupom-n { color: #111827; }
+.pe-desafio { background: color-mix(in srgb, var(--pe-cor) 10%, #fff); border-radius: 10px; padding: 8px 10px; } .pe-desafio-topo { display: flex; justify-content: space-between; gap: 6px; font-weight: 600; } .pe-desafio-linha { display: flex; align-items: center; gap: 8px; } .pe-barra { flex: 1; height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; } .pe-barra i { display: block; width: 20%; height: 100%; background: var(--pe-cor); } .pe-desafio small { color: #6b7280; white-space: nowrap; }
+.pe-icone-rec { width: 20px; display: grid; place-items: center; }
+.pe-tela .pe-pilha { overflow: auto; }
+
+/* Personalização app motorista */
+.pm-modo { display: flex; justify-content: center; gap: 4px; margin-bottom: 8px; } .pm-modo button { border: 1px solid var(--borda); background: var(--cartao); color: inherit; padding: 4px 14px; border-radius: 999px; cursor: pointer; } .pm-modo button.sel { background: var(--primaria, #2563eb); color: #fff; border-color: transparent; }
+.pm-tela { position: relative; height: 100%; overflow: hidden; font-size: 12px; --pm-tx: #101828; --pm-card: #fff; } .pm-tela.escuro { --pm-tx: #f5f7fa; --pm-card: #131a24; }
+.pm-mapa { position: absolute; inset: 0; background: repeating-linear-gradient(45deg, #d6e4f5, #d6e4f5 10px, #e5eefa 10px, #e5eefa 20px); } .pm-tela.escuro .pm-mapa { background: repeating-linear-gradient(45deg, #1b2431, #1b2431 10px, #222c3a 10px, #222c3a 20px); }
+.pm-topo { position: absolute; top: 10px; left: 8px; right: 8px; display: flex; gap: 6px; align-items: center; z-index: 3; }
+.pm-pilula { display: inline-flex; align-items: center; gap: 6px; background: var(--pm-card); color: var(--pm-tx); border-radius: 999px; padding: 4px 8px 4px 4px; box-shadow: 0 1px 5px rgba(0,0,0,.3); } .pm-pilula.saldo { flex: 1; justify-content: center; padding: 8px; }
+.pm-botao { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--pm-card); color: var(--pm-tx); box-shadow: 0 1px 5px rgba(0,0,0,.3); } .pm-botao.alerta { position: absolute; right: 8px; top: 60px; background: #e8500e; color: #fff; z-index: 3; border-radius: 50%; width: 36px; height: 36px; }
+.pm-logo { width: 28px; height: 28px; border-radius: 50%; background: #111; color: var(--pe-cor); display: grid; place-items: center; overflow: hidden; border: 2px solid var(--pe-cor); } .pm-logo img { width: 100%; height: 100%; object-fit: cover; } .pm-logo b { font-size: 10px; }
+.pm-direita { position: absolute; right: 8px; bottom: 150px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+.pm-maca { position: absolute; left: 8px; bottom: 150px; z-index: 3; background: var(--pm-card); color: var(--pm-tx); border-radius: 999px; padding: 6px 10px; display: inline-flex; gap: 4px; align-items: center; box-shadow: 0 1px 5px rgba(0,0,0,.3); }
+.pm-iniciar { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 3; width: 74px; height: 74px; border-radius: 50%; background: var(--pe-cor); color: var(--pe-sobre); display: grid; place-items: center; font-weight: 800; box-shadow: 0 0 0 8px color-mix(in srgb, var(--pe-cor) 30%, transparent); }
+.pm-folha { position: absolute; left: 0; right: 0; bottom: 0; background: var(--pm-card); color: var(--pm-tx); border-radius: 20px 20px 0 0; padding: 6px 12px 10px; text-align: center; z-index: 4; box-shadow: 0 -2px 10px rgba(0,0,0,.25); } .pm-folha p { margin: 8px 0 10px; opacity: .7; }
+.pm-rodape { display: flex; justify-content: space-around; align-items: center; } .pm-rodape span { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; } .pm-rodape span.ativo { color: var(--pe-cor); font-weight: 700; } .pm-rodape b { font-size: 13px; max-width: 80px; }
+.pm-tela.neutro .pm-topo, .pm-tela.marcante .pm-topo { top: 0; left: 0; right: 0; padding: 10px 8px 8px; background: var(--pm-card); } .pm-tela.marcante .pm-topo { background: var(--pe-cor); color: var(--pe-sobre); } .pm-tela.neutro .pm-pilula, .pm-tela.marcante .pm-pilula, .pm-tela.neutro .pm-botao, .pm-tela.marcante .pm-botao { box-shadow: none; }
+.pm-amostra { display: grid; place-items: center; width: 56px; height: 40px; border-radius: 8px; border: 1px solid var(--borda); } .pm-amostra.claro { background: #fff; color: #111827; } .pm-amostra.escuro { background: #111827; color: #fff; } .pm-amostra.sistema { background: linear-gradient(90deg, #fff 50%, #111827 50%); color: #6b7280; }

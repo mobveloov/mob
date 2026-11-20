@@ -26,7 +26,7 @@ export function aplicarMarca(m: MarcaApp) {
   s.setProperty("--fonte", `"${m.fonte}", system-ui, sans-serif`);
   document.title = m.nome;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", m.cores.primaria);
-  if (config().papel === "passageiro") reaplicarPersonalizacao(); // a personalização do painel vale por cima da marca
+  reaplicarPersonalizacao(); // a personalização do painel vale por cima da marca
 }
 
 export function useMarca() {
