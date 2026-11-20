@@ -1,0 +1,26 @@
+/* Busca global (Ctrl K) e janelinha Atualizações. Usa as variáveis do menu lateral (--ml-*). */
+.botao-topo { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid var(--ml-borda); border-radius: 999px; background: none; color: var(--suave); font: inherit; font-size: 13px; cursor: pointer; }
+.botao-topo:hover { background: var(--primaria-suave); color: var(--primaria-viva); }
+.botao-topo kbd { padding: 1px 6px; border: 1px solid var(--ml-borda); border-radius: 5px; font: inherit; font-size: 11px; }
+.botao-topo.so-icone { width: 36px; padding: 0; justify-content: center; border: 0; }
+.busca-fundo { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-start; justify-content: center; padding: 10vh 16px 16px; background: rgba(15, 23, 42, .5); backdrop-filter: blur(2px); }
+.busca-janela { width: 100%; max-width: 560px; max-height: 76vh; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--ml-borda); border-radius: 14px; background: var(--ml-fundo); color: var(--ml-texto); box-shadow: 0 20px 50px rgba(0, 0, 0, .3); }
+.busca-campo { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--ml-borda); color: var(--ml-suave); }
+.busca-campo input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ml-forte); font: inherit; font-size: 15px; }
+.busca-campo kbd { padding: 1px 6px; border: 1px solid var(--ml-borda); border-radius: 5px; font-size: 11px; }
+.busca-lista { margin: 0; padding: 6px; list-style: none; overflow-y: auto; flex: 1; min-height: 0; }
+.busca-lista li { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.busca-lista li strong { font-size: 14px; font-weight: 600; color: var(--ml-forte); }
+.busca-lista li small { font-size: 12px; color: var(--ml-suave); }
+.busca-lista li.busca-sel { background: var(--ml-hover); }
+.busca-lista li.busca-vazio { color: var(--ml-suave); cursor: default; }
+.busca-rodape { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 0; padding: 8px 14px; border-top: 1px solid var(--ml-borda); font-size: 11.5px; color: var(--ml-suave); }
+.atu-topo { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--ml-borda); }
+.atu-topo h2 { margin: 0; font-size: 16px; color: var(--ml-forte); }
+.atu-topo button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--ml-suave); cursor: pointer; }
+.atu-lista { margin: 0; padding: 8px 16px 16px; list-style: none; overflow-y: auto; }
+.atu-lista li { padding: 10px 0; border-bottom: 1px solid var(--ml-borda); }
+.atu-lista li:last-child { border-bottom: 0; }
+.atu-lista small { display: block; font-size: 11.5px; color: var(--ml-suave); }
+.atu-lista strong { display: block; font-size: 14px; color: var(--ml-forte); }
+.atu-lista p { margin: 2px 0 0; font-size: 13px; }

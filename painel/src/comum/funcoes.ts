@@ -1,6 +1,6 @@
 // Menu do painel: os mesmos grupos, submenus, nomes e ordem do painel Machine (menu no topo),
-// mais o que só existe aqui: itens extras no fim de cada grupo (seção "Outras telas") e os grupos
-// "Cobrança" e "Mais" (CRM, bot, totem, IA, apps, marca...).
+// mais o que só existe aqui: itens extras no fim de cada grupo (seção "Outras telas") e o grupo
+// "Mais" (CRM, bot, totem, IA, apps, marca...).
 // Os ids e as rotas são fixos: cada tela é ligada ao menu pelo id (src/web/App.tsx).
 
 import { podeCargo, type Cargo } from "./cargos.ts";
@@ -27,20 +27,23 @@ const EXTRA = "Outras telas";
 export const FUNCOES: Funcao[] = [
   { id: "painel", grupo: "Painel", nome: "Painel", rota: "/" },
 
+  { id: "equipe", grupo: "Cadastro", nome: "Minha equipe", rota: "/equipe", antigas: ["/usuarios"], minimo: "admin" },
   { id: "cupons", grupo: "Cadastro", nome: "Cupons", rota: "/cupons", minimo: "gestor" },
+  { id: "passe-livre", grupo: "Cadastro", nome: "Passe Livre", rota: "/passe-livre", minimo: "gestor" },
   { id: "empresas", grupo: "Cadastro", nome: "Empresas", rota: "/empresas", antigas: ["/conveniadas"], minimo: "gestor" },
   { id: "faixas-vouchers", grupo: "Cadastro", nome: "Faixa de Vouchers", rota: "/faixas-vouchers", minimo: "gestor" },
-  { id: "areas", grupo: "Cadastro", secao: "Gestão de Áreas", nome: "Áreas", rota: "/areas", minimo: "gestor" },
-  { id: "plantao", grupo: "Cadastro", secao: "Gestão de Áreas", nome: "Plantão", rota: "/plantao" },
-  { id: "filiais", grupo: "Cadastro", secao: "Gestão de Áreas", nome: "Filiais", rota: "/filiais", minimo: "gestor" },
+  { id: "areas", grupo: "Cadastro", secao: "Gestão de áreas", nome: "Áreas", rota: "/areas", minimo: "gestor" },
+  { id: "cidades", grupo: "Cadastro", secao: "Gestão de áreas", nome: "Cidades", rota: "/cidades", minimo: "gestor" },
+  { id: "plantao", grupo: "Cadastro", secao: "Gestão de áreas", nome: "Plantão", rota: "/plantao" },
   { id: "motoristas", grupo: "Cadastro", nome: "Motoristas", rota: "/motoristas" },
   { id: "punicoes", grupo: "Cadastro", nome: "Punições", rota: "/punicoes", minimo: "gestor" },
-  { id: "passageiros", grupo: "Cadastro", nome: "Clientes", rota: "/passageiros", antigas: ["/clientes"] },
+  { id: "passageiros", grupo: "Cadastro", secao: "Clientes", nome: "Clientes", rota: "/passageiros", antigas: ["/clientes"] },
+  { id: "consulta-cartoes", grupo: "Cadastro", secao: "Clientes", nome: "Consulta de cartões", rota: "/consulta-cartoes", minimo: "gestor" },
   { id: "ruas", grupo: "Cadastro", nome: "Ruas", rota: "/ruas", minimo: "gestor" },
   { id: "desafios", grupo: "Cadastro", nome: "Desafios", rota: "/desafios", minimo: "gestor" },
+  { id: "filiais", grupo: "Cadastro", secao: EXTRA, nome: "Filiais", rota: "/filiais", minimo: "gestor" },
   { id: "destravar", grupo: "Cadastro", secao: EXTRA, nome: "Destravar Motoristas", rota: "/destravar" },
   { id: "veiculos", grupo: "Cadastro", secao: EXTRA, nome: "Veículos", rota: "/veiculos" },
-  { id: "equipe", grupo: "Cadastro", secao: EXTRA, nome: "Equipe", rota: "/equipe", antigas: ["/usuarios"], minimo: "admin" },
 
   { id: "solicitar", grupo: "Corridas", nome: "Solicitar nova corrida", rota: "/solicitar" },
   { id: "monitoramento", grupo: "Corridas", nome: "Acompanhamento", rota: "/monitoramento", antigas: ["/acompanhamento"] },
@@ -58,12 +61,19 @@ export const FUNCOES: Funcao[] = [
   { id: "funil-clientes", grupo: "Corridas", secao: EXTRA, nome: "Funil de Clientes", rota: "/funil-clientes", minimo: "gestor" },
   { id: "mapa-bairros", grupo: "Corridas", secao: EXTRA, nome: "Mapa de Bairros e Demanda", rota: "/mapa-bairros", minimo: "gestor" },
 
+  { id: "carteiras", grupo: "Financeiro", secao: "Créditos", nome: "Carteiras de crédito", rota: "/carteiras", minimo: "gestor" },
+  { id: "creditos-recargas-saques", grupo: "Financeiro", secao: "Créditos", nome: "Recargas e Saques", rota: "/creditos-recargas-saques", minimo: "gestor" },
+  { id: "creditos-extrato", grupo: "Financeiro", secao: "Créditos", nome: "Extrato", rota: "/creditos-extrato", minimo: "gestor" },
+  { id: "cartao-painel", grupo: "Financeiro", secao: "Cartão", nome: "Painel de Controle", rota: "/cartao-painel", minimo: "admin" },
+  { id: "cartao-transacoes", grupo: "Financeiro", secao: "Cartão", nome: "Transações", rota: "/cartao-transacoes", minimo: "admin" },
+  { id: "cartao-saldo-central", grupo: "Financeiro", secao: "Cartão", nome: "Saldo da Central", rota: "/cartao-saldo-central", minimo: "admin" },
+  { id: "cartao-saldo-motorista", grupo: "Financeiro", secao: "Cartão", nome: "Saldo do Motorista", rota: "/cartao-saldo-motorista", minimo: "admin" },
   { id: "transacao-pix", grupo: "Financeiro", secao: "Pix", nome: "Transações", rota: "/transacao-pix", minimo: "gestor" },
   { id: "faturamento-empresa", grupo: "Financeiro", secao: "Contas a receber", nome: "Faturamento por empresa", rota: "/faturamento-empresa", minimo: "admin" },
   { id: "faturamento-centro-custo", grupo: "Financeiro", secao: "Contas a receber", nome: "Faturamento de centro de custo", rota: "/faturamento-centro-custo", minimo: "admin" },
   { id: "faturamento-periodo", grupo: "Financeiro", secao: "Contas a receber", nome: "Faturamento por período", rota: "/faturamento-periodo", minimo: "admin" },
   { id: "vouchers-motoristas", grupo: "Financeiro", secao: "Contas a pagar", nome: "Vouchers e tickets por motoristas", rota: "/vouchers-motoristas", minimo: "gestor" },
-  { id: "pagamentos-pendentes", grupo: "Financeiro", nome: "Pagamentos pendentes", rota: "/pagamentos-pendentes", antigas: ["/pendencias"], minimo: "admin" },
+  { id: "pagamentos-pendentes", grupo: "Financeiro", secao: "Contas a pagar", nome: "Pagamentos pendentes", rota: "/pagamentos-pendentes", antigas: ["/pendencias"], minimo: "admin" },
   { id: "visao-geral", grupo: "Financeiro", secao: "Relatórios", nome: "Visão geral", rota: "/visao-geral", minimo: "admin" },
   { id: "relatorio-faturamento", grupo: "Financeiro", secao: "Relatórios", nome: "Faturamento", rota: "/relatorio-faturamento" },
   { id: "extrato-online", grupo: "Financeiro", secao: "Relatórios", nome: "Transações online", rota: "/extrato-online", minimo: "admin" },
@@ -75,8 +85,6 @@ export const FUNCOES: Funcao[] = [
   { id: "os-percentual-motorista", grupo: "Financeiro", secao: "Estatísticas", nome: "% de OS por motorista", rota: "/os-percentual-motorista", minimo: "admin" },
   { id: "km-rodados", grupo: "Financeiro", secao: "Poder público", nome: "Km rodados por motorista", rota: "/km-rodados", minimo: "gestor" },
   { id: "indicacoes", grupo: "Financeiro", nome: "Recompensas por indicação", rota: "/indicacoes", antigas: ["/recompensas-indicacao"], minimo: "admin" },
-  { id: "extrato-central", grupo: "Financeiro", secao: EXTRA, nome: "Extrato da central", rota: "/extrato-central", minimo: "gestor" },
-  { id: "carteiras", grupo: "Financeiro", secao: EXTRA, nome: "Carteiras", rota: "/carteiras", minimo: "gestor" },
   { id: "extrato", grupo: "Financeiro", secao: EXTRA, nome: "Extrato Geral", rota: "/extrato", minimo: "gestor" },
   { id: "saques", grupo: "Financeiro", secao: EXTRA, nome: "Saques", rota: "/saques", minimo: "gestor" },
   { id: "recargas", grupo: "Financeiro", secao: EXTRA, nome: "Recargas", rota: "/recargas", minimo: "gestor" },
@@ -87,8 +95,9 @@ export const FUNCOES: Funcao[] = [
   { id: "alertas-empresas", grupo: "Comunicação", nome: "Alertas para empresas", rota: "/alertas-empresas" },
 
   { id: "config-gerais", grupo: "Configurações", nome: "Gerais", rota: "/config-gerais", minimo: "gestor" },
-  { id: "taxas-central", grupo: "Configurações", nome: "Taxas da central", rota: "/taxas-central", minimo: "admin" },
   { id: "personalizacao-app", grupo: "Configurações", nome: "Personalização app passageiro", rota: "/personalizacao-app", minimo: "admin" },
+  { id: "carteiras-credito", grupo: "Configurações", nome: "Carteiras de crédito", rota: "/carteiras-credito", minimo: "gestor" },
+  { id: "taxas-central", grupo: "Configurações", nome: "Taxas da central", rota: "/taxas-central", minimo: "admin" },
   { id: "regras-despacho", grupo: "Configurações", nome: "Despacho", rota: "/regras-despacho", antigas: ["/despacho"], minimo: "gestor" },
   { id: "transbordos", grupo: "Configurações", nome: "Transbordos", rota: "/transbordos", minimo: "gestor" },
   { id: "categorias", grupo: "Configurações", nome: "Tarifas e categorias", rota: "/categorias", antigas: ["/tarifas"], minimo: "gestor" },
@@ -97,17 +106,21 @@ export const FUNCOES: Funcao[] = [
   { id: "integracoes", grupo: "Configurações", nome: "Integrações", rota: "/integracoes", minimo: "admin" },
   { id: "config-nps", grupo: "Configurações", nome: "NPS", rota: "/config-nps", minimo: "gestor" },
   { id: "termos-app", grupo: "Configurações", nome: "Termos de uso", rota: "/termos-app", minimo: "gestor" },
-  { id: "carteiras-credito", grupo: "Configurações", secao: EXTRA, nome: "Carteiras de crédito", rota: "/carteiras-credito", minimo: "gestor" },
   { id: "regras-credito", grupo: "Configurações", secao: EXTRA, nome: "Regras de Crédito", rota: "/regras-credito", minimo: "gestor" },
 
   { id: "avaliacoes", grupo: "Avaliações", nome: "NPS", rota: "/avaliacoes", antigas: ["/nps"] },
 
+  { id: "ajuda-termos", grupo: "Ajuda", nome: "Termos de uso", rota: "/ajuda-termos" },
   { id: "juridico", grupo: "Ajuda", nome: "Política de privacidade", rota: "/juridico" },
+  { id: "central-suporte", grupo: "Ajuda", nome: "Central de suporte", rota: "/central-suporte" },
+  { id: "ouvidoria", grupo: "Ajuda", nome: "Ouvidoria", rota: "/ouvidoria" },
   { id: "central-ajuda", grupo: "Ajuda", secao: EXTRA, nome: "Central de Ajuda", rota: "/central-ajuda" },
 
-  // Cobrança entre centrais (grupo nosso, fora da Machine).
+  // Cobrança: o mesmo grupo da Machine (Extrato da central e Controle financeiro de centrais são "Novo" lá).
+  { id: "ultimo-boleto", grupo: "Cobrança", nome: "Último boleto", rota: "/ultimo-boleto", minimo: "gestor" },
   { id: "demonstrativo-mensal", grupo: "Cobrança", nome: "Demonstrativo Mensal", rota: "/demonstrativo-mensal", minimo: "gestor" },
   { id: "meus-planos", grupo: "Cobrança", nome: "Meus planos", rota: "/meus-planos", minimo: "gestor" },
+  { id: "extrato-central", grupo: "Cobrança", nome: "Extrato da central", rota: "/extrato-central", minimo: "gestor" },
   { id: "controle-centrais", grupo: "Cobrança", nome: "Controle financeiro de centrais", rota: "/controle-centrais", minimo: "gestor" },
 
   // Telas próprias (não existem na Machine).
