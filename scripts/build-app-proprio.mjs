@@ -10,6 +10,7 @@
 //   o pacote com ".passageiro" / ".motorista" no lugar de ".painel" ou ".central".
 //   app.empresaId: id da empresa no painel (padrão: o nome da pasta em tenants/).
 // API: APP_URL_API (ex.: http://10.0.2.2:8787 no emulador) ou app.urlApi ou app.urlPainel.
+// ENDEREÇO FIXO: com APP_URL_DESCOBERTA (https, fixo) o app acha sozinho o servidor quando o túnel de teste troca de endereço. Veja docs/ENDERECO_FIXO.md.
 // APP_TESTE=1: APK de teste, com o campo "Servidor" na entrada (para o endereço temporário do túnel). Nunca para a loja.
 // Push (opcional): google-services.json do Firebase DA EMPRESA, fora do Git, em FIREBASE_GOOGLE_SERVICES_PASSAGEIRO /
 //   FIREBASE_GOOGLE_SERVICES_MOTORISTA (caminho) ou em tenants/<empresa>/firebase/google-services-<app>.json.
@@ -43,12 +44,15 @@ const base = marca.app ?? {};
 const nome = base[papel]?.nome ?? (papel === "motorista" ? `${base.nome ?? ""} Motorista`.trim() : base.nome);
 const pacote = base[papel]?.pacote ?? (base.pacote ? `${base.pacote.replace(/\.(painel|central)$/, "")}.${papel}` : "");
 const urlApi = String(process.env.APP_URL_API ?? base.urlApi ?? base.urlPainel ?? "").replace(/\/+$/, "");
+// Endereço fixo sem APK novo: URL FIXA que devolve {"api": "https://..."} com onde o servidor está agora (APP_URL_DESCOBERTA ou app.urlDescoberta).
+const urlDescoberta = String(process.env.APP_URL_DESCOBERTA ?? base.urlDescoberta ?? "").trim();
 const empresaId = base.empresaId ?? empresa;
 const erros = [];
 if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(pacote)) erros.push(`app.${papel}.pacote ou app.pacote`);
 if (!nome) erros.push("app.nome");
 if (!/^https?:\/\/[^\s"'<>]+$/.test(urlApi)) erros.push("app.urlApi ou app.urlPainel (ou a variável APP_URL_API)");
 if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(empresaId)) erros.push("app.empresaId");
+if (urlDescoberta && !/^https:\/\/[^\s"'<>]+$/.test(urlDescoberta)) erros.push("app.urlDescoberta (precisa ser https) ou APP_URL_DESCOBERTA");
 if (erros.length) falhar(`Falta no brand.json: ${erros.join("; ")}.`);
 const cleartext = urlApi.startsWith("http://");
 if (cleartext && quer("aab")) falhar("A loja não aceita API sem https. Use https no AAB.");
@@ -76,7 +80,7 @@ passo(`Compilando o app do ${papel} (${nome})`);
 const painel = path.join(RAIZ, "painel");
 if (!fs.existsSync(path.join(painel, "node_modules"))) falhar("Rode npm install na pasta painel antes.");
 rodar(npx, ["vite", "build", "--config", "vite.apps.config.ts", "--logLevel", "warn"], painel, { ...process.env, APP: papel, SAIDA: path.join(saida, "www") });
-fs.writeFileSync(path.join(saida, "www", "config.json"), JSON.stringify({ empresaId, api: urlApi, ...(process.env.APP_TESTE === "1" ? { teste: true } : {}) }, null, 2));
+fs.writeFileSync(path.join(saida, "www", "config.json"), JSON.stringify({ empresaId, api: urlApi, ...(urlDescoberta ? { descoberta: urlDescoberta } : {}), ...(process.env.APP_TESTE === "1" ? { teste: true } : {}) }, null, 2));
 
 // ---------------------------------------------------------------- ícone e abertura
 const sharp = (await import("sharp")).default;

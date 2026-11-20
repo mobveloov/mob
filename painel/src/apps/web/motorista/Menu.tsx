@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import {
   Bell, BadgeCheck, Banknote, Calendar, Car, ChevronDown, ChevronRight, ClipboardList, FileText, Gauge, GitFork, Gift, Hand, Headphones, Headset, Info, LifeBuoy, LocateFixed, LogOut, Lock,
   MapPin, MessageCircle, MessageSquare, Navigation, Pencil, Phone, Play, Plus, Radar, RefreshCw, ScanFace, Settings, ShieldCheck, SlidersHorizontal, Trash2, User, UserRound, Wallet, X,
-  BatteryCharging, Globe, Layers, Map as IconeMapa, Music, Smartphone, SquareDashed, Volume2, Vibrate, Timer, Mic, Radio, Bolt,
+  BatteryCharging, Globe, Layers, Map as IconeMapa, Music, Smartphone, SquareDashed, Volume2, Vibrate, Timer, Mic, Radio, Bolt, Wifi,
 } from "lucide-react";
 import { api, flutuante, hora, reais, telefoneBonito, tempoReal, type Posicao } from "../comum/api";
 import { mensagemDeErro, type MarcaApp } from "../comum/ui";
@@ -348,6 +348,7 @@ export function Configuracoes({ voltar }: Voltar) {
       <div className="config-grupo">
         <Chave icone={Mic} ligado={a.gravar} mudar={(v) => mudar({ gravar: v })} titulo="Gravar as corridas (áudio)" texto="Protege você de acusações. O passageiro é avisado. Se a empresa tornar obrigatório, vale sempre." />
         <Chave icone={Radio} ligado={a.gravarVideo} mudar={(v) => mudar({ gravarVideo: v })} titulo="Gravar também o vídeo" texto="Só se a empresa liberar. Qualidade leve (480p), envio quando houver rede." />
+        <Chave icone={Wifi} ligado={a.gravarSoWifi} mudar={(v) => mudar({ gravarSoWifi: v })} titulo="Enviar gravações só no Wi‑Fi" texto="A cópia fica no seu celular por 3 dias e sobe quando houver Wi‑Fi. Desligado, sobe também no 4G/5G." />
         <Chave icone={Smartphone} ligado={a.manterTela} mudar={(v) => mudar({ manterTela: v })} titulo="Manter a tela ligada" texto="Evita que a tela apague enquanto você está online ou em corrida" />
         <Chave icone={Mic} ligado={a.voz} mudar={(v) => mudar({ voz: v })} titulo="Assistente de Voz (Co-piloto)" texto="Avisos por voz ao chegar perto do destino" />
         {linha(Music, "Pacote de Sons", undefined, NOMES_SONS[a.sons], () => setAbrir("sons"))}

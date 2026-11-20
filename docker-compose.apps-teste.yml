@@ -43,6 +43,18 @@ services:
       - painel
     restart: unless-stopped
 
+  tunel-fixo:
+    # Túnel NOMEADO do Cloudflare: endereço fixo (domínio do dono). Só sobe com --profile fixo e CLOUDFLARE_TUNEL_TOKEN no painel/.env.
+    # Pare o "tunel" (rápido) antes. Veja docs/ENDERECO_FIXO.md.
+    image: cloudflare/cloudflared:2026.10.7
+    profiles: ["fixo"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNEL_TOKEN:-}
+    depends_on:
+      - painel
+    restart: unless-stopped
+
 volumes:
   apps-teste-dados:
   apps-teste-banco:

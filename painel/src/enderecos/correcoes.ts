@@ -2,7 +2,7 @@
 // vale para todas as empresas (só entra na busca das cidades que a empresa atende) e é importada de um arquivo TSV.
 // Formato do arquivo (uma linha por casa; linhas com # são comentário):
 //   cod_municipio <TAB> numero <TAB> nome_logradouro <TAB> bairro <TAB> tipo <TAB> latitude <TAB> longitude [<TAB> qualquer coisa]
-// numero 0 = ponto da rua. Este módulo não lê nem liga nenhum outro sistema: só o arquivo que o usuário entregar.
+// numero 0 = ponto da rua. Também aceita CSV (vírgula ou ponto e vírgula) com cabeçalho e JSON (lista de objetos); veja docs/CASAS_IMPORTACAO.md. Este módulo não lê nem liga nenhum outro sistema: só o arquivo que o usuário entregar.
 import { banco, transacao } from "../servidor/banco.ts";
 
 export const normalizar = (s: string) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
@@ -10,13 +10,46 @@ const titulo = (s: string) => s.toLowerCase().replace(/(^|\s)(\S)/g, (_m, a, b) 
 
 export interface CasaCorrigida { municipio: string; numero: number; rua: string; bairro: string; tipo: string; lat: number; lng: number }
 
+const CHAVES: Record<string, string[]> = {
+  municipio: ["cod_municipio", "municipio", "cod_ibge", "ibge", "cidade_id", "codigo_municipio"],
+  numero: ["numero", "num", "num_endereco", "n"],
+  rua: ["nome_logradouro", "logradouro", "rua", "endereco", "nome_rua"],
+  bairro: ["bairro", "nom_localidade", "localidade"],
+  tipo: ["tipo", "tipo_logradouro", "dsc_tipo"],
+  lat: ["latitude", "lat"],
+  lng: ["longitude", "lng", "lon", "long"],
+};
+const semAcento = (s: string) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+/** Converte CSV com cabeçalho ou JSON para o formato de colunas do TSV (o TSV sem cabeçalho passa como está). */
+function paraTsv(conteudo: string): string {
+  const texto = String(conteudo).replace(/^﻿/, "");
+  const t = texto.trimStart();
+  const linhas: Array<Record<string, unknown>> = [];
+  if (t.startsWith("[") || t.startsWith("{")) {
+    try { const j = JSON.parse(t); linhas.push(...(Array.isArray(j) ? j : Array.isArray(j?.casas) ? j.casas : [])); } catch { return ""; }
+  } else {
+    const primeira = t.split(/\r?\n/, 1)[0] ?? "";
+    const sep = primeira.includes("\t") ? "" : primeira.includes(";") ? ";" : primeira.includes(",") ? "," : "";
+    if (!sep || !/(lat|municipio|logradouro|rua)/i.test(semAcento(primeira))) return texto;
+    const cab = primeira.split(sep).map((x) => semAcento(x).replace(/^"|"$/g, ""));
+    for (const l of t.split(/\r?\n/).slice(1)) {
+      if (!l.trim()) continue;
+      const c = l.split(sep).map((x) => x.trim().replace(/^"|"$/g, ""));
+      linhas.push(Object.fromEntries(cab.map((k, i) => [k, c[i] ?? ""])));
+    }
+  }
+  const pega = (o: Record<string, unknown>, k: string) => { for (const n of CHAVES[k]) for (const [kk, v] of Object.entries(o)) if (semAcento(kk) === n && v != null) return String(v).trim(); return ""; };
+  return linhas.map((o) => [pega(o, "municipio"), pega(o, "numero"), pega(o, "rua"), pega(o, "bairro"), pega(o, "tipo"), pega(o, "lat").replace(",", "."), pega(o, "lng").replace(",", ".")].join("\t")).join("\n");
+}
+
 /** Importa o conteúdo de um arquivo de correções. Linhas repetidas atualizam a anterior. Devolve quantas entraram e quantas foram ignoradas. */
 export function importarCorrecoes(conteudo: string): { importadas: number; ignoradas: number } {
   let importadas = 0, ignoradas = 0;
   const ins = banco().prepare(`INSERT INTO enderecos_correcoes (municipio, numero, rua, rua_norm, bairro, bairro_norm, tipo, lat, lng) VALUES (?,?,?,?,?,?,?,?,?)
     ON CONFLICT (municipio, rua_norm, bairro_norm, numero) DO UPDATE SET rua = excluded.rua, bairro = excluded.bairro, tipo = excluded.tipo, lat = excluded.lat, lng = excluded.lng`);
   transacao(() => {
-    for (const linha of String(conteudo).split(/\r?\n/)) {
+    for (const linha of paraTsv(conteudo).split(/\r?\n/)) {
       if (!linha.trim() || linha.trim().startsWith("#")) continue;
       const c = linha.split("\t");
       const municipio = (c[0] ?? "").trim(), numero = Number((c[1] ?? "").trim()), rua = (c[2] ?? "").trim(), bairro = (c[3] ?? "").trim(), tipo = (c[4] ?? "").trim();
@@ -61,6 +94,21 @@ export function buscarNasCorrecoes(municipios: string[], palavras: string[], num
   }
   achados.sort((a, b) => Number(b.exato) - Number(a.exato));
   return achados.slice(0, limite);
+}
+
+/** Casas importadas (número > 0) num raio em volta de um ponto, para o mapa dos apps. */
+export function correcoesPerto(municipios: string[], lat: number, lng: number, raioM: number): Array<{ d: number; numero: number; rua: string; lat: number; lng: number }> {
+  if (!municipios.length || !Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+  const db = banco(), cos = Math.cos((lat * Math.PI) / 180), dlat = raioM / 111_320, dlng = raioM / (111_320 * Math.max(cos, 0.01));
+  const r: Array<{ d: number; numero: number; rua: string; lat: number; lng: number }> = [];
+  for (const m of municipios) {
+    const linhas = db.prepare("SELECT numero, rua, tipo, lat, lng FROM enderecos_correcoes WHERE municipio = ? AND numero > 0 AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?").all(m, lat - dlat, lat + dlat, lng - dlng, lng + dlng) as unknown as Array<{ numero: number; rua: string; tipo: string; lat: number; lng: number }>;
+    for (const c of linhas) {
+      const d = Math.hypot((c.lat - lat) * 111_320, (c.lng - lng) * 111_320 * cos);
+      if (d <= raioM) r.push({ d, numero: c.numero, rua: titulo(`${c.tipo} ${c.rua}`.trim()), lat: c.lat, lng: c.lng });
+    }
+  }
+  return r;
 }
 
 /** Casa corrigida mais perto de um ponto (até ~60 m). */
