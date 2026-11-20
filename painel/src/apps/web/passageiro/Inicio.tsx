@@ -15,7 +15,7 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
   const primeiro = eu.nome.split(" ")[0];
   const pers = usePersonalizacao();
   const rec = pers?.recursos; // recursos ligados e desligados em Configurações > Personalização (sem a personalização, tudo como era)
-  const comMapa = rec?.mapa !== false, comDestino = rec?.destino !== false;
+  const comMapa = rec?.mapa !== false, comDestino = rec?.selecao_destino !== false;
   return (
     <div className={`inicio estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
       {comMapa && <Mapa eu={aqui} perto={aqui} controles className="fundo" />}

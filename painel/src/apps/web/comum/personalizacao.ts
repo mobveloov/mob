@@ -12,7 +12,7 @@ export interface PersonalizacaoApp {
   design: { estiloTela: "flutuante" | "neutro" | "marcante"; marca: string; mostrarNome: boolean; mostrarImagem: boolean; imagemMarcaUrl: string; dimensoesImagem: { largura: number; altura: number } | null };
   veiculoMapa: { id: string; tipo: number; iconeLivreUrl: string; iconeOcupadoUrl: string; diferenciaOcupado: boolean; iconeAlternativoUrl: string };
   telaInicial: { estilo: string; recursos: Array<{ id: string; visivel: boolean; posicao: number }>; ordemVisiveis: string[]; mapaFixo: boolean };
-  recursos: Record<"mapa" | "destino" | "cupons" | "anuncio" | "desafio", boolean>;
+  recursos: Record<"mapa" | "selecao_destino" | "aviso_cupons" | "anuncio" | "desafio", boolean>; desafioLiberado: boolean;
 }
 
 const chave = () => `personalizacao-${config().empresaId}`;
