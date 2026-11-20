@@ -7,13 +7,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { arquivo, idCorridaValido, ler, gravar } from "./armazem.ts";
 import { alertas } from "./despacho.ts";
+import { gerais } from "../config/gerais.ts";
 
 export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number }
 export const GRAVACAO_PADRAO: ConfigGravacao = { ativa: true, obrigatoria: false, video: false, dias: 30 };
 
-/** Configuração da empresa (ajustes.json › gravacao). O painel edita esse arquivo; sem ele valem os padrões. */
+/** Configuração da empresa: Configurações › Gerais › Regras do motorista (o arquivo ajustes.json › gravacao ainda vale, se existir, para quem já usava). */
 export function configGravacao(empresaId: string): ConfigGravacao {
-  const a = ler<{ gravacao?: Partial<ConfigGravacao> }>(arquivo(empresaId, "ajustes.json"), {}).gravacao ?? {};
+  let doPainel: Partial<ConfigGravacao> = {};
+  try { doPainel = gerais(empresaId).motorista.gravacao; } catch { /* sem configuração: valem os padrões */ }
+  const a = { ...doPainel, ...(ler<{ gravacao?: Partial<ConfigGravacao> }>(arquivo(empresaId, "ajustes.json"), {}).gravacao ?? {}) };
   const dias = Number(a.dias);
   return {
     ativa: a.ativa ?? GRAVACAO_PADRAO.ativa, obrigatoria: !!a.obrigatoria && (a.ativa ?? true), video: !!a.video,

@@ -4,6 +4,7 @@
 // Os contatos (WhatsApp, telefone, site, termos e privacidade) vêm da marca da empresa.
 
 import { gerais } from "../config/gerais.ts";
+import { pagamentos as pagamentosDoPainel } from "../config/pagamentos.ts";
 import * as D from "../servidor/dados.ts";
 import { arquivo, ler } from "./armazem.ts";
 
@@ -32,6 +33,17 @@ export const AJUSTES_PADRAO: Ajustes = {
   mensagensRapidas: ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor.", "Bom dia", "Boa tarde", "Boa noite"],
 };
 
+/** Nome de cada forma de pagamento do painel (Config › Integrações › métodos) como o app e a corrida a gravam. */
+const NOME_NO_APP: Record<string, string> = { "Dinheiro": "Dinheiro", "Pix": "Pix", "Cartão na Maquininha": "Cartão na maquininha", "Saldo da Carteira": "Saldo da carteira" };
+
+/** Formas de pagamento que o passageiro pode escolher: as ligadas no painel (o cartão no app ainda não existe no aplicativo). */
+export function formasDePagamento(empresaId: string): string[] {
+  let metodos: Record<string, boolean> = {};
+  try { metodos = pagamentosDoPainel(empresaId).metodos; } catch { /* sem configuração: valem as quatro de sempre */ }
+  const l = Object.entries(NOME_NO_APP).filter(([k]) => metodos[k] !== false).map(([, v]) => v);
+  return l.length ? l : [NOME_NO_APP["Dinheiro"]];
+}
+
 const lista = (v: unknown, padrao: string[]) => (Array.isArray(v) ? v.map((x) => String(x).replace(/[<>]/g, "").trim().slice(0, 60)).filter(Boolean).slice(0, 20) : padrao);
 
 export function ajustes(empresaId: string): Ajustes {
@@ -46,9 +58,9 @@ export function ajustes(empresaId: string): Ajustes {
   return {
     motivosPassageiro: lista(a.motivosPassageiro ?? g?.cancelamento.passageiro.motivos, AJUSTES_PADRAO.motivosPassageiro),
     motivosMotorista: lista(a.motivosMotorista ?? g?.cancelamento.motorista.motivos, AJUSTES_PADRAO.motivosMotorista),
-    etiquetasBoas: lista(a.etiquetasBoas, AJUSTES_PADRAO.etiquetasBoas), etiquetasRuins: lista(a.etiquetasRuins, AJUSTES_PADRAO.etiquetasRuins),
+    etiquetasBoas: lista(a.etiquetasBoas ?? g?.avaliacao.etiquetasBoas, AJUSTES_PADRAO.etiquetasBoas), etiquetasRuins: lista(a.etiquetasRuins ?? g?.avaliacao.etiquetasRuins, AJUSTES_PADRAO.etiquetasRuins),
     opcionais: Array.isArray(a.opcionais) ? opcionais : opcionaisDoPainel.length ? opcionaisDoPainel : AJUSTES_PADRAO.opcionais,
-    pagamentos: lista(a.pagamentos, AJUSTES_PADRAO.pagamentos),
+    pagamentos: lista(a.pagamentos, formasDePagamento(empresaId)),
     mensagensRapidas: lista(a.mensagensRapidas ?? g?.motorista.mensagensRapidas, AJUSTES_PADRAO.mensagensRapidas),
   };
 }

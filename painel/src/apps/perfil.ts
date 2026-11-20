@@ -8,6 +8,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { cadastroPorId, GENEROS } from "../comum/cadastros.ts";
+import { gravarPosicao, lerPosicao } from "../comum/lugares-passageiro.ts";
 import { visaoDoMotorista } from "../comum/motorista-campos.ts";
 import { alterarCampos, atualizar, criar, listar, mesclar, remover, type Registro } from "../cadastros/armazem.ts";
 import { listarProprias, type Ponto } from "../corridas/index.ts";
@@ -224,7 +225,9 @@ export function lugares(empresaId: string, telefone: string) {
   const doCadastro = (campo: string, guardado: Ponto | null): Ponto | null => {
     const texto = String(cli?.[campo] ?? "").trim();
     if (!texto) return cli ? null : guardado;
-    return guardado && guardado.texto.trim() === texto ? guardado : { texto };
+    if (guardado && guardado.texto.trim() === texto) return guardado;
+    const pos = lerPosicao(cli?.[`${campo}Pos`]);
+    return pos ? { texto, ...pos } : { texto };
   };
   return { casa: doCadastro("enderecoCasa", p.lugares.casa), trabalho: doCadastro("enderecoTrabalho", p.lugares.trabalho), favoritos: p.lugares.favoritos, recentes };
 }
@@ -241,7 +244,7 @@ function pontoLimpo(v: unknown): Ponto {
 function espelharLugarNoCadastro(empresaId: string, telefone: string, p: ReturnType<typeof pessoa>) {
   const cli = listar(empresaId, CLI()).find((r) => soDigitos(r.telefone) === telefone);
   if (!cli) return;
-  alterarCampos(empresaId, CLI(), cli.id, { enderecoCasa: p.lugares.casa?.texto ?? null, enderecoTrabalho: p.lugares.trabalho?.texto ?? null, ...(p.lugares.favoritos[0] ? { enderecoFavorito: p.lugares.favoritos[0].ponto.texto } : {}) }, "app do passageiro");
+  alterarCampos(empresaId, CLI(), cli.id, { enderecoCasa: p.lugares.casa?.texto ?? null, enderecoTrabalho: p.lugares.trabalho?.texto ?? null, enderecoCasaPos: gravarPosicao(p.lugares.casa), enderecoTrabalhoPos: gravarPosicao(p.lugares.trabalho), ...(p.lugares.favoritos[0] ? { enderecoFavorito: p.lugares.favoritos[0].ponto.texto } : {}) }, "app do passageiro");
 }
 
 export function salvarLugar(empresaId: string, telefone: string, tipo: string, nome: string, ponto: unknown) {

@@ -141,7 +141,6 @@ export function sessaoDoToken(empresaId: string, token: string): SessaoApp | nul
   const s = linha ? (JSON.parse(linha.dados) as SessaoApp) : undefined;
   if (!s || s.empresaId !== empresaId || s.expira < Date.now()) return null;
   if (impedimento(empresaId, s.papel, s.telefone)) return null;
-  registrarContato(empresaId, s.papel, s.chave);
   return s;
 }
 
