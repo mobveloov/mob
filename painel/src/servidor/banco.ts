@@ -127,6 +127,14 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS app_ofertas (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, motorista TEXT NOT NULL, resultado TEXT NOT NULL, em TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS app_ofertas_motorista ON app_ofertas (empresa, motorista, seq);
+    CREATE TABLE IF NOT EXISTS app_avisos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL,
+      titulo TEXT NOT NULL, texto TEXT NOT NULL, origem TEXT NOT NULL DEFAULT '', origem_id TEXT NOT NULL DEFAULT '', envio_ref TEXT NOT NULL DEFAULT '',
+      estado TEXT NOT NULL DEFAULT 'enviada', push TEXT NOT NULL DEFAULT 'sem_chave', erro TEXT NOT NULL DEFAULT '',
+      em INTEGER NOT NULL, entregue_em INTEGER, lida_em INTEGER, UNIQUE (empresa, id));
+    CREATE INDEX IF NOT EXISTS app_avisos_pessoa ON app_avisos (empresa, papel, chave, em);
+    CREATE INDEX IF NOT EXISTS app_avisos_origem ON app_avisos (empresa, origem, origem_id);
+    CREATE INDEX IF NOT EXISTS app_avisos_envio ON app_avisos (empresa, envio_ref);
     CREATE TABLE IF NOT EXISTS app_contatos (
       empresa TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (empresa, papel, chave));
     CREATE TABLE IF NOT EXISTS enderecos_correcoes (

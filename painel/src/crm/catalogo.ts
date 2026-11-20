@@ -3,7 +3,7 @@
 
 export type CategoriaTemplate = "coupon" | "expiration_warning" | "referral" | "reactivation" | "birthday" | "loyalty" | "sweepstake" | "nps" | "welcome" | "abandoned" | "post_ride" | "operational" | "strategic" | "custom";
 export type TipoGatilhoCatalogo = string;
-export type CanalEnvio = "whatsapp";
+export type CanalEnvio = "whatsapp" | "app";
 
 export const CATEGORIAS: { value: CategoriaTemplate; label: string }[] = [
   { value: "coupon", label: "Cupom de Desconto" },
@@ -23,7 +23,8 @@ export const CATEGORIAS: { value: CategoriaTemplate; label: string }[] = [
 ];
 
 export const CANAIS_ENVIO: { value: CanalEnvio; label: string; hint: string }[] = [
-  { value: "whatsapp", label: "WhatsApp", hint: "Só pelo WhatsApp da empresa. Nada vai para o app." },
+  { value: "whatsapp", label: "WhatsApp", hint: "Pelo WhatsApp da empresa. Nada vai para o app." },
+  { value: "app", label: "Push do app", hint: "Cai na caixa de Notificações do app do passageiro ou do motorista e, com a chave do Firebase, toca no celular." },
 ];
 
 export const VARIAVEIS_TEMPLATE: { key: string; label: string }[] = [

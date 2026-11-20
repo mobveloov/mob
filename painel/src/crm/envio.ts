@@ -24,12 +24,14 @@ import { aplicarRegras, destinatarios, publico, selecionar, telefoneWhatsApp } f
 import { reservar } from "./ritmo.ts";
 import type { Campanha, Contato, ItemFila, Jornada } from "./tipos.ts";
 import { provedorDaEmpresa, type ProvedorWhatsApp } from "./whatsapp.ts";
+import { entregarNoApp } from "./canal-app.ts";
+import { resumoDaOrigem } from "../apps/avisos.ts";
 
 const MAX_TENTATIVAS = 3;
 const ESPERA_ERRO_MS = 2 * 60_000;
 
-function novoItem(origem: ItemFila["origem"], c: Contato, texto: string, agora: number): ItemFila {
-  return { id: A.novoId(), origem, chave: c.chave, nome: c.nome, telefone: telefoneWhatsApp(c.telefone), texto, estado: "pendente", tentativas: 0, criadoEm: agora, proximaEm: agora, enviadoEm: null, erro: "" };
+function novoItem(origem: ItemFila["origem"], c: Contato, texto: string, agora: number, canal: "whatsapp" | "app" = "whatsapp"): ItemFila {
+  return { id: A.novoId(), origem, canal, chave: c.chave, nome: c.nome, telefone: telefoneWhatsApp(c.telefone), texto, estado: "pendente", tentativas: 0, criadoEm: agora, proximaEm: agora, enviadoEm: null, erro: "" };
 }
 
 const nomeEmpresa = (empresaId: string) => D.marca(empresaId).nomeExibido || D.empresa(empresaId)?.nome || "";
@@ -62,7 +64,7 @@ async function disparar(empresaId: string, campanhaId: string, agora: number): P
   const alvo = destinatarios(lista);
   const empresa = nomeEmpresa(empresaId);
   const textos = [c.texto, ...c.variacoes];
-  const itens = alvo.map((p) => novoItem({ tipo: "campanha", id: c.id }, p, montarTexto(escolherVariacao(textos, `${c.id}:${p.chave}`), { contato: p, cupom, empresa }), agora));
+  const itens = alvo.map((p) => novoItem({ tipo: "campanha", id: c.id }, p, montarTexto(escolherVariacao(textos, `${c.id}:${p.chave}`), { contato: p, cupom, empresa }), agora, c.canal));
   A.adicionarNaFila(empresaId, itens);
   atualizarCampanha(empresaId, c.id, (x) => {
     x.estado = itens.length ? "enviando" : "concluida";
@@ -110,7 +112,7 @@ export function relatorioCampanha(empresaId: string, id: string) {
   const enviados = itens.filter((i) => i.enviadoEm).map((i) => i.enviadoEm!);
   const total = itens.length;
   return {
-    campanha: c, total, enviados: conta("enviado"), pendentes: conta("pendente"), falhas: conta("falha"), cancelados: conta("cancelado"),
+    campanha: c, app: c.canal === "app" ? resumoDaOrigem(empresaId, "crm-campaign", id) : null, total, enviados: conta("enviado"), pendentes: conta("pendente"), falhas: conta("falha"), cancelados: conta("cancelado"),
     taxaEntrega: total ? Math.round((conta("enviado") / total) * 1000) / 10 : 0,
     primeiroEnvio: enviados.length ? new Date(Math.min(...enviados)).toISOString() : null,
     ultimoEnvio: enviados.length ? new Date(Math.max(...enviados)).toISOString() : null,
@@ -146,7 +148,7 @@ async function rodar(empresaId: string, j: Jornada, agora: number): Promise<numb
   alvo = destinatarios(alvo).filter((c) => !ja[c.chave] || (c.ultimaCorrida != null && ja[c.chave] < c.ultimaCorrida));
   const empresa = nomeEmpresa(empresaId);
   const quando = agoraBr().toISOString();
-  const itens = alvo.map((c) => novoItem({ tipo: "jornada", id: j.id }, c, montarTexto(j.texto, { contato: c, cupom, empresa }), agora));
+  const itens = alvo.map((c) => novoItem({ tipo: "jornada", id: j.id }, c, montarTexto(j.texto, { contato: c, cupom, empresa }), agora, j.canal ?? "whatsapp"));
   for (const c of alvo) ja[c.chave] = quando;
   d[j.id] = ja;
   A.salvarDisparos(empresaId, d);
@@ -197,11 +199,23 @@ async function rodada(empresaId: string, o: Opcoes): Promise<ResumoRodada> {
     const item = A.proximaPendente(empresaId, t, pausadas);
     if (!item) { r.motivo = n ? "fim" : "vazia"; break; }
     if (pausaGeral(empresaId).pausado) { r.motivo = "pausado"; break; }
-    if (real && enviadosHoje(empresaId, t) >= tetoHoje(empresaId, t)) { r.motivo = "teto"; break; }
+    if (real && item.canal !== "app" && enviadosHoje(empresaId, t) >= tetoHoje(empresaId, t)) { r.motivo = "teto"; break; }
     // Governança (CRM › Configurações): janela de horário e opt-in explícito.
     const bar = barrarEnvio(empresaId, item, new Date(t - 3 * HORA));
     if (bar.barrar === "janela") { r.motivo = "pausa"; break; }
     if (bar.barrar === "optin") { A.alterarItem(empresaId, item.id, (i) => { if (i && i.estado === "pendente") { i.estado = "cancelado"; i.erro = bar.motivo; } }); continue; }
+    // Canal "push do app": cai na caixa de avisos do app (e no push do sistema, se houver chave). Sem ritmo, teto nem descadastro do WhatsApp.
+    if (item.canal === "app") {
+      const papel = item.chave.startsWith("m:") ? "motorista" : "passageiro";
+      const res = await entregarNoApp(empresaId, { telefone: item.telefone, nome: item.nome, papel, titulo: nomeEmpresa(empresaId) || "Aviso", texto: item.texto, origem: item.origem.tipo === "campanha" ? "campaign" : item.origem.tipo === "jornada" ? "journey" : "manual", origemId: item.origem.id });
+      A.alterarItem(empresaId, item.id, (i) => {
+        if (!i || i.estado !== "pendente") return;
+        i.tentativas++;
+        if (res.ok) { i.estado = "enviado"; i.enviadoEm = agora(); i.erro = ""; r.enviados++; } else { i.estado = "falha"; i.erro = res.erro; r.falhas++; }
+      });
+      r.motivo = "fim";
+      continue;
+    }
     // Descadastrou depois de entrar na fila (campanha ou jornada): não envia e não gasta o ritmo.
     if (descadastrado(empresaId, item.telefone)) {
       A.alterarItem(empresaId, item.id, (i) => { if (i && i.estado === "pendente") { i.estado = "cancelado"; i.erro = WA_OPTOUT_SKIP; } });

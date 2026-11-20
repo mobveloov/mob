@@ -17,6 +17,7 @@ import { Inicio } from "./Inicio";
 import { Opcoes } from "./Opcoes";
 import { ParaOnde, type ModoParaOnde } from "./ParaOnde";
 import { Avaliar, OpcoesDaCorrida } from "./PosCorrida";
+import { avisarNovoAviso } from "../comum/Avisos";
 import "./passageiro.css";
 import "./passageiro-m.css";
 
@@ -97,6 +98,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   useEffect(() => { void manterTelaLigada(true); return () => { void manterTelaLigada(false); }; }, []); // tela acesa enquanto acompanha a viagem
 
   useEffect(() => tempoReal((tipo, d) => {
+    if (tipo === "aviso") { avisarNovoAviso(d); return; }
     if (tipo === "corrida") {
       const c = d as Corrida;
       if (esperandoHorario(c)) return; // agendada: aparece na aba Agendadas até chegar a hora

@@ -27,6 +27,8 @@ import { reservar } from "./ritmo.ts";
 import { extractVariables, validateSpinText } from "./spintext.ts";
 import { estaDescadastrado, salvarTemplate, template, templates, type Template } from "./templates.ts";
 import { provedorDaEmpresa } from "./whatsapp.ts";
+import { canalValido, entregarNoApp } from "./canal-app.ts";
+import { barrarEnvio } from "../crm2/governanca.ts";
 
 export interface Gatilho {
   id: string;
@@ -34,7 +36,7 @@ export interface Gatilho {
   template_id: string | null;
   trigger_type: string;
   trigger_config: Record<string, unknown>;
-  send_channel: "whatsapp";
+  send_channel: "whatsapp" | "app";
   is_active: boolean;
   fire_count: number;
   last_fired_at: string | null;
@@ -87,7 +89,7 @@ export function sanearGatilho(e: string, corpo: Record<string, unknown>): Pick<G
   if (txt(c.city, 80)) cfg.city = txt(c.city, 80);
   if (c.respect_window) cfg.respect_window = true;
   if (c.respect_daily_cap !== undefined) cfg.respect_daily_cap = !!c.respect_daily_cap;
-  return { name, template_id, trigger_type, trigger_config: cfg, send_channel: "whatsapp" };
+  return { name, template_id, trigger_type, trigger_config: cfg, send_channel: canalValido(corpo.send_channel) };
 }
 
 export function salvarGatilho(e: string, id: string | null, d: Pick<Gatilho, "name" | "template_id" | "trigger_type" | "trigger_config" | "send_channel"> & { is_active?: boolean }): Gatilho {
@@ -247,6 +249,22 @@ export async function enviarGatilho(e: string, g: Gatilho, p: PedidoEnvio, logId
   const adiar = (motivo: string): ResultadoGatilho => { gravar("pending", { erro: motivo, saiEm: agora + ESPERA_MS }); return "retry"; };
 
   if (!tel) { gravar("failed", { mensagem: texto, erro: "Telefone inválido." }); log("failed", "Telefone inválido."); return "failed"; }
+  // Canal "push do app": caixa de avisos do app (+ push do sistema). Não usa WhatsApp, descadastro, ritmo nem teto.
+  if (g.send_channel === "app") {
+    if (pausaGeral(e).pausado) return adiar("Envios do CRM pausados pelo painel: sai quando você continuar");
+    const bar = barrarEnvio(e, { chave: `p:${digitos.slice(-11)}` }, new Date(agora - 3 * HORA));
+    if (bar.barrar === "janela") return adiar(bar.motivo);
+    if (bar.barrar === "optin") { gravar("skipped", { erro: bar.motivo }); return "skipped"; }
+    const r = await entregarNoApp(e, { telefone: tel, nome: p.nome ?? "", papel: "passageiro", titulo: t.title || nomeEmpresa(e), texto: montarMensagem(e, { ...t, wa_optout_footer: false }, p.nome, p.vars), origem: "trigger", origemId: g.id });
+    if (r.ok) {
+      gravar("sent", { mensagem: [t.title, texto].filter(Boolean).join(" — ") });
+      const g2 = gatilho(e, g.id);
+      if (g2) banco().prepare("UPDATE crm_gatilhos SET dados = ? WHERE empresa = ? AND id = ?").run(JSON.stringify({ ...g2, fire_count: g2.fire_count + 1, last_fired_at: new Date().toISOString() }), e, g.id);
+      return "sent";
+    }
+    gravar("failed", { mensagem: texto, erro: r.erro });
+    return "failed";
+  }
   if (descadastrado(e, tel)) { gravar("skipped", { erro: WA_OPTOUT_SKIP }); log("skipped", WA_OPTOUT_SKIP); return "skipped"; }
   if (pausaGeral(e).pausado) return adiar("Envios do CRM pausados pelo painel: sai quando você continuar");
   const provedor = provedorDaEmpresa(e);

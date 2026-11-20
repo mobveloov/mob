@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, FileText, ShieldCheck, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
 import { api, reais, telefoneBonito } from "../comum/api";
 import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { ListaDeAvisos, useNaoLidos } from "../comum/Avisos";
 import { compartilharTexto, dataCurta, prepararFoto, quandoAgendada, type Eu, type Perfil } from "./apoio";
 import { GENEROS } from "./Entrar";
 import { Avatar, Campo, TextoDoPainel } from "./pecas";
@@ -34,7 +35,8 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
   };
   useEffect(() => { carregar(); }, []);
 
-  const voltar = () => { setTela(""); carregar(); };
+  const { naoLidos, atualizar: contarAvisos } = useNaoLidos();
+  const voltar = () => { setTela(""); carregar(); contarAvisos(); };
   if (tela === "perfil") return <EditarPerfil eu={eu} voltar={voltar} salvou={() => { mudouEu?.(); voltar(); }} />;
   if (tela === "cupons") return <Voltar titulo="Meus Cupons" voltar={voltar}><Cupons /></Voltar>;
   if (tela === "cartoes") return <Voltar titulo="Meus Cartões" voltar={voltar}><Cartoes /></Voltar>;
@@ -69,7 +71,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
         <ItemConta icone={<History size={22} />} cor="azul" titulo="Histórico de Corridas" sub="Veja suas viagens anteriores" ir={() => irPara("historico")} />
         <ItemConta icone={<CalendarDays size={22} />} cor="verde" titulo="Agendamentos" sub="Suas viagens agendadas" ir={() => irPara("agendadas")} />
         <ItemConta icone={<Star size={22} />} cor="amarelo" titulo="Motoristas Favoritos" sub="Seus motoristas preferidos" ir={() => setTela("favoritos")} />
-        <ItemConta icone={<Bell size={22} />} cor="roxo" titulo="Notificações" sub="Avisos da central" ir={() => setTela("avisos")} />
+        <ItemConta icone={<Bell size={22} />} cor="roxo" titulo="Notificações" sub={naoLidos ? `${naoLidos} ${naoLidos === 1 ? "aviso novo" : "avisos novos"}` : "Avisos da central"} ir={() => setTela("avisos")} />
       </div>
       <h3 className="conta-secao">CONTA</h3>
       <div className="conta-grupo">
@@ -295,11 +297,14 @@ function Indique({ perfil, marca, mudou }: { perfil: Perfil; marca: MarcaApp; mu
 }
 
 function Avisos() {
-  const [lista, setLista] = useState<Array<{ titulo: string; texto: string; em: string }> | null>(null);
-  useEffect(() => { void api<{ notificacoes: NonNullable<typeof lista> }>("/notificacoes").then((r) => setLista(r.notificacoes)).catch(() => setLista([])); }, []);
-  if (!lista) return <Carregando />;
-  if (!lista.length) return <p className="dica">Nenhum aviso por enquanto.</p>;
-  return <>{lista.map((n, i) => <Cartao key={i}><strong>{n.titulo}</strong>{n.texto && <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{n.texto}</p>}{n.em && <small className="dica">{dataCurta(n.em)}</small>}</Cartao>)}</>;
+  const [fixas, setFixas] = useState<Array<{ titulo: string; texto: string; em: string }>>([]);
+  useEffect(() => { void api<{ notificacoes: typeof fixas }>("/notificacoes").then((r) => setFixas(r.notificacoes)).catch(() => undefined); }, []);
+  return (
+    <>
+      <ListaDeAvisos classeCartao="cartao" vazio={!fixas.length && <p className="dica">Nenhum aviso por enquanto.</p>} />
+      {fixas.map((n, i) => <Cartao key={i}><strong>{n.titulo}</strong>{n.texto && <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{n.texto}</p>}{n.em && <small className="dica">{dataCurta(n.em)}</small>}</Cartao>)}
+    </>
+  );
 }
 
 function Ajuda({ marca }: { marca: MarcaApp }) {

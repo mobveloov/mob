@@ -35,6 +35,7 @@ import { euCompleto } from "./perfil.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
+import { contarNaoLidos, listarDaPessoa, marcarLidos } from "./avisos.ts";
 import { registrarCotacao } from "../operacao/radar.ts";
 import { entrar, eu, pedirCodigo, registrarContato, sair, salvarGeneroPassageiro, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
@@ -151,6 +152,15 @@ r.get("/eu", ok((req, res) => {
 r.post("/eu", so("passageiro"), ok((req, res) => { if (req.body?.nome !== undefined || req.body?.genero === undefined) salvarNomePassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body?.nome ?? "")); if (req.body?.genero !== undefined) salvarGeneroPassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body.genero)); res.json({ eu: euCompleto(ctx(req).empresaId, ctx(req).sessao) }); }));
 
 r.post("/push", ok((req, res) => { registrarToken(ctx(req).empresaId, alvo(req), String(req.body?.token ?? "")); res.json({ ok: true }); }));
+
+// Caixa de avisos da central (docs/PUSH_APPS.md). Abrir a lista marca como "entregue"; marcar lido muda para "lida".
+r.get("/avisos", ok((req, res) => res.json(listarDaPessoa(ctx(req).empresaId, alvo(req)))));
+r.get("/avisos/contagem", ok((req, res) => res.json({ naoLidos: contarNaoLidos(ctx(req).empresaId, alvo(req)) })));
+r.post("/avisos/lidos", ok((req, res) => {
+  const ids = req.body?.todos === true ? "todos" : Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).map(String) : [];
+  const n = marcarLidos(ctx(req).empresaId, alvo(req), ids);
+  res.json({ marcados: n, naoLidos: contarNaoLidos(ctx(req).empresaId, alvo(req)) });
+}));
 
 // Estado de agora (o app chama ao abrir e quando o tempo real volta).
 r.get("/estado", ok((req, res) => {
