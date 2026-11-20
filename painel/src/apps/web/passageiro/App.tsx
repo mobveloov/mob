@@ -32,7 +32,7 @@ export default function App() {
   return <Logado marca={marca} sair={() => setLogado(false)} />;
 }
 
-const avisoDaTaxa = (c: Corrida) => (c.status === "cancelada" && c.taxaCancelamento ? `Corrida cancelada. Foi cobrada uma taxa de cancelamento de ${reais(c.taxaCancelamento)}.` : "");
+const avisoDaTaxa = (c: Corrida) => (c.status === "cancelada" && c.mensagemCancelamento ? c.mensagemCancelamento : c.status === "cancelada" && c.taxaCancelamento ? `Corrida cancelada. Foi cobrada uma taxa de cancelamento de ${reais(c.taxaCancelamento)}.` : "");
 
 /** Endereço de onde a pessoa está agora (para a partida quando ela vai direto para casa ou trabalho). */
 async function partidaAgora(aqui: Posicao | null): Promise<Ponto> {

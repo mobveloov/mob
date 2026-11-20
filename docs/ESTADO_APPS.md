@@ -169,3 +169,6 @@ cabeçalhos anti-clonagem do painel (arquivo `servidor/index.ts` é da sessão d
 - App do motorista, durante a corrida: **Avisar problema** (lista de motivos; vai para o chat de suporte da central com a OS), **Compartilhar** (resumo da corrida), além de cancelar/desistir com motivos, SOS, ligar, chat, rota completa, editar rota (inclui paradas), cheguei, iniciar e finalizar.
 - Painel: `GET /api/apps-central/pessoas/<telefone>` devolve a ficha de passageiro e a de motorista da mesma pessoa (`doisPapeis`), para a tela do painel mostrar as duas ligadas (tela é da sessão do painel).
 - PR #18 sem conflitos com o `main` de 19/11 (verificado com `git merge-tree`).
+
+### 12. Cancelamento por culpa do passageiro
+Motivo do motorista que e culpa do passageiro ("Passageiro nao apareceu", "Passageiro pediu para cancelar"...) cancela a corrida de vez (status cancelada, motivo no painel), mesmo com o motorista a caminho: nao volta para "procurando" nem e reofertada. O passageiro ve "Corrida cancelada: voce nao apareceu" (app e notificacao) e pede outra se quiser. So desistencia do motorista por outro motivo volta para a fila. Teste: apps-painel.test.ts.
