@@ -363,3 +363,25 @@ test("taxas da central: cada taxa configurada no painel aparece no extrato do mo
     for (const t of taxas(E.id)) removerTaxa(E.id, t.id);
   }
 });
+
+test("recarga de saldo do motorista: o pedido chega à central, o depósito confirmado entra no saldo da carteira e aparece em Recargas do painel", async () => {
+  const cookie = await cookieDoPainel();
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Iara Recarga", telefone: "11900000051", status: "Ativo", veiculo: "Sedã", placa: "IAR1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000051");
+  const antes = (await chamar("GET", `${API}/carteira`, undefined, tokM)).corpo;
+  assert.doesNotMatch(String(antes.recarga), /saque/i, "o texto da recarga não fala de saque");
+  const pedido = await chamar("POST", `${API}/suporte`, { texto: "Pedido de recarga: quero depositar R$ 50,00 de saldo na carteira (taxas das corridas)." }, tokM);
+  assert.equal(pedido.status, 200, JSON.stringify(pedido.corpo));
+  const { listar } = await import("../src/cadastros/armazem.ts");
+  const motorista = listar(E.id, cadastroPorId("motoristas")!).find((m) => m.telefone === "11900000051")!;
+  // A central confirma o depósito e credita na carteira (mesma função do painel: Carteiras › ajuste manual).
+  const { lancar } = await import("../src/apps/extras.ts");
+  lancar(E.id, "motorista", motorista.id, 50, "Depósito confirmado", "admin@ponta.test");
+  const depois = (await chamar("GET", `${API}/carteira`, undefined, tokM)).corpo;
+  assert.equal(Math.round((depois.saldo - antes.saldo) * 100), 5000, "o depósito entra no saldo");
+  assert.ok(depois.extrato.some((l: any) => l.valor === 50 && /Depósito confirmado/.test(l.descricao)), "aparece no extrato do app");
+  const { listaRecargas } = await import("../src/config/financeiro.ts");
+  const hoje = new Date().toISOString().slice(0, 10);
+  const rec = listaRecargas(E.id, "motorista", { inicio: hoje, fim: hoje });
+  assert.ok(rec.itens.some((i: any) => i.valor === 50), "o painel enxerga a recarga em Recargas");
+});

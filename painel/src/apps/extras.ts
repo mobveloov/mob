@@ -643,7 +643,7 @@ rotasExtras.get("/carteira", ok((req, res) => {
   res.json({
     saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave),
     saques: sessao.papel === "motorista" ? saques(empresaId, sessao.chave) : undefined,
-    recarga: `Para pôr saldo, fale com a central${m.textos.suporteTelefone ? ` (${m.textos.suporteTelefone})` : ""}. O valor entra na hora em que a central confirmar.`,
+    recarga: `Depois de pedir o depósito, a central confirma e o valor entra no seu saldo${m.textos.suporteTelefone ? `. Dúvidas: ${m.textos.suporteTelefone}` : ""}.`,
   });
 }));
 rotasExtras.post("/saques", so("motorista"), ok((req, res) => {

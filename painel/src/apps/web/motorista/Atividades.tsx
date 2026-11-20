@@ -3,8 +3,9 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Clock, Eye, EyeOff, Flag, Gift, Plus, SlidersHorizontal, Star, UserRound, Wallet, X, Car } from "lucide-react";
-import { reais } from "../comum/api";
-import { Avatar, Erro, Folha, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
+import { api, reais } from "../comum/api";
+import { mensagemDeErro } from "../comum/ui";
+import { Avatar, Erro, Folha, Info, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
 import { useAjustes } from "./ajustes";
 import { diaHora, soHora, type Eu } from "./tipos";
 import { Carteira as CarteiraAntiga } from "./Telas";
@@ -203,21 +204,55 @@ export function InformacoesDaCorrida({ ganho: c, voltar }: Voltar & { ganho: Gan
 
 interface DadosCarteira { saldo: number; extrato: Array<{ id?: string; valor: number; descricao: string; em: string; corridaId?: string | null }> }
 
+/** Recarregar saldo: o motorista deposita crédito para a central descontar as taxas das corridas (não é saque). O pedido vai para a central, que confirma o depósito e credita na carteira. */
+function RecargaDeSaldo({ saldo, instrucao, voltar }: { saldo: number | undefined; instrucao: string; voltar: () => void }) {
+  const [valor, setValor] = useState("");
+  const [erro, setErro] = useState(""), [ok, setOk] = useState(""), [ocupado, setOcupado] = useState(false);
+  const v = Number(valor.replace(",", "."));
+  const depositar = async () => {
+    setErro(""); setOk(""); setOcupado(true);
+    try {
+      await api("/suporte", { corpo: { texto: `Pedido de recarga: quero depositar ${reais(v)} de saldo na carteira (taxas das corridas).` } });
+      setValor(""); setOk("Pedido de depósito enviado. Quando a central confirmar, o valor entra no saldo da sua carteira.");
+    } catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
+  };
+  return (
+    <Pagina>
+      <Topo estilo="esquerda" titulo="Recarregar saldo" voltar={voltar} />
+      <div className="conteudo">
+        <section className="cartao-m">
+          <small className="dica">Saldo para taxas das corridas</small>
+          <p className="valor-grande esquerda">{saldo != null ? reais(saldo) : "—"}</p>
+          <p className="dica">É com este saldo que a central desconta as taxas de cada corrida. Deposite para continuar recebendo corridas.</p>
+        </section>
+        <form className="cartao-m" onSubmit={(e) => { e.preventDefault(); void depositar(); }}>
+          <h3 className="titulo-secao">Depositar</h3>
+          <label className="campo"><span className="campo-rotulo">Valor do depósito (mínimo R$ 10,00)</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
+          <button className="botao-m" disabled={ocupado || !(v >= 10)}>DEPOSITAR</button>
+          {instrucao && <p className="dica">{instrucao}</p>}
+          <Erro texto={erro} /><Info texto={ok} tipo="ok" />
+        </form>
+      </div>
+    </Pagina>
+  );
+}
+
 export function CarteiraDoMotorista({ voltar }: Voltar) {
-  const { dados, erro } = useBuscar<DadosCarteira>("/carteira");
-  const [sacando, setSacando] = useState(false);
-  if (sacando) return <CarteiraAntiga voltar={() => setSacando(false)} />;
+  const { dados, erro } = useBuscar<DadosCarteira & { recarga?: string }>("/carteira");
+  const [tela, setTela] = useState<"" | "recarregar" | "retirar">("");
+  if (tela === "retirar") return <CarteiraAntiga voltar={() => setTela("")} />;
+  if (tela === "recarregar") return <RecargaDeSaldo saldo={dados?.saldo} instrucao={dados?.recarga ?? ""} voltar={() => setTela("")} />;
   return (
     <Pagina>
       <Topo estilo="esquerda" titulo="Carteira" voltar={voltar} />
       <div className="conteudo">
         <Erro texto={erro} />
         <section className="cartao-m">
-          <small className="dica">Saldo</small>
+          <small className="dica">Saldo para taxas das corridas</small>
           <p className="valor-grande esquerda">{dados ? reais(dados.saldo) : "—"}</p>
           <div className="acoes-carteira">
-            <button type="button" onClick={() => setSacando(true)}><span className="quadro"><Plus size={22} /></span>Adicionar</button>
-            <button type="button" onClick={() => setSacando(true)}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>
+            <button type="button" onClick={() => setTela("recarregar")}><span className="quadro"><Plus size={22} /></span>Adicionar</button>
+            <button type="button" onClick={() => setTela("retirar")}><span className="quadro"><ArrowUp size={22} /></span>Retirar</button>
           </div>
         </section>
         <section className="cartao-m">
