@@ -32,7 +32,7 @@ export function sanearPersonalizacaoMotorista(e: unknown, nomePadrao = "", corPa
   if (Array.isArray(o.recursos)) for (const r of o.recursos as Array<Record<string, unknown>>) if (r && RECURSOS_MOTORISTA.includes(r.id as IdRecursoMotorista)) pedidos.set(String(r.id), r.visivel !== false && r.visivel !== "false");
   return {
     nome: texto(o.nome, 60) || nomePadrao, corPrincipal: /^#[0-9a-fA-F]{6}$/.test(cor) ? cor.toLowerCase() : corPadrao,
-    tema: umDe(o.tema, TEMAS, "sistema"), veiculoMapa: umDe(o.veiculoMapa, VEICULOS_MAPA, "realista"), marca: umDe(o.marca, MARCAS_MOTORISTA, "imagem"),
+    tema: umDe(o.tema, TEMAS, "sistema"), veiculoMapa: umDe(o.veiculoMapa, VEICULOS_MAPA, "realista"), marca: umDe(o.marca, MARCAS_MOTORISTA, "texto"),
     imagemMarca: typeof o.imagemMarca === "string" && ARQUIVO.test(o.imagemMarca) ? o.imagemMarca : "", estiloTela: umDe(o.estiloTela, ESTILOS_TELA, "flutuante"),
     recursos: RECURSOS_MOTORISTA.map((id) => ({ id, visivel: RECURSOS_FIXOS.includes(id) ? true : pedidos.get(id) ?? true })),
   };
