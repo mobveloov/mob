@@ -424,12 +424,24 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 .mlc-roxo { --c: 168, 85, 247; --t: #7e22ce; --t2: #6b21a8; }
 .mlc-rosa { --c: 244, 63, 94; --t: #be123c; --t2: #9f1239; }
 .mlc-lima { --c: 132, 204, 22; --t: #4d7c0f; --t2: #3f6212; }
+.mlc-ciano { --c: 6, 182, 212; --t: #0e7490; --t2: #155e75; }
+.mlc-ambar { --c: 245, 158, 11; --t: #b45309; --t2: #92400e; }
+.mlc-indigo { --c: 99, 102, 241; --t: #4338ca; --t2: #3730a3; }
+.mlc-teal { --c: 20, 184, 166; --t: #0f766e; --t2: #115e59; }
+.mlc-ardosia { --c: 100, 116, 139; --t: #475569; --t2: #334155; }
+.mlc-fucsia { --c: 217, 70, 239; --t: #a21caf; --t2: #86198f; }
 :root[data-theme="dark"] .mlc-laranja { --t: #fb923c; --t2: #fdba74; }
 :root[data-theme="dark"] .mlc-azul { --t: #38bdf8; --t2: #7dd3fc; }
 :root[data-theme="dark"] .mlc-verde { --t: #34d399; --t2: #6ee7b7; }
 :root[data-theme="dark"] .mlc-roxo { --t: #c084fc; --t2: #d8b4fe; }
 :root[data-theme="dark"] .mlc-rosa { --t: #fb7185; --t2: #fda4af; }
 :root[data-theme="dark"] .mlc-lima { --t: #a3e635; --t2: #bef264; }
+:root[data-theme="dark"] .mlc-ciano { --t: #22d3ee; --t2: #67e8f9; }
+:root[data-theme="dark"] .mlc-ambar { --t: #fbbf24; --t2: #fcd34d; }
+:root[data-theme="dark"] .mlc-indigo { --t: #818cf8; --t2: #a5b4fc; }
+:root[data-theme="dark"] .mlc-teal { --t: #2dd4bf; --t2: #5eead4; }
+:root[data-theme="dark"] .mlc-ardosia { --t: #94a3b8; --t2: #cbd5e1; }
+:root[data-theme="dark"] .mlc-fucsia { --t: #e879f9; --t2: #f0abfc; }
 
 .ml-lateral { position: sticky; top: 0; align-self: flex-start; height: 100vh; width: var(--ml-larg); flex-shrink: 0; display: flex; flex-direction: column; background: var(--ml-fundo); border-right: 1px solid var(--ml-borda); transition: width .2s, background-color .3s, border-color .3s; z-index: 55; }
 .menu-recolhido .ml-lateral { width: 64px; }
