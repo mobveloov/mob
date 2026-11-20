@@ -51,7 +51,7 @@ function estiloUmaVez() {
 /** Põe a base no mapa. Devolve como trocar para satélite e como desligar. */
 export function baseDoMapa(L: L, mapa: Leaflet.Map, o: OpcoesBase = {}): BaseDoMapa {
   const api = (o.api ?? "").replace(/\/+$/, ""), empresa = () => o.empresaId || empresaDoPainel;
-  let camada: Leaflet.TileLayer | null = null, cfg = PADRAO, sat = !!o.satelite, fim = false, avisoEl: HTMLDivElement | null = null, motivo = "", erros = 0, carregou = 0, atribuicaoAtual = "";
+  let camada: Leaflet.TileLayer | null = null, cfg = PADRAO, sat = !!o.satelite, fim = false, avisoEl: HTMLDivElement | null = null, motivo = "", seguidos = 0, atribuicaoAtual = "";
   estiloUmaVez();
 
   const esconderAviso = () => { avisoEl?.remove(); avisoEl = null; };
@@ -69,18 +69,19 @@ export function baseDoMapa(L: L, mapa: Leaflet.Map, o: OpcoesBase = {}): BaseDoM
     camada?.remove();
     const estilo = sat ? "satelite" : temaEscuro() ? "escuro" : "claro";
     const filtro = !sat && estilo === "escuro" && cfg.escuroComFiltro;
-    erros = 0; carregou = 0; esconderAviso();
+    seguidos = 0; esconderAviso();
     const nova = L.tileLayer(`${api}/api/mapa/${encodeURIComponent(empresa())}/tiles/${estilo}/{z}/{x}/{y}.png`, {
       maxZoom: sat ? 18 : 19, className: filtro ? "mapa-base-escura" : "",
     });
-    nova.on("tileload", () => { carregou++; if (carregou >= 1 && avisoEl) esconderAviso(); });
+    // Aviso quando as imagens falham em sequência (a primeira que carrega bem tira o aviso).
+    nova.on("tileload", () => { seguidos = 0; esconderAviso(); });
     nova.on("tileerror", (e: Leaflet.TileErrorEvent) => {
-      erros++;
-      if (erros === 1) {
+      seguidos++;
+      if (seguidos === 1) {
         const src = (e.tile as HTMLImageElement).src;
-        fetch(src, { cache: "no-store" }).then((r) => r.json()).then((j: { erro?: string }) => { if (j?.erro) motivo = j.erro; if (!carregou && erros >= 2) { esconderAviso(); mostrarAviso(); } }).catch(() => { /* sem rede: fica sem motivo */ });
+        fetch(src, { cache: "no-store" }).then((r) => r.json()).then((j: { erro?: string }) => { if (j?.erro) { motivo = j.erro; if (avisoEl) { esconderAviso(); mostrarAviso(); } } }).catch(() => { /* sem rede: fica sem motivo */ });
       }
-      if (!carregou && erros >= 3) mostrarAviso();
+      if (seguidos >= 3) mostrarAviso();
     });
     nova.addTo(mapa); nova.bringToBack();
     camada = nova;
