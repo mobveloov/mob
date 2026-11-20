@@ -107,14 +107,14 @@ export function apagarImagem(id: string, nome: string) {
 }
 
 /** Guarda uma imagem da marca. Devolve o nome do arquivo salvo. */
-export function salvarImagem(id: string, tipo: string, mime: string, bytes: Uint8Array): string {
+export function salvarImagem(id: string, tipo: string, mime: string, bytes: Uint8Array, maximo = MAX_IMAGEM): string {
   const ext = TIPOS_IMAGEM[mime];
-  if (tipo === "fotoEmpresa") {
-    if (!ext || !["png", "jpg", "webp"].includes(ext)) throw new Error("Envie a foto em PNG, JPG ou WEBP.");
+  if (tipo === "fotoEmpresa" || tipo === "personalizacaoMarca") {
+    if (!ext || !["png", "jpg", "webp"].includes(ext)) throw new Error(tipo === "fotoEmpresa" ? "Envie a foto em PNG, JPG ou WEBP." : "Envie uma imagem em formato PNG ou JPG.");
     if (!bytesDaImagemConferem(ext, bytes)) throw new Error("O arquivo não é uma imagem válida.");
   }
   if (!ext) throw new Error("Envie PNG, JPG, WEBP, SVG ou ICO.");
-  if (bytes.length > MAX_IMAGEM) throw new Error("Imagem grande demais (máximo 2 MB).");
+  if (bytes.length > maximo) throw new Error(`Imagem grande demais (máximo ${Math.round(maximo / 1048576)} MB).`);
   const pasta = path.join(pastaEmpresa(id), "arquivos");
   fs.mkdirSync(pasta, { recursive: true });
   for (const antigo of fs.readdirSync(pasta).filter((n) => n.startsWith(`${tipo}.`))) fs.rmSync(path.join(pasta, antigo));

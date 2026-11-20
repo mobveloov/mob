@@ -251,3 +251,8 @@ html[data-tema="escuro"] input, html[data-tema="escuro"] select, html[data-tema=
 html[data-tema="escuro"] .conta-texto strong, html[data-tema="escuro"] .conta-secao + .conta-grupo strong { color: var(--texto); }
 html[data-tema="escuro"] .conta-texto small { color: var(--suave); }
 html[data-tema="escuro"] .conta-secao { color: var(--suave); }
+/* Personalização (Configurações do painel): ícone do carro da empresa e estilo da tela inicial */
+.pino-veiculo { display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.inicio.estilo-neutro, .inicio.estilo-marcante { background: #fff; }
+.inicio.estilo-neutro .inicio-topo { background: #fff; color: #111827; }
+.inicio.estilo-marcante .inicio-topo { background: var(--cor); color: var(--cor-texto); }

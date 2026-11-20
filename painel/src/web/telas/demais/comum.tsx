@@ -15,8 +15,9 @@ export async function pedirConfig<T = any>(url: string, metodo = "GET", corpo?: 
   let emp = "";
   try { emp = localStorage.getItem("empresa") ?? ""; } catch { /* sem armazenamento */ }
   if (emp) h["X-Empresa"] = emp;
-  if (corpo !== undefined) h["Content-Type"] = "application/json";
-  const r = await fetch(`/api/config${url}`, { method: metodo, headers: h, credentials: "same-origin", body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+  const arquivo = typeof Blob !== "undefined" && corpo instanceof Blob; // envio de imagem: vai como veio, com o tipo do arquivo
+  if (corpo !== undefined) h["Content-Type"] = arquivo ? (corpo as Blob).type : "application/json";
+  const r = await fetch(`/api/config${url}`, { method: metodo, headers: h, credentials: "same-origin", body: corpo === undefined ? undefined : arquivo ? (corpo as Blob) : JSON.stringify(corpo) });
   const b = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error((b as { erro?: string }).erro || `Erro ${r.status}`);
   return b as T;

@@ -28,6 +28,8 @@ import { arquivoDaMidia, arquivoDoAudio, enviarAudio, enviarMidia, enviarTexto, 
 import * as P from "./despacho.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { ajustes } from "./ajustes.ts";
+import { dadosParaOApp } from "../config/personalizacao.ts";
+import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { euCompleto } from "./perfil.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
@@ -100,6 +102,15 @@ r.get("/marca", ok((req, res) => {
   });
 }));
 
+// Ícones do carro no mapa (desenho SVG; o app mostra por <img> ou no mapa, por isso sem token).
+r.get("/personalizacao/icone/:veiculo/:estado.svg", (req, res) => {
+  const v = req.params.veiculo as VeiculoMapa, e = req.params.estado;
+  if (!(VEICULOS_MAPA as readonly string[]).includes(v) || (e !== "livre" && e !== "ocupado")) return res.status(404).end();
+  res.setHeader("Content-Type", "image/svg+xml");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(iconeCarroSvg(v, e));
+});
+
 r.post("/entrar/codigo", ok(async (req, res) => {
   const papel = req.body?.papel as PapelApp;
   if (!PAPEIS.includes(papel)) throw new Error("App inválido.");
@@ -122,6 +133,8 @@ r.use(rotasPublicasV2);
 r.use(rotasPublicasExtras);
 
 r.use(exigirApp);
+// Personalização do app do passageiro (Configurações do painel): cores, design, veículo no mapa, tela inicial e recursos. Aplique ao abrir, sem gerar APK.
+r.get("/personalizacao", ok((req, res) => res.json(dadosParaOApp(ctx(req).empresaId))));
 r.use(rotasExtras);
 r.use(rotasV2);
 

@@ -48,18 +48,17 @@ test("personalização do app: padrão da marca, grava só admin, mapa fixo no e
   assert.equal(p.corpo.estiloTela, "flutuante");
   assert.equal(p.corpo.recursos[0].id, "mapa");
   assert.equal((await api(cOp, "PUT", "/personalizacao", { nome: "X" })).status, 403);
-  const r = await api(cAdm, "PUT", "/personalizacao", { nome: "Minha Central", corPrincipal: "#FF0000", veiculoMapa: "moderno", estiloTela: "neutro", marca: "nome_imagem",
+  const r = await api(cAdm, "PUT", "/personalizacao", { nome: "Minha Central", corPrincipal: "#FF0000", veiculoMapa: "moderno", estiloTela: "neutro", marca: "texto",
     recursos: [{ id: "anuncio", visivel: true }, { id: "mapa", visivel: false }, { id: "desafio", visivel: true }] });
   assert.equal(r.status, 200);
   assert.equal(r.corpo.corPrincipal, "#ff0000");
   assert.equal(r.corpo.recursos[0].id, "anuncio", "a ordem pedida vale fora do estilo flutuante");
   assert.equal(r.corpo.recursos.find((x: any) => x.id === "desafio").visivel, false, "desafio fica bloqueado");
   assert.equal(r.corpo.recursos.length, 5, "o que faltou entra no fim");
-  const flut = await api(cAdm, "PUT", "/personalizacao", { estiloTela: "flutuante", recursos: [{ id: "anuncio", visivel: true }, { id: "mapa", visivel: false }] });
+  const flut = await api(cAdm, "PUT", "/personalizacao", { nome: "Minha Central", estiloTela: "flutuante", recursos: [{ id: "anuncio", visivel: true }, { id: "mapa", visivel: false }] });
   assert.equal(flut.corpo.recursos[0].id, "mapa");
   assert.equal(flut.corpo.recursos[0].visivel, true);
-  assert.equal((await api(cAdm, "PUT", "/personalizacao", { imagemMarca: "data:text/html;base64,AAAA" })).status, 400);
-  assert.equal((await api(cAdm, "PUT", "/personalizacao", { imagemMarca: "data:image/png;base64,iVBORw0KGgo=" })).status, 200);
+  assert.equal((await api(cAdm, "PUT", "/personalizacao", { nome: "Minha Central", marca: "imagem" })).status, 400, "marca com imagem exige a imagem enviada");
   assert.equal((await api(cAdm2, "GET", "/personalizacao")).corpo.nome, "Grupo C Dois", "outra empresa não vê");
 });
 
