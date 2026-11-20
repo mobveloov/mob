@@ -119,14 +119,26 @@ const motoristaAlvo = (id: string): Alvo => ({ papel: "motorista", chave: id });
 
 // ------------------------------------------------------------------ como a corrida aparece no app
 
+const semAcento = (s: string) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+/** Motivo de cancelamento do motorista que é culpa do passageiro ("Passageiro não apareceu", "Passageiro pediu para cancelar"...). */
+export const culpaDoPassageiro = (motivo: string) => { const n = semAcento(motivo); return /^passageiro/.test(n) || /nao apareceu|nao compareceu|ausente/.test(n); };
+const passageiroAusente = (motivo: string) => /nao apareceu|nao compareceu|ausente/.test(semAcento(motivo));
+/** O que o passageiro lê quando o motorista cancela por culpa dele (a corrida não volta para a fila). */
+export function mensagemDeCancelamento(c: CorridaPropria): string {
+  if (c.status !== "cancelada" || c.canceladaPor !== "Motorista" || !culpaDoPassageiro(c.motivoCancelamento)) return "";
+  return passageiroAusente(c.motivoCancelamento) ? "Corrida cancelada: você não apareceu. Se quiser, peça uma nova corrida." : "Corrida cancelada a seu pedido. Se quiser, peça uma nova corrida.";
+}
+
 export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: PapelApp) {
   const aberta = ABERTA.has(c.status);
+  const culpa = papel === "passageiro" ? mensagemDeCancelamento(c) : "";
   const m = c.motoristaId ? motorista(empresaId, c.motoristaId) : undefined;
   return {
     id: c.id, os: c.os, status: c.status, statusTexto: STATUS_TEXTO[c.status], aberta,
     embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
     estimativa: c.estimativa, valor: c.valor, cupom: c.cupom, desconto: c.desconto, avaliacao: c.avaliacao,
-    solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm, finalizadaEm: c.finalizadaEm, canceladaPor: c.canceladaPor,
+    solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm, finalizadaEm: c.finalizadaEm, canceladaPor: culpa ? "" : c.canceladaPor,
+    ...(culpa ? { statusTexto: culpa.split(". ")[0], mensagemCancelamento: culpa } : {}),
     motorista: c.motoristaId ? {
       nome: c.motorista, veiculo: String(m?.veiculo ?? ""), placa: String(m?.placa ?? ""),
       // Telefone só enquanto a corrida está aberta, e só para quem está nela.
@@ -508,7 +520,7 @@ export function vigiar(empresaId: string) {
     }
     const statusAntes = antes?.split("|")[0];
     if (statusAntes !== c.status && TEXTO_PUSH[c.status] && c.canal === "app") {
-      void avisar(empresaId, passageiroAlvo(c), { titulo: STATUS_TEXTO[c.status], texto: TEXTO_PUSH[c.status]!, dados: { tipo: "corrida", corridaId: c.id }, canal: c.status === "no_local" ? "chegada" : "corridas" });
+      void avisar(empresaId, passageiroAlvo(c), { titulo: STATUS_TEXTO[c.status], texto: mensagemDeCancelamento(c) || TEXTO_PUSH[c.status]!, dados: { tipo: "corrida", corridaId: c.id }, canal: c.status === "no_local" ? "chegada" : "corridas" });
     }
     if (c.status === "cancelada" && c.motoristaId && statusAntes && statusAntes !== "cancelada" && c.canceladaPor !== "Motorista") {
       void avisar(empresaId, motoristaAlvo(c.motoristaId), { titulo: "Corrida cancelada", texto: `OS ${c.os} foi cancelada.`, dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
