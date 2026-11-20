@@ -68,3 +68,21 @@ test("Notificação: filtros escolhem quem recebe", async () => {
   await assert.rejects(() => usar({ papel: "passageiro", filtros: { corridasMin: 1 } }), /Nenhum destinatário/); // ninguém fez corrida
   assert.equal((await usar({ papel: "passageiro", filtros: { corridasMax: 0 } })).destinatarios, 2);
 });
+
+test("Notificações app: lista mostra envio agendado, ordena por coluna e a prévia conta quem recebe", async () => {
+  const { listaNotificacoes, criarAgendamento, previaDestinatarios } = await import("../src/config/comunicacao.ts");
+  criar(E, cadastroPorId("motoristas")!, { nome: "Prévia A", telefone: "11955550001", status: "Ativo" }, "t");
+  criar(E, cadastroPorId("motoristas")!, { nome: "Prévia B", telefone: "11955550002", status: "Ativo" }, "t");
+  const pedido = sanearPedido({ papel: "motorista", titulo: "Zeta", mensagem: "primeiro", tituloOpcional: true });
+  const previa = previaDestinatarios(E, pedido);
+  assert.ok(previa.total >= 2);
+  assert.ok(previa.nomes.includes("Prévia A"));
+  await dispararNotificacao(E, pedido, "adm");
+  criarAgendamento(E, { papel: "motorista", titulo: "Futura", mensagem: "depois", tituloOpcional: true, regra: "unico", data: "2099-01-01", hora: "10:00" });
+  const l = listaNotificacoes(E, {}, 1);
+  assert.ok(l.itens.some((i) => i.status === "Agendada" && i.titulo === "Futura" && i.enviadoEm.startsWith("2099-01-01")));
+  assert.ok(l.itens.some((i) => i.status === "Concluído" && i.titulo === "Zeta"));
+  const asc = listaNotificacoes(E, { ordem: "titulo", sentido: "asc" }, 1).itens.map((i) => i.titulo);
+  assert.deepEqual(asc, [...asc].sort((a, b) => a.localeCompare(b, "pt-BR")));
+  assert.equal(listaNotificacoes(E, { titulo: "futu" }, 1).itens.length, 1);
+});
