@@ -32,6 +32,7 @@ import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagame
 import { texto } from "./armazem.ts";
 import { personalizacao, salvarPersonalizacao } from "./personalizacao.ts";
 import { bandeira, salvarBandeira } from "./bandeira.ts";
+import { camposBandeira, salvarCamposBandeira } from "./bandeira-campos.ts";
 import { salvarTransbordo, transbordoDasParceiras } from "./transbordo.ts";
 import { areasDaEmpresa } from "../areas/areas.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
@@ -193,6 +194,8 @@ rotasConfig.delete("/descontos/:id", gestor, ok((req, res) => res.json({ descont
 const dadosBandeira = (empresaId: string) => ({ ...bandeira(empresaId), areas: areasDaEmpresa(empresaId).filter((a) => !a.bloqueio?.ativo).map((a) => ({ id: a.id, nome: a.nome })) });
 rotasConfig.get("/bandeira", ok((req, res) => res.json(dadosBandeira(emp(req)))));
 rotasConfig.put("/bandeira", gestor, ok((req, res) => { salvarBandeira(emp(req), req.body, areasDaEmpresa(emp(req)).map((a) => a.id)); res.json(dadosBandeira(emp(req))); }));
+rotasConfig.get("/bandeira-campos", ok((req, res) => res.json({ valores: camposBandeira(emp(req)), categorias: categoriasCompletas(emp(req)).map((c) => ({ id: c.id, nome: c.nome })) })));
+rotasConfig.put("/bandeira-campos", gestor, ok((req, res) => res.json({ valores: salvarCamposBandeira(emp(req), req.body?.valores ?? req.body) })));
 rotasConfig.get("/transbordo-bandeiras", ok((req, res) => res.json({ parceiras: transbordoDasParceiras(emp(req)) })));
 rotasConfig.put("/transbordo-bandeiras", gestor, ok((req, res) => res.json({ parceiras: salvarTransbordo(emp(req), req.body) })));
 rotasConfig.get("/personalizacao", ok((req, res) => res.json(personalizacao(emp(req)))));
