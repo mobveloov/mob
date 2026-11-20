@@ -59,7 +59,7 @@ export default function Estatistica({ id }: { id: string }) {
       <div className="dm-cab">
         <div><h1>{titulo}</h1></div>
         <div className="dm-cab-acoes">
-          {csv && <button className="botao primario" onClick={() => salvar(() => gerar(() => buscarCsvRel(`/relatorio/${id}/csv?inicio=${aplicado.inicio}&fim=${aplicado.fim}`), `${id}.csv`))}>Exportar</button>}
+          {csv && <button className="botao primario" onClick={() => salvar(() => gerar(() => buscarCsvRel(`/relatorio/${id}/csv?inicio=${aplicado.inicio}&fim=${aplicado.fim}`), `${id}.csv`), "")}>Exportar</button>}
           <button className="botao" disabled={!x?.total} onClick={() => window.print()}>Imprimir</button>
         </div>
       </div>

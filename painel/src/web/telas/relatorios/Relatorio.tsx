@@ -73,7 +73,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
     <>
       <Cab titulo={def.titulo} sub={def.descricao}>
         {aoVoltar && <button className="botao" onClick={aoVoltar}>Voltar</button>}
-        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => gerar(() => buscarCsvRel(`/relatorio/${id}/csv?${qs(aplicado)}`), `${id}.csv`))}><Download size={14} /> Exportar</button>}
+        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => gerar(() => buscarCsvRel(`/relatorio/${id}/csv?${qs(aplicado)}`), `${id}.csv`), "")}><Download size={14} /> Exportar</button>}
         {(BOTOES[id]?.imprimir ?? true) && <button className="botao" onClick={() => window.print()}><Printer size={14} /> Imprimir</button>}
       </Cab>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
