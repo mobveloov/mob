@@ -32,6 +32,8 @@ import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaqu
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
 import { texto } from "./armazem.ts";
+import { salvarConfigMapas, visaoMapas } from "./mapas.ts";
+import { ultimoErroDoProvedor } from "../servidor/mapas-tiles.ts";
 import { enviarImagemMarca, MAX_IMAGEM_MARCA, personalizacao, removerImagemMarca, salvarPersonalizacao } from "./personalizacao.ts";
 import { bandeira, salvarBandeira } from "./bandeira.ts";
 import { camposBandeira, salvarCamposBandeira } from "./bandeira-campos.ts";
@@ -277,6 +279,11 @@ rotasConfig.put("/pagamentos", admin, ok((req, res) => {
   const p = salvarPagamentos(emp(req), req.body);
   res.json({ ...p, credenciais: credenciaisMp(emp(req)) });
 }));
+
+// Mapas (Integrações): provedor das imagens dos mapas. A chave nunca volta inteira.
+const visaoDosMapas = (e: string) => { const v = visaoMapas(e); return { ...v, ultimoErro: ultimoErroDoProvedor(v.efetivo) }; };
+rotasConfig.get("/mapas", ok((req, res) => res.json(visaoDosMapas(emp(req)))));
+rotasConfig.put("/mapas", admin, ok((req, res) => { salvarConfigMapas(emp(req), (req.body ?? {}) as Record<string, unknown>); res.json(visaoDosMapas(emp(req))); }));
 
 // ------------------------------------------------------------------ NPS, avaliações, termos, ajuda
 
