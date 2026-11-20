@@ -67,7 +67,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     if (onlineRef.current && !s.online) ultimoEnvio.current = 0; // servidor reiniciou: a próxima posição religa
   }, []);
   useEffect(() => { usarSoWifi(ajustes.gravarSoWifi); }, [ajustes.gravarSoWifi]); // gravações esperam o Wi‑Fi (ou saem logo)
-  useEffect(() => { void manterTelaLigada(ajustes.manterTela && (online || !!corrida)); return () => { void manterTelaLigada(false); }; }, [ajustes.manterTela, online, !!corrida]); // tela acesa online ou em corrida
+  useEffect(() => { void manterTelaLigada(ajustes.manterTela, !ajustes.manterTela); return () => { void manterTelaLigada(false); }; }, [ajustes.manterTela, online, !!corrida]); // tela acesa online ou em corrida
   useEffect(() => { void rastrearEmSegundoPlano(online); return () => { void rastrearEmSegundoPlano(false); }; }, [online]); // online: serviço em primeiro plano manda a posição com a tela apagada
   const carregarGanhos = useCallback(() => { void api<{ hoje: { valor: number } }>("/ganhos").then((g) => setHoje(g.hoje.valor)).catch(() => undefined); }, []);
   useEffect(() => { void carregar().catch(() => undefined); carregarGanhos(); }, [carregar, carregarGanhos]);
