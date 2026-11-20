@@ -16,6 +16,7 @@ import { buscarCorridas } from "../servidor/fontes/index.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { gravarOperacao, lerOperacao } from "./armazem.ts";
 import { ondasDaCorrida, type Onda } from "./ondas.ts";
+import { detalhesDaCorrida, logDaOs, trajetoDaOs } from "./log-trajeto.ts";
 
 const ABERTA = new Set<StatusProprio>(["procurando", "a_caminho", "no_local", "em_andamento"]);
 const COM_MOTORISTA = new Set<StatusProprio>(["a_caminho", "no_local", "em_andamento"]);
@@ -171,8 +172,14 @@ export function detalhe(empresaId: string, id: string) {
     },
     podeCancelar: ABERTA.has(c.status), podeReenviar: c.status === "cancelada" || c.status === "nao_atendida", podeRecibo: c.status !== "cancelada" && c.status !== "nao_atendida",
     temLances: false, naoLidas: naoLidas(empresaId, c.id).length,
+    machine: detalhesDaCorrida(empresaId, c),
   };
 }
+
+/** Histórico da OS (log da solicitação): eventos reais da corrida e a tabela de motoristas de cada rodada do despacho. */
+export const logDaSolicitacao = (empresaId: string, id: string) => logDaOs(empresaId, acharPropria(empresaId, id));
+/** Trajeto da OS: percurso real gravado pelo app do motorista, etapas, distância e tempo realizados. */
+export const trajetoDaCorrida = (empresaId: string, id: string) => trajetoDaOs(empresaId, acharPropria(empresaId, id));
 
 // ====================================================================== auditoria (raio-x)
 

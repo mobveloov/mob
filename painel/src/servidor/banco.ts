@@ -138,6 +138,13 @@ export function banco(): Banco {
       UNIQUE (empresa, id));
     CREATE INDEX IF NOT EXISTS ondas_corrida ON ondas (empresa, corrida_id);
     CREATE INDEX IF NOT EXISTS ondas_ordem ON ondas (empresa, seq);
+    CREATE TABLE IF NOT EXISTS corrida_eventos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, em TEXT NOT NULL, tipo TEXT NOT NULL,
+      descricao TEXT NOT NULL, usuario TEXT NOT NULL DEFAULT '', canal TEXT NOT NULL DEFAULT '', dados TEXT NOT NULL DEFAULT '');
+    CREATE INDEX IF NOT EXISTS corrida_eventos_corrida ON corrida_eventos (empresa, corrida_id, seq);
+    CREATE TABLE IF NOT EXISTS corrida_pontos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, em TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, fase TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS corrida_pontos_corrida ON corrida_pontos (empresa, corrida_id, seq);
     CREATE TABLE IF NOT EXISTS chat_mensagens (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, id TEXT NOT NULL, de TEXT NOT NULL,
       tem_audio INTEGER NOT NULL DEFAULT 0, audio_id TEXT, em TEXT NOT NULL, dados TEXT NOT NULL);

@@ -286,6 +286,9 @@ function umaVez(chave: string, fn: () => Promise<CorridaPropria>) {
   return p;
 }
 
+/** Android, iOS ou Web, pelo navegador/aplicativo que fez o pedido (aparece nas Informações de controle da OS). */
+const sistemaDoAparelho = (req: Request) => { const u = String(req.get("user-agent") ?? ""); return /android/i.test(u) ? "Android" : /iphone|ipad|ipod|ios/i.test(u) ? "iOS" : "Web"; };
+
 r.post("/corridas", so("passageiro"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const b = req.body ?? {};
@@ -315,7 +318,7 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
       categoria: txt(b.categoria, 60), pagamento, canal: "app",
       observacao: txt(b.observacao, 300), cupom: txt(b.cupom, 30), paradas,
       agendadaPara: typeof b.agendadaPara === "string" && b.agendadaPara ? b.agendadaPara : undefined,
-      valorOferecido: num(b.valorOferecido) ?? undefined,
+      valorOferecido: num(b.valorOferecido) ?? undefined, sistema: sistemaDoAparelho(req),
       opcionais: Array.isArray(b.opcionais) ? b.opcionais.map((x: unknown) => txt(x, 20)).filter((x: string) => ajustes(empresaId).opcionais.some((o) => o.id === x)).slice(0, 8) : undefined,
     }, "app do passageiro");
   });

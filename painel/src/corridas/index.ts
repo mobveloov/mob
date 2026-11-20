@@ -24,6 +24,7 @@ import { filial as acharFilial, filialDe } from "../filiais/filiais.ts";
 import { idValido, raiz } from "../servidor/dados.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
 import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
+import { canalDoPor, registrarEvento, type TipoEvento } from "./registro.ts";
 
 export type StatusProprio = "procurando" | "a_caminho" | "no_local" | "em_andamento" | "finalizada" | "cancelada" | "nao_atendida";
 export type Canal = "painel" | "bot" | "totem" | "app" | "macaneta";
@@ -84,6 +85,8 @@ export interface NovaCorridaPropria {
   enviarVariosCarros?: boolean;
   /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
   valorFinal?: { modo: "livre" | "prefixado"; valor?: number };
+  /** Sistema do aparelho de quem pediu (Android, iOS ou Web), para as "Informações de controle". */
+  sistema?: string;
 }
 
 export interface CorridaPropria {
@@ -148,6 +151,8 @@ export interface CorridaPropria {
   telefoneContato?: string;
   /** Oferta enviada a vários carros ao mesmo tempo. */
   enviarVariosCarros?: boolean;
+  /** Sistema do aparelho de quem pediu (Android, iOS ou Web). */
+  sistema?: string;
   /** Desconto da empresa conveniada pela forma de pagamento (já somado em "desconto"): percentual e valor em reais. */
   descontoEmpresa?: { pct: number; valor: number };
   /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
@@ -491,6 +496,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(limpo(n.infoInterna, 500) ? { infoInterna: limpo(n.infoInterna, 500) } : {}),
       ...(soDigitos(n.telefoneContato ?? "").length >= 10 ? { telefoneContato: soDigitos(n.telefoneContato ?? "").slice(0, 13) } : {}),
       ...(n.enviarVariosCarros ? { enviarVariosCarros: true } : {}),
+      ...(n.sistema && /^(Android|iOS|Web)$/.test(n.sistema) ? { sistema: n.sistema } : {}),
       ...(daEmpresa ? { descontoEmpresa: daEmpresa } : {}),
       ...(n.valorFinal ? { valorFinal: n.valorFinal.modo === "prefixado" ? { modo: "prefixado" as const, valor: arred(Number(n.valorFinal.valor)) } : { modo: "livre" as const } } : {}),
     };
@@ -500,8 +506,57 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     // Gatilhos do CRM: cadastro novo e pedido aberto.
     if (!cliente && !n.semCadastro) emitirEventoCrm({ empresaId, tipo: "new_passenger", telefone, nome });
     avisarCrm(empresaId, corrida);
+    registrarEvento(empresaId, corrida.id, {
+      tipo: "criada", em: corrida.solicitadaEm, usuario: por, canal: n.canal === "painel" ? "Painel" : CANAL_TEXTO[n.canal] ?? n.canal,
+      descricao: `Corrida criada (${CANAL_TEXTO[n.canal] ?? n.canal}): ${corrida.embarque.texto}${corrida.destino ? ` → ${corrida.destino.texto}` : ""}`,
+      dados: { categoria: corrida.categoria, pagamento: corrida.pagamento, valorPrevisto: corrida.estimativa.valor, agendadaPara: corrida.agendadaPara ?? null },
+    });
     return corrida;
   });
+}
+
+
+// ------------------------------------------------------------------ registro de eventos (Histórico da OS)
+
+const brl = (v: number | null | undefined) => (v == null ? "sem valor" : `R$ ${v.toFixed(2).replace(".", ",")}`);
+
+/** Compara a corrida antes e depois de uma mudança e grava um evento para cada coisa que aconteceu (status, motorista, valor, pagamento...). */
+function registrarMudancas(empresaId: string, antes: CorridaPropria, c: CorridaPropria) {
+  const ev = (tipo: TipoEvento, descricao: string, por: string, em: string, dados?: Record<string, unknown>) =>
+    registrarEvento(empresaId, c.id, { tipo, descricao, usuario: por, canal: canalDoPor(por), em, dados });
+  let anterior: StatusProprio = antes.status;
+  const novos = c.historico.slice(antes.historico.length);
+  let ultimaPor = "sistema", ultimaEm = agoraBr().toISOString();
+  for (const h of novos) {
+    ultimaPor = h.por; ultimaEm = h.em;
+    const nota = h.nota ?? "";
+    if (nota.startsWith("Motorista: ")) {
+      ev("atribuida", `Corrida atribuída ao motorista ${nota.slice(11)}`, h.por, h.em, { motoristaId: c.motoristaId });
+    } else if (nota.startsWith("Edição manual")) {
+      ev("alteracao", `OS alterada pela central (${nota.slice(14)})`, h.por, h.em);
+    } else if (nota.startsWith("Avaliação ")) {
+      ev("avaliacao", `Passageiro avaliou o motorista com nota ${nota.slice(10)}`, h.por, h.em);
+    } else if (nota.startsWith("Nota do passageiro ")) {
+      ev("avaliacao_passageiro", `Motorista avaliou o passageiro com nota ${nota.slice(19)}`, h.por, h.em);
+    }
+    if (h.status !== anterior) {
+      const s = h.status;
+      if (s === "a_caminho") ev("a_caminho", "Motorista a caminho do embarque", h.por, h.em);
+      else if (s === "no_local") ev("chegou", "Motorista chegou ao local de embarque", h.por, h.em);
+      else if (s === "em_andamento") ev("iniciou", "Corrida iniciada (passageiro embarcou)", h.por, h.em);
+      else if (s === "finalizada") ev("finalizou", `Corrida finalizada, valor final ${brl(c.valor)}`, h.por, h.em, { valor: c.valor });
+      else if (s === "cancelada") ev("cancelou", `Corrida cancelada${c.canceladaPor ? ` por ${c.canceladaPor}` : ""}${c.motivoCancelamento ? `: ${c.motivoCancelamento}` : ""}`, h.por, h.em, { quem: c.canceladaPor, taxa: c.taxaCancelamento ?? null });
+      else if (s === "nao_atendida") ev("nao_atendida", `Corrida não atendida${nota ? `: ${nota}` : ""}`, h.por, h.em);
+      else if (s === "procurando") ev("voltou_a_procurar", `Corrida voltou a procurar motorista${nota ? ` (${nota})` : ""}`, h.por, h.em);
+      anterior = h.status;
+    }
+  }
+  // Valor e pagamento: quem mudou (central, app, contraoferta) e de quanto para quanto.
+  if (c.pagamento !== antes.pagamento) ev("mudanca_pagamento", `Forma de pagamento alterada de ${antes.pagamento || "—"} para ${c.pagamento || "—"}`, ultimaPor, ultimaEm, { de: antes.pagamento, para: c.pagamento });
+  if (c.estimativa.valor !== antes.estimativa.valor) ev("mudanca_valor", `Valor previsto alterado de ${brl(antes.estimativa.valor)} para ${brl(c.estimativa.valor)}`, ultimaPor, ultimaEm, { de: antes.estimativa.valor, para: c.estimativa.valor });
+  if ((c.valorOferecido ?? null) !== (antes.valorOferecido ?? null)) ev("mudanca_valor", `Valor oferecido alterado de ${brl(antes.valorOferecido ?? null)} para ${brl(c.valorOferecido ?? null)}`, ultimaPor, ultimaEm, { de: antes.valorOferecido ?? null, para: c.valorOferecido ?? null });
+  if (c.status === antes.status && c.status !== "cancelada" && (c.valor ?? null) !== (antes.valor ?? null)) ev("mudanca_valor", `Valor final alterado de ${brl(antes.valor)} para ${brl(c.valor)}`, ultimaPor, ultimaEm, { de: antes.valor, para: c.valor });
+  if (c.status === "cancelada" && antes.status === "cancelada" && (c.taxaCancelamento ?? null) !== (antes.taxaCancelamento ?? null)) ev("mudanca_valor", `Taxa de cancelamento alterada de ${brl(antes.taxaCancelamento ?? null)} para ${brl(c.taxaCancelamento ?? null)}`, ultimaPor, ultimaEm, { de: antes.taxaCancelamento ?? null, para: c.taxaCancelamento ?? null });
 }
 
 /** Muda uma corrida com segurança (fila por empresa). Os apps usam para valor oferecido, rota editada, taxímetro etc. */
@@ -525,6 +580,7 @@ function alterar(empresaId: string, id: string, fn: (c: CorridaPropria) => void)
     fn(c);
     gravar(empresaId, [c]);
     if (c.status !== achada.status) avisarCrm(empresaId, c);
+    registrarMudancas(empresaId, achada, c);
     return c;
   });
 }
@@ -717,6 +773,7 @@ export function encerrarSemMotorista(empresaId: string, minutos = 20) {
     const mudadas = listarProprias(empresaId).filter((c) => c.status === "procurando" && Date.parse(horaDaCorrida(c)) < limite).map((x) => {
       const c = structuredClone(x);
       c.status = "nao_atendida"; c.historico.push({ em: agoraBr().toISOString(), status: "nao_atendida", por: "sistema" });
+      registrarEvento(empresaId, c.id, { tipo: "nao_atendida", descricao: `Corrida não atendida: ninguém aceitou em ${minutos} minutos`, usuario: "sistema", canal: "Sistema" });
       return c;
     });
     gravar(empresaId, mudadas);
