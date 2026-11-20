@@ -13,6 +13,7 @@ import { ajustes } from "../apps/ajustes.ts";
 import { arquivo, ler } from "../apps/armazem.ts";
 import { enviarDocumento, extrato, lancar, pessoa, removerDocumento, salvarPessoa, saldo, saldos, TIPOS_DOCUMENTO, MAX_DOC } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
+import { ultimosContatos } from "../apps/sessoes.ts";
 import { agoraBr, arred, celulaCsv, normal } from "../servidor/util.ts";
 import { conferir, cepValido, cpfValido, emailValido, placaValida, renavamValido, soDigitos, telefoneValido, UFS } from "./validacao.ts";
 import { cad, contem, digitos, emp, ok, paginar, quem, registros, soAdmin, texto } from "./comum.ts";
@@ -55,7 +56,10 @@ function veiculosPorMotorista(empresaId: string) {
   return m;
 }
 
-function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<string, Registro[]>; saldo: Map<string, number>; tokens: Set<string> }) {
+/** O app falou com o servidor nos últimos 7 dias: está instalado (mesmo sem o token de notificação). */
+const appFalouHaPouco = (em?: string) => !!em && Date.now() - Date.parse(em) < 7 * 86_400_000;
+
+function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<string, Registro[]>; saldo: Map<string, number>; tokens: Set<string>; contatos: Map<string, string> }) {
   const doMot = ctx.veiculos.get(m.id) ?? [];
   const ativo = doMot.find((v) => v.emUso === true);
   return {
@@ -66,13 +70,13 @@ function linhaMotorista(empresaId: string, m: Registro, ctx: { veiculos: Map<str
     viatura: String(m.viatura ?? ""), categorias: String(m.categorias ?? ""), validadeCnh: m.validadeCnh ?? null, cnh: situacaoCnh(m.validadeCnh),
     validadeLicenciamento: (ativo?.validadeLicenciamento ?? m.validadeLicenciamento ?? null) as string | null, tipoVinculo: String(m.tipoVinculo ?? ""),
     criadoEm: m.criadoEm,
-    diagnostico: { online: estaOnline(empresaId, m.id), app: ctx.tokens.has(m.id), fantasma: m.fantasma === true, versao: null as string | null },
+    diagnostico: { online: estaOnline(empresaId, m.id), app: ctx.tokens.has(m.id) || appFalouHaPouco(ctx.contatos.get(m.id)), ultimoContato: ctx.contatos.get(m.id) ?? null, fantasma: m.fantasma === true, versao: null as string | null },
   };
 }
 
 function contexto(empresaId: string) {
   const tokens = new Set(ler<Array<{ papel: string; chave: string }>>(arquivo(empresaId, "push.json"), []).filter((t) => t.papel === "motorista").map((t) => t.chave));
-  return { veiculos: veiculosPorMotorista(empresaId), saldo: new Map(saldos(empresaId).filter((s) => s.papel === "motorista").map((s) => [s.chave, s.saldo])), tokens };
+  return { contatos: ultimosContatos(empresaId, "motorista"), veiculos: veiculosPorMotorista(empresaId), saldo: new Map(saldos(empresaId).filter((s) => s.papel === "motorista").map((s) => [s.chave, s.saldo])), tokens };
 }
 
 /** Lista de motoristas com os filtros da tela. */

@@ -141,7 +141,27 @@ export function sessaoDoToken(empresaId: string, token: string): SessaoApp | nul
   const s = linha ? (JSON.parse(linha.dados) as SessaoApp) : undefined;
   if (!s || s.empresaId !== empresaId || s.expira < Date.now()) return null;
   if (impedimento(empresaId, s.papel, s.telefone)) return null;
+  registrarContato(empresaId, s.papel, s.chave);
   return s;
+}
+
+// ------------------------------------------------------------------ último contato do app (o painel decide "app instalado" por aqui)
+
+const contatoGravado = new Map<string, number>();
+/** Anota que o app falou com o servidor agora (no máximo uma gravação por minuto por pessoa). Qualquer pedido com token vale, e o app manda um "ping" ao abrir e de poucos em poucos minutos. */
+function registrarContato(empresaId: string, papel: PapelApp, chave: string) {
+  const k = `${empresaId}|${papel}|${chave}`, agora = Date.now();
+  if (agora - (contatoGravado.get(k) ?? 0) < 60_000) return;
+  contatoGravado.set(k, agora);
+  try {
+    banco().prepare("INSERT INTO app_contatos (empresa, papel, chave, em) VALUES (?, ?, ?, ?) ON CONFLICT (empresa, papel, chave) DO UPDATE SET em = excluded.em").run(empresaId, papel, chave, new Date(agora).toISOString());
+  } catch { /* estatística: não pode derrubar o pedido */ }
+}
+/** Quando o app de cada pessoa falou com o servidor pela última vez (chave → data ISO). */
+export function ultimosContatos(empresaId: string, papel: PapelApp): Map<string, string> {
+  try {
+    return new Map((banco().prepare("SELECT chave, em FROM app_contatos WHERE empresa = ? AND papel = ?").all(empresaId, papel) as Array<{ chave: string; em: string }>).map((r) => [r.chave, r.em]));
+  } catch { return new Map(); }
 }
 
 export function sair(empresaId: string, token: string) {
