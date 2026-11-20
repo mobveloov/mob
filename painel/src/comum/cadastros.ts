@@ -131,6 +131,8 @@ export const CADASTROS: Cadastro[] = [
       { chave: "enderecoFavorito", rotulo: "Endereço favorito", tipo: "texto" },
       { chave: "enderecoCasa", rotulo: "Endereço de casa", tipo: "texto" },
       { chave: "enderecoTrabalho", rotulo: "Endereço de trabalho", tipo: "texto" },
+      { chave: "enderecoCasaPos", rotulo: "Posição da casa no mapa", tipo: "texto", dica: "Latitude e longitude, preenchidas ao escolher o endereço sugerido." },
+      { chave: "enderecoTrabalhoPos", rotulo: "Posição do trabalho no mapa", tipo: "texto", dica: "Latitude e longitude, preenchidas ao escolher o endereço sugerido." },
       { chave: "cidade", rotulo: "Cidade", tipo: "texto" },
       { chave: "observacao", rotulo: "Observação", tipo: "textoLongo" },
       { chave: "corridas", rotulo: "Corridas (90 dias)", tipo: "numero", calculado: true },

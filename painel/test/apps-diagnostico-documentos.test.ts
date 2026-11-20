@@ -71,6 +71,24 @@ test("diagnóstico: APP OFF só sem contato há mais de 7 dias, sem sessão e se
   assert.equal(d.app, true, "contato há 2 dias"); assert.ok(d.ultimoContato);
 });
 
+test("diagnóstico: os dias sem contato vêm de Configurações > Gerais e ficam entre 1 e 90", async () => {
+  const { salvarGerais, gerais } = await import("../src/config/gerais.ts");
+  const m = criar(U.id, MOT, { nome: "Dez Dias Fora", telefone: "11944440099", status: "Ativo" }, "teste");
+  registrarContato(U.id, "motorista", m.id, Date.now() - 10 * 86_400_000);
+  try {
+    assert.equal(gerais(U.id).motorista.diasSemContatoApp, 7, "padrão 7");
+    assert.equal((await diag(m.id)).app, false, "10 dias > 7");
+    salvarGerais(U.id, { motorista: { diasSemContatoApp: 15 } });
+    assert.equal((await diag(m.id)).app, true, "10 dias < 15");
+    salvarGerais(U.id, { motorista: { diasSemContatoApp: 5 } });
+    assert.equal((await diag(m.id)).app, false, "10 dias > 5");
+    assert.equal(salvarGerais(U.id, { motorista: { diasSemContatoApp: 500 } }).motorista.diasSemContatoApp, 90, "máximo 90");
+    assert.equal(salvarGerais(U.id, { motorista: { diasSemContatoApp: 0 } }).motorista.diasSemContatoApp, 1, "mínimo 1");
+    assert.equal(salvarGerais(U.id, { motorista: { diasSemContatoApp: 12.6 } }).motorista.diasSemContatoApp, 13, "inteiro");
+    assert.equal(salvarGerais(U.id, { motorista: { diasSemContatoApp: "abc" } }).motorista.diasSemContatoApp, 7, "lixo volta ao padrão");
+  } finally { salvarGerais(U.id, { motorista: { diasSemContatoApp: 7 } }); }
+});
+
 test("diagnóstico: o login e qualquer chamada do app contam como contato; o ping também", async () => {
   const m = criar(U.id, MOT, { nome: "Logou Agora", telefone: "11944440004", status: "Ativo" }, "teste");
   assert.equal((await diag(m.id)).app, false);

@@ -5,11 +5,9 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
-import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
-import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
+import { api, ErroApi, flutuante, manterTelaLigada, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
+import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
-import { PermissoesPasso } from "./Permissoes";
-import { carregarPersonalizacao, personalizacaoDoCache } from "../comum/personalizacao";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
@@ -50,6 +48,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [chat, setChat] = useState(false);
   const [tela, setTela] = useState("");
   const [menu, setMenu] = useState(false);
+  const regras = useConfigDoPainel();
   const [dialogo, setDialogo] = useState<"" | "online" | "offline" | "analise" | "alerta">("");
   const [folhaAberta, setFolhaAberta] = useState(false); // folha de baixo do mapa: recolhida (barra) ou aberta (aviso + Desconectar)
   const [conectado, setConectado] = useState(false);
@@ -88,7 +87,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   // Tempo real.
   useEffect(() => tempoReal((tipo, d) => {
-    if (tipo === "oferta") { if (document.visibilityState === "hidden") void permissoesNativas.ofertaTelaCheia("Nova corrida", "Toque para ver a chamada"); setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
+    if (tipo === "oferta") { setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
     else if (tipo === "oferta_encerrada") { setOferta((o) => (o?.id === d.id ? null : o)); pararSons(); if (d.motivo) setAviso(String(d.motivo)); }
     else if (tipo === "corrida") {
       const c = d as Corrida;
@@ -132,24 +131,10 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, [online]);
   useEffect(() => { void posicaoAgora().then((p) => setPosicao((a) => a ?? p)).catch(() => undefined); }, []);
   useEffect(() => { void api("/ping", { corpo: {} }).catch(() => undefined); }, []); // avisa a central que o app está aberto
-  // A cor principal e o nome da empresa vêm do painel (Configurações > Personalização): lê ao entrar, a cada minuto e ao voltar ao app, sem APK novo.
-  useEffect(() => {
-    personalizacaoDoCache();
-    void carregarPersonalizacao();
-    const t = setInterval(() => void carregarPersonalizacao(), 60000);
-    const f = () => { if (document.visibilityState === "visible") void carregarPersonalizacao(); };
-    document.addEventListener("visibilitychange", f);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", f); };
-  }, []);
-  // Primeira vez (e sempre que faltar alguma): abre o passo a passo das permissões do Android.
-  useEffect(() => { void permissoesNativas.faltando().then((f) => { if (f.length) setTela((t) => t || "permissoes"); }); }, []);
   useEffect(() => { void api<{ online: boolean }>("/eu").then((r) => { if (r.online) setOnline(true); }).catch(() => undefined); }, []);
 
   const ficarOnline = async () => {
     setDialogo(""); setErro("");
-    // No APK: sem as permissões essenciais (localização o tempo todo, notificações, exibir sobre outros apps, bateria) não fica online.
-    const falta = await permissoesNativas.faltando();
-    if (falta.length) { setAviso("Libere as permissões para receber corridas com o app minimizado."); setTela("permissoes"); return; }
     try {
       const p = posicao ?? await posicaoAgora();
       await api("/online", { corpo: p });
@@ -202,7 +187,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     veiculos: <MeusVeiculos voltar={voltar} />,
     cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} irCarteira={() => setTela("carteira")} aoSairDaConta={() => { setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />,
     senha: <AlterarSenha voltar={voltar} />,
-    config: <Configuracoes voltar={voltar} irPermissoes={() => setTela("permissoes")} />,
+    config: <Configuracoes voltar={voltar} />,
     diagnostico: <Diagnostico voltar={voltar} eu={eu} conectado={conectado} posicao={posicao} online={online} />,
     suporte: <Suporte voltar={voltar} marca={marca} />,
     fale: <FaleConosco voltar={voltar} marca={marca} />,
@@ -210,7 +195,6 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     preferencias: <Preferencias voltar={voltar} />,
     desafios: <Desafios voltar={voltar} marca={marca} />,
     notificacoes: <Notificacoes voltar={voltar} />,
-    permissoes: <PermissoesPasso voltar={voltar} />,
     passelivre: <PasseLivre voltar={voltar} />,
   };
   if (tela && telas[tela]) return <>{telas[tela]}{chamada}</>;
@@ -260,7 +244,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         </div>
       )}
 
-      <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>
+      {(regras?.motorista.botaoPanico ?? true) && <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>}
 
       <div className="inicio-flutuantes">
         {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}

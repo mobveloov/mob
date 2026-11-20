@@ -4,13 +4,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpDown, Ban, Briefcase, ChevronDown, ChevronRight, History, House, MapPin, Pin, Plus, Star, X } from "lucide-react";
 import { api, type Posicao } from "../comum/api";
-import { mensagemDeErro } from "../comum/ui";
+import { mensagemDeErro, useConfigDoPainel } from "../comum/ui";
 import { linhasDoEndereco, salvarLugar, temCoord, type Endereco, type Lugares, type Ponto, type Rota } from "./apoio";
 import { Mapa } from "./Mapa";
 import { Aviso, Topo } from "./pecas";
 
 export type ModoParaOnde = "destino" | "casa" | "trabalho" | "recentes";
-const MAX_PARADAS = 3;
 type Ativo = "partida" | "destino" | number;
 
 async function enderecoDoPonto(p: Posicao, padrao: string): Promise<Ponto> {
@@ -23,6 +22,9 @@ async function enderecoDoPonto(p: Posicao, padrao: string): Promise<Ponto> {
 export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: {
   aqui: Posicao | null; lugares: Lugares | null; modo: ModoParaOnde; voltar: () => void; seguir: (r: Rota) => void; mudouLugares: (l: Lugares) => void;
 }) {
+  // Paradas: ligar/desligar e o limite vêm de Configurações › Gerais › Regras do passageiro.
+  const regras = useConfigDoPainel();
+  const maxParadas = regras ? (regras.passageiro.paradasAtivo ? regras.passageiro.limiteParadas : 0) : 0;
   const [partida, setPartida] = useState<Ponto>({ texto: "" });
   const [destino, setDestino] = useState<Ponto>({ texto: "" });
   const [paradas, setParadas] = useState<Ponto[]>([]);
@@ -129,7 +131,7 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
           {!definindo && paradas.map((p, i) => campo(i, `PARADA ${i + 1}`, p, "Endereço da parada", (
             <button className="icone-botao escuro pequeno" aria-label={`Tirar a parada ${i + 1}`} onClick={() => { setParadas((l) => l.filter((_, j) => j !== i)); setAtivo("destino"); }}><X size={18} /></button>
           )))}
-          {campo("destino", definindo ? "ENDEREÇO" : "DESTINO", destino, "Para onde você vai?", !definindo && paradas.length < MAX_PARADAS ? (
+          {campo("destino", definindo ? "ENDEREÇO" : "DESTINO", destino, "Para onde você vai?", !definindo && paradas.length < maxParadas ? (
             <button className="redondo mais cheio" aria-label="Adicionar parada" onClick={() => { setParadas((l) => [...l, { texto: "" }]); setAtivo(paradas.length); }}><Plus size={18} strokeWidth={3} /></button>
           ) : undefined)}
         </div>

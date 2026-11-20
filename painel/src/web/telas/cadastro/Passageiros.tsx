@@ -5,6 +5,7 @@ import { DataBr } from "../../componentes/DataBr";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
+import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEndereco";
 import { Cabecalho, Campo, chamar, ComFiltros, consulta, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
 
 interface Linha { id: string; nome: string; telefone: string; email: string; cidade: string; genero: string; dispositivo: string; origem: string; tipoCurto: string; nota: number | null; status: string; bloqueado: boolean }
@@ -95,17 +96,22 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
   const novo = id === "novo";
   const [f, setF] = useState<Record<string, string>>({ nome: "", genero: "", telefone: "", email: "", nascimento: "", cidade: "", cpf: "", status: "Ativo", origemCadastro: estabelecimento ? "Estabelecimento" : "Painel", observacao: "", avaliouApp: "Pendente", notaApp: "0", senha: "" });
   const [nota, setNota] = useState<number | null>(null);
+  const [casa, setCasa] = useState<PontoEscolhido>({ texto: "" });
+  const [trabalho, setTrabalho] = useState<PontoEscolhido>({ texto: "" });
   const { aviso, tentar } = useAviso();
   useCarregar(async () => {
     if (novo) return null;
     const r = await chamar<{ passageiro: Record<string, unknown>; nota: number | null }>("GET", `/passageiros/${id}`);
     setF((a) => ({ ...a, ...Object.fromEntries(["nome", "genero", "telefone", "email", "nascimento", "cidade", "cpf", "status", "origemCadastro", "observacao", "avaliouApp"].map((k) => [k, String(r.passageiro[k] ?? a[k])])), notaApp: String(r.passageiro.notaApp ?? 0) }));
     setNota(r.nota);
+    const ponto = (t: unknown, pos: unknown): PontoEscolhido => { const m = /^(-?[\d.]+),(-?[\d.]+)$/.exec(String(pos ?? "")); return { texto: String(t ?? ""), ...(m ? { lat: Number(m[1]), lng: Number(m[2]) } : {}) }; };
+    setCasa(ponto(r.passageiro.enderecoCasa, r.passageiro.enderecoCasaPos)); setTrabalho(ponto(r.passageiro.enderecoTrabalho, r.passageiro.enderecoTrabalhoPos));
     return r;
   }, [id]);
   const set = (k: string, v: string) => setF({ ...f, [k]: v });
   const salvar = async () => {
-    const corpo = { ...f, notaApp: Number(f.notaApp) || 0, senha: f.senha || undefined };
+    const pos = (p: PontoEscolhido) => (p.lat != null && p.lng != null ? `${p.lat},${p.lng}` : "");
+    const corpo = { ...f, notaApp: Number(f.notaApp) || 0, senha: f.senha || undefined, ...(novo ? {} : { enderecoCasa: casa.texto, enderecoCasaPos: pos(casa), enderecoTrabalho: trabalho.texto, enderecoTrabalhoPos: pos(trabalho) }) };
     if (await tentar(() => (novo ? chamar("POST", "/passageiros", corpo) : chamar("PUT", `/passageiros/${id}`, corpo)), "Cliente salvo.")) { onSalvo(); onFechar(); }
   };
   return (
@@ -134,6 +140,14 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
         </>}
       </div>
       <p className="cg-mono">Campos com * são obrigatórios.</p>
+      {!novo && <>
+        <h4 className="cg-secao">Endereços salvos</h4>
+        <p className="cg-mono">Os mesmos "Casa" e "Trabalho" que o passageiro vê no app.</p>
+        <div className="cg-grade">
+          <div className="larga"><CampoEndereco rotulo="Casa" valor={casa} onChange={setCasa} /></div>
+          <div className="larga"><CampoEndereco rotulo="Trabalho" valor={trabalho} onChange={setTrabalho} /></div>
+        </div>
+      </>}
       <h4 className="cg-secao">Dados internos</h4>
       <Campo rotulo="Observação" dica={`${f.observacao.length}/5000. Só a central vê.`}><textarea value={f.observacao} maxLength={5000} rows={3} onChange={(e) => set("observacao", e.target.value)} /></Campo>
       {!novo && <>
