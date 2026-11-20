@@ -256,3 +256,12 @@ html[data-tema="escuro"] .conta-secao { color: var(--suave); }
 .inicio.estilo-neutro, .inicio.estilo-marcante { background: #fff; }
 .inicio.estilo-neutro .inicio-topo { background: #fff; color: #111827; }
 .inicio.estilo-marcante .inicio-topo { background: var(--cor); color: var(--cor-texto); }
+
+/* Respiro e área de toque (Conta, Editar Perfil, Carteira, formulários): mínimo de 48 px, quebra de linha, fonte grande */
+.conta-item { min-height: 64px; } .conta-texto { overflow-wrap: anywhere; line-height: 1.3; } .conta-texto small { display: block; margin-top: .15rem; line-height: 1.35; }
+.conta-secao { margin-top: 1.6rem; }
+input, select, textarea { min-height: 48px; }
+.botao { min-height: 52px; }
+label { line-height: 1.3; overflow-wrap: anywhere; }
+.tela { scroll-padding-bottom: 40vh; } /* o teclado não cobre o campo que está sendo digitado */
+@media (max-width: 380px) { .conta-grupo { margin-left: .7rem; margin-right: .7rem; } .seletor-tema button { padding: .6rem .2rem; font-size: .85rem; } }
