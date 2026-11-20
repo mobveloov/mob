@@ -31,3 +31,6 @@ ACESSO_TESTE.txt
 /apk motorista/
 /apk passageiro/
 /prints*/
+
+# Exportações de dados (casas do mobveloov etc.): nunca no git
+dados-importacao/
