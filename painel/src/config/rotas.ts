@@ -26,6 +26,7 @@ import { atualizarCadastro, salvarDadosBancarios, salvarIntegracaoFinanceira, vi
 import { regrasDespacho, salvarDespacho, transbordos } from "./despacho.ts";
 import { areasAutomaticas, ativarAutomacao, ativarDinamica, automacoes, dinamicas, LEGENDA_DINAMICA, nivelDinamica, prioridadeDinamicas, PRIORIDADES, removerAutomacao, removerDinamica, ROTULO_PRIORIDADE, salvarAutomacao, salvarDinamica, salvarPrioridade } from "./dinamica.ts";
 import { csvExtratoCentral, csvExtratoOnline, csvRelatorioFaturamento, csvVisaoGeral, relatorioFaturamento, extratoDaCentral, extratoOnline, marcarTransacao, pedirRecargaCentral, resolverPedidoRecarga, visaoGeral } from "./financeiro-visao.ts";
+import { csvExtratoCreditos, csvRecargasESaques, csvSaldoMotoristas, csvTransacoesCartao, extratoCreditos, listaTransacoesCartao, painelCartao, recargasESaques, saldoDaCentral, saldoDosMotoristas } from "./financeiro-credito.ts";
 import { detalheCarteira, extratoGeral, listaCarteiras, listaRecargas, listaSaques, periodo, producaoMotoristas } from "./financeiro.ts";
 import { adicionarBanner, arquivoDoBanner, gerais, MAX_BANNER, removerBanner, salvarGerais, salvarTermos, TERMOS_PADRAO, termos } from "./gerais.ts";
 import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagamentos } from "./pagamentos.ts";
@@ -92,6 +93,20 @@ rotasConfig.get("/relatorio-faturamento", ok((req, res) => res.json(relatorioFat
 rotasConfig.get("/relatorio-faturamento/csv", ok((req, res) => baixarCsv(res, "relatorio-faturamento", csvRelatorioFaturamento(emp(req), per(req), filtroFaturamento(req)))));
 rotasConfig.post("/transacoes-online/:id/status", admin, ok((req, res) => res.json(marcarTransacao(emp(req), req.params.id, String(req.body?.status ?? ""), texto(req.body?.motivo, 200), quem(req)))));
 rotasConfig.get("/recargas", ok((req, res) => res.json({ periodo: per(req), ...listaRecargas(emp(req), papelCart(q(req, "aba") || "motorista"), per(req)) })));
+// Financeiro > Créditos e Cartão (Machine): leitura para Gestor e acima. Aprovar ou recusar saque usa as rotas /saques/:id/:acao (admin).
+const filtroRS = (req: Request) => ({ tipo: q(req, "tipo"), papel: q(req, "papel"), situacao: q(req, "situacao"), busca: q(req, "busca").slice(0, 80) });
+const filtroExtrato = (req: Request) => ({ tipo: q(req, "tipo"), papel: q(req, "papel"), busca: q(req, "busca").slice(0, 80) });
+const filtroCartao = (req: Request) => ({ origem: q(req, "origem"), status: q(req, "status"), repasse: q(req, "repasse"), busca: q(req, "busca").slice(0, 80) });
+rotasConfig.get("/creditos/recargas-saques", gestor, ok((req, res) => res.json(recargasESaques(emp(req), per(req), filtroRS(req)))));
+rotasConfig.get("/creditos/recargas-saques/csv", gestor, ok((req, res) => baixarCsv(res, "recargas-e-saques", csvRecargasESaques(emp(req), per(req), filtroRS(req)))));
+rotasConfig.get("/creditos/extrato", gestor, ok((req, res) => res.json(extratoCreditos(emp(req), per(req), filtroExtrato(req)))));
+rotasConfig.get("/creditos/extrato/csv", gestor, ok((req, res) => baixarCsv(res, "extrato-de-creditos", csvExtratoCreditos(emp(req), per(req), filtroExtrato(req)))));
+rotasConfig.get("/cartao/painel", gestor, ok((req, res) => res.json(painelCartao(emp(req), per(req)))));
+rotasConfig.get("/cartao/transacoes", gestor, ok((req, res) => res.json(listaTransacoesCartao(emp(req), per(req), filtroCartao(req)))));
+rotasConfig.get("/cartao/transacoes/csv", gestor, ok((req, res) => baixarCsv(res, "transacoes-de-cartao", csvTransacoesCartao(emp(req), per(req), filtroCartao(req)))));
+rotasConfig.get("/cartao/saldo-central", gestor, ok((req, res) => res.json(saldoDaCentral(emp(req), per(req)))));
+rotasConfig.get("/cartao/saldo-motorista", gestor, ok((req, res) => res.json(saldoDosMotoristas(emp(req), per(req), q(req, "busca").slice(0, 80)))));
+rotasConfig.get("/cartao/saldo-motorista/csv", gestor, ok((req, res) => baixarCsv(res, "saldo-do-motorista", csvSaldoMotoristas(emp(req), per(req), q(req, "busca").slice(0, 80)))));
 rotasConfig.get("/relatorios/producao", ok((req, res) => {
   const p = periodo("personalizado", q(req, "inicio") || agoraBr().toISOString().slice(0, 8) + "01", q(req, "fim") || agoraBr().toISOString().slice(0, 10));
   res.json({ periodo: p, ...producaoMotoristas(emp(req), { ...p, busca: q(req, "busca"), categoria: q(req, "categoria"), pagamento: q(req, "pagamento"), ordem: q(req, "ordem"), dir: q(req, "dir") }) });

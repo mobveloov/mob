@@ -60,6 +60,12 @@ export const FUNCOES: Funcao[] = [
   { id: "funil-clientes", grupo: "Corridas", secao: EXTRA, nome: "Funil de Clientes", rota: "/funil-clientes", minimo: "gestor" },
   { id: "mapa-bairros", grupo: "Corridas", secao: EXTRA, nome: "Mapa de Bairros e Demanda", rota: "/mapa-bairros", minimo: "gestor" },
 
+  { id: "creditos-recargas-saques", grupo: "Financeiro", secao: "Créditos", nome: "Recargas e Saques", rota: "/creditos-recargas-saques", minimo: "gestor" },
+  { id: "creditos-extrato", grupo: "Financeiro", secao: "Créditos", nome: "Extrato", rota: "/creditos-extrato", minimo: "gestor" },
+  { id: "cartao-painel", grupo: "Financeiro", secao: "Cartão", nome: "Painel de Controle", rota: "/cartao-painel", minimo: "gestor" },
+  { id: "cartao-transacoes", grupo: "Financeiro", secao: "Cartão", nome: "Transações", rota: "/cartao-transacoes", minimo: "gestor" },
+  { id: "cartao-saldo-central", grupo: "Financeiro", secao: "Cartão", nome: "Saldo da Central", rota: "/cartao-saldo-central", minimo: "gestor" },
+  { id: "cartao-saldo-motorista", grupo: "Financeiro", secao: "Cartão", nome: "Saldo do Motorista", rota: "/cartao-saldo-motorista", minimo: "gestor" },
   { id: "transacao-pix", grupo: "Financeiro", secao: "Pix", nome: "Transações", rota: "/transacao-pix", minimo: "gestor" },
   { id: "faturamento-empresa", grupo: "Financeiro", secao: "Contas a receber", nome: "Faturamento por empresa", rota: "/faturamento-empresa", minimo: "admin" },
   { id: "faturamento-centro-custo", grupo: "Financeiro", secao: "Contas a receber", nome: "Faturamento de centro de custo", rota: "/faturamento-centro-custo", minimo: "admin" },
@@ -111,6 +117,7 @@ export const FUNCOES: Funcao[] = [
   { id: "central-ajuda", grupo: "Ajuda", secao: EXTRA, nome: "Central de Ajuda", rota: "/central-ajuda" },
 
   // Cobrança entre centrais (grupo nosso, fora da Machine).
+  { id: "ultimo-boleto", grupo: "Cobrança", nome: "Último boleto", rota: "/ultimo-boleto", minimo: "gestor" },
   { id: "demonstrativo-mensal", grupo: "Cobrança", nome: "Demonstrativo Mensal", rota: "/demonstrativo-mensal", minimo: "gestor" },
   { id: "meus-planos", grupo: "Cobrança", nome: "Meus planos", rota: "/meus-planos", minimo: "gestor" },
   { id: "controle-centrais", grupo: "Cobrança", nome: "Controle financeiro de centrais", rota: "/controle-centrais", minimo: "gestor" },
