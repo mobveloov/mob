@@ -310,3 +310,9 @@ Nenhuma parte do CRM, Bot ou Totem está 100% copiada do mobveloov: o que veio e
 - **Carteiras de crédito:** novo item em Configurações > Regras e integrações (rota `/carteiras-credito`), abre a mesma tela de Carteiras; "Carteiras" segue em Financeiro.
 - **Teste `consulta-nps`:** o esperado acompanha o dia da corrida recuada 2,5 h; confere também com o relógio fixado à 1h.
 - Testes novos: `test/painel-pendencias.test.ts` (desconto, observação, trava, Editar OS, comissão, taxa) e `test/despacho-varios-carros.test.ts`.
+
+## Conferência final do menu (20/11/2026)
+- Agente de conferência clicou nos 98 itens do menu lateral, logado como administrador: todos abrem, sem "Em construção", sem erro de página, de console ou resposta 5xx; todas as abas das telas abriram; Ctrl K e Atualizações funcionam.
+- Gravações testadas e conferidas ao recarregar: Taxas da central (criar e renomear), Tarifas e categorias (criar categoria), Passe Livre (nova oferta), Filiais (nova filial) e Ouvidoria (nova manifestação). Faltava mensagem de sucesso em quatro delas: corrigido.
+- Tabelas por tela, aba e campo: `docs/MENU_MACHINE.md` (menu) e `docs/comparacao/CAMPOS_A.md` a `CAMPOS_E.md` (campos, com a seção "Não consegui igualar" de cada grupo).
+- Sem página de referência (suposições para o dono validar): Cartão (Painel de Controle, Transações, Saldo da Central, Saldo do Motorista), Créditos (Recargas e Saques, Extrato), Último boleto, Consulta de cartões, Termos de uso (Ajuda), Central de suporte e Ouvidoria. "Cidades" não foi criada (o dono não achou essa tela na Machine).
