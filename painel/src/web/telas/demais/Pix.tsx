@@ -27,7 +27,12 @@ export function TransacaoPix() {
         <label>Buscar por OS<input value={os} onChange={(e) => setOs(e.target.value)} placeholder="Nº da OS" /></label>
         <label>Período<SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} opcoes={PERIODOS_PIX} /></label>
         <label>Nome/VTR do motorista<input value={motorista} onChange={(e) => setMotorista(e.target.value)} /></label>
-        <label>Situação do Pagamento<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="">Todas</option>{(dados?.situacoes ?? []).map((s: string) => <option key={s}>{s}</option>)}</select></label>
+        <fieldset className="dm-campo" style={{ border: 0, padding: 0, flexBasis: "100%" }}>
+          <span>Situação do Pagamento</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>{(dados?.situacoes ?? ["Paga", "Estornada", "Processando", "Em disputa", "Chargeback"]).map((s: string) => (
+            <label key={s}><input type="checkbox" checked={situacao.split("|").includes(s)} onChange={() => { const l = situacao.split("|").filter(Boolean); setSituacao((l.includes(s) ? l.filter((x) => x !== s) : [...l, s]).join("|")); }} /> {s}</label>
+          ))}</div>
+        </fieldset>
         <button className="botao" onClick={() => { setOs(""); setMotorista(""); setSituacao(""); setPer(PERIODO_HOJE); setPagina(1); }}>Limpar filtro</button>
       </div>
       <div className="dm-kpis">
