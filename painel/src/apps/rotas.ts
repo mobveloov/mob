@@ -541,7 +541,10 @@ const legado = (s: Sos) => ({ id: s.id, corridaId: s.corridaId, os: s.os, papel:
 rotasAppsCentral.get("/alertas", ok((req, res) => res.json({ alertas: listarSos(req.ctx!.empresaId, { limite: 200 }).map(legado) })));
 rotasAppsCentral.post("/alertas/:id/resolver", exigirPapel("admin", "operador"), ok((req, res) => res.json({ alerta: legado(encerrarSos(req.ctx!.empresaId, req.params.id, req.ctx!.usuario.email, "")) })));
 rotasAppsCentral.get("/sos", ok((req, res) => {
-  const lista = listarSos(req.ctx!.empresaId, { situacao: String(req.query.situacao ?? ""), limite: Number(req.query.limite) || 200 });
+  const empresaId = req.ctx!.empresaId;
+  const ids = new Map(listarProprias(empresaId).map((c) => [c.id, c]));
+  const comCorrida = (s: Sos) => { const c = s.corridaId ? ids.get(s.corridaId) : null; return { ...s, corrida: c ? { os: c.os, status: c.status, embarque: c.embarque.texto, destino: c.destino?.texto ?? "", passageiro: c.passageiro.nome, telefonePassageiro: c.passageiro.telefone, motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, categoria: c.categoria } : null }; };
+  const lista = listarSos(empresaId, { situacao: String(req.query.situacao ?? ""), limite: Number(req.query.limite) || 200 }).map(comCorrida);
   res.json({ alertas: lista, pendentes: lista.filter((s) => s.situacao !== "encerrado").length, abertos: lista.filter((s) => s.situacao === "aberto").length });
 }));
 rotasAppsCentral.get("/sos/resumo", ok((req, res) => {

@@ -92,3 +92,5 @@
 .oc-solic { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .oc-mapa-solic { height: 300px; margin-top: 12px; }
 @media (max-width: 900px) { .oc-solic, .oc-rastreio, .oc-grid2, .oc-grid3 { grid-template-columns: 1fr; } .oc-mapa-solic { height: 240px; } .oc-janela { border-radius: 14px; } }
+
+@media (max-width: 820px) { .sos-grade { grid-template-columns: minmax(0, 1fr) !important; } }

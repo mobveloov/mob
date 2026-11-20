@@ -2,6 +2,7 @@
 // Servidor: /api/apps-central (src/apps/rotas.ts). Atualiza sozinho a cada 10 s.
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Avisos, Cartao, Titulo, useCarregar } from "../componentes/ui";
 
 interface MotoristaOnline { id: string; nome: string; placa: string; lat: number; lng: number; atualizadoEm: string; situacao: string }
@@ -30,6 +31,7 @@ export default function AppsCentral() {
       <Titulo titulo="Apps e SOS" sub="Motoristas online pelo app do motorista e pedidos de ajuda dos dois apps." />
       <Avisos lista={[mot.erro, al.erro, erro]} />
       <Cartao titulo={`Alertas de SOS em aberto (${abertos.length})`}>
+        <p className="suave">Para atender, ligar e ver o mapa, use a tela <Link to="/alertas-seguranca">Alertas de segurança</Link>.</p>
         {!abertos.length ? <p className="vazio">Nenhum alerta em aberto.</p> : (
           <div className="tabela-rola"><table>
             <thead><tr><th>Quando</th><th>OS</th><th>Quem</th><th>Telefone</th><th>Local</th><th /></tr></thead>

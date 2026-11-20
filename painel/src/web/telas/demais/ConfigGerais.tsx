@@ -50,6 +50,7 @@ export function ConfigGerais() {
         <Secao titulo="Suporte e Contato">
           <div className="dm-grade3">
             <Campo rotulo="WhatsApp de Suporte"><input value={g.suporte.whatsapp} onChange={(e) => set(["suporte", "whatsapp"], e.target.value)} placeholder="Ex: 5511999999999" /></Campo>
+            <Campo rotulo="WhatsApp de emergência (SOS)" dica="Quando alguém aperta o botão de pânico no app, este número recebe a mensagem com nome, telefone e local. Deixe vazio para não enviar."><input value={g.suporte.whatsappEmergencia ?? ""} onChange={(e) => set(["suporte", "whatsappEmergencia"], e.target.value)} placeholder="Ex: 5511999999999" /></Campo>
             <Campo rotulo="Telefone da Central"><input value={g.suporte.telefone} onChange={(e) => set(["suporte", "telefone"], e.target.value)} /></Campo>
             <Campo rotulo="Link de Ajuda / FAQ Externo"><input value={g.suporte.linkAjuda} onChange={(e) => set(["suporte", "linkAjuda"], e.target.value)} placeholder="https://..." /></Campo>
           </div>
@@ -67,6 +68,8 @@ export function ConfigGerais() {
             {sw(["motorista", "cpfObrigatorio"], "CPF Obrigatório", "Torna o campo de CPF obrigatório durante o cadastro de novos motoristas no app.")}
             {sw(["motorista", "descontarCupomNoToque"], "Descontar Cupom na Tela de Aceite", "O valor que o motorista vê quando a corrida toca já vem com o desconto do passageiro subtraído.")}
             {sw(["motorista", "botaoPanico"], "Botão de Pânico Integrado", "Ativa um botão de emergência flutuante na tela do motorista durante a corrida.")}
+            <Campo rotulo="Distância do alerta de pânico (km)" dica="Motoristas online até esta distância de quem pediu ajuda recebem o aviso de emergência. Use 0 para não avisar os outros motoristas."><input type="number" min={0} max={100} step={0.5} disabled={!admin} value={g.motorista.raioPanicoKm ?? 3} onChange={(e) => set(["motorista", "raioPanicoKm"], Math.min(100, Math.max(0, Number(e.target.value) || 0)))} /></Campo>
+            <Campo rotulo="Duração do alerta de pânico (minutos)" dica="Por quanto tempo o alerta continua aparecendo para os motoristas por perto, se a central não o encerrar antes."><input type="number" min={5} max={1440} step={1} disabled={!admin} value={g.motorista.duracaoPanicoMin ?? 30} onChange={(e) => set(["motorista", "duracaoPanicoMin"], Math.min(1440, Math.max(5, Math.round(Number(e.target.value)) || 30)))} /></Campo>
           </Secao>
           <Secao titulo="Mapa de Navegação GPS" selo="App Nativo" sub="O motorista acompanha a rota e o GPS direto pela tela do app, sem precisar abrir apps de terceiros.">
             <Interruptor valor={g.motorista.mapaNavegacao} onChange={(v) => set(["motorista", "mapaNavegacao"], v)} rotulo="Mapa de navegação no app" desabilitado={!admin} />
