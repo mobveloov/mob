@@ -38,9 +38,9 @@ export function periodo(chave: string, inicio = "", fim = ""): { inicio: string;
 }
 
 export type PapelCarteira = "motorista" | "passageiro";
-interface Linha { id: string; papel: PapelCarteira; chave: string; valor: number; descricao: string; corridaId: string | null; em: string; por: string }
+export interface Linha { id: string; papel: PapelCarteira; chave: string; valor: number; descricao: string; corridaId: string | null; em: string; por: string }
 
-function lancamentos(empresaId: string, de: string, ate: string, papel?: PapelCarteira, chave?: string): Linha[] {
+export function lancamentos(empresaId: string, de: string, ate: string, papel?: PapelCarteira, chave?: string): Linha[] {
   const sql = `SELECT id, papel, chave, valor, descricao, corrida_id AS corridaId, em, por FROM carteira WHERE empresa = ? AND substr(em, 1, 10) >= ? AND substr(em, 1, 10) <= ?${papel ? " AND papel = ?" : ""}${chave ? " AND chave = ?" : ""} ORDER BY em DESC, rowid DESC LIMIT 2000`;
   const args = [empresaId, de, ate, ...(papel ? [papel] : []), ...(chave ? [chave] : [])];
   return banco().prepare(sql).all(...args) as unknown as Linha[];

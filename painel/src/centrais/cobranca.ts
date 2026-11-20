@@ -182,3 +182,26 @@ export function csvDemonstrativo(visorId: string, alvoId: unknown, competencia: 
   linhas.push(["Total a pagar", "", "", "", d.totalAPagar]);
   return montarCsv(["Descrição", "Quantidade", "Valor unitário", "Débitos", "Créditos"], [["Central", d.central.nome, "", "", ""], ["Competência", d.competencia, "", "", ""], ["Dias ativos", d.diasAtivos, "", "", ""], ...linhas]);
 }
+
+// ------------------------------------------------------------------ Último boleto
+
+/** Dia do mês seguinte à competência em que o boleto vence (regra do painel enquanto não houver cobrança automática). */
+export const DIA_VENCIMENTO_BOLETO = 10;
+
+/**
+ * Último boleto da central: o da última competência fechada (o mês anterior). Sem gateway de cobrança, o boleto não é emitido
+ * aqui: o valor vem do Demonstrativo Mensal e o vencimento é o previsto. A situação é "Não emitido" até a plataforma emitir.
+ */
+export function ultimoBoleto(visorId: string, alvoId: unknown) {
+  const [a, m] = competenciaAtual().split("-").map(Number);
+  const comp = new Date(Date.UTC(a, m - 2, 1)).toISOString().slice(0, 7);
+  const d = demonstrativo(visorId, alvoId, comp);
+  const [ca, cm] = comp.split("-").map(Number);
+  const vencimento = new Date(Date.UTC(ca, cm, DIA_VENCIMENTO_BOLETO)).toISOString().slice(0, 10);
+  return {
+    central: d.central, competencia: comp, competenciaRotulo: d.competencias.find((c) => c.valor === comp)?.rotulo ?? comp, plano: d.plano,
+    valor: d.totalAPagar, subtotal: d.subtotal, descontos: d.descontos, quemPaga: d.quemPaga, vencimento, vencimentoPrevisto: true,
+    status: "Não emitido" as const, emitido: false, linhaDigitavel: null as string | null,
+    aviso: "Boleto ainda não emitido. O valor é o do Demonstrativo Mensal; a plataforma emite o boleto e avisa a central.",
+  };
+}
