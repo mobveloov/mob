@@ -77,6 +77,9 @@ export function ConfigGerais() {
               </>
             )}
           </Secao>
+          <Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
+            <Campo rotulo="Dias sem contato para o app aparecer como OFF" dica="Define há quantos dias sem contato do app o diagnóstico mostra APP OFF"><input type="number" min={1} max={90} step={1} disabled={!admin} value={g.motorista.diasSemContatoApp} onChange={(e) => set(["motorista", "diasSemContatoApp"], Math.min(90, Math.max(1, Math.round(Number(e.target.value)) || 1)))} /></Campo>
+          </Secao>
           <Secao titulo="Mensagens Rápidas (Chat)" sub="Textos prontos para o motorista enviar com 1 toque.">
             <ul className="dm-lista-edit">{g.motorista.mensagensRapidas.map((m: string, i: number) => (
               <li key={i}><input value={m} aria-label={`Mensagem ${i + 1}`} onChange={(e) => set(["motorista", "mensagensRapidas"], g.motorista.mensagensRapidas.map((x: string, j: number) => (j === i ? e.target.value : x)))} />{admin && <button className="icone" aria-label="Remover mensagem" onClick={() => set(["motorista", "mensagensRapidas"], g.motorista.mensagensRapidas.filter((_: string, j: number) => j !== i))}><Trash2 size={14} /></button>}</li>
