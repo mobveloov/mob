@@ -6,7 +6,7 @@ import { periodo } from "../config/financeiro.ts";
 import { extratoDaCentral, montarCsv } from "../config/financeiro-visao.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { agoraBr } from "../servidor/util.ts";
-import { csvDemonstrativo, demonstrativo, escolherPlano, escolherServicos, meusPlanos } from "./cobranca.ts";
+import { csvDemonstrativo, demonstrativo, escolherPlano, escolherServicos, meusPlanos, ultimoBoleto } from "./cobranca.ts";
 import { centraisVisiveis, criarAssociada, desvincular, empresasLivres, ErroCentral, exigirVisivel, linhasDeControle, controleDe, salvarControle, vincular } from "./rede.ts";
 
 export const rotasCentrais = express.Router();
@@ -76,5 +76,6 @@ rotasCentrais.get("/planos", ok((req, res) => res.json(meusPlanos(emp(req), q(re
 rotasCentrais.put("/planos", ok((req, res) => { const p = escolherPlano(emp(req), req.body?.central, req.body?.plano); res.json({ ...meusPlanos(emp(req), req.body?.central), plano: p }); }));
 rotasCentrais.put("/servicos", ok((req, res) => { escolherServicos(emp(req), req.body?.central, req.body?.servicos); res.json(meusPlanos(emp(req), req.body?.central)); }));
 
-rotasCentrais.get("/demonstrativo", ok((req, res) => res.json(demonstrativo(emp(req), q(req, "central") || undefined, q(req, "competencia")))));
+rotasCentrais.get("/ultimo-boleto", ok((req, res) => res.json(ultimoBoleto(emp(req), q(req, "central") || undefined))));
+rotasCentrais.get("/demonstrativo",ok((req, res) => res.json(demonstrativo(emp(req), q(req, "central") || undefined, q(req, "competencia")))));
 rotasCentrais.get("/demonstrativo/csv", ok((req, res) => csv(res, "demonstrativo-mensal", csvDemonstrativo(emp(req), q(req, "central") || undefined, q(req, "competencia")))));
