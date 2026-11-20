@@ -92,3 +92,17 @@ test("formas de pagamento ligam e desligam os métodos aceitos em Integrações"
 test("sanearForm sem entrada devolve os padrões", () => {
   assert.deepEqual(sanearForm(undefined), valoresPadrao());
 });
+
+test("tarifa: valor do km varia pela distância total e a categoria pode ser duplicada com as tarifas", async () => {
+  const { calcularTarifa, CALCULO_PADRAO } = await import("../src/config/tarifa-calculo.ts");
+  const t = { ...CALCULO_PADRAO, precoBase: 5, valorKm: 2, variarKm: true, faixasKm: [{ ate: 5, valor: 1.25 }], kmAPartir: 4 };
+  assert.equal(calcularTarifa(t, { km: 4, minutos: 0 }).valor, 10);
+  assert.equal(calcularTarifa(t, { km: 10, minutos: 0 }).valor, 45);
+  assert.equal(calcularTarifa({ ...t, variarKm: false }, { km: 10, minutos: 0 }).valor, 25);
+  const c = await api(cAdm, "POST", "/categorias", { nome: "Comum", descricao: "x", taxaBase: 5, precoKm: 2 });
+  assert.equal(c.status, 200);
+  const d = await api(cAdm, "POST", `/categorias/${c.corpo.categoria.id}/duplicar`, { nome: "Comum 2" });
+  assert.equal(d.status, 200);
+  assert.equal(d.corpo.categoria.taxaBase, 5);
+  assert.equal((await api(cAdm, "POST", `/categorias/${c.corpo.categoria.id}/duplicar`, { nome: "comum" })).status, 400);
+});

@@ -13,7 +13,7 @@ import { avaliacoesNps, csvAvaliacoes, PERIODOS_NPS, TIPOS_NPS, configNps, reset
 import { alertasAtivos, criarAlerta, encerrarAlerta, listarAlertas } from "./alertas.ts";
 import { central, marcarCentralLidas } from "./central-notificacoes.ts";
 import { ajuda, salvarAjuda } from "./ajuda.ts";
-import { categoriasCompletas, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
+import { categoriasCompletas, duplicarCategoria, ICONES, removerCategoria, removerTarifaExtra, salvarCategoria, salvarTarifaExtra, salvarTarifaPadrao } from "./categorias.ts";
 import { ROTULO_METODO } from "./tarifa-calculo.ts";
 import { pedidosRecentes } from "../corridas/index.ts";
 import { agendamentos, buscarPessoas, conversas, criarAgendamento, dispararNotificacao, executarAgendamentos, historicoNotificacoes, listaNotificacoes, marcarLidas, mensagensDaPessoa, pausarAgendamento, removerAgendamento, responder, sanearPedido } from "./comunicacao.ts";
@@ -176,6 +176,7 @@ rotasConfig.delete("/credito/regras/:id", gestor, ok((req, res) => res.json(remo
 rotasConfig.get("/categorias", ok((req, res) => res.json({ categorias: categoriasCompletas(emp(req)), dinamicas: dinamicas(emp(req)), automacoes: automacoes(emp(req)), metodos: ROTULO_METODO, regras: credito(emp(req)).regras, icones: ICONES })));
 rotasConfig.post("/categorias", gestor, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), null, req.body ?? {}, quem(req)) })));
 rotasConfig.put("/categorias/:id", gestor, ok((req, res) => res.json({ categoria: salvarCategoria(emp(req), req.params.id, req.body ?? {}, quem(req)) })));
+rotasConfig.post("/categorias/:id/duplicar", gestor, ok((req, res) => res.json({ categoria: duplicarCategoria(emp(req), req.params.id, String(req.body?.nome ?? ""), !!req.body?.comMotoristas, quem(req)) })));
 rotasConfig.delete("/categorias/:id", gestor, ok((req, res) => { removerCategoria(emp(req), req.params.id); res.json({ ok: true }); }));
 
 // Editar tarifa (Machine): tarifa padrão e tarifas extras por dia e horário. Só o admin altera.
