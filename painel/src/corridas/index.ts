@@ -17,6 +17,7 @@ import path from "node:path";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { corridaVazia, type CorridaPainel, type GrupoStatus } from "../comum/corrida.ts";
 import { listar, mesclar, type Registro } from "../cadastros/armazem.ts";
+import { gerais as geraisDaEmpresa } from "../config/gerais.ts";
 import { descontoDaEmpresa } from "./empresa-conveniada.ts";
 import { emitirEventoCrm, EVENTO_DO_STATUS } from "../crm/eventos.ts";
 import { filial as acharFilial, filialDe } from "../filiais/filiais.ts";
@@ -373,6 +374,16 @@ const soDigitos = (s: string) => String(s ?? "").replace(/\D/g, "");
 /** Pede uma corrida própria. Endereço só em texto ganha coordenada pelo CNEFE (se houver); distância e tempo pela rota (OSRM, se houver). */
 const limpo = (v: unknown, max: number) => String(v ?? "").replace(/[<>]/g, "").trim().slice(0, max);
 
+/** Agendamento: antecedência mínima e prazo máximo vêm de Configurações › Gerais › Regras do passageiro. */
+export function regrasDeAgendamento(empresaId: string): { minutos: number; dias: number } {
+  try { const p = geraisDaEmpresa(empresaId).passageiro; return { minutos: p.agendamentoMinutos, dias: p.agendamentoDias }; } catch { return { minutos: 15, dias: 30 }; }
+}
+function conferirAgendamento(empresaId: string, faltaMs: number) {
+  const r = regrasDeAgendamento(empresaId);
+  if (faltaMs < r.minutos * 60_000) throw new Error(`Agende com pelo menos ${r.minutos} minutos de antecedência.`);
+  if (faltaMs > r.dias * 86_400_000) throw new Error(`Agende para no máximo ${r.dias} dias.`);
+}
+
 export async function criarCorridaPropria(empresaId: string, pedido: NovaCorridaPropria, por = "sistema"): Promise<CorridaPropria> {
   const pedidas = (pedido.paradas ?? []).filter((p) => String(p?.texto ?? "").trim());
   if (pedidas.length > 3) throw new Error("No máximo 3 paradas.");
@@ -384,8 +395,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
     if (!m) throw new Error("Data do agendamento inválida.");
     agendadaPara = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])).toISOString();
     const falta = Date.parse(agendadaPara) - agoraBr().getTime();
-    if (falta < 15 * 60_000) throw new Error("Agende com pelo menos 15 minutos de antecedência.");
-    if (falta > 30 * 86_400_000) throw new Error("Agende para no máximo 30 dias.");
+    conferirAgendamento(empresaId, falta);
   }
   let minutos: number | null = null;
   // Distância pela rota: embarque -> paradas -> destino (só quando todos os pontos têm coordenada).
@@ -667,8 +677,7 @@ export function editarCorridaPropria(empresaId: string, id: string, e: EdicaoCor
       if (!m) throw new Error("Data do agendamento inválida.");
       const nova = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5])).toISOString();
       const falta = Date.parse(nova) - agoraBr().getTime();
-      if (falta < 15 * 60_000) throw new Error("Agende com pelo menos 15 minutos de antecedência.");
-      if (falta > 30 * 86_400_000) throw new Error("Agende para no máximo 30 dias.");
+      conferirAgendamento(empresaId, falta);
       if (nova !== c.agendadaPara) { c.agendadaPara = nova; mudou.push("agendamento"); }
     }
     if (e.motoristaId !== undefined && e.motoristaId !== (c.motoristaId ?? "")) {

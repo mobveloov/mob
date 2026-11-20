@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bike, CalendarCheck, CarFront, Check, ChevronDown, ChevronLeft, ChevronRight, Keyboard, SlidersHorizontal, Ticket, User, Wallet } from "lucide-react";
 import { api, reais } from "../comum/api";
-import { mensagemDeErro } from "../comum/ui";
+import { mensagemDeErro, useConfigDoPainel } from "../comum/ui";
 import {
   agoraBrasilia, apiOu, diaBonito, ehMoto, esperandoHorario, estimarComParadas, faixaDaOferta, MESES_LONGOS, PASSO_OFERTA,
   quandoAgendada, ruaCurta, temCoord, type Categoria, type Corrida, type Rota,
@@ -14,10 +14,6 @@ import type { Posicao } from "../comum/api";
 import { Aviso, FolhaModal, PrecoAjustavel } from "./pecas";
 
 interface Opcional { id: string; nome: string }
-const OPCIONAIS_PADRAO: Opcional[] = [
-  { id: "porta-malas", nome: "Porta-malas grande" }, { id: "encomenda", nome: "Encomenda" },
-  { id: "adaptado", nome: "Carro adaptado" }, { id: "disposicao", nome: "Motorista à disposição" },
-];
 const novoPedido = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function pontosDaRota(r: { embarque: { texto: string; lat?: number; lng?: number }; paradas?: Array<{ texto: string; lat?: number; lng?: number }>; destino: { texto: string; lat?: number; lng?: number } | null }): PontoMapa[] {
@@ -36,7 +32,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
   const [categoria, setCategoria] = useState("");
   const [pagamento, setPagamento] = useState("");
   const [cupom, setCupom] = useState("");
-  const [listaOpcionais, setListaOpcionais] = useState<Opcional[]>(OPCIONAIS_PADRAO);
+  const [listaOpcionais, setListaOpcionais] = useState<Opcional[]>([]);
   const [opcionais, setOpcionais] = useState<string[]>([]);
   const [dia, setDia] = useState("");
   const [horario, setHorario] = useState("");
@@ -45,12 +41,17 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
   const [enviando, setEnviando] = useState(false);
   const [folga, setFolga] = useState(0);
   const pedidoId = useRef(novoPedido());
+  // Agendamento (antecedência e prazo) e lugares da categoria vêm do painel.
+  const regras = useConfigDoPainel();
+  const antecedencia = regras?.passageiro.agendamentoMinutos ?? 15, prazoDias = regras?.passageiro.agendamentoDias ?? 30;
+  const dadosDaCategoria = (nome: string) => regras?.categorias.find((x) => x.nome === nome);
+  const agendamentoLiberado = !regras || regras.categorias.length === 0 || regras.categorias.some((x) => x.permiteAgendamento !== false);
 
   useEffect(() => {
     void api<{ categorias: Categoria[]; pagamentos: string[] }>("/opcoes").then((o) => {
       setOpcoes(o); setCategoria(o.categorias[0]?.nome ?? ""); setPagamento(o.pagamentos[0] ?? "");
     }).catch((e) => setErro(mensagemDeErro(e)));
-    void apiOu<{ opcionais: Opcional[] }>("/opcionais", { opcionais: OPCIONAIS_PADRAO }).then((r) => setListaOpcionais(r.opcionais.length ? r.opcionais : OPCIONAIS_PADRAO)).catch(() => undefined);
+    void apiOu<{ opcionais: Opcional[] }>("/opcionais", { opcionais: [] }).then((r) => setListaOpcionais(r.opcionais)).catch(() => undefined);
   }, []);
 
   const pontos = [rota.partida, ...rota.paradas, ...(rota.destino ? [rota.destino] : [])];
@@ -77,7 +78,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
     setErro("");
     if (quando === "agendar") {
       if (!agendadaPara) { setJanela("dia"); return; }
-      if (agendadaPara < agoraBrasilia(15)) { setErro("Agende com pelo menos 15 minutos de antecedência."); return; }
+      if (agendadaPara < agoraBrasilia(antecedencia)) { setErro(`Agende com pelo menos ${antecedencia} minutos de antecedência.`); return; }
     }
     setEnviando(true);
     try {
@@ -101,7 +102,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
         <button className="redondo-branco" onClick={voltar} aria-label="Voltar"><ArrowLeft size={22} /></button>
         <div className="segmento" role="tablist">
           <button role="tab" aria-selected={quando === "agora"} className={quando === "agora" ? "ativo" : ""} onClick={() => setQuando("agora")}>Agora</button>
-          <button role="tab" aria-selected={quando === "agendar"} className={quando === "agendar" ? "ativo" : ""} onClick={() => { setQuando("agendar"); if (!agendadaPara) setJanela("dia"); }}>Agendar</button>
+          {agendamentoLiberado && <button role="tab" aria-selected={quando === "agendar"} className={quando === "agendar" ? "ativo" : ""} onClick={() => { setQuando("agendar"); if (!agendadaPara) setJanela("dia"); }}>Agendar</button>}
         </div>
       </div>
 
@@ -109,7 +110,7 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
         <span className="puxador" />
         <div className="opcoes-cabeca">
           <h2>Opções para você</h2>
-          <button className="pilula-cinza" onClick={() => setJanela("opcionais")}><SlidersHorizontal size={16} /> Opcionais{opcionais.length ? ` (${opcionais.length})` : ""}</button>
+          {listaOpcionais.length > 0 && <button className="pilula-cinza" onClick={() => setJanela("opcionais")}><SlidersHorizontal size={16} /> Opcionais{opcionais.length ? ` (${opcionais.length})` : ""}</button>}
         </div>
         {quando === "agendar" && (
           <button className="linha-agendamento" onClick={() => setJanela("dia")}>
@@ -127,10 +128,10 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
             return (
               <div key={c.nome} role="radio" aria-checked={categoria === c.nome} tabIndex={0} className={`categoria ${categoria === c.nome ? "ativa" : ""}`}
                 onClick={() => setCategoria(c.nome)} onKeyDown={(e) => { if (e.key === "Enter") setCategoria(c.nome); }}>
-                <span className="categoria-icone">{ehMoto(c.nome) ? <Bike size={30} /> : <CarFront size={30} />}</span>
+                <span className="categoria-icone">{(dadosDaCategoria(c.nome)?.tipoFisico ? dadosDaCategoria(c.nome)?.tipoFisico === "moto" : ehMoto(c.nome)) ? <Bike size={30} /> : <CarFront size={30} />}</span>
                 <span className="categoria-texto">
-                  <strong>{c.nome} <small className="lugares"><User size={13} /> {ehMoto(c.nome) ? 1 : 4}</small></strong>
-                  <small>{c.descricao || (ehMoto(c.nome) ? "Viagem de moto" : "Viagem de carro")}</small>
+                  <strong>{c.nome} {!dadosDaCategoria(c.nome)?.ocultarCapacidade && Number(dadosDaCategoria(c.nome)?.capacidade) > 0 && <small className="lugares"><User size={13} /> {Number(dadosDaCategoria(c.nome)?.capacidade)}</small>}</strong>
+                  <small>{c.descricao}</small>
                 </span>
                 {calculando ? <span className="suave">…</span>
                   : v != null && faixa ? <PrecoAjustavel valor={v} min={faixa.min} max={faixa.max} passo={PASSO_OFERTA} mudar={(n) => { setCategoria(c.nome); setOfertas((o) => ({ ...o, [c.nome]: n })); }} />
@@ -182,8 +183,8 @@ export function Opcoes({ rota, voltar, pediu, agendou }: { rota: Rota; voltar: (
         </FolhaModal>
       )}
       {janela === "cupom" && <Cupom atual={cupom} fechar={() => setJanela("")} aplicar={(c) => { setCupom(c); setJanela(""); }} />}
-      {janela === "dia" && <Calendario valor={dia} fechar={() => setJanela("")} escolher={(d) => { setDia(d); setJanela("hora"); }} />}
-      {janela === "hora" && <Relogio dia={dia} valor={horario} fechar={() => setJanela("")} escolher={(h) => { setHorario(h); setJanela(""); }} />}
+      {janela === "dia" && <Calendario antecedencia={antecedencia} prazoDias={prazoDias} valor={dia} fechar={() => setJanela("")} escolher={(d) => { setDia(d); setJanela("hora"); }} />}
+      {janela === "hora" && <Relogio antecedencia={antecedencia} dia={dia} valor={horario} fechar={() => setJanela("")} escolher={(h) => { setHorario(h); setJanela(""); }} />}
     </div>
   );
 }
@@ -204,9 +205,9 @@ function Cupom({ atual, fechar, aplicar }: { atual: string; fechar: () => void; 
 
 // ------------------------------------------------------------------ data e hora do agendamento (horário de Brasília)
 
-function Calendario({ valor, fechar, escolher }: { valor: string; fechar: () => void; escolher: (dia: string) => void }) {
-  const hoje = agoraBrasilia().slice(0, 10), ultimo = agoraBrasilia(30 * 24 * 60).slice(0, 10);
-  const [marcado, setMarcado] = useState(valor || agoraBrasilia(15).slice(0, 10));
+function Calendario({ antecedencia, prazoDias, valor, fechar, escolher }: { antecedencia: number; prazoDias: number; valor: string; fechar: () => void; escolher: (dia: string) => void }) {
+  const hoje = agoraBrasilia().slice(0, 10), ultimo = agoraBrasilia(prazoDias * 24 * 60).slice(0, 10);
+  const [marcado, setMarcado] = useState(valor || agoraBrasilia(antecedencia).slice(0, 10));
   const [mes, setMes] = useState(marcado.slice(0, 7));
   const dias = useMemo(() => {
     const [a, m] = mes.split("-").map(Number);
@@ -239,8 +240,8 @@ function Calendario({ valor, fechar, escolher }: { valor: string; fechar: () => 
   );
 }
 
-function Relogio({ dia, valor, fechar, escolher }: { dia: string; valor: string; fechar: () => void; escolher: (hora: string) => void }) {
-  const minimo = agoraBrasilia(15);
+function Relogio({ antecedencia, dia, valor, fechar, escolher }: { antecedencia: number; dia: string; valor: string; fechar: () => void; escolher: (hora: string) => void }) {
+  const minimo = agoraBrasilia(antecedencia);
   const sugerida = valor || (dia === minimo.slice(0, 10) ? minimo.slice(11, 16) : "08:00");
   const [h, setH] = useState(sugerida.slice(0, 2));
   const [m, setM] = useState(sugerida.slice(3, 5));
@@ -266,7 +267,7 @@ function Relogio({ dia, valor, fechar, escolher }: { dia: string; valor: string;
             </div>
           </>
         )}
-        {cedo && <p className="dica perigo">Escolha a partir de {minimo.slice(11, 16)} (15 minutos de antecedência).</p>}
+        {cedo && <p className="dica perigo">Escolha a partir de {minimo.slice(11, 16)} ({antecedencia} minutos de antecedência).</p>}
         <div className="seletor-botoes">
           <button className="icone-botao escuro pequeno" aria-label="Digitar o horário" onClick={() => setDigitar(!digitar)}><Keyboard size={20} /></button>
           <span className="espaco" />
