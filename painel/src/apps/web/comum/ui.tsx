@@ -1,6 +1,7 @@
 // Peças de tela comuns aos dois apps: marca da empresa, login, chat (texto e áudio), mapa simples e estrelas.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { reaplicarPersonalizacao } from "./personalizacao";
 import { ACEITA_MIDIA, api, config, enviarMidiaDoChat, ErroApi, guardarToken, Gravador, problemaDaMidia, trocarServidor, urlArquivo, urlDaMidia, urlDoAudio, type Papel, type Posicao } from "./api";
 
 export interface MarcaApp {
@@ -25,6 +26,7 @@ export function aplicarMarca(m: MarcaApp) {
   s.setProperty("--fonte", `"${m.fonte}", system-ui, sans-serif`);
   document.title = m.nome;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", m.cores.primaria);
+  if (config().papel === "passageiro") reaplicarPersonalizacao(); // a personalização do painel vale por cima da marca
 }
 
 export function useMarca() {

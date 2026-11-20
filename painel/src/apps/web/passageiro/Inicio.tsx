@@ -4,6 +4,7 @@
 import { Briefcase, Gift, History, House, Search } from "lucide-react";
 import type { Posicao } from "../comum/api";
 import { saudacao, type Eu, type Lugares } from "./apoio";
+import { usePersonalizacao } from "../comum/personalizacao";
 import { Mapa } from "./Mapa";
 import { Avatar } from "./pecas";
 
@@ -12,20 +13,23 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
   irPara: () => void; atalho: (a: "casa" | "trabalho" | "recentes") => void; indique: () => void;
 }) {
   const primeiro = eu.nome.split(" ")[0];
+  const pers = usePersonalizacao();
+  const rec = pers?.recursos; // recursos ligados e desligados em Configurações > Personalização (sem a personalização, tudo como era)
+  const comMapa = rec?.mapa !== false, comDestino = rec?.destino !== false;
   return (
-    <div className="inicio">
-      <Mapa eu={aqui} perto={aqui} controles className="fundo" />
+    <div className={`inicio estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
+      {comMapa && <Mapa eu={aqui} perto={aqui} controles className="fundo" />}
       <div className="inicio-topo">
         <div className="inicio-ola">
           <Avatar foto={eu.foto} nome={eu.nome} tamanho={52} />
           <div><small>{saudacao()}</small><strong>{primeiro}! <span aria-hidden="true">👋</span></strong></div>
           <button className="icone-botao presente" onClick={indique} aria-label="Indique e ganhe"><Gift size={24} /></button>
         </div>
-        <button className="busca-inicio" onClick={irPara}>
+        {comDestino && <button className="busca-inicio" onClick={irPara}>
           <span className="icone-redondo cor"><Search size={22} /></span>
           <span className="busca-texto"><strong>Para onde você vai?</strong><small>Digite um endereço ou lugar</small></span>
           <span className="botao-ir">IR</span>
-        </button>
+        </button>}
         <div className="atalhos">
           <button onClick={() => atalho("casa")}><span className="icone-redondo claro"><House size={18} /></span><strong>Casa</strong><small>{lugares?.casa ? "Ir para casa" : "Definir"}</small></button>
           <button onClick={() => atalho("trabalho")}><span className="icone-redondo claro"><Briefcase size={18} /></span><strong>Trabalho</strong><small>{lugares?.trabalho ? "Ir trabalhar" : "Definir"}</small></button>

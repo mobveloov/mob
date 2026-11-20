@@ -239,3 +239,9 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .folha-corpo.n1 { max-height: 30vh; overflow-y: auto; } .folha-corpo.n2 { max-height: 62vh; overflow-y: auto; } .folha.recolhida { padding-bottom: .6rem; }
 .topo-vazio { width: 44px; height: 44px; display: inline-block; }
 .faixa-gravacao { display: flex; align-items: center; gap: .5rem; padding: .5rem .8rem; border-radius: 12px; background: #fff3f3; color: #8a1c1c; font-weight: 700; font-size: .85rem; } .faixa-gravacao i { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; animation: pisca 1.2s infinite; } @keyframes pisca { 50% { opacity: .25; } }
+
+/* Personalização (Configurações do painel): ícone do carro da empresa e estilo da tela inicial */
+.pino-veiculo { display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.inicio.estilo-neutro, .inicio.estilo-marcante { background: #fff; }
+.inicio.estilo-neutro .inicio-topo { background: #fff; color: #111827; }
+.inicio.estilo-marcante .inicio-topo { background: var(--cor); color: var(--cor-texto); }

@@ -5,7 +5,8 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { api, posicaoAgora, type Posicao } from "../comum/api";
+import { api, posicaoAgora, urlArquivo, type Posicao } from "../comum/api";
+import { personalizacaoAtual, usePersonalizacao } from "../comum/personalizacao";
 import { LocateFixed, Moon, Sun } from "lucide-react";
 import { useRota } from "../comum/rota";
 
@@ -26,9 +27,15 @@ function icone(p: PontoMapa, n: number, resumo?: { km: number; minutos: number }
 }
 const SVG_MOTO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 10a3.5 3.5 0 0 0-1.1.2l-1.2-2.4H18V6h-3v1.6l.9 1.8-2.7 2.6H10l-1.5-3H6v2h1.6l.5 1A3.5 3.5 0 1 0 9.7 14H13l3.5-3.4.6 1.2A3.5 3.5 0 1 0 19 10zM5.5 16a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm13.5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>`;
 export interface CarroPerto { lat: number; lng: number; tipo: "carro" | "moto"; categoria?: string }
-const iconePerto = (tipo: "carro" | "moto") => L.divIcon({ className: "", html: `<div class="pino-perto pino-perto-${tipo}" aria-label="${tipo === "moto" ? "Moto disponível" : "Carro disponível"}">${tipo === "moto" ? SVG_MOTO : SVG_CARRO.replace('width="20" height="20"', 'width="16" height="16"')}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
+/** Carro escolhido em Configurações > Personalização (Realista, Moderno ou Clássico); sem a personalização, o desenho padrão do app. */
+function iconeDaEmpresa(tamanho: number, ocupado = false): L.DivIcon | null {
+  const v = personalizacaoAtual()?.veiculoMapa;
+  const url = v ? urlArquivo(ocupado && v.diferenciaOcupado ? v.iconeOcupadoUrl : v.iconeLivreUrl) : "";
+  return url ? L.divIcon({ className: "", html: `<img class="pino-veiculo" src="${url}" width="${tamanho}" height="${tamanho}" alt="Motorista" draggable="false">`, iconSize: [tamanho, tamanho], iconAnchor: [tamanho / 2, tamanho / 2] }) : null;
+}
+const iconePerto = (tipo: "carro" | "moto") => (tipo === "carro" ? iconeDaEmpresa(34) : null) ?? L.divIcon({ className: "", html: `<div class="pino-perto pino-perto-${tipo}" aria-label="${tipo === "moto" ? "Moto disponível" : "Carro disponível"}">${tipo === "moto" ? SVG_MOTO : SVG_CARRO.replace('width="20" height="20"', 'width="16" height="16"')}</div>`, iconSize: [30, 30], iconAnchor: [15, 15] });
 const iconeCasa = (n: number) => L.divIcon({ className: "", html: `<span class="casa-num">${n}</span>`, iconSize: [30, 16], iconAnchor: [15, 8] });
-const iconeCarro = L.divIcon({ className: "", html: `<div class="pino-carro" aria-label="Motorista">${SVG_CARRO}</div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
+const iconeCarroPadrao = L.divIcon({ className: "", html: `<div class="pino-carro" aria-label="Motorista">${SVG_CARRO}</div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
 const iconeEu = L.divIcon({ className: "", html: `<div class="pino-eu">${SVG_PESSOA}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
 
 const CHAVE_TEMA = "tema-mapa-passageiro";
@@ -57,6 +64,7 @@ export function Mapa({ pontos = [], carro, alvoCarro, perto, eu: euProp, escuro 
   const camadaPerto = useRef<L.LayerGroup | null>(null);
   const camadaCarroRota = useRef<L.LayerGroup | null>(null);
   const [carrosPerto, setCarrosPerto] = useState<CarroPerto[]>([]);
+  const versaoPers = usePersonalizacao()?.versao; // mudou no painel: troca o ícone do carro na hora
   const animacao = useRef(0);
   const mover = useRef(aoMover);
   mover.current = aoMover;
@@ -159,7 +167,8 @@ export function Mapa({ pontos = [], carro, alvoCarro, perto, eu: euProp, escuro 
     if (!g) return;
     g.clearLayers();
     for (const c of carrosPerto) L.marker([c.lat, c.lng], { icon: iconePerto(c.tipo), interactive: false, keyboard: false, title: c.categoria }).addTo(g);
-  }, [carrosPerto]);
+  }, [carrosPerto, versaoPers]);
+  useEffect(() => { marcaCarro.current?.setIcon(iconeDaEmpresa(44) ?? iconeCarroPadrao); }, [versaoPers]);
 
   // Caminho do motorista até o embarque (ou destino), pelas ruas; refaz enquanto ele anda.
   const { linha: caminhoCarro } = useRota(carro && alvoCarro ? [carro, alvoCarro] : [], 12000, 4, true);
@@ -180,7 +189,7 @@ export function Mapa({ pontos = [], carro, alvoCarro, perto, eu: euProp, escuro 
     if (!carro) { marcaCarro.current?.remove(); marcaCarro.current = null; return; }
     const destino = L.latLng(carro.lat, carro.lng);
     if (!marcaCarro.current) {
-      marcaCarro.current = L.marker(destino, { icon: iconeCarro, zIndexOffset: 1000, keyboard: false }).addTo(m);
+      marcaCarro.current = L.marker(destino, { icon: iconeDaEmpresa(44) ?? iconeCarroPadrao, zIndexOffset: 1000, keyboard: false }).addTo(m);
       enquadrar();
       return;
     }
