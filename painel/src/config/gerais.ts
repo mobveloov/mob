@@ -98,7 +98,7 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
       editarValorFinal: sim(m.editarValorFinal), confirmarTaxas: sim(m.confirmarTaxas), editarRota: sim(m.editarRota), cpfObrigatorio: sim(m.cpfObrigatorio),
       descontarCupomNoToque: sim(m.descontarCupomNoToque), botaoPanico: sim(m.botaoPanico), mapaNavegacao: sim(m.mapaNavegacao),
       distanciaRecalculo: Math.round(numero(m.distanciaRecalculo, 150, 20, 5000)),
-      diasSemContatoApp: Math.round(numero(m.diasSemContatoApp, 7, 1, 365)),
+      diasSemContatoApp: Math.round(numero(m.diasSemContatoApp, 7, 1, 90)),
       mensagensRapidas: lista(m.mensagensRapidas).map((x) => texto(x, 120)).filter(Boolean).slice(0, 20),
       documentos: docs.map((d) => {
         const o = (d ?? {}) as Record<string, unknown>;
