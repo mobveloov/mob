@@ -456,6 +456,7 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
         {item(Hand, "Abrir corrida (Maçaneta)", "macaneta", "Iniciar viagem direta na rua")}
         {item(Wallet, "Histórico de ganhos", "historico", "Resumo financeiro e corridas")}
         {item(Gift, "Indique e ganhe", "desafios", undefined, "Bônus")}
+        {item(Wallet, "Passe Livre", "passelivre", "Sem taxa da central por um período")}
         <div className="menu-sep" />
         <div className="menu-titulo">Conta e veículo</div>
         {item(Car, "Meus veículos", "veiculos")}

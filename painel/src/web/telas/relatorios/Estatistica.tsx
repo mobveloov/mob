@@ -5,7 +5,8 @@
 
 import { useState } from "react";
 import { Aviso, Carregando, useCarregar, useSalvar } from "../demais/comum";
-import { baixarCsvRel, mesAtual, pedirRel } from "./comum";
+import { useAvisoRelatorio } from "../../componentes/AvisoRelatorio";
+import { buscarCsvRel, mesAtual, pedirRel } from "./comum";
 import "./relatorios.css";
 
 type Valores = { inicio: string; fim: string };
@@ -34,6 +35,7 @@ export default function Estatistica({ id }: { id: string }) {
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState(""), [dir, setDir] = useState<"asc" | "desc">("asc");
   const { msg, salvar } = useSalvar();
+  const { gerar, aviso } = useAvisoRelatorio();
   const titulo = TITULOS[id] ?? id;
   const csv = id === "os-operador";
   const obrigatorios = id === "os-pagamento"; // a Machine só marca o asterisco nesta tela
@@ -57,8 +59,8 @@ export default function Estatistica({ id }: { id: string }) {
       <div className="dm-cab">
         <div><h1>{titulo}</h1></div>
         <div className="dm-cab-acoes">
-          {csv && <button className="botao primario" onClick={() => salvar(() => baixarCsvRel(`/relatorio/${id}/csv?inicio=${aplicado.inicio}&fim=${aplicado.fim}`, `${id}.csv`), "Relatório exportado.")}>Exportar</button>}
-          <button className="botao" onClick={() => window.print()}>Imprimir</button>
+          {csv && <button className="botao primario" onClick={() => salvar(() => gerar(() => buscarCsvRel(`/relatorio/${id}/csv?inicio=${aplicado.inicio}&fim=${aplicado.fim}`), `${id}.csv`), "")}>Exportar</button>}
+          <button className="botao" disabled={!x?.total} onClick={() => window.print()}>Imprimir</button>
         </div>
       </div>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
@@ -85,7 +87,7 @@ export default function Estatistica({ id }: { id: string }) {
                 </thead>
                 <tbody>
                   {!x.linhas.length ? <tr><td colSpan={x.colunas.length} className="vazio">Nenhum resultado encontrado.</td></tr> : x.linhas.map((l: any, i: number) => (
-                    <tr key={i}>{x.colunas.map((c: any) => <td key={c.chave} className={ALINHA_NUM.includes(c.tipo) ? "num" : ""}>{celula(c.tipo, l[c.chave])}</td>)}</tr>
+                    <tr key={i}>{x.colunas.map((c: any) => <td key={c.chave} data-rotulo={c.rotulo} className={ALINHA_NUM.includes(c.tipo) ? "num" : ""}>{celula(c.tipo, l[c.chave])}</td>)}</tr>
                   ))}
                 </tbody>
               </table>
@@ -100,6 +102,7 @@ export default function Estatistica({ id }: { id: string }) {
           )}
         </div>
       </div>
+      {aviso}
     </>
   );
 }

@@ -62,6 +62,7 @@ export const REGRAS_API: RegraApi[] = [
   { caminho: /^\/apps-central\/(carteiras|saques)(\/|$)/, minimo: "gestor" },
   { metodos: ESCRITA, caminho: /^\/apps-central\/(carteiras|saques)(\/|$)/, minimo: "admin" },
   { caminho: /^\/(gestao\/)?indicacoes(\/|$)/, minimo: "admin" },
+  { caminho: /^\/gestao\/passe-livre(\/|$)/, minimo: "admin" },
 
   // Configurações (as telas de apoio, como categorias, continuam legíveis para quem despacha).
   { caminho: /^\/config\/(integracao-financeira|pagamentos)(\/|$)/, minimo: "admin" },
@@ -70,7 +71,7 @@ export const REGRAS_API: RegraApi[] = [
   { metodos: ESCRITA, caminho: /^\/config\/(gerais|credito|categorias|dinamicas|dinamicas-prioridade|dinamicas-automacoes|descontos|descontos-matriz|despacho|nps|termos|ajuda)(\/|$)/, minimo: "gestor" },
 
   // Cadastros de gestão.
-  { caminho: /^\/gestao\/(cupons|areas|desafios|desafios-previa|empresas|empresas-exportar|punicoes)(\/|$)/, minimo: "gestor" },
+  { caminho: /^\/gestao\/(cupons|areas|desafios|desafios-previa|empresas|empresas-exportar|punicoes|cartoes-clientes)(\/|$)/, minimo: "gestor" },
   { caminho: /^\/gestao\/(config-creditos)(\/|$)/, minimo: "admin" },
   { metodos: ESCRITA, caminho: /^\/areas\/ruas(\/|$)/, minimo: "gestor" },
   { caminho: /^\/areas\/(funil|bairros)(\/|$)/, minimo: "gestor" },

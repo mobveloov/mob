@@ -4,7 +4,8 @@
 import { useMemo, useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { Aviso, Cab, Campo, Carregando, dinheiro, useCarregar, useSalvar } from "../demais/comum";
-import { baixarCsvRel, mesAtual, pedirRel } from "./comum";
+import { useAvisoRelatorio } from "../../componentes/AvisoRelatorio";
+import { buscarCsvRel, mesAtual, pedirRel } from "./comum";
 
 type Valores = Record<string, any>;
 const num = (v: unknown, casas: number) => Number(v).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
@@ -36,6 +37,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState(""), [dir, setDir] = useState<"asc" | "desc">("asc");
   const { msg, salvar } = useSalvar();
+  const { gerar, aviso } = useAvisoRelatorio();
 
   // pré-preenche os padrões do relatório (ex.: taxa de 20%) na primeira vez
   const [iniciou, setIniciou] = useState(false);
@@ -74,7 +76,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
     <>
       <Cab titulo={def.titulo} sub={def.descricao}>
         {aoVoltar && <button className="botao" onClick={aoVoltar}>Voltar</button>}
-        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => baixarCsvRel(`/relatorio/${id}/csv?${qs(aplicado, ordem ? `&ordem=${encodeURIComponent(ordem)}&dir=${dir}` : "")}`, `${id}.csv`), "CSV exportado.")}><Download size={14} /> Exportar</button>}
+        {(BOTOES[id]?.exportar ?? true) && <button className="botao" disabled={obrigatorioFalta} onClick={() => salvar(() => gerar(() => buscarCsvRel(`/relatorio/${id}/csv?${qs(aplicado, ordem ? `&ordem=${encodeURIComponent(ordem)}&dir=${dir}` : "")}`), `${id}.csv`), "")}><Download size={14} /> Exportar</button>}
         {(BOTOES[id]?.imprimir ?? true) && <button className="botao" onClick={() => window.print()}><Printer size={14} /> Imprimir</button>}
       </Cab>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
@@ -122,6 +124,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
           )}
         </div>
       )}
+      {aviso}
     </>
   );
 }
