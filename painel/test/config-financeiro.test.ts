@@ -200,11 +200,11 @@ test("financeiro: ajuste de carteira, extrato, recargas e saques pelo painel", a
   assert.equal(rc.corpo.itens[0].usuario, "Rita Rodas");
   assert.equal((await api(cookieAdm, "GET", "/recargas?aba=passageiro&periodo=mes")).corpo.total, 0);
   const { pedirSaque } = await import("../src/apps/extras.ts");
-  const s = pedirSaque(E, m.id, "Rita Rodas", 20, "rita@pix.test");
+  const s = pedirSaque(E, m.id, "Rita Rodas", 30, "rita@pix.test");
   const sq = await api(cookieAdm, "GET", "/saques?periodo=mes");
   assert.equal(sq.corpo.qtdPendentes, 1); assert.equal(sq.corpo.itens[0].cidade, "Jaboticabal - SP");
   assert.equal((await api(cookieAdm, "POST", `/saques/${s.id}/pagar`, {})).corpo.saque.situacao, "Pago");
-  assert.equal((await api(cookieAdm, "GET", "/saques?periodo=mes")).corpo.totalPago, 20);
+  assert.equal((await api(cookieAdm, "GET", "/saques?periodo=mes")).corpo.totalPago, 30);
   lancar(E2, "motorista", "outro", 99, "Crédito da central", "x@y.test");
   assert.equal((await api(cookieAdm, "GET", "/extrato?aba=geral&periodo=mes")).corpo.manual, 50, "outra empresa não entra");
   const rel = await api(cookieAdm, "GET", "/relatorios/producao");

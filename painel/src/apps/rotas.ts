@@ -27,7 +27,8 @@ import { num, txt } from "./armazem.ts";
 import { arquivoDaMidia, arquivoDoAudio, enviarAudio, enviarMidia, enviarTexto, maxAudioBytes, maxMidiaBytes, mensagens, resumoDaMensagem } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
-import { ajustes } from "./ajustes.ts";
+import { gerais } from "../config/gerais.ts";
+import { ajustes, formasDePagamento } from "./ajustes.ts";
 import { euCompleto } from "./perfil.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
@@ -48,7 +49,6 @@ const ok = (fn: Fn) => async (req: Request, res: Response) => {
   }
 };
 
-const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na maquininha", PAGAMENTO_SALDO];
 const ANTES_DE_COMECAR = new Set(["procurando", "a_caminho", "no_local"]);
 
 // ------------------------------------------------------------------ CORS e empresa
@@ -184,7 +184,7 @@ r.get("/opcoes", ok((req, res) => {
   const categorias = listar(empresaId, cadastroPorId("categorias")!)
     .filter((c) => c.ativa !== false && String(c.nome ?? "").trim())
     .map((c) => ({ nome: String(c.nome), descricao: String(c.descricao ?? ""), aPartirDe: estimarPreco(empresaId, { categoria: String(c.nome), distanciaKm: null }).valor }));
-  res.json({ categorias, pagamentos: PAGAMENTOS });
+  res.json({ categorias, pagamentos: formasDePagamento(empresaId) });
 }));
 
 // Endereços: primeiro a base da empresa (CNEFE); se ela não achar (ou não estiver ligada), o OpenStreetMap, perto de quem pede.
@@ -278,8 +278,11 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
   const nome = String(eu(empresaId, sessao).nome ?? "");
   if (!nome) throw new Error("Informe seu nome antes de pedir.");
   const pedidoId = typeof b.pedidoId === "string" && /^[\w-]{8,64}$/.test(b.pedidoId) ? b.pedidoId : `${Date.now()}`;
-  const pagamento = PAGAMENTOS.includes(b.pagamento) ? b.pagamento : "";
+  const pagamento = formasDePagamento(empresaId).includes(b.pagamento) ? b.pagamento : "";
   const paradas = Array.isArray(b.paradas) ? b.paradas.slice(0, 4).map(ponto) : [];
+  // Paradas: o painel liga/desliga e define o limite (Configurações › Gerais › Regras do passageiro).
+  const regraParadas = (() => { try { const p = gerais(empresaId).passageiro; return p.paradasAtivo ? p.limiteParadas : 0; } catch { return 3; } })();
+  if (paradas.length > regraParadas) throw new Error(regraParadas ? `No máximo ${regraParadas} paradas.` : "A empresa não permite paradas na corrida.");
   const c = await umaVez(`${empresaId}:${sessao.telefone}:${pedidoId}`, async () => {
     if (pagamento === PAGAMENTO_SALDO) {
       // Confere o saldo pela estimativa (com as paradas) antes de criar.
