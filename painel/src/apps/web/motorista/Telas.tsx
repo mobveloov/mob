@@ -79,7 +79,7 @@ export function Preferencias({ voltar }: { voltar: () => void }) {
 // ====================================================================== carteira
 
 interface DadosCarteira {
-  saldo: number; recarga: string;
+  saldo: number; recarga: string; minimoSaque?: number;
   extrato: Array<{ id?: string; valor: number; descricao: string; em: string }>;
   saques?: Array<{ id?: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string }>;
 }
@@ -111,9 +111,9 @@ export function Carteira({ voltar }: { voltar: () => void }) {
           <h3>Retirar saldo</h3>
           {pendente ? <p className="dica">Você já tem uma retirada esperando a central. Assim que ela for resolvida, pode pedir outra.</p> : (
             <>
-              <label className="campo"><span className="campo-rotulo">Valor (mínimo R$ 10,00)</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
+              <label className="campo"><span className="campo-rotulo">Valor (mínimo {reais(d.minimoSaque ?? 10)})</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
               <label className="campo"><span className="campo-rotulo">Chave Pix</span><span className="campo-caixa"><input value={pix} maxLength={120} onChange={(e) => setPix(e.target.value)} placeholder="CPF, celular, e-mail ou chave aleatória" /></span></label>
-              <button className="botao-m" disabled={ocupado || !(v >= 10) || v > d.saldo || pix.trim().length < 5}>RETIRAR</button>
+              <button className="botao-m" disabled={ocupado || !(v >= (d.minimoSaque ?? 10)) || v > d.saldo || pix.trim().length < 5}>RETIRAR</button>
               {v > d.saldo && <p className="dica">O valor é maior que o saldo.</p>}
             </>
           )}

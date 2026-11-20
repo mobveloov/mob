@@ -321,8 +321,23 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
 
 // ------------------------------------------------------------------ ícone flutuante (só no APK do motorista)
 
-interface PluginFlutuante { rastrear?(o: { url: string; token: string }): Promise<void>; pararRastreio?(): Promise<void>; manterTela?(o: { ligar: boolean }): Promise<void>; permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
+interface PluginFlutuante { permissoes?(): Promise<Permissoes>; abrir?(o: { tipo: string }): Promise<void>; ofertaTelaCheia?(o: { titulo: string; texto: string }): Promise<void>; cancelarOferta?(): Promise<void>; rastrear?(o: { url: string; token: string }): Promise<void>; pararRastreio?(): Promise<void>; manterTela?(o: { ligar: boolean }): Promise<void>; permitido(): Promise<{ valor: boolean }>; pedir(): Promise<void>; mostrar(): Promise<void>; esconder(): Promise<void> }
 const FlutuanteNativo = registerPlugin<PluginFlutuante>("Flutuante");
+
+/** Situação das permissões do Android que o motorista precisa para receber corrida com o app minimizado ou a tela bloqueada. */
+export interface Permissoes { sobrePosicao: boolean; notificacoes: boolean; bateria: boolean; localizacao: boolean; localizacaoSempre: boolean; telaCheia: boolean; fabricante: string; sdk: number }
+/** As essenciais: sem elas o motorista não fica online (no APK). */
+export const ESSENCIAIS: Array<keyof Permissoes> = ["localizacaoSempre", "notificacoes", "sobrePosicao", "bateria"];
+export const permissoesNativas = {
+  disponivel: () => nativo() && Capacitor.isPluginAvailable("Flutuante"),
+  ler: async (): Promise<Permissoes | null> => { try { return permissoesNativas.disponivel() ? (await FlutuanteNativo.permissoes?.()) ?? null : null; } catch { return null; } },
+  abrir: async (tipo: string) => { try { await FlutuanteNativo.abrir?.({ tipo }); } catch { /* sem plugin */ } },
+  /** Chegou uma chamada com o app minimizado ou a tela bloqueada: acorda a tela e abre o app por cima de tudo. */
+  ofertaTelaCheia: async (titulo: string, texto: string) => { try { if (permissoesNativas.disponivel()) await FlutuanteNativo.ofertaTelaCheia?.({ titulo, texto }); } catch { /* sem plugin */ } },
+  cancelarOferta: async () => { try { if (permissoesNativas.disponivel()) await FlutuanteNativo.cancelarOferta?.(); } catch { /* sem plugin */ } },
+  /** Falta alguma permissão essencial? Devolve os nomes que faltam (vazio: pode ficar online). Fora do APK, nunca falta. */
+  faltando: async (): Promise<Array<keyof Permissoes>> => { const p = await permissoesNativas.ler(); return p ? ESSENCIAIS.filter((k) => !p[k]) : []; },
+};
 /** Bolinha por cima de outros apps quando o app é minimizado. Fora do APK do motorista, tudo isto não faz nada. */
 export const flutuante = {
   disponivel: () => nativo() && Capacitor.isPluginAvailable("Flutuante"),
@@ -425,6 +440,7 @@ let geracaoDeSom = 0;
 /** Para na hora o toque da chamada (aceitou, recusou, venceu ou outro motorista pegou a corrida) e a vibração. */
 export function pararSons() {
   geracaoDeSom++;
+  void permissoesNativas.cancelarOferta(); // some a notificação de chamada em tela cheia
   for (const a of tocando) { try { a.pause(); a.currentTime = 0; } catch { /* já parou */ } }
   tocando.clear();
   try { navigator.vibrate?.(0); } catch { /* sem vibração */ }

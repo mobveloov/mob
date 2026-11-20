@@ -312,10 +312,12 @@ export function conferirPagamento(empresaId: string, telefone: string, pagamento
 
 export interface Saque { id: string; motoristaId: string; nome: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string; resolvidoEm: string | null; resolvidoPor: string }
 
+/** Valor mínimo de saque/depósito: vem daqui para o app (o app não guarda número fixo). */
+export const SAQUE_MINIMO = 10;
 export function pedirSaque(empresaId: string, motoristaId: string, nome: string, valor: number, chavePix: string): Saque {
   const v = arred(valor);
   const pix = chavePix.trim().slice(0, 120);
-  if (!(v >= 10)) throw new Error("O saque mínimo é R$ 10,00.");
+  if (!(v >= SAQUE_MINIMO)) throw new Error(`O saque mínimo é ${SAQUE_MINIMO.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
   if (pix.length < 5) throw new Error("Informe a chave Pix.");
   return transacao(() => {
     if (saldo(empresaId, "motorista", motoristaId) < v) throw new Error("Saldo insuficiente para este saque.");
@@ -664,7 +666,7 @@ rotasExtras.get("/carteira", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const m = D.marca(empresaId);
   res.json({
-    saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave),
+    saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave), minimoSaque: SAQUE_MINIMO,
     saques: sessao.papel === "motorista" ? saques(empresaId, sessao.chave) : undefined,
     recarga: `Depois de pedir o depósito, a central confirma e o valor entra no seu saldo${m.textos.suporteTelefone ? `. Dúvidas: ${m.textos.suporteTelefone}` : ""}.`,
   });

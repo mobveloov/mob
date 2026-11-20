@@ -24,3 +24,25 @@ Feita no navegador em tamanho de celular (375×812) contra uma cópia dos dados 
 - Passada completa por todas as telas dos dois apps (cadastro, pedir corrida, aceitar, chat, cancelar, carteira, histórico, ajustes, mapa) com dados reais: só vi Início e Conta do passageiro e o Início do motorista. O restante está coberto pelos testes automáticos, não por olhos.
 - O mapa de fundo não carrega no navegador de teste (sem tiles em alguns momentos); não deu para conferir pinos e rotas visualmente.
 - Redesenho amplo (item 6 do pedido): só fiz o que o pedido exigia (tema escuro do passageiro, botões do mapa). Um polimento geral de espaçamento e tipografia continua pendente.
+
+## Segunda rodada (mesmo dia)
+
+| Item | O que foi feito | Como foi provado | O que só se testa em aparelho |
+|---|---|---|---|
+| Tela sempre ligada | `MainActivity` dos dois apps liga `FLAG_KEEP_SCREEN_ON` ao abrir e em cada `onResume`; Wake Lock da web reaplicado a cada 30 s. Causa: o APK do passageiro não tinha plugin nativo. | Compila no build do APK. | Deixar o app parado além do tempo de tela. |
+| Toques | 3 toques do motorista em laço, sons suaves do passageiro (`scripts/gerar-toques.mjs`). | RMS e duração medidos nos arquivos. | Ouvir dentro do carro. |
+| Notificação fixa "Você está online" + botão Ficar offline | `PosicaoService` ganhou a ação `FICAR_OFFLINE`: avisa `/offline`, fecha a bolha e para o serviço. | Compila no build do APK. | Tocar o botão com o app fechado. |
+| Chamada por cima de tudo | Plugin `ofertaTelaCheia`: acorda a tela, notificação de chamada com full-screen intent e, com "Exibir sobre outros apps", abre o app direto. `pararSons()` cancela. | Compila no build do APK. | Tudo: tela bloqueada, outro app aberto, Android 14. |
+| Permissões passo a passo | `Permissoes.tsx` + plugin `permissoes()/abrir()`: localização o tempo todo, notificações, exibir sobre outros apps, bateria (essenciais), tela cheia (opcional) e início automático por fabricante. Abre sozinho na primeira vez; sem as essenciais o motorista não fica online. | Tipos e build. Tela vista no navegador só como "explicação" (sem plugin). | Estados OK/Falta e os atalhos de cada fabricante. |
+| Concluir cadastro | A rota `/cadastro/concluir` e o bloqueio por documentos obrigatórios vieram da sessão do painel e já estão no app web do motorista (`Cadastro.tsx`). | Testes da sessão do painel. | Fluxo completo no APK. |
+| Personalização do painel | O motorista agora lê `/personalizacao` (ao entrar, a cada 60 s e ao voltar): cor principal e nome. O passageiro já lia (sessão do painel). | tsc e suíte (640 testes). | Ver a cor mudar no aparelho. |
+| Respiro e toque (Ajustes, Conta, Carteira, formulários) | Linhas com 56 px de altura mínima, divisores, quebra de texto, interruptores com área de toque de 48 px, campos de 48 px, folga para o teclado. | CSS revisado; não passei pelas telas em 360×640 com fonte grande no navegador. | Fonte do sistema aumentada. |
+
+### Ainda fixo nos apps (não vem do painel)
+
+- Lista de lembretes da folha aberta do mapa do motorista (`AvisoDoMotorista` em `Pecas.tsx`).
+- Lista de problemas do botão "Avisar um problema" (`PROBLEMAS` em `Corrida.tsx`).
+- Valor mínimo de R$ 10,00 na retirada e no depósito (`Telas.tsx`, `Atividades.tsx`).
+- Perguntas e respostas da tela "Taxa de aceitação" (`Atividades.tsx`).
+- Lista de fabricantes que pedem início automático (`Permissoes.tsx`).
+- Personalização do passageiro: faltam ordem dos recursos, cupons, anúncio, desafio, marca no topo e layout Flutuante (lista em `docs/APPS_PERSONALIZACAO.md`).

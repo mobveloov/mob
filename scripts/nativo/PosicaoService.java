@@ -39,6 +39,10 @@ public class PosicaoService extends Service implements LocationListener {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && "FICAR_OFFLINE".equals(intent.getAction())) {
+            ficarOffline();
+            return START_NOT_STICKY;
+        }
         if (intent != null) {
             url = intent.getStringExtra("url");
             token = intent.getStringExtra("token");
@@ -66,6 +70,38 @@ public class PosicaoService extends Service implements LocationListener {
         return START_REDELIVER_INTENT;
     }
 
+    /** Botão "Ficar offline" da notificação: manda /offline ao servidor (o app descobre ao voltar), tira a bolha flutuante e para o serviço. */
+    private void ficarOffline() {
+        final String u = url == null ? null : url.replace("/posicao", "/offline");
+        final String t = token;
+        try { stopService(new Intent(this, FlutuanteService.class)); } catch (Exception e) { /* bolha já fechada */ }
+        if (u == null || t == null) { stopSelf(); return; }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection c = null;
+                try {
+                    c = (HttpURLConnection) new URL(u).openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(8000);
+                    c.setReadTimeout(8000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json");
+                    c.setRequestProperty("Authorization", "Bearer " + t);
+                    OutputStream o = c.getOutputStream();
+                    o.write("{}".getBytes("UTF-8"));
+                    o.close();
+                    c.getResponseCode();
+                } catch (Exception e) {
+                    // sem rede: o servidor derruba o motorista sozinho quando a posição para de chegar
+                } finally {
+                    if (c != null) c.disconnect();
+                }
+            }
+        }).start();
+        stopSelf();
+    }
+
     private void iniciarEmPrimeiroPlano() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CANAL) == null) {
@@ -76,6 +112,9 @@ public class PosicaoService extends Service implements LocationListener {
         Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(this, CANAL) : new Notification.Builder(this);
         b.setContentTitle("Você está online").setContentText("Recebendo corridas. Toque para abrir.").setSmallIcon(getApplicationInfo().icon).setOngoing(true);
         if (pi != null) b.setContentIntent(pi);
+        // Botão da notificação: "Ficar offline" (como nos apps de mobilidade): avisa o servidor, tira a bolha e encerra o serviço.
+        Intent off = new Intent(this, PosicaoService.class).setAction("FICAR_OFFLINE");
+        b.addAction(0, "Ficar offline", PendingIntent.getService(this, 1, off, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
         Notification n = b.build();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(4711, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
