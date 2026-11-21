@@ -46,3 +46,11 @@ Feita no navegador em tamanho de celular (375×812) contra uma cópia dos dados 
 - Perguntas e respostas da tela "Taxa de aceitação" (`Atividades.tsx`).
 - Lista de fabricantes que pedem início automático (`Permissoes.tsx`).
 - Personalização do passageiro: faltam ordem dos recursos, cupons, anúncio, desafio, marca no topo e layout Flutuante (lista em `docs/APPS_PERSONALIZACAO.md`).
+
+## Menu lateral do motorista: cabeçalho cortado (corrigido de verdade)
+
+**Causa real** (reproduzida no navegador em 360×640 com fonte grande): `.menu-lateral > div` é uma coluna flex de altura fixa e **todos os filhos encolhiam** (`flex-shrink: 1`). O cabeçalho amarelo era espremido a ~50 px (nome e foto cortados) e os itens da lista se sobrepunham. Não era só padding da barra de status.
+
+**Correção** (`motorista-m.css`): filhos do menu com `flex-shrink: 0`, cabeçalho com `flex: none` e altura mínima, foto de 64 px redonda e fixa, nome e veículo/placa com quebra de linha, X em coluna própria; topo e rodapé com `max(env(safe-area-inset-*), 28px)` (no Android o `env()` pode vir zero); o menu rola quando não cabe.
+
+**Provas** em `docs/evidencias/`: `menu-motorista-1-antes-360x640-fonte20.jpg` (antes: cabeçalho espremido e itens sobrepostos, igual à captura do dono), `...-2-depois-360x640-fonte20.jpg`, `...-3-depois-rodape.jpg` ("Termos de uso", "Sair da conta" e a versão com folga embaixo) e `...-4-depois-412x915.jpg`. A foto real não foi testada (a conta de teste não tem foto; o CSS trava 64×64 e `object-fit: cover`). A área segura de um notch alto foi coberta pelo mínimo de 28 px, não simulada.
