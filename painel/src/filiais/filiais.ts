@@ -9,7 +9,11 @@ import { banco, transacao } from "../servidor/banco.ts";
 import { idValido, listarUsuarios } from "../servidor/dados.ts";
 
 export type TipoVinculo = "motorista" | "operador";
-export interface Filial { id: string; nome: string; cidade: string; endereco: string; responsavel: string; telefone: string; ativa: boolean; criadaEm: string }
+export interface Filial {
+  id: string; nome: string; cidade: string; endereco: string; responsavel: string; telefone: string; ativa: boolean; criadaEm: string;
+  /** Onde fica a filial no mapa (opcionais): UF, coordenadas, zoom, raio de cobertura em km e áreas desenhadas que ela cobre. */
+  uf: string; lat: number | null; lng: number | null; zoom: number | null; raioKm: number; areaIds: string[];
+}
 export interface FilialComTotais extends Filial { motoristas: number; operadores: number }
 
 export class ErroFilial extends Error { constructor(msg: string, public status = 400) { super(msg); } }
@@ -18,12 +22,18 @@ const limpo = (v: unknown, max: number) => String(v ?? "").replace(/[<>]/g, "").
 const exigirEmpresa = (empresaId: string) => { if (!idValido(empresaId)) throw new ErroFilial("Empresa inválida."); };
 
 type Linha = { id: string; nome: string; cidade: string; endereco: string; responsavel: string; telefone: string; ativa: number; criada_em: string };
-const paraFilial = (l: Linha): Filial => ({ id: l.id, nome: l.nome, cidade: l.cidade, endereco: l.endereco, responsavel: l.responsavel, telefone: l.telefone, ativa: l.ativa === 1, criadaEm: l.criada_em });
+type LinhaGeo = Linha & { uf: string | null; lat: number | null; lng: number | null; zoom: number | null; raio_km: number | null; areas: string | null };
+const SELECT = "SELECT f.id, f.nome, f.cidade, f.endereco, f.responsavel, f.telefone, f.ativa, f.criada_em, g.uf, g.lat, g.lng, g.zoom, g.raio_km, g.areas FROM filiais f LEFT JOIN filiais_geo g ON g.empresa = f.empresa AND g.id = f.id";
+const listaDeIds = (v: string | null): string[] => { try { const a = JSON.parse(v ?? "[]"); return Array.isArray(a) ? a.map(String) : []; } catch { return []; } };
+const paraFilial = (l: LinhaGeo): Filial => ({
+  id: l.id, nome: l.nome, cidade: l.cidade, endereco: l.endereco, responsavel: l.responsavel, telefone: l.telefone, ativa: l.ativa === 1, criadaEm: l.criada_em,
+  uf: l.uf ?? "", lat: l.lat ?? null, lng: l.lng ?? null, zoom: l.zoom ?? null, raioKm: l.raio_km ?? 0, areaIds: listaDeIds(l.areas),
+});
 
 export function listarFiliais(empresaId: string): FilialComTotais[] {
   exigirEmpresa(empresaId);
   const db = banco();
-  const linhas = db.prepare("SELECT id, nome, cidade, endereco, responsavel, telefone, ativa, criada_em FROM filiais WHERE empresa = ? ORDER BY nome COLLATE NOCASE").all(empresaId) as unknown as Linha[];
+  const linhas = db.prepare(`${SELECT} WHERE f.empresa = ? ORDER BY f.nome COLLATE NOCASE`).all(empresaId) as unknown as LinhaGeo[];
   const contas = new Map<string, { motorista: number; operador: number }>();
   // Só conta quem ainda existe (motorista apagado ou usuário removido não entra na conta).
   const vivos = { motorista: new Set(listar(empresaId, cadastroPorId("motoristas")!).map((m) => m.id)), operador: new Set(listarUsuarios().filter((u) => u.empresaId === empresaId).map((u) => u.id)) };
@@ -38,7 +48,7 @@ export function listarFiliais(empresaId: string): FilialComTotais[] {
 
 export function filial(empresaId: string, id: string): Filial | null {
   exigirEmpresa(empresaId);
-  const l = banco().prepare("SELECT id, nome, cidade, endereco, responsavel, telefone, ativa, criada_em FROM filiais WHERE empresa = ? AND id = ?").get(empresaId, String(id)) as unknown as Linha | undefined;
+  const l = banco().prepare(`${SELECT} WHERE f.empresa = ? AND f.id = ?`).get(empresaId, String(id)) as unknown as LinhaGeo | undefined;
   return l ? paraFilial(l) : null;
 }
 function exigir(empresaId: string, id: string): Filial {
@@ -52,6 +62,28 @@ function dadosLimpos(d: Record<string, unknown>) {
   if (nome.length < 2) throw new ErroFilial("Informe o nome da filial.");
   return { nome, cidade: limpo(d.cidade, 80), endereco: limpo(d.endereco, 160), responsavel: limpo(d.responsavel, 80), telefone: limpo(d.telefone, 20).replace(/[^\d()+\s-]/g, ""), ativa: d.ativa === false || d.ativa === "false" ? 0 : 1 };
 }
+const num = (v: unknown, min: number, max: number, rotulo: string): number | null => {
+  if (v === "" || v == null) return null;
+  const n = typeof v === "string" ? parseFloat(v.replace(",", ".")) : Number(v);
+  if (!Number.isFinite(n) || n < min || n > max) throw new ErroFilial(`${rotulo} inválida.`);
+  return n;
+};
+/** Localização da filial no mapa. Só vale se latitude e longitude vierem juntas. */
+function geoLimpa(d: Record<string, unknown>) {
+  const lat = num(d.lat, -90, 90, "Latitude"), lng = num(d.lng, -180, 180, "Longitude");
+  if ((lat == null) !== (lng == null)) throw new ErroFilial("Informe latitude e longitude juntas.");
+  const zoom = num(d.zoom, 3, 19, "Zoom");
+  const raio = num(d.raioKm, 0, 200, "Raio") ?? 0;
+  const uf = limpo(d.uf, 2).toUpperCase().replace(/[^A-Z]/g, "");
+  const areaIds = Array.isArray(d.areaIds) ? [...new Set(d.areaIds.map((x) => limpo(x, 80)).filter(Boolean))].slice(0, 50) : [];
+  return { lat, lng, zoom: zoom == null ? null : Math.round(zoom), raio, uf, areas: JSON.stringify(areaIds) };
+}
+function gravarGeo(empresaId: string, id: string, d: Record<string, unknown>) {
+  const g = geoLimpa(d);
+  banco().prepare(`INSERT INTO filiais_geo (empresa, id, uf, lat, lng, zoom, raio_km, areas) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (empresa, id) DO UPDATE SET uf = excluded.uf, lat = excluded.lat, lng = excluded.lng, zoom = excluded.zoom, raio_km = excluded.raio_km, areas = excluded.areas`)
+    .run(empresaId, id, g.uf, g.lat, g.lng, g.zoom, g.raio, g.areas);
+}
 const nomeRepetido = (empresaId: string, nome: string, ignorar?: string) =>
   listarFiliais(empresaId).some((f) => f.id !== ignorar && f.nome.toLowerCase() === nome.toLowerCase());
 
@@ -59,9 +91,11 @@ export function criarFilial(empresaId: string, d: Record<string, unknown>, por: 
   exigirEmpresa(empresaId);
   const v = dadosLimpos(d);
   if (nomeRepetido(empresaId, v.nome)) throw new ErroFilial("Já existe uma filial com este nome.");
+  geoLimpa(d);
   const id = crypto.randomUUID();
   banco().prepare("INSERT INTO filiais (empresa, id, nome, cidade, endereco, responsavel, telefone, ativa, criada_em, por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     .run(empresaId, id, v.nome, v.cidade, v.endereco, v.responsavel, v.telefone, v.ativa, new Date().toISOString(), limpo(por, 120));
+  gravarGeo(empresaId, id, d);
   return exigir(empresaId, id);
 }
 
@@ -69,8 +103,10 @@ export function atualizarFilial(empresaId: string, id: string, d: Record<string,
   const atual = exigir(empresaId, id);
   const v = dadosLimpos({ ...atual, ...d });
   if (nomeRepetido(empresaId, v.nome, id)) throw new ErroFilial("Já existe uma filial com este nome.");
+  geoLimpa({ ...atual, ...d });
   banco().prepare("UPDATE filiais SET nome = ?, cidade = ?, endereco = ?, responsavel = ?, telefone = ?, ativa = ? WHERE empresa = ? AND id = ?")
     .run(v.nome, v.cidade, v.endereco, v.responsavel, v.telefone, v.ativa, empresaId, id);
+  gravarGeo(empresaId, id, { ...atual, ...d });
   return exigir(empresaId, id);
 }
 
@@ -80,6 +116,7 @@ export function removerFilial(empresaId: string, id: string) {
   transacao(() => {
     banco().prepare("DELETE FROM filiais_vinculos WHERE empresa = ? AND filial_id = ?").run(empresaId, id);
     banco().prepare("DELETE FROM filiais WHERE empresa = ? AND id = ?").run(empresaId, id);
+    banco().prepare("DELETE FROM filiais_geo WHERE empresa = ? AND id = ?").run(empresaId, id);
   });
 }
 

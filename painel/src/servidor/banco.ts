@@ -225,6 +225,9 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS filiais_vinculos (
       empresa TEXT NOT NULL, tipo TEXT NOT NULL, chave TEXT NOT NULL, filial_id TEXT NOT NULL, PRIMARY KEY (empresa, tipo, chave));
     CREATE INDEX IF NOT EXISTS filiais_vinculos_filial ON filiais_vinculos (empresa, filial_id, tipo);
+    CREATE TABLE IF NOT EXISTS filiais_geo (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, uf TEXT NOT NULL DEFAULT '', lat REAL, lng REAL, zoom INTEGER, raio_km REAL NOT NULL DEFAULT 0,
+      areas TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (empresa, id));
   `);
   aberto = { arquivo, db };
   db.exec("BEGIN");
