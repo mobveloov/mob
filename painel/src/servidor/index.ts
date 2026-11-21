@@ -116,7 +116,8 @@ app.get("/api/publico/arquivo/:empresa/:nome", ok((req, res) => {
   res.setHeader("Content-Type", a.mime);
   res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("Cache-Control", "public, max-age=300");
+  // Com ?v= (versão da imagem, vinda da marca; o nome do arquivo sozinho não conta) a url muda a cada troca: pode guardar por muito tempo. Sem versão, sempre confere se mudou.
+  res.setHeader("Cache-Control", req.query.v && req.query.v !== req.params.nome ? "public, max-age=31536000, immutable" : "no-cache");
   res.send(fs.readFileSync(a.arquivo));
 }));
 
@@ -125,7 +126,7 @@ app.get("/manifest.webmanifest", ok((req, res) => {
   const e = empresaPublica(req);
   const m = e ? D.marca(e.id) : sanearMarca({});
   const imgIcone = m.arquivos.iconeApp || imagemDaEmpresa(m.arquivos);
-  const icone = e && imgIcone ? `/api/publico/arquivo/${e.id}/${imgIcone}` : null;
+  const icone = e && imgIcone ? `/api/publico/arquivo/${e.id}/${imgIcone}?v=${encodeURIComponent(D.versaoImagem(e.id, imgIcone) || imgIcone)}` : null;
   res.type("application/manifest+json").json({
     name: m.produto, short_name: m.app.nome || m.produto, start_url: "/", display: "standalone",
     background_color: m.cores.fundo, theme_color: m.cores.primaria, lang: "pt-BR",

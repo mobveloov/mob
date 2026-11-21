@@ -109,7 +109,7 @@ function FormularioAutomatico({ c, onFechar, onSalvo }: { c: Cupom; onFechar: ()
     if (await tentar(() => (c.id ? api.salvarRegistro("cupons", c.id, corpo) : api.criarRegistro("cupons", corpo)), "Cupom automático salvo.")) { onSalvo(); onFechar(); }
   };
   return (
-    <Janela aberta titulo={String(c.codigo)} sub={`${String(c.descricao)}. Limite de uso: ${String(c.limite)}.`} onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar</button></>}>
+    <Janela cheia aberta titulo={String(c.codigo)} sub={`${String(c.descricao)}. Limite de uso: ${String(c.limite)}.`} onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>Gravar</button></>}>
       {aviso}
       <div className="cg-grade">
         <Campo rotulo="Tipo"><select value={f.tipoDesconto} onChange={(e) => setF({ ...f, tipoDesconto: e.target.value })}><option value="Percentual">% Porcentagem</option><option value="Valor fixo">R$ Fixo</option></select></Campo>
@@ -135,7 +135,7 @@ function Formulario({ c, cidades, onFechar, onSalvo }: { c: Cupom | null; cidade
     if (await tentar(() => (c ? api.salvarRegistro("cupons", c.id, corpo) : api.criarRegistro("cupons", corpo)), "Cupom salvo.")) { onSalvo(); onFechar(); }
   };
   return (
-    <Janela cheia aberta titulo={c ? "Editar Cupom" : "Novo Cupom"} sub="Configure as condições e o público-alvo" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar Cupom</button></>}>
+    <Janela cheia aberta titulo={c ? "Editar Cupom" : "Novo Cupom"} sub="Configure as condições e o público-alvo" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>Gravar</button></>}>
       {aviso}
       <div className="cg-grade">
         <Campo rotulo="Código do Cupom *"><input value={f.codigo} onChange={(e) => set("codigo", e.target.value.toUpperCase())} /></Campo>

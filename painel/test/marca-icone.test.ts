@@ -45,5 +45,6 @@ test("manifest usa a foto da empresa quando não há ícone do app", async () =>
   const lista = await (await fetch(`${base}/api/sessao`, { headers: { cookie } })).json() as { empresa: { id: string } };
   const man = await (await fetch(`${base}/manifest.webmanifest?empresa=${lista.empresa.id}`, { headers: { cookie } })).json() as { icons: Array<{ src: string }> };
   assert.equal(man.icons.length, 1);
-  assert.ok(man.icons[0].src.endsWith(marca.arquivos.fotoEmpresa));
+  assert.ok(man.icons[0].src.includes(`/${marca.arquivos.fotoEmpresa}?v=`), "a url do ícone leva a versão do arquivo");
+  assert.ok(/\?v=[a-z0-9]+$/.test(man.icons[0].src), "versão vinda do arquivo (data de gravação e tamanho)");
 });

@@ -82,7 +82,7 @@ export function removerImagemMarcaMotorista(empresaId: string): PersonalizacaoMo
 export function dadosParaOAppMotorista(empresaId: string) {
   const m = marca(empresaId);
   const p = ler(empresaId), v = vista(empresaId, p);
-  const arq = (n: string) => (n ? `/api/publico/arquivo/${empresaId}/${n}` : "");
+  const arq = (n: string) => (n ? `/api/publico/arquivo/${empresaId}/${n}?v=${encodeURIComponent(D.versaoImagem(empresaId, n) || n)}` : "");
   const base = `/api/apps/${empresaId}/personalizacao/icone/${p.veiculoMapa}`;
   const dados = {
     empresa: { id: empresaId, nome: p.nome, nomeExibido: m.nomeExibido, logoClaro: arq(m.arquivos.logoClaro), logoEscuro: arq(m.arquivos.logoEscuro), icone: arq(m.arquivos.iconeApp || m.arquivos.favicon) },

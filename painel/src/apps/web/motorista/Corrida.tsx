@@ -16,6 +16,7 @@ import { enviarSos } from "../comum/sos";
 import { definirRetencao, iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
 import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
+import { decimal } from "../../../comum/formato-br.ts";
 
 /** Pontos da viagem em ordem: embarque, paradas e destino. */
 export function pontosDaViagem(c: { embarque: Ponto; paradas?: Ponto[]; destino?: Ponto | null }): PontoMapa[] {
@@ -188,7 +189,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           onPointerUp={(e) => { const d = arraste.current == null ? 0 : e.clientY - arraste.current; arraste.current = null; if (d < -30) mudarNivel(nivel + 1); else if (d > 30) mudarNivel(nivel - 1); else mudarNivel(nivel === 2 ? 0 : nivel + 1); }}
           onPointerCancel={() => { arraste.current = null; }}><span className="puxador" /></button>
         <div className="passageiro">
-          <Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={58} selo={c.passageiro.nota != null ? <span className="avatar-nota"><Star size={10} fill="currentColor" /> {c.passageiro.nota.toFixed(1)}</span> : undefined} />
+          <Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={58} selo={c.passageiro.nota != null ? <span className="avatar-nota"><Star size={10} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span> : undefined} />
           <div className="passageiro-nome">
             <strong>{c.passageiro.nome}</strong>
             {c.passageiro.corridas != null && <small>{c.passageiro.corridas} corridas</small>}
@@ -263,7 +264,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
             <Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={88} />
             <strong>{c.passageiro.nome}</strong>
             <div className="chips centro">
-              {c.passageiro.nota != null && <span className="chip ok"><Star size={13} fill="currentColor" /> {c.passageiro.nota.toFixed(1)}</span>}
+              {c.passageiro.nota != null && <span className="chip ok"><Star size={13} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span>}
               {c.passageiro.corridas != null && <span className="chip">{c.passageiro.corridas} corridas</span>}
             </div>
           </div>

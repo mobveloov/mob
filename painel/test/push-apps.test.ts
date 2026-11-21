@@ -200,3 +200,19 @@ test("FCM: com a conta de serviço na variável, o push do sistema sai e o aviso
     assert.equal(sem.push, "sem_aparelho");
   } finally { delete process.env.FCM_CONTA_SERVICO_JSON; }
 });
+
+test("CRM: push do app só chega a quem tem cadastro no app e o histórico informa o papel de quem recebeu", async () => {
+  const P = await import("../src/crm/publico.ts");
+  const contato = (tipo: "motorista" | "passageiro", nome: string, telefone: string) => ({ chave: P.chaveDe(tipo, telefone, nome), tipo, nome, telefone, cidade: "", situacao: "", noCadastro: false, corridas: 3, finalizadas: 3, canceladas: 0, gasto: 0, ultimaCorrida: null, ultimoGrupo: "finalizada", diasSemCorrida: 1, categorias: [], canais: [], origens: [] }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const lista = [contato("motorista", "Mário Motorista", "11988880001"), contato("motorista", "Fulano do Histórico", "11955550000"), contato("motorista", "Beltrano do Histórico", "11955550001")];
+  assert.equal(P.destinatarios(lista).length, 3, "no WhatsApp todo mundo com telefone entra");
+  assert.deepEqual(P.destinatariosDoCanal(emp, lista, "app").map((c) => c.nome), ["Mário Motorista"], "no push só entra quem está no cadastro de motoristas");
+  assert.equal(P.destinatariosDoCanal(emp, [contato("passageiro", "Paula Passageira", "11977770001"), contato("passageiro", "Sem app", "11922220000")], "app").length, 1);
+
+  A.salvarCampanhas(emp, [campanha("c-papel", "app", "motorista", "Oi {primeiro_nome}")]);
+  naFila(emp, "c-papel", [{ tipo: "m", nome: "Mário Motorista", tel: "11988880001" }], "Oi {primeiro_nome}");
+  await E.processarFila(emp, semEspera);
+  const l = R.listarEnvios(emp, { canal: "app", busca: "Oi Mário" }).linhas[0];
+  assert.equal(l.app?.papel, "motorista");
+  assert.equal(l.app?.estado, "enviada");
+});

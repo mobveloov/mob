@@ -5,6 +5,7 @@ import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./corridas.css";
 import { baseDoMapa } from "../../../comum/mapa-base.ts";
+import { invalidarDepois } from "../../../comum/mapa-seguro.ts";
 
 export class ErroOp extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
@@ -124,8 +125,8 @@ export function useMapa(centro: [number, number] = CENTRO_PADRAO, zoom = 12, ati
     const m = L.map(ref.current, { zoomControl: true }).setView(centro, zoom);
     baseDoMapa(L, m);
     setMapa(m);
-    const t = setTimeout(() => m.invalidateSize(), 150);
-    return () => { clearTimeout(t); m.remove(); setMapa(null); };
+    const cancela = invalidarDepois(m, 150);
+    return () => { cancela(); m.remove(); setMapa(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ativo]);
   return { ref, mapa };

@@ -131,7 +131,7 @@ export const luminosidade = (hex: string) => { const n = parseInt(hex.slice(1), 
 export function dadosParaOApp(empresaId: string) {
   const m = marca(empresaId);
   const p = ler(empresaId), v = vista(empresaId, p);
-  const arq = (n: string) => (n ? `/api/publico/arquivo/${empresaId}/${n}` : "");
+  const arq = (n: string) => (n ? `/api/publico/arquivo/${empresaId}/${n}?v=${encodeURIComponent(D.versaoImagem(empresaId, n) || n)}` : "");
   const base = `/api/apps/${empresaId}/personalizacao/icone/${p.veiculoMapa}`;
   const recursos = p.recursos.map((r, i) => ({ id: r.id, visivel: r.visivel, posicao: i + 1 }));
   const visiveis = recursos.filter((r) => r.visivel);

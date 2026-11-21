@@ -7,6 +7,7 @@ import "leaflet/dist/leaflet.css";
 import { Pencil, Plus, Trash2, Zap } from "lucide-react";
 import { Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 import { baseDoMapa } from "../../../comum/mapa-base.ts";
+import { ajustarSeguro, invalidarDepois } from "../../../comum/mapa-seguro.ts";
 
 const num = (v: string) => (v === "" ? 0 : Number(String(v).replace(/\./g, "").replace(",", ".")) || 0);
 const txt = (n: number | null | undefined) => (n == null || n === 0 ? "" : String(n).replace(".", ","));
@@ -172,9 +173,10 @@ function MapaDinamicas({ aba, manuais, automaticas }: { aba: Aba; manuais: any[]
       const cor = r.ativa ? COR_NIVEL[r.nivel] ?? "#dc2626" : "#94a3b8";
       return L.polygon(r.poligono, { color: cor, fillOpacity: 0.25 }).bindTooltip(`${r.nome} · ${valorDinamica(r)}`, { permanent: true, direction: "center", className: "dm-etiqueta" }).addTo(mapa);
     });
-    if (camadas.length) mapa.fitBounds(L.featureGroup(camadas).getBounds().pad(0.3));
-    setTimeout(() => mapa.invalidateSize(), 200);
-    return () => { mapa.remove(); };
+    const ajusta = () => { if (camadas.length) ajustarSeguro(mapa, L.featureGroup(camadas).getBounds().pad(0.3)); };
+    ajusta();
+    const cancela = invalidarDepois(mapa, 200, ajusta);
+    return () => { cancela(); mapa.remove(); };
   }, [aba, manuais, automaticas]);
   return <div ref={ref} className="dm-mapa" role="img" aria-label="Mapa das áreas com tarifa dinâmica" />;
 }
@@ -191,9 +193,8 @@ function DesenhoArea({ pontos, onChange }: { pontos: Array<[number, number]>; on
     const desenhar = () => { grupo.clearLayers(); const p = atual.current; if (p.length) { L.polygon(p, { color: "#ef4444" }).addTo(grupo); p.forEach((x) => L.circleMarker(x, { radius: 4, color: "#ef4444" }).addTo(grupo)); } };
     desenhar();
     mapa.on("click", (e: L.LeafletMouseEvent) => { atual.current = [...atual.current, [Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6))]]; onChange(atual.current); desenhar(); });
-    const ajusta = () => mapa.invalidateSize();
-    setTimeout(ajusta, 200);
-    return () => { mapa.remove(); };
+    const cancela = invalidarDepois(mapa, 200);
+    return () => { cancela(); mapa.remove(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { /* o desenho segue o estado pelo clique; limpar recria o mapa pela chave */ }, [pontos]);

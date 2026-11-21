@@ -58,7 +58,7 @@ export const crm = {
   ligarEmojis: (ligado: boolean) => pedir<{ ligado: boolean }>("/emojis", "PUT", { ligado }),
   visao: (dias: number) => pedir<VisaoCrm>("/visao", "POST", { dias }),
   publico: (regras: Regras) => pedir<RespPublico>("/publico", "POST", { regras }),
-  contar: (regras: Regras) => pedir<{ total: number; destinatarios: number; avisos: string[] }>("/publico/contar", "POST", { regras }),
+  contar: (regras: Regras, canal: "whatsapp" | "app" = "whatsapp") => pedir<{ total: number; destinatarios: number; semCadastroApp: number; avisos: string[] }>("/publico/contar", "POST", { regras, canal }),
   optOut: (chave: string, sair: boolean) => pedir("/publico/optout", "POST", { chave, sair }),
   listas: () => pedir<{ listas: Array<Lista & { total: number }> }>("/listas"),
   novaLista: (d: { nome: string; modo: "fixa" | "dinamica"; regras: Regras }) => pedir<{ lista: Lista; total?: number }>("/listas", "POST", d),

@@ -47,6 +47,16 @@
 .cg-abas button b { font-size: 10px; background: var(--cg-fundo); border-radius: 999px; padding: 1px 7px; color: var(--cg-suave); }
 .cg-abas button.ativa { background: var(--cg-marca); color: var(--cg-marca-txt); }
 .cg-abas button.ativa b { background: #ffffff33; color: inherit; }
+/* Abas que não cabem na tela rolam para o lado e mostram sombra no(s) lado(s) com mais abas escondidas. */
+.cg-abas {
+  background-color: var(--cg-cartao); scroll-snap-type: x proximity; scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+  background-image: linear-gradient(to right, var(--cg-cartao) 30%, transparent), linear-gradient(to left, var(--cg-cartao) 30%, transparent),
+    linear-gradient(to right, rgba(0, 0, 0, .28), transparent), linear-gradient(to left, rgba(0, 0, 0, .28), transparent);
+  background-position: 0 0, 100% 0, 0 0, 100% 0; background-repeat: no-repeat; background-size: 36px 100%, 36px 100%, 16px 100%, 16px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.cg-abas button { scroll-snap-align: start; }
+@media (max-width: 640px) { .cg-abas button { padding-inline: 10px; font-size: 11px; } }
 
 .cg-tabela-caixa { background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 18px; overflow: hidden; }
 .cg-rolagem { overflow-x: auto; }

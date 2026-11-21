@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import App from "./App";
 import "./estilo.css";
+import { ligarValidacaoPtBr } from "./validacao-ptbr";
+
+ligarValidacaoPtBr();
 
 const Totem = lazy(() => import("./totem/Totem"));
 const Premios = lazy(() => import("./totem/Premios"));

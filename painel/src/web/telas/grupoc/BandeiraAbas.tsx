@@ -8,7 +8,7 @@ import { Aviso, Carregando, pedirConfig, useCarregar, useGestor, useSalvar } fro
 
 const contador = (c: ControleForm, v: unknown) => (c.tipo === "area" || (c.tipo === "texto" && (c.tamanho ?? 0) > 0 && (c.tamanho ?? 0) <= 100 && /titulo|mensagem/.test(c.nome)) ? `${String(v ?? "").length}/${c.tamanho ?? 500}` : "");
 
-export function BandeiraAbas({ aba, especiais, aoGravar }: { aba: AbaForm; especiais?: Partial<Record<"documentos", ReactNode>>; aoGravar?: () => Promise<void> }) {
+export function BandeiraAbas({ aba, especiais, aoGravar, extra }: { aba: AbaForm; especiais?: Partial<Record<"documentos", ReactNode>>; aoGravar?: () => Promise<void>; extra?: ReactNode }) {
   const gestor = useGestor();
   const navegar = useNavigate();
   const d = useCarregar(() => pedirConfig("/bandeira-campos"), []);
@@ -63,6 +63,7 @@ export function BandeiraAbas({ aba, especiais, aoGravar }: { aba: AbaForm; espec
           </div>
         ))}
       </section>
+      {extra}
       <div className="dm-salvar"><button type="button" className="botao" onClick={() => navegar(-1)}>Voltar</button>{gestor && <button className="botao primario" disabled={salvando} onClick={gravar}>Gravar</button>}</div>
     </>
   );

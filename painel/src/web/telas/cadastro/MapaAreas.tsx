@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { baseDoMapa, type BaseDoMapa } from "../../../comum/mapa-base.ts";
+import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 
 export type Ponto = [number, number];
 export interface AreaMapa { id: string; nome: string; poligono: Ponto[]; cor?: string; bloqueio?: boolean }
@@ -86,7 +87,7 @@ export default function MapaAreas({ areas = [], desenho, onDesenho, corDesenho =
       });
       limites.push(...desenho);
     }
-    if (limites.length && (!onDesenho || !ajustou.current)) { m.fitBounds(L.latLngBounds(limites), { padding: [24, 24], maxZoom: 15 }); ajustou.current = true; } // ao desenhar, o mapa não pula a cada ponto
+    if (limites.length && (!onDesenho || !ajustou.current)) { if (ajustarSeguro(m, L.latLngBounds(limites), { padding: [24, 24], maxZoom: 15 })) ajustou.current = true; } // ao desenhar, o mapa não pula a cada ponto
   }, [areas, desenho, corDesenho]);
 
   return <div ref={caixa} className={`cg-mapa ${grande ? "cg-mapa-grande" : ""}`} style={onDesenho ? { cursor: "crosshair" } : undefined} />;

@@ -20,7 +20,7 @@ import { rodarAgendaDePremios } from "../totem/premios.ts";
 import { dentroDaJanela, enviadosHoje, pausaGeral, tetoHoje } from "./limites.ts";
 import { registrar, type OrigemEnvio } from "./registro.ts";
 import { escolherVariacao, montarTexto } from "./mensagem.ts";
-import { aplicarRegras, destinatarios, publico, selecionar, telefoneWhatsApp } from "./publico.ts";
+import { aplicarRegras, destinatarios, destinatariosDoCanal, publico, selecionar, telefoneWhatsApp } from "./publico.ts";
 import { reservar } from "./ritmo.ts";
 import type { Campanha, Contato, ItemFila, Jornada } from "./tipos.ts";
 import { provedorDaEmpresa, type ProvedorWhatsApp } from "./whatsapp.ts";
@@ -61,7 +61,7 @@ async function disparar(empresaId: string, campanhaId: string, agora: number): P
   if (!c.texto.trim()) throw new Error("Escreva a mensagem.");
   const cupom = conferirCupom(empresaId, c.cupom, true);
   const { lista } = await selecionar(empresaId, c.publico);
-  const alvo = destinatarios(lista);
+  const alvo = destinatariosDoCanal(empresaId, lista, c.canal);
   const empresa = nomeEmpresa(empresaId);
   const textos = [c.texto, ...c.variacoes];
   const itens = alvo.map((p) => novoItem({ tipo: "campanha", id: c.id }, p, montarTexto(escolherVariacao(textos, `${c.id}:${p.chave}`), { contato: p, cupom, empresa }), agora, c.canal));
@@ -145,7 +145,7 @@ async function rodar(empresaId: string, j: Jornada, agora: number): Promise<numb
   const d = A.disparos(empresaId);
   const ja = d[j.id] ?? {};
   // Já recebeu depois da última corrida: não repete (volta a valer quando a pessoa pedir de novo).
-  alvo = destinatarios(alvo).filter((c) => !ja[c.chave] || (c.ultimaCorrida != null && ja[c.chave] < c.ultimaCorrida));
+  alvo = destinatariosDoCanal(empresaId, alvo, j.canal ?? "whatsapp").filter((c) => !ja[c.chave] || (c.ultimaCorrida != null && ja[c.chave] < c.ultimaCorrida));
   const empresa = nomeEmpresa(empresaId);
   const quando = agoraBr().toISOString();
   const itens = alvo.map((c) => novoItem({ tipo: "jornada", id: j.id }, c, montarTexto(j.texto, { contato: c, cupom, empresa }), agora, j.canal ?? "whatsapp"));

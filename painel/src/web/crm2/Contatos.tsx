@@ -4,6 +4,7 @@ import { Cartao, Gaveta, useCarregar } from "../componentes/ui";
 import { useGestor, useAdmin, useRetorno } from "../crm/comum";
 import { ESTAGIO_CLASSE, ESTAGIO_ROTULO, EVENTO_ROTULO, RFM_SEGMENTOS } from "../../crm2/catalogo";
 import { crm2, dataCurta, dataHora, dinheiroBr, erroTexto, type ContatoCrm } from "./api";
+import { decimal } from "../../comum/formato-br.ts";
 
 const ESTAGIOS = ["novo", "ativo", "fiel", "em_risco", "inativo", "perdido"];
 const TAMANHO_PAGINA = 25;
@@ -220,7 +221,7 @@ function Ficha({ contato, onVoltar }: { contato: ContatoCrm; onVoltar: () => voi
           <Caixa rotulo="Ticket Médio" valor={dinheiroBr(c.ticket_medio)} />
           <Caixa rotulo="Cancelamentos" valor={c.cancelamentos} />
           <Caixa rotulo="Simulações s/ conversão" valor={c.simulacoes_sem_conversao} />
-          <Caixa rotulo="Nota Média" valor={c.nota_media > 0 ? c.nota_media.toFixed(1) : "-"} />
+          <Caixa rotulo="Nota Média" valor={c.nota_media > 0 ? decimal(c.nota_media, 1) : "-"} />
           <Caixa rotulo="Categoria Favorita" valor={c.categoria_favorita || "-"} />
           <Caixa rotulo="NPS" valor={c.nps ?? "-"} />
           <Caixa rotulo="Msgs (7 dias)" valor={msgs ?? "..."} tom={msgs != null && msgs > 3 ? "alerta" : ""} />

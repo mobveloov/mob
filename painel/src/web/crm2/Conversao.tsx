@@ -3,6 +3,7 @@ import { Download, Info, RefreshCw, TrendingUp } from "lucide-react";
 import { Cartao, Kpi, useCarregar } from "../componentes/ui";
 import { ORIGEM_ENVIO } from "../../crm2/catalogo";
 import { baixarCsv, crm2, dinheiroBr } from "./api";
+import { decimal } from "../../comum/formato-br.ts";
 
 const num = (n: number) => n.toLocaleString("pt-BR");
 
@@ -29,7 +30,7 @@ export default function Conversao() {
       <div className="grade">
         <Kpi rotulo="Enviadas" valor={num(total.sent)} />
         <Kpi rotulo="Converteram" valor={num(total.converted)} tom="ok" />
-        <Kpi rotulo="Taxa de conversão" valor={`${total.sent ? ((total.converted / total.sent) * 100).toFixed(2) : "0.00"}%`} tom="info" />
+        <Kpi rotulo="Taxa de conversão" valor={`${total.sent ? decimal((total.converted / total.sent) * 100, 2) : "0,00"}%`} tom="info" />
         <Kpi rotulo="Receita recuperada" valor={dinheiroBr(total.revenue)} />
       </div>
       {erro && <div className="aviso erro">{erro}</div>}
@@ -43,7 +44,7 @@ export default function Conversao() {
                 <td>{r.source_name}</td>
                 <td className="num">{num(r.sent)}</td>
                 <td className="num" style={{ color: "var(--ok)" }}>{num(r.converted)}</td>
-                <td className="num">{r.conversion_rate.toFixed(1)}%</td>
+                <td className="num">{decimal(r.conversion_rate, 1)}%</td>
                 <td className="num forte">{dinheiroBr(r.revenue)}</td>
               </tr>
             ))}</tbody>

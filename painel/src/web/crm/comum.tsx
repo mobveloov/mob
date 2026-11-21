@@ -57,12 +57,12 @@ const num = (v: string) => (v === "" ? undefined : Math.max(0, Math.floor(Number
  * Regras do segmento: tipo, cidade, inatividade, nº de corridas, categoria, canal e lista.
  * Mostra quantas pessoas recebem (com telefone e sem "não quero receber") antes de salvar.
  */
-export function EditorRegras({ regras, onChange, opcoes, listas, semTipo }: {
-  regras: Regras; onChange: (r: Regras) => void;
+export function EditorRegras({ regras, onChange, opcoes, listas, semTipo, canal = "whatsapp" }: {
+  canal?: "whatsapp" | "app"; regras: Regras; onChange: (r: Regras) => void;
   opcoes?: { cidades: Opcao[]; categorias: Opcao[]; canais: Opcao[] }; listas?: Array<Lista & { total: number }>; semTipo?: boolean;
 }) {
   const [op, setOp] = useState(opcoes);
-  const [conta, setConta] = useState<{ total: number; destinatarios: number } | null>(null);
+  const [conta, setConta] = useState<{ total: number; destinatarios: number; semCadastroApp?: number } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const r = regras;
   const mudar = (p: Partial<Regras>) => onChange({ ...r, ...p });
@@ -72,11 +72,11 @@ export function EditorRegras({ regras, onChange, opcoes, listas, semTipo }: {
     let vivo = true;
     const t = setTimeout(() => {
       if (!opcoes) crm.publico({ tipo: r.tipo }).then((p) => vivo && setOp(p.opcoes)).catch(() => {});
-      crm.contar(r).then((c) => { if (vivo) { setConta(c); setErro(null); } }).catch((e) => vivo && setErro(erroTexto(e)));
+      crm.contar(r, canal).then((c) => { if (vivo) { setConta(c); setErro(null); } }).catch((e) => vivo && setErro(erroTexto(e)));
     }, 300);
     return () => { vivo = false; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(r)]);
+  }, [JSON.stringify(r), canal]);
   const listasDoTipo = (listas ?? []).filter((l) => l.regras.tipo === r.tipo);
   return (
     <div className="form">
@@ -104,7 +104,7 @@ export function EditorRegras({ regras, onChange, opcoes, listas, semTipo }: {
         </label>
       )}
       <div className="aviso" style={{ background: "var(--info-bg)", color: "var(--info)", marginBottom: 0 }} aria-live="polite">
-        <Users size={14} /> {erro ? erro : conta ? <><strong>{conta.destinatarios}</strong> {conta.destinatarios === 1 ? "pessoa recebe" : "pessoas recebem"} ({conta.total} no segmento; quem não tem telefone, está bloqueado ou pediu para sair fica de fora)</> : "Contando..."}
+        <Users size={14} /> {erro ? erro : conta ? <><strong>{conta.destinatarios}</strong> {conta.destinatarios === 1 ? "pessoa recebe" : "pessoas recebem"} ({conta.total} no segmento; {canal === "app" ? `${conta.semCadastroApp ?? 0} sem cadastro no app ficam de fora, além de quem não tem telefone, está bloqueado ou pediu para sair` : "quem não tem telefone, está bloqueado ou pediu para sair fica de fora"})</> : "Contando..."}
       </div>
     </div>
   );

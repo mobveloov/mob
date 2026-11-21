@@ -3,6 +3,7 @@ import { Bell, ChevronDown, ChevronRight, RefreshCw, Search, X } from "lucide-re
 import { CANAIS_ENVIO, infoGatilho, ROTULOS_ORIGEM, TIPOS_GATILHO } from "../../crm/catalogo.ts";
 import { Cartao, useCarregar } from "../componentes/ui";
 import { automacao } from "./api-automacao";
+import { classeApp, ROTULO_APP, StatusApp } from "./status-app";
 import { classeEnvio, Contagem, hora, Paginador, ROTULO_ENVIO, useAtrasado } from "./automacao-comum";
 
 type Periodo = "today" | "7d" | "30d" | "custom";
@@ -102,7 +103,7 @@ export default function Notificacoes() {
             <button type="button" onClick={() => setAberto(abre ? null : l.id)} style={{ all: "unset", cursor: "pointer", display: "flex", gap: 10, width: "100%" }}>
               {abre ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <span style={{ minWidth: 0, flex: 1 }}>
-                <span><span className={`selo ${classeEnvio(l.estado)}`}>{ROTULO_ENVIO[l.estado] ?? l.estado}</span> <span className="selo">{ROTULOS_ORIGEM[l.origem] ?? l.origem}</span> <span className="selo">{canalNome(l.canal)}</span> {src && <small className="sub">{src}</small>}</span>
+                <span>{l.canal === "app" && l.estado === "sent" && l.app ? <span className={`selo ${classeApp(l.app.estado)}`}>{ROTULO_APP[l.app.estado] ?? l.app.estado}</span> : <span className={`selo ${classeEnvio(l.estado)}`}>{ROTULO_ENVIO[l.estado] ?? l.estado}</span>} <span className="selo">{ROTULOS_ORIGEM[l.origem] ?? l.origem}</span> <span className="selo">{canalNome(l.canal)}</span> {src && <small className="sub">{src}</small>}</span>
                 <span style={{ display: "block", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.titulo ? <strong>{l.titulo} </strong> : null}<small className="sub">{l.previa}</small></span>
                 <small className="sub">{l.nome || "Sem nome"} · {l.telefone} · {hora(l.em)}</small>
               </span>
@@ -113,10 +114,11 @@ export default function Notificacoes() {
                 {l.previa && <p style={{ whiteSpace: "pre-wrap" }}><small className="sub">Mensagem:</small> {l.previa}</p>}
                 {l.erro && <p style={{ color: "var(--alerta)" }}><small className="sub">Motivo/erro:</small> {l.erro}</p>}
                 <div className="grade" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 4 }}>
-                  <p><small className="sub">Passageiro:</small> {l.nome || "-"} ({l.telefone})</p>
+                  <p><small className="sub">{l.app?.papel === "motorista" ? "Motorista" : l.app?.papel === "passageiro" ? "Passageiro" : "Pessoa"}:</small> {l.nome || "-"} ({l.telefone})</p>
                   <p><small className="sub">Data:</small> {hora(l.em)}</p>
                   {l.origem === "trigger" && <p><small className="sub">Evento:</small> {infoGatilho(gat.get(l.origem_id)?.type ?? "")?.label ?? "-"}</p>}
                   {src && <p><small className="sub">{ROTULOS_ORIGEM[l.origem]}:</small> {src}</p>}
+                  {l.canal === "app" && l.estado === "sent" && <div style={{ gridColumn: "1 / -1" }}><StatusApp app={l.app} /></div>}
                   {l.faixa != null && <p><small className="sub">Faixa:</small> {l.faixa} dia(s) sem corrida</p>}
                   {l.variante && <p><small className="sub">Variante A/B:</small> {l.variante}</p>}
                 </div>

@@ -20,8 +20,8 @@ export default function CrmCampanhas() {
 
   const acao = (c: CampanhaLinha, a: "pausar" | "retomar" | "cancelar" | "duplicar", ok: string) => tentar(() => crm.acao(c.id, a), ok).then(recarregar);
   const disparar = async (c: CampanhaLinha) => {
-    const n = await crm.contar(c.publico).catch(() => null);
-    if (!confirm(`Enviar "${c.nome}" agora para ${n?.destinatarios ?? "?"} pessoas? As mensagens saem em lotes, com pausa entre eles.`)) return;
+    const n = await crm.contar(c.publico, c.canal === "app" ? "app" : "whatsapp").catch(() => null);
+    if (!confirm(`Enviar "${c.nome}" agora para ${n?.destinatarios ?? "?"} pessoas${c.canal === "app" && n?.semCadastroApp ? ` (${n.semCadastroApp} ficam de fora por não terem cadastro no app)` : ""}? As mensagens saem em lotes, com pausa entre eles.`)) return;
     await tentar(() => crm.disparar(c.id), (r) => `${r.naFila ?? 0} mensagens na fila de envio.`);
     recarregar();
   };
@@ -122,7 +122,7 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Campanha>; onSalvo: () 
         <small>{CANAIS_ENVIO.find((x) => x.value === (c.canal ?? "whatsapp"))?.hint}</small>
       </label>
       <h3 className="sub">Quem recebe</h3>
-      <EditorRegras regras={c.publico ?? { tipo: "passageiro" }} onChange={(publico) => mudar({ publico })} listas={listas.dados?.listas} />
+      <EditorRegras canal={c.canal === "app" ? "app" : "whatsapp"} regras={c.publico ?? { tipo: "passageiro" }} onChange={(publico) => mudar({ publico })} listas={listas.dados?.listas} />
       <h3 className="sub">Mensagem</h3>
       <label>Texto<textarea ref={campo} rows={5} value={c.texto ?? ""} onChange={(e) => mudar({ texto: e.target.value })} /><small>Clique para inserir uma variável:</small></label>
       <Variaveis onInserir={inserir} />

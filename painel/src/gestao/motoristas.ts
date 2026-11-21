@@ -18,6 +18,7 @@ import { arquivo, ler } from "../apps/armazem.ts";
 import { documentosObrigatorios, enviarDocumento, extrato, lancar, pessoa, removerDocumento, salvarPessoa, saldo, saldos, TIPOS_DOCUMENTO, MAX_DOC } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
 import { agoraBr, arred, celulaCsv, normal } from "../servidor/util.ts";
+import { camposFaltando, estaAtivando, mensagemFaltam } from "../comum/motorista-ativar.ts";
 import { conferir, cepValido, cpfValido, emailValido, placaValida, renavamValido, soDigitos, telefoneValido, UFS } from "./validacao.ts";
 import { cad, contem, digitos, emp, ok, paginar, quem, registros, soAdmin, texto } from "./comum.ts";
 import {
@@ -169,6 +170,13 @@ export function validarMotorista(dados: Record<string, unknown>, anterior: Regis
   }
 }
 
+/** Só na hora de ATIVAR o motorista os dados do cadastro viram obrigatórios (cadastro vindo do app nasce incompleto e pode ser ajustado). */
+export function exigirParaAtivar(anterior: Registro, depois: Record<string, unknown>) {
+  if (!estaAtivando(anterior.status, depois.status)) return;
+  const faltam = camposFaltando(depois);
+  if (faltam.length) throw new Error(mensagemFaltam(faltam));
+}
+
 /** Normaliza o que o painel mostra no que o app guarda (CPF só com números etc.). */
 function normalizarMotorista(dados: Record<string, unknown>) {
   for (const k of ["cpf", "bancoCpfTitular", "cep"]) if (k in dados && dados[k]) dados[k] = soDigitos(dados[k]);
@@ -284,6 +292,7 @@ export function rotasMotoristas(r: Router) {
     validarMotorista(entrada, anterior, false); normalizarMotorista(entrada); espelharCamposDoMotorista(entrada);
     if ("cpf" in entrada) cpfRepetido(e, entrada.cpf, anterior.id);
     const dados = juntar(anterior, entrada, CAMPOS_MOTORISTA);
+    exigirParaAtivar(anterior, dados);
     if ("status" in entrada && entrada.status !== anterior.status) dados.statusMudouEm = new Date().toISOString();
     const m = atualizar(e, cad("motoristas"), anterior.id, dados, quem(req));
     if (b.financeiro && ehAdmin(req)) salvarFinanceiro(e, m.id, b.financeiro as Record<string, unknown>);

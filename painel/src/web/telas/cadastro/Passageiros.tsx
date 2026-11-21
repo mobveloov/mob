@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEndereco";
 import { Cabecalho, Campo, chamar, ComFiltros, consulta, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
+import { decimal } from "../../../comum/formato-br.ts";
 
 interface Linha { id: string; nome: string; telefone: string; email: string; cidade: string; genero: string; dispositivo: string; origem: string; tipoCurto: string; nota: number | null; status: string; bloqueado: boolean }
 interface Resposta { passageiros: Linha[]; paginacao: { atual: number; totalPaginas: number; totalItens: number }; contadores: Record<string, number> }
@@ -71,7 +72,7 @@ export default function Passageiros() {
                 <td><strong>{p.nome}</strong></td>
                 <td>{p.telefone}</td>
                 <td>{p.email}</td>
-                <td>{p.nota == null ? "Avaliações Insuficientes" : `${p.nota.toFixed(1)} ★`}</td>
+                <td>{p.nota == null ? "Avaliações Insuficientes" : `${decimal(p.nota, 1)} ★`}</td>
                 <td><Selo tom={p.bloqueado ? "ruim" : "ok"}>{p.status}</Selo></td>
                 <td>{p.tipoCurto}</td>
                 <td className="direita"><MenuAcoes itens={[
@@ -115,7 +116,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
     if (await tentar(() => (novo ? chamar("POST", "/passageiros", corpo) : chamar("PUT", `/passageiros/${id}`, corpo)), "Cliente salvo.")) { onSalvo(); onFechar(); }
   };
   return (
-    <Janela cheia aberta titulo="Cadastro de passageiro" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>{novo ? "Criar novo cliente" : "Salvar"}</button></>}>
+    <Janela cheia aberta titulo="Cadastro de passageiro" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>Gravar</button></>}>
       {aviso}
       <h4 className="cg-secao">Informações gerais</h4>
       <div className="cg-grade">
@@ -153,7 +154,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
       {!novo && <>
         <h4 className="cg-secao">Avaliações</h4>
         <div className="cg-grade">
-          <Campo rotulo="Nota Passageiro (Média)"><input readOnly value={nota == null ? "-" : nota.toFixed(1)} /></Campo>
+          <Campo rotulo="Nota Passageiro (Média)"><input readOnly value={nota == null ? "-" : decimal(nota, 1)} /></Campo>
           <Campo rotulo="Avaliou o App?"><select value={f.avaliouApp} onChange={(e) => set("avaliouApp", e.target.value)}><option>Pendente</option><option>Avaliou</option><option>Não quis avaliar</option><option>Adiou</option></select></Campo>
           <Campo rotulo="Nota para o App"><select value={f.notaApp} onChange={(e) => set("notaApp", e.target.value)}>{[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} ★</option>)}</select></Campo>
         </div>

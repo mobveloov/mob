@@ -7,6 +7,7 @@ import { pedirConfig } from "../demais/comum";
 import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEndereco";
 import { Aviso, L, fone, msgErro, op, pino, reais, soDig, useDados, useMapa } from "./comum";
 import "./corridas.css";
+import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 
 const PAGAMENTOS = ["Dinheiro", "Crédito", "Débito", "Pix"];
 const EXIGENCIAS = ["Porta-malas grande", "Aceita encomendas", "Adaptado para cadeirante", "Ficar à disposição do passageiro"];
@@ -117,7 +118,7 @@ export default function Solicitar() {
     const carros = (mapa.dados?.motoristas ?? []).filter((x: any) => x.lat != null && x.situacao !== "offline");
     for (const c of carros) L.marker([c.lat, c.lng], { icon: pino(c.situacao === "livre" ? "#22c55e" : "#64748b", "🚗") }).bindPopup(`<b>${c.nome}</b><br>${c.placa}`).addTo(g);
     const k = JSON.stringify(pts) + carros.length;
-    if (ajustado.current !== k) { ajustado.current = k; const todos = [...pts, ...carros.map((c: any) => [c.lat, c.lng] as [number, number])]; if (todos.length) m.fitBounds(L.latLngBounds(todos).pad(0.3), { maxZoom: 15 }); }
+    if (ajustado.current !== k) { ajustado.current = k; const todos = [...pts, ...carros.map((c: any) => [c.lat, c.lng] as [number, number])]; if (todos.length) ajustarSeguro(m, L.latLngBounds(todos).pad(0.3), { maxZoom: 15 }); }
   }, [m, origem, destino, paradas, semDestino, mapa.dados]);
 
   const minimo = useMemo(() => new Date(Date.now() - 3 * 3600_000 + 20 * 60_000).toISOString().slice(0, 16), []);

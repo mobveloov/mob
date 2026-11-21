@@ -87,7 +87,7 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Jornada>; onSalvo: () =
         <label>Dias (X)<input type="number" min={1} max={365} value={g.dias} onChange={(e) => setJ({ ...j, gatilho: { ...g, dias: Number(e.target.value) } })} /></label>
       </div>
       <h3 className="sub">Filtro extra do público (opcional)</h3>
-      <EditorRegras regras={j.publico ?? { tipo: "passageiro" }} onChange={(publico) => setJ({ ...j, publico })} />
+      <EditorRegras canal={j.canal === "app" ? "app" : "whatsapp"} regras={j.publico ?? { tipo: "passageiro" }} onChange={(publico) => setJ({ ...j, publico })} />
       <div className="aviso">Com o gatilho, hoje <strong>{alcance ?? "..."}</strong> pessoas receberiam (quem já recebeu e não pediu de novo fica de fora).</div>
       <h3 className="sub">Mensagem</h3>
       <label>Texto<textarea ref={campo} rows={5} value={j.texto ?? ""} onChange={(e) => setJ({ ...j, texto: e.target.value })} /></label>

@@ -129,7 +129,7 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
 
   return (
     <Janela cheia aberta titulo={e ? "Alterando Empresa" : "Criando Empresa"} sub="Campos com * são obrigatórios." largura="grande" onFechar={onFechar}
-      rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>{e ? "Gravar" : "Criar"}</button></>}>
+      rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>Gravar</button></>}>
       {aviso}
       <h4 className="cg-secao">Dados da empresa</h4>
       <div className="cg-grade">

@@ -8,6 +8,7 @@ import { empresaEscolhidaAgora } from "../../api";
 import { useAdmin } from "../../crm/comum";
 import { Abas, Campo, chamar, dataHoraBr, dinheiro, Interruptor, Janela, Opcoes, Selo, useAviso, Vazio } from "./base";
 import MapaAreas from "./MapaAreas";
+import { camposFaltando, estaAtivando, mensagemFaltam } from "../../../comum/motorista-ativar.ts";
 
 type ModoTaxa = "padrao" | "personalizado" | "isento";
 type ModoSaldo = "padrao" | "desativado" | "personalizado";
@@ -50,7 +51,6 @@ const CAMPOS = [
   "tipoChavePix", "chavePix", "obsInterna1", "obsInterna2", "obsInterna3", "bancoCpfTitular", "bancoNomeTitular", "ocupacao", "renda", "bancoNumero", "bancoAgencia", "bancoConta", "bancoContaDv",
 ] as const;
 const BOOLEANOS = ["fantasma", "semNumero"];
-const OBRIGATORIOS: Array<[string, string]> = [["nome", "Nome"], ["nascimento", "Nascimento"], ["email", "E-mail"], ["telefone", "Telefone"], ["cpf", "CPF"], ["nivel", "Relação"], ["endereco", "Endereço"], ["cep", "CEP"], ["uf", "UF"], ["cidade", "Cidade"], ["bairro", "Bairro"]];
 
 const texto = (v: unknown) => (v == null ? "" : String(v));
 const num = (v: string) => Number(v.replace(",", "."));
@@ -88,16 +88,18 @@ export default function MotoristaJanela({ id, onFechar, onSalvo, cidades, catego
   const opPag = det?.preferencias.opcoesPagamento ?? opcoesNovo.opcoesPagamento;
   const opExi = det?.preferencias.opcoesExigencia ?? opcoesNovo.opcoesExigencia;
 
+  // Obrigatórios só valem ao criar pelo painel ou ao ATIVAR (cadastro vindo do app nasce incompleto e pode ser ajustado).
+  const ativando = !novo && estaAtivando(det?.motorista.status, dados.status);
   const faltando = () => {
-    const f = OBRIGATORIOS.filter(([k]) => !texto(dados[k]).trim()).map(([, r]) => r);
-    if (dados.semNumero !== true && !texto(dados.numero).trim()) f.push("Número");
+    if (!novo && !ativando) return [];
+    const f = camposFaltando(dados);
     if (novo && !cats.length) f.push("Categorias");
     return f;
   };
 
   const salvar = async () => {
     const f = faltando();
-    if (f.length) { setAviso({ texto: `Preencha os campos obrigatórios: ${f.join(", ")}.`, erro: true }); return; }
+    if (f.length) { setAviso({ texto: mensagemFaltam(f, ativando ? "ativar" : "cadastrar"), erro: true }); return; }
     setSalvando(true);
     const d: Record<string, unknown> = { ...dados, fantasma: dados.fantasma === true, semNumero: dados.semNumero === true, categorias: cats.join(", ") };
     for (const k of ["renda"]) if (d[k] === "") d[k] = null;
@@ -135,7 +137,7 @@ export default function MotoristaJanela({ id, onFechar, onSalvo, cidades, catego
               <div className="cg-kpi"><span>Total de corridas finalizadas</span><strong style={{ fontSize: 18 }}>{det.resumo.finalizadas}</strong></div>
             </div>
           )}
-          <p style={{ margin: "0 0 6px", color: "var(--cg-suave)" }}>Campos com * são obrigatórios.</p>
+          <p style={{ margin: "0 0 6px", color: "var(--cg-suave)" }}>Campos com * são obrigatórios para ativar o motorista.</p>
           {!novo && det?.indicadoPor && <p style={{ margin: "0 0 6px" }}>Motorista indicado por: <b>{det.indicadoPor}</b></p>}
           <h4 className="cg-secao">Dados Principais</h4>
           <div className="cg-grade">
