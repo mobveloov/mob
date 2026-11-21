@@ -4,6 +4,8 @@
 //   GET  /historico                    histórico com filtros avançados (paginado no banco; ?todas=1 devolve a lista das outras fontes)
 //   GET  /historico/exportar           planilha CSV do filtro (com proteção contra fórmula)
 //   GET  /corridas/:id                 detalhe (repasses, financeiro, datas)
+//   GET  /corridas/:id/log             Histórico da OS: eventos da corrida (criada, chamadas, aceite, a caminho, chegou, iniciou, finalizou, cancelou, mudanças)
+//   GET  /corridas/:id/trajeto         Trajeto da OS: pontos de GPS gravados, etapas, distância e tempo realizados, paradas
 //   GET  /corridas/:id/raiox           auditoria: ondas de envio, timeline técnica, motoristas da região
 //   GET  /corridas/:id/rastreio        rastreio (posição do motorista e link de compartilhar)
 //   GET  /corridas/:id/recibo          recibo em HTML
@@ -23,7 +25,7 @@ import { aposCancelar, aposFinalizar } from "../apps/extras.ts";
 import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { alterarCampos, listar } from "../cadastros/armazem.ts";
-import { alertas } from "../apps/despacho.ts";
+import { sosPendentes } from "../apps/sos.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
@@ -93,7 +95,7 @@ rotasOperacao.get("/historico", ok(async (req, res) => {
   if (soProprias(req, f) && req.query.todas !== "1") {
     const r = consultarProprias(emp(req), f, pag(req), porPagina, nomeDaCentral(req));
     const empresas = empresasPorTelefone(emp(req));
-    const comAlerta = new Set(alertas(emp(req)).filter((a) => !a.resolvido).map((a) => `propria:${a.corridaId}`));
+    const comAlerta = new Set(sosPendentes(emp(req)).filter((a) => a.corridaId).map((a) => `propria:${a.corridaId}`));
     return res.json({
       avisos: [], stats: r.stats, filtroBase: base, pagina: r.pagina, paginas: r.paginas, total: r.total, status: S.STATUS_FILTRO,
       corridas: r.itens.map((c) => ({ ...paraLinha(c, empresas), alerta: comAlerta.has(`propria:${c.id}`) })),
@@ -123,6 +125,8 @@ rotasOperacao.get("/historico/exportar", ok((req, res) => {
 // ------------------------------------------------------------------ uma corrida
 
 rotasOperacao.get("/corridas/:id", ok((req, res) => res.json(S.detalhe(emp(req), req.params.id))));
+rotasOperacao.get("/corridas/:id/log", ok(async (req, res) => res.json(await S.logDaSolicitacao(emp(req), req.params.id))));
+rotasOperacao.get("/corridas/:id/trajeto", ok((req, res) => res.json(S.trajetoDaCorrida(emp(req), req.params.id))));
 rotasOperacao.get("/corridas/:id/raiox", ok((req, res) => res.json(S.raioX(emp(req), req.params.id))));
 rotasOperacao.get("/corridas/:id/rastreio", ok((req, res) => res.json(S.rastreio(emp(req), req.params.id, `${req.protocol}://${req.get("host")}`))));
 rotasOperacao.get("/corridas/:id/recibo", ok((req, res) => res.json({ html: S.recibo(emp(req), req.params.id) })));

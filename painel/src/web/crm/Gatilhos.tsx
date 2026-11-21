@@ -248,6 +248,7 @@ function Formulario({ gatilho, templates, onSalvo }: { gatilho: GatilhoLinha | n
   const [uma, setUma] = useState(!!cfg.once_per_contact);
   const [cidade, setCidade] = useState(typeof cfg.city === "string" ? cfg.city : "");
   const [janela, setJanela] = useState(!!cfg.respect_window);
+  const [canalEnvio, setCanalEnvio] = useState<"whatsapp" | "app">(gatilho?.send_channel ?? "whatsapp");
   const info = infoGatilho(tipo);
   const [teto, setTeto] = useState(cfg.respect_daily_cap !== undefined ? !!cfg.respect_daily_cap : !info?.transactional);
   const tpl = templates.find((t) => t.id === templateId);
@@ -283,7 +284,7 @@ function Formulario({ gatilho, templates, onSalvo }: { gatilho: GatilhoLinha | n
     if (cidade.trim()) config.city = cidade.trim();
     if (janela) config.respect_window = true;
     config.respect_daily_cap = teto;
-    const corpo = { name: nome.trim(), template_id: templateId, trigger_type: tipo, trigger_config: config, send_channel: "whatsapp" as const, ...(editada ? { mensagem: { titulo: titulo.trim(), texto: texto.trim(), copia } } : {}) };
+    const corpo = { name: nome.trim(), template_id: templateId, trigger_type: tipo, trigger_config: config, send_channel: canalEnvio, ...(editada ? { mensagem: { titulo: titulo.trim(), texto: texto.trim(), copia } } : {}) };
     const r = await tentar(() => (gatilho ? automacao.salvarGatilho(gatilho.id, corpo) : automacao.novoGatilho(corpo)));
     if (r) onSalvo();
   };
@@ -316,7 +317,7 @@ function Formulario({ gatilho, templates, onSalvo }: { gatilho: GatilhoLinha | n
           </select>
         </label>
         <label>Canal
-          <select value="whatsapp" onChange={() => {}}>{CANAIS_ENVIO.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
+          <select value={canalEnvio} onChange={(e) => setCanalEnvio(e.target.value as "whatsapp" | "app")}>{CANAIS_ENVIO.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
         </label>
       </div>
       {tpl && (

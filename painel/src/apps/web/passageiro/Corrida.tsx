@@ -5,16 +5,16 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Bike, CarFront, Clock, Flag, LocateFixed, MapPin, MessageSquareText, Moon, Pencil, Phone, Plus, Search, Share2, ShieldAlert, Sun, Tag, User, Wallet, X, XCircle } from "lucide-react";
 import { api, posicaoAgora, reais, vibrar, type Posicao } from "../comum/api";
-import { mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { mensagemDeErro, useConfigDoPainel, type MarcaApp } from "../comum/ui";
 import {
   apiOu, compartilharTexto, distanciaKm, ehMoto, faixaDaOferta, linhasDoEndereco, linkPublico, PASSO_OFERTA, rotaFaltando, ruaCurta, temCoord, valorDaCorrida,
   type ContraOferta, type Corrida, type Endereco, type Ponto,
 } from "./apoio";
 import { Mapa } from "./Mapa";
+import { enviarSos } from "../comum/sos";
 import { pontosDaRota } from "./Opcoes";
 import { Avatar, Aviso, Dialogo, FolhaBaixo, FolhaModal, Nota, Placa, PrecoAjustavel } from "./pecas";
 
-const MOTIVOS_PADRAO = ["Motorista demorou muito", "Valor da corrida", "Pedi por engano", "Outro"];
 
 /** Cronômetro desde que a busca começou (guardado por corrida, para não zerar ao reabrir o app). */
 function useCronometro(id: string) {
@@ -158,7 +158,7 @@ export function Cancelar({ corrida: c, fechar, mudou }: { corrida: Corrida; fech
   const [motivo, setMotivo] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
-  useEffect(() => { void apiOu<{ motivos: string[] }>("/motivos-cancelamento", { motivos: MOTIVOS_PADRAO }).then((r) => setMotivos(r.motivos.length ? r.motivos : MOTIVOS_PADRAO)).catch(() => setMotivos(MOTIVOS_PADRAO)); }, []);
+  useEffect(() => { void apiOu<{ motivos: string[] }>("/motivos-cancelamento", { motivos: [] }).then((r) => setMotivos(r.motivos)).catch(() => setMotivos([])); }, []);
   const confirmar = async () => {
     setErro(""); setOcupado(true);
     try { mudou((await api<{ corrida: Corrida }>(`/corridas/${c.id}/cancelar`, { corpo: { motivo } })).corrida); fechar(); }
@@ -190,6 +190,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
   const [aviso, setAviso] = useState("");
   const [erro, setErro] = useState("");
   const m = c.motorista;
+  const regras = useConfigDoPainel();
 
   // Distância e tempo do motorista: do servidor, ou calculados pela posição dele (≈ 25 km/h na cidade).
   const alvo = c.status === "em_andamento" ? c.destino : c.embarque;
@@ -210,7 +211,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
   const sos = async () => {
     setJanela("");
     const p = await posicaoAgora().catch(() => null);
-    try { await api(`/corridas/${c.id}/sos`, { corpo: p ?? {} }); setAviso("A central foi avisada. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+    try { await enviarSos(c.id, p); } catch (e) { setErro(mensagemDeErro(e)); }
   };
 
   const podeCancelar = ["a_caminho", "no_local"].includes(c.status);
@@ -264,7 +265,7 @@ export function Acompanhar({ corrida: c, pos, marca, naoLidas, abrirChat, mudou 
               <div className="ponto-rota"><span className="bola-rota" /><span><small className="cor-texto">Embarque</small><strong>{e1}</strong><small>{e2}</small></span></div>
               {(c.paradas ?? []).map((p, i) => { const [p1, p2] = linhasDoEndereco(p); return <Fragment key={i}><div className="ponto-rota"><span className="bola-rota parada">{i + 1}</span><span><small>Parada {i + 1}</small><strong>{p1}</strong><small>{p2}</small></span></div></Fragment>; })}
               {c.destino && (() => { const [d1, d2] = linhasDoEndereco(c.destino); return <div className="ponto-rota"><span className="bola-rota fim" /><span><small>Destino</small><strong>{d1}</strong><small>{d2}</small></span></div>; })()}
-              {c.status !== "finalizada" && <button className="botao-claro" onClick={() => setJanela("rota")}><Pencil size={16} /> Editar rota</button>}
+              {c.status !== "finalizada" && (regras?.passageiro.editarRota ?? true) && <button className="botao-claro" onClick={() => setJanela("rota")}><Pencil size={16} /> Editar rota</button>}
             </div>
             <div className="duas-colunas">
               <div className="mini-cartao"><Wallet size={22} /><span><small>Pagamento</small><strong>{c.pagamento}</strong></span></div>

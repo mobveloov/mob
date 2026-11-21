@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { reaplicarPersonalizacao } from "./personalizacao";
-import { ACEITA_MIDIA, api, config, enviarMidiaDoChat, ErroApi, guardarToken, Gravador, problemaDaMidia, trocarServidor, urlArquivo, urlDaMidia, urlDoAudio, type Papel, type Posicao } from "./api";
+import { ACEITA_MIDIA, api, urlApi, config, enviarMidiaDoChat, ErroApi, guardarToken, Gravador, problemaDaMidia, trocarServidor, urlArquivo, urlDaMidia, urlDoAudio, type Papel, type Posicao } from "./api";
 
 export interface MarcaApp {
   empresaId: string; nome: string; nomeExibido: string; cores: { primaria: string; secundaria: string; fundo: string; texto: string };
@@ -26,7 +26,7 @@ export function aplicarMarca(m: MarcaApp) {
   s.setProperty("--fonte", `"${m.fonte}", system-ui, sans-serif`);
   document.title = m.nome;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", m.cores.primaria);
-  if (config().papel === "passageiro") reaplicarPersonalizacao(); // a personalização do painel vale por cima da marca
+  reaplicarPersonalizacao(); // a personalização do painel vale por cima da marca
 }
 
 export function useMarca() {
@@ -325,3 +325,52 @@ export function Carregando({ texto = "Carregando…" }: { texto?: string }) { re
 export function Cartao({ children, className = "" }: { children: ReactNode; className?: string }) { return <section className={`cartao ${className}`}>{children}</section>; }
 
 export const mensagemDeErro = (e: unknown) => (e instanceof ErroApi || e instanceof Error ? e.message : "Erro.");
+
+// ------------------------------------------------------------------ regras do painel (rota /config)
+
+/** O que o painel manda para os apps (Configurações › Gerais, Categorias e Pagamentos). Só o que os apps usam. */
+export interface ConfigDoPainel {
+  passageiro: { paradasAtivo: boolean; limiteParadas: number; editarRota: boolean; destinoLivre: boolean; agendamentoMinutos: number; agendamentoDias: number; avisoDinamica: boolean; cpfObrigatorio: boolean };
+  motorista: { botaoPanico: boolean; avisosDeConduta: string[]; problemasNaCorrida: string[]; editarValorFinal: boolean; confirmarTaxas: boolean; mapaNavegacao: boolean; distanciaRecalculo: number; contraofertaSegundos: number };
+  macaneta: { ativo: boolean; pedeNome: boolean; pedeTelefone: boolean; pedeCpf: boolean; pedeEmail: boolean; categorias: string[] };
+  pagamentos: { cartaoApp: { ativo: boolean } };
+  assuntosDeOcorrencia: string[];
+  categorias: Array<{ nome: string; capacidade?: number | string; tipoFisico?: "carro" | "moto" | "caminhao"; permiteAgendamento?: boolean; ocultarCapacidade?: boolean; negociacao?: { ativo: boolean; descontoMaxPax: number; acrescimoMaxMot: number } }>;
+}
+let configDoPainel: ConfigDoPainel | null = null;
+let buscandoConfig: Promise<void> | null = null;
+const ouvintesConfig = new Set<() => void>();
+function carregarConfigDoPainel() {
+  buscandoConfig ??= api<ConfigDoPainel>("/config").then((c) => { configDoPainel = c; ouvintesConfig.forEach((f) => f()); }).catch(() => undefined).finally(() => { buscandoConfig = null; });
+  return buscandoConfig;
+}
+/** Regras do painel. Vem nulo até a primeira resposta (ou se o servidor não responder): quem usa deve ter um comportamento neutro. Atualiza ao voltar para o app. */
+export function useConfigDoPainel(): ConfigDoPainel | null {
+  const [c, setC] = useState(configDoPainel);
+  useEffect(() => {
+    const atualizar = () => setC(configDoPainel);
+    ouvintesConfig.add(atualizar);
+    void carregarConfigDoPainel();
+    const voltou = () => { if (document.visibilityState === "visible") void carregarConfigDoPainel(); };
+    document.addEventListener("visibilitychange", voltou);
+    return () => { ouvintesConfig.delete(atualizar); document.removeEventListener("visibilitychange", voltou); };
+  }, []);
+  return c;
+}
+
+// ------------------------------------------------------------------ banners (Configurações › Gerais › Banners)
+
+/** Faixa com os banners que a empresa enviou pelo painel (tipo "app" na tela inicial, "login" na entrada). Sem banner, não mostra nada. */
+export function Banners({ tipo }: { tipo: "app" | "login" }) {
+  const [lista, setLista] = useState<Array<{ id: string; link: string; imagem: string }>>([]);
+  useEffect(() => { void api<{ banners: Array<{ id: string; link: string; imagem: string }> }>(`/banners?tipo=${tipo}`).then((r) => setLista(r.banners)).catch(() => undefined); }, [tipo]);
+  if (!lista.length) return null;
+  return (
+    <div className="faixa-banners">
+      {lista.map((b) => {
+        const img = <img src={urlApi(b.imagem)} alt="Banner da empresa" loading="lazy" />;
+        return b.link ? <a key={b.id} href={b.link} target="_blank" rel="noreferrer">{img}</a> : <span key={b.id}>{img}</span>;
+      })}
+    </div>
+  );
+}

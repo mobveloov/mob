@@ -1,18 +1,18 @@
-// Logo da empresa num círculo (ícone do app, ou o logo, ou as iniciais do nome).
+// Logo da empresa num círculo, no canto do topo do app. Vem da Personalização do painel (imagem escolhida); sem imagem, as iniciais do nome.
+// Nunca usa imagem fixa do app.
 
 import { urlArquivo } from "../comum/api";
+import { logoDaPersonalizacao, usePersonalizacao } from "../comum/personalizacao";
 import type { MarcaApp } from "../comum/ui";
 import { iniciais } from "./tipos";
-import { usePersonalizacao } from "../comum/personalizacao";
 
 export function LogoMarca({ marca, tamanho = 76 }: { marca: MarcaApp; tamanho?: number }) {
-  // O ícone/logo vem da Personalização do painel (imagem da marca, depois ícone e logo da empresa); o da marca do app só vale de reserva.
   const pers = usePersonalizacao();
-  const doPainel = (pers?.design.mostrarImagem && pers.design.imagemMarcaUrl) || pers?.empresa.icone || pers?.empresa.logoClaro || "";
-  const src = urlArquivo(doPainel || marca.icone || marca.logoClaro);
+  const src = urlArquivo(logoDaPersonalizacao(pers) || (pers ? "" : marca.icone || marca.logoClaro || ""));
+  const nome = pers?.empresa.nome || marca.nome;
   return (
     <span className="logo-circulo" style={{ width: tamanho, height: tamanho }}>
-      {src ? <img src={src} alt={marca.nome} /> : <strong>{iniciais(marca.nome)}</strong>}
+      {src ? <img src={src} alt={nome} /> : <strong>{iniciais(nome)}</strong>}
     </span>
   );
 }

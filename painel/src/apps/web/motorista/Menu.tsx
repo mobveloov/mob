@@ -8,10 +8,11 @@ import {
   BatteryCharging, Globe, Layers, Map as IconeMapa, Music, Smartphone, SquareDashed, Volume2, Vibrate, Timer, Mic, Radio, Bolt, Wifi,
 } from "lucide-react";
 import { api, flutuante, hora, reais, telefoneBonito, tempoReal, type Posicao } from "../comum/api";
-import { mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { Banners, mensagemDeErro, useConfigDoPainel, type MarcaApp } from "../comum/ui";
 import { FormDados, FormDocumentos, FormEndereco, FormFoto, FormVeiculo, type DadosCadastro } from "./Cadastro";
 import { Chamada } from "./Chamada";
 import { Conversa, type MensagemM } from "./Conversa";
+import { DIAS_COPIA } from "./gravador";
 import {
   ajustes as ajustesAgora, NOMES_NAVEGADOR, NOMES_SONS, NOMES_TEMA, tocar, useAjustes, VERSAO, type Navegador, type Sons, type Tema,
 } from "./ajustes";
@@ -25,6 +26,7 @@ type Voltar = { voltar: () => void };
 export function Corridas({ barra, aoPegar, aoMudar }: { barra: React.ReactNode; aoPegar: (c: Corrida) => void; aoMudar?: () => void }) {
   const [aba, setAba] = useState<"disponiveis" | "pendentes" | "programadas">("disponiveis");
   const { dados, erro, recarregar } = useBuscar<CorridasAbertas>("/corridas-abertas");
+  const regras = useConfigDoPainel();
   const [aberta, setAberta] = useState<CorridaAberta | null>(null);
   const [aviso, setAviso] = useState("");
   const [erroAcao, setErroAcao] = useState("");
@@ -64,7 +66,7 @@ export function Corridas({ barra, aoPegar, aoMudar }: { barra: React.ReactNode; 
         aceitar={async (valor, contra) => {
           setErroAcao("");
           try {
-            if (contra) { await api(`/corridas/${aberta.id}/contraoferta`, { corpo: { valor } }); setAviso("Contra-oferta enviada. Vale por 60 segundos."); setAberta(null); }
+            if (contra) { await api(`/corridas/${aberta.id}/contraoferta`, { corpo: { valor } }); setAviso(`Contra-oferta enviada. Vale por ${regras?.motorista.contraofertaSegundos ?? 60} segundos.`); setAberta(null); }
             else { const r = await api<{ corrida: Corrida }>(`/corridas/${aberta.id}/pegar`, { corpo: {} }); setAberta(null); aoPegar(r.corrida); }
             aoMudar?.(); void recarregar();
           } catch (e) { setErroAcao(mensagemDeErro(e)); void recarregar(); }
@@ -81,9 +83,14 @@ export function Macaneta({ voltar, posicao, aoAbrir }: Voltar & { posicao: Posic
   const [categoria, setCategoria] = useState("");
   const [destino, setDestino] = useState("");
   const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState(""), [cpf, setCpf] = useState(""), [email, setEmail] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
-  useEffect(() => { if (!categoria && op.dados?.categorias[0]) setCategoria(op.dados.categorias[0].nome); }, [op.dados, categoria]);
+  // Dados pedidos ao passageiro e categorias liberadas: Configurações › Gerais › Maçaneta.
+  const regras = useConfigDoPainel()?.macaneta;
+  const categorias = (op.dados?.categorias ?? []).filter((c) => !regras?.categorias.length || regras.categorias.includes(c.nome));
+  useEffect(() => { if ((!categoria || !categorias.some((c) => c.nome === categoria)) && categorias[0]) setCategoria(categorias[0].nome); }, [op.dados, categoria, regras]); // eslint-disable-line react-hooks/exhaustive-deps
+  const faltaDado = (regras?.pedeNome && nome.trim().length < 2) || (regras?.pedeTelefone && telefone.replace(/\D/g, "").length < 10) || (regras?.pedeCpf && cpf.replace(/\D/g, "").length !== 11) || (regras?.pedeEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
   const abrir = async () => {
     if (!posicao) { setErro("Ligue o GPS para abrir a corrida."); return; }
     setErro(""); setOcupado(true);
@@ -93,7 +100,7 @@ export function Macaneta({ voltar, posicao, aoAbrir }: Voltar & { posicao: Posic
         const r = await api<{ enderecos: Array<{ texto: string; lat: number; lng: number }> }>(`/enderecos?q=${encodeURIComponent(destino)}`);
         ponto = r.enderecos[0] ?? { texto: destino };
       }
-      const r = await api<{ corrida: Corrida }>("/macaneta", { corpo: { modo, categoria, destino: ponto, lat: posicao.lat, lng: posicao.lng, passageiro: nome ? { nome } : undefined } });
+      const r = await api<{ corrida: Corrida }>("/macaneta", { corpo: { modo, categoria, destino: ponto, lat: posicao.lat, lng: posicao.lng, passageiro: { nome, telefone, cpf, email } } });
       aoAbrir(r.corrida);
     } catch (e) { setErro(mensagemDeErro(e)); } finally { setOcupado(false); }
   };
@@ -117,12 +124,15 @@ export function Macaneta({ voltar, posicao, aoAbrir }: Voltar & { posicao: Posic
           </div>
           {modo === "destino" && <label className="campo"><span className="campo-rotulo">Destino *</span><span className="campo-caixa"><MapPin size={18} className="campo-icone" /><input value={destino} placeholder="Rua, número e bairro" onChange={(e) => setDestino(e.target.value)} /></span></label>}
           <div className="aviso-taximetro"><Info size={18} /><span>{modo === "taximetro" ? "O valor será apurado em tempo real pelo taxímetro durante a viagem de acordo com a distância e o tempo decorridos." : "O valor será calculado pela rota até o destino que você informar."}</span></div>
-          <label className="campo"><span className="campo-rotulo">Categoria</span><span className="campo-caixa"><select value={categoria} onChange={(e) => setCategoria(e.target.value)}>{(op.dados?.categorias ?? []).map((c) => <option key={c.nome}>{c.nome}</option>)}</select><ChevronDown size={18} className="campo-icone" /></span></label>
-          <label className="campo"><span className="campo-rotulo">Nome do passageiro (opcional)</span><span className="campo-caixa"><User size={18} className="campo-icone" /><input value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></span></label>
+          <label className="campo"><span className="campo-rotulo">Categoria</span><span className="campo-caixa"><select value={categoria} onChange={(e) => setCategoria(e.target.value)}>{categorias.map((c) => <option key={c.nome}>{c.nome}</option>)}</select><ChevronDown size={18} className="campo-icone" /></span></label>
+          <label className="campo"><span className="campo-rotulo">Nome do passageiro{regras?.pedeNome ? " *" : " (opcional)"}</span><span className="campo-caixa"><User size={18} className="campo-icone" /><input value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></span></label>
+          {regras?.pedeTelefone && <label className="campo"><span className="campo-rotulo">Telefone do passageiro *</span><span className="campo-caixa"><input inputMode="tel" value={telefone} maxLength={20} onChange={(e) => setTelefone(e.target.value)} /></span></label>}
+          {regras?.pedeCpf && <label className="campo"><span className="campo-rotulo">CPF do passageiro *</span><span className="campo-caixa"><input inputMode="numeric" value={cpf} maxLength={14} onChange={(e) => setCpf(e.target.value)} /></span></label>}
+          {regras?.pedeEmail && <label className="campo"><span className="campo-rotulo">E-mail do passageiro *</span><span className="campo-caixa"><input type="email" value={email} maxLength={100} onChange={(e) => setEmail(e.target.value)} /></span></label>}
           <Erro texto={erro} />
         </div>
         <div className="fundo-botao">
-          <button type="button" className="botao-m verde" disabled={ocupado || !categoria || (modo === "destino" && destino.trim().length < 3)} onClick={() => void abrir()}><Play size={16} fill="currentColor" /> {modo === "taximetro" ? "INICIAR CORRIDA NO TAXÍMETRO" : "INICIAR CORRIDA"}</button>
+          <button type="button" className="botao-m verde" disabled={ocupado || !categoria || !!faltaDado || (modo === "destino" && destino.trim().length < 3)} onClick={() => void abrir()}><Play size={16} fill="currentColor" /> {modo === "taximetro" ? "INICIAR CORRIDA NO TAXÍMETRO" : "INICIAR CORRIDA"}</button>
         </div>
       </div>
     </Pagina>
@@ -354,7 +364,7 @@ export function Configuracoes({ voltar, irPermissoes }: Voltar & { irPermissoes?
       <div className="config-grupo">
         <Chave icone={Mic} ligado={a.gravar} mudar={(v) => mudar({ gravar: v })} titulo="Gravar as corridas (áudio)" texto="Protege você de acusações. O passageiro é avisado. Se a empresa tornar obrigatório, vale sempre." />
         <Chave icone={Radio} ligado={a.gravarVideo} mudar={(v) => mudar({ gravarVideo: v })} titulo="Gravar também o vídeo" texto="Só se a empresa liberar. Qualidade leve (480p), envio quando houver rede." />
-        <Chave icone={Wifi} ligado={a.gravarSoWifi} mudar={(v) => mudar({ gravarSoWifi: v })} titulo="Enviar gravações só no Wi‑Fi" texto="A cópia fica no seu celular por 3 dias e sobe quando houver Wi‑Fi. Desligado, sobe também no 4G/5G." />
+        <Chave icone={Wifi} ligado={a.gravarSoWifi} mudar={(v) => mudar({ gravarSoWifi: v })} titulo="Enviar gravações só no Wi‑Fi" texto={`A cópia fica no seu celular por ${DIAS_COPIA()} dias e sobe quando houver Wi‑Fi. Desligado, sobe também no 4G/5G.`} />
         <Chave icone={Smartphone} ligado={a.manterTela} mudar={(v) => mudar({ manterTela: v })} titulo="Manter a tela ligada" texto="Evita que a tela apague enquanto você está online ou em corrida" />
         <Chave icone={Mic} ligado={a.voz} mudar={(v) => mudar({ voz: v })} titulo="Assistente de Voz (Co-piloto)" texto="Avisos por voz ao chegar perto do destino" />
         {linha(Music, "Toque da chamada", undefined, NOMES_SONS[a.sons], () => setAbrir("sons"))}
@@ -448,9 +458,13 @@ export function FaleConosco({ voltar, marca }: Voltar & { marca: MarcaApp }) {
 
 export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: MarcaApp; fechar: () => void; ir: (t: string) => void; sair: () => void }) {
   const c = useContatos(marca.suporte);
+  const macanetaLigada = useConfigDoPainel()?.macaneta.ativo ?? true;
   const [confirmar, setConfirmar] = useState(false);
+  const [texto, setTexto] = useState<{ titulo: string; tipo: "motorista" | "privacidade" } | null>(null);
   const item = (icone: typeof Car, titulo: string, tela: string, texto?: string, selo?: string) => <ItemMenu icone={icone} titulo={titulo} texto={texto} selo={selo} aoTocar={() => { fechar(); ir(tela); }} />;
   return (
+    <>
+    {texto && <TextoDoPainel titulo={texto.titulo} tipo={texto.tipo} fechar={() => setTexto(null)} />}
     <div className="menu-lateral" onClick={fechar}>
       <div onClick={(e) => e.stopPropagation()}>
         <div className="menu-perfil">
@@ -458,8 +472,9 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
           <div className="nome"><strong>{eu.nome.split(" ")[0]}</strong>{(eu.veiculo || eu.placa) && <span>{[eu.veiculo, eu.placa].filter(Boolean).join(" · ")}</span>}</div>
           <button type="button" className="fechar" aria-label="Fechar o menu" onClick={fechar}><X size={18} /></button>
         </div>
+        <div style={{ padding: "0 .8rem" }}><Banners tipo="app" /></div>
         <div className="menu-titulo">Operação</div>
-        {item(Hand, "Abrir corrida (Maçaneta)", "macaneta", "Iniciar viagem direta na rua")}
+        {macanetaLigada && item(Hand, "Abrir corrida (Maçaneta)", "macaneta", "Iniciar viagem direta na rua")}
         {item(Wallet, "Histórico de ganhos", "historico", "Resumo financeiro e corridas")}
         {item(Gift, "Indique e ganhe", "desafios", undefined, "Bônus")}
         {item(Wallet, "Passe Livre", "passelivre", "Sem taxa da central por um período")}
@@ -475,8 +490,8 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
         {item(MessageSquare, "Chat com suporte", "suporte")}
         {item(Headset, "Fale conosco", "fale")}
         {item(Settings, "Configurações", "config")}
-        {c.termosUrl && <ItemMenu icone={FileText} titulo="Termos de uso" aoTocar={() => window.open(c.termosUrl, "_blank")} />}
-        {c.privacidadeUrl && <ItemMenu icone={ShieldCheck} titulo="Política de privacidade" aoTocar={() => window.open(c.privacidadeUrl, "_blank")} />}
+        <ItemMenu icone={FileText} titulo="Termos de uso" aoTocar={() => (c.termosUrl ? window.open(c.termosUrl, "_blank") : setTexto({ titulo: "Termos de uso", tipo: "motorista" }))} />
+        <ItemMenu icone={ShieldCheck} titulo="Política de privacidade" aoTocar={() => (c.privacidadeUrl ? window.open(c.privacidadeUrl, "_blank") : setTexto({ titulo: "Política de privacidade", tipo: "privacidade" }))} />
         <div className="menu-rodape">
           <ItemMenu icone={LogOut} perigo titulo="Sair da conta" aoTocar={() => setConfirmar(true)} direita={<span />} />
           <small>Versão {VERSAO}</small>
@@ -484,8 +499,20 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
       </div>
       {confirmar && <Dialogo icone={LogOut} perigo titulo="Sair da conta?" texto="Você vai ficar offline." cancelar={() => setConfirmar(false)} rotulo="Sair" confirmar={sair} />}
     </div>
+    </>
   );
 }
 
 // ajuda para o compilador: ícones usados só em texto de ajuda
 void [LifeBuoy, Navigation, SquareDashed, Bolt, ajustesAgora, telefoneBonito, hora, FileText];
+
+/** Termos de uso e privacidade escritos pela empresa no painel (Configurações › Termos de uso). */
+function TextoDoPainel({ titulo, tipo, fechar }: { titulo: string; tipo: "motorista" | "privacidade"; fechar: () => void }) {
+  const [t, setT] = useState<string | null>(null);
+  useEffect(() => { void api<{ texto: string }>(`/termos/${tipo}`).then((r) => setT(r.texto)).catch(() => setT("")); }, [tipo]);
+  return (
+    <Folha titulo={titulo} fechar={fechar}>
+      {t === null ? <p className="dica">Carregando…</p> : t ? <p style={{ whiteSpace: "pre-wrap", margin: 0, maxHeight: "60vh", overflow: "auto" }}>{t}</p> : <p className="dica">A empresa ainda não publicou este texto.</p>}
+    </Folha>
+  );
+}

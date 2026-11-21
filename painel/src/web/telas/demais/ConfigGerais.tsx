@@ -50,6 +50,7 @@ export function ConfigGerais() {
         <Secao titulo="Suporte e Contato">
           <div className="dm-grade3">
             <Campo rotulo="WhatsApp de Suporte"><input value={g.suporte.whatsapp} onChange={(e) => set(["suporte", "whatsapp"], e.target.value)} placeholder="Ex: 5511999999999" /></Campo>
+            <Campo rotulo="WhatsApp de emergência (SOS)" dica="Quando alguém aperta o botão de pânico no app, este número recebe a mensagem com nome, telefone e local. Deixe vazio para não enviar."><input value={g.suporte.whatsappEmergencia ?? ""} onChange={(e) => set(["suporte", "whatsappEmergencia"], e.target.value)} placeholder="Ex: 5511999999999" /></Campo>
             <Campo rotulo="Telefone da Central"><input value={g.suporte.telefone} onChange={(e) => set(["suporte", "telefone"], e.target.value)} /></Campo>
             <Campo rotulo="Link de Ajuda / FAQ Externo"><input value={g.suporte.linkAjuda} onChange={(e) => set(["suporte", "linkAjuda"], e.target.value)} placeholder="https://..." /></Campo>
           </div>
@@ -67,6 +68,8 @@ export function ConfigGerais() {
             {sw(["motorista", "cpfObrigatorio"], "CPF Obrigatório", "Torna o campo de CPF obrigatório durante o cadastro de novos motoristas no app.")}
             {sw(["motorista", "descontarCupomNoToque"], "Descontar Cupom na Tela de Aceite", "O valor que o motorista vê quando a corrida toca já vem com o desconto do passageiro subtraído.")}
             {sw(["motorista", "botaoPanico"], "Botão de Pânico Integrado", "Ativa um botão de emergência flutuante na tela do motorista durante a corrida.")}
+            <Campo rotulo="Distância do alerta de pânico (km)" dica="Motoristas online até esta distância de quem pediu ajuda recebem o aviso de emergência. Use 0 para não avisar os outros motoristas."><input type="number" min={0} max={100} step={0.5} disabled={!admin} value={g.motorista.raioPanicoKm ?? 3} onChange={(e) => set(["motorista", "raioPanicoKm"], Math.min(100, Math.max(0, Number(e.target.value) || 0)))} /></Campo>
+            <Campo rotulo="Duração do alerta de pânico (minutos)" dica="Por quanto tempo o alerta continua aparecendo para os motoristas por perto, se a central não o encerrar antes."><input type="number" min={5} max={1440} step={1} disabled={!admin} value={g.motorista.duracaoPanicoMin ?? 30} onChange={(e) => set(["motorista", "duracaoPanicoMin"], Math.min(1440, Math.max(5, Math.round(Number(e.target.value)) || 30)))} /></Campo>
           </Secao>
           <Secao titulo="Mapa de Navegação GPS" selo="App Nativo" sub="O motorista acompanha a rota e o GPS direto pela tela do app, sem precisar abrir apps de terceiros.">
             <Interruptor valor={g.motorista.mapaNavegacao} onChange={(v) => set(["motorista", "mapaNavegacao"], v)} rotulo="Mapa de navegação no app" desabilitado={!admin} />
@@ -77,12 +80,28 @@ export function ConfigGerais() {
               </>
             )}
           </Secao>
+          <Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
+            <Campo rotulo="Dias sem contato para o app aparecer como OFF" dica="Define há quantos dias sem contato do app o diagnóstico mostra APP OFF"><input type="number" min={1} max={90} step={1} disabled={!admin} value={g.motorista.diasSemContatoApp} onChange={(e) => set(["motorista", "diasSemContatoApp"], Math.min(90, Math.max(1, Math.round(Number(e.target.value)) || 1)))} /></Campo>
+          </Secao>
           <Secao titulo="Mensagens Rápidas (Chat)" sub="Textos prontos para o motorista enviar com 1 toque.">
             <ul className="dm-lista-edit">{g.motorista.mensagensRapidas.map((m: string, i: number) => (
               <li key={i}><input value={m} aria-label={`Mensagem ${i + 1}`} onChange={(e) => set(["motorista", "mensagensRapidas"], g.motorista.mensagensRapidas.map((x: string, j: number) => (j === i ? e.target.value : x)))} />{admin && <button className="icone" aria-label="Remover mensagem" onClick={() => set(["motorista", "mensagensRapidas"], g.motorista.mensagensRapidas.filter((_: string, j: number) => j !== i))}><Trash2 size={14} /></button>}</li>
             ))}</ul>
             {admin && <div className="dm-linha"><input value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Escreva uma nova mensagem..." aria-label="Nova mensagem rápida" maxLength={120} /><button className="botao" onClick={() => { if (chat.trim()) { set(["motorista", "mensagensRapidas"], [...g.motorista.mensagensRapidas, chat.trim()]); setChat(""); } }}>Adicionar</button></div>}
           </Secao>
+          <Secao titulo="Gravação das corridas" sub="O app do motorista grava o áudio da corrida para a segurança dele. O passageiro é avisado.">
+            {sw(["motorista", "gravacao", "ativa"], "Gravar as corridas", "Liga a gravação de áudio nos aplicativos dos motoristas.")}
+            {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "obrigatoria"], "Gravação obrigatória", "O motorista não consegue desligar a gravação.")}
+            {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "video"], "Liberar gravação de vídeo", "Além do áudio, o motorista pode gravar vídeo (qualidade leve).")}
+            {g.motorista.gravacao.ativa && <Campo rotulo="Dias que a cópia fica no celular do motorista"><input type="number" min={1} max={30} value={g.motorista.gravacao.diasNoAparelho} disabled={!admin} onChange={(e) => set(["motorista", "gravacao", "diasNoAparelho"], Number(e.target.value))} /></Campo>}
+            {g.motorista.gravacao.ativa && <Campo rotulo="Guardar as gravações por (dias)"><input type="number" min={1} max={365} value={g.motorista.gravacao.dias} disabled={!admin} onChange={(e) => set(["motorista", "gravacao", "dias"], Number(e.target.value))} /></Campo>}
+          </Secao>
+          <Secao titulo="Chamadas e negociação" sub="Tempos das ofertas de corrida para o motorista.">
+            <Campo rotulo="Validade da contra-oferta do motorista (segundos)"><input type="number" min={10} max={600} value={g.motorista.contraofertaSegundos} disabled={!admin} onChange={(e) => set(["motorista", "contraofertaSegundos"], Number(e.target.value))} /></Campo>
+            <Campo rotulo="Oferecer a mesma corrida de novo ao mesmo motorista depois de (minutos)"><input type="number" min={1} max={60} value={g.motorista.reofertaMinutos} disabled={!admin} onChange={(e) => set(["motorista", "reofertaMinutos"], Number(e.target.value))} /></Campo>
+          </Secao>
+          <ListaEditavel titulo="Avisos de conduta (mapa do motorista)" sub="Lembretes que aparecem para o motorista na tela do mapa. Lista vazia esconde o aviso." lista={g.motorista.avisosDeConduta} on={(l) => set(["motorista", "avisosDeConduta"], l)} admin={admin} nome="Aviso" />
+          <ListaEditavel titulo="Problemas na corrida" sub="Opções do botão de avisar a central sobre um problema durante a corrida." lista={g.motorista.problemasNaCorrida} on={(l) => set(["motorista", "problemasNaCorrida"], l)} admin={admin} nome="Problema" />
           <Secao titulo="Gestão de Documentos" sub="O que o motorista precisa enviar para ser aprovado." acao={admin && <button className="botao" onClick={() => setNovoDoc(true)}><Plus size={14} /> Novo Doc</button>}>
             <ul className="dm-docs">{g.motorista.documentos.map((d: any, i: number) => (
               <li key={d.id}><span><strong>{d.nome}</strong><small>{d.alvo === "veiculo" ? "Documento do Veículo" : "Documento Pessoal"}</small></span>
@@ -115,8 +134,12 @@ export function ConfigGerais() {
           {g.passageiro.bonusAtivo && <Campo rotulo="Crédito Inicial (R$)"><Num v={g.passageiro.bonusValor} on={(n) => set(["passageiro", "bonusValor"], n)} placeholder="5,00" /></Campo>}
           <Interruptor valor={g.passageiro.paradasAtivo} onChange={(v) => set(["passageiro", "paradasAtivo"], v)} rotulo="Permitir Múltiplas Paradas" descricao="Passageiros poderão adicionar paradas extras na rota durante a viagem." desabilitado={!admin} />
           {g.passageiro.paradasAtivo && <Campo rotulo="Limite Máximo:"><input type="number" min={0} max={3} value={g.passageiro.limiteParadas} onChange={(e) => set(["passageiro", "limiteParadas"], Number(e.target.value))} /></Campo>}
+          <Campo rotulo="Agendamento: antecedência mínima (minutos)"><input type="number" min={0} max={1440} value={g.passageiro.agendamentoMinutos} disabled={!admin} onChange={(e) => set(["passageiro", "agendamentoMinutos"], Number(e.target.value))} /></Campo>
+          <Campo rotulo="Agendamento: até quantos dias à frente"><input type="number" min={1} max={365} value={g.passageiro.agendamentoDias} disabled={!admin} onChange={(e) => set(["passageiro", "agendamentoDias"], Number(e.target.value))} /></Campo>
+          <ListaEditavel titulo="Etiquetas de avaliação: notas 4 e 5" sub="O passageiro marca ao avaliar bem o motorista." lista={g.avaliacao.etiquetasBoas} on={(l) => set(["avaliacao", "etiquetasBoas"], l)} admin={admin} nome="Etiqueta" max={12} />
+          <ListaEditavel titulo="Etiquetas de avaliação: notas de 1 a 3" sub="O passageiro marca ao avaliar mal o motorista." lista={g.avaliacao.etiquetasRuins} on={(l) => set(["avaliacao", "etiquetasRuins"], l)} admin={admin} nome="Etiqueta" max={12} />
           {sw(["passageiro", "destinoLivre"], "Destino Livre (A combinar)", "Permite solicitar a corrida sem informar o destino final no mapa (ideal para modo taxímetro/corrida livre).")}
-          <Salvar parte={{ passageiro: g.passageiro }} texto="Salvar Passageiro" />
+          <Salvar parte={{ passageiro: g.passageiro, avaliacao: g.avaliacao }} texto="Salvar Passageiro" />
         </Secao>
       )}
       {aba === "indicacoes" && (
@@ -215,6 +238,19 @@ function DocumentosPadrao({ docs, admin, onMudar, onAdicionar }: { docs: any[]; 
 
 function Secao({ titulo, sub, selo, acao, children }: { titulo: string; sub?: string; selo?: string; acao?: ReactNode; children: ReactNode }) {
   return <section className="dm-cartao dm-secao"><div className="dm-linha dm-entre"><div><h3>{titulo} {selo && <span className="selo ok">{selo}</span>}</h3>{sub && <p className="sub">{sub}</p>}</div>{acao}</div>{children}</section>;
+}
+
+/** Lista de textos que o app mostra (um por linha), com adicionar e remover. */
+function ListaEditavel({ titulo, sub, lista, on, admin, nome, max = 12 }: { titulo: string; sub: string; lista: string[]; on: (l: string[]) => void; admin: boolean; nome: string; max?: number }) {
+  const [novo, setNovo] = useState("");
+  return (
+    <Secao titulo={titulo} sub={sub}>
+      <ul className="dm-lista-edit">{lista.map((m, i) => (
+        <li key={i}><input value={m} aria-label={`${nome} ${i + 1}`} maxLength={80} disabled={!admin} onChange={(e) => on(lista.map((x, j) => (j === i ? e.target.value : x)))} />{admin && <button className="icone" aria-label={`Remover ${nome.toLowerCase()} ${i + 1}`} onClick={() => on(lista.filter((_, j) => j !== i))}><Trash2 size={14} /></button>}</li>
+      ))}</ul>
+      {admin && lista.length < max && <div className="dm-linha"><input value={novo} onChange={(e) => setNovo(e.target.value)} placeholder="Escreva um novo texto..." aria-label={`Novo texto: ${titulo}`} maxLength={80} /><button className="botao" onClick={() => { if (novo.trim()) { on([...lista, novo.trim()]); setNovo(""); } }}>Adicionar</button></div>}
+    </Secao>
+  );
 }
 
 function Motivos({ titulo, lista, on }: { titulo: string; lista: string[]; on: (l: string[]) => void }) {

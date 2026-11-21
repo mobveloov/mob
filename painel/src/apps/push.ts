@@ -3,7 +3,8 @@
 // A conta de serviço do Firebase (o JSON baixado no console do Firebase) fica FORA do Git, em um destes lugares:
 //   1. variável de ambiente FIREBASE_SERVICO_<EMPRESA> (id da empresa em maiúsculas, "-" vira "_"),
 //      com o caminho do arquivo JSON ou o próprio JSON;
-//   2. arquivo DADOS_DIR/empresas/<id>/apps/firebase-servico.json.
+//   2. arquivo DADOS_DIR/empresas/<id>/apps/firebase-servico.json;
+//   3. variável FCM_CONTA_SERVICO_JSON (caminho do JSON ou o próprio JSON), valendo para todas as empresas do servidor.
 // Sem conta de serviço o push fica desligado e os apps seguem pelo tempo real (SSE) com o app aberto.
 // Um único projeto Firebase da empresa atende os dois apps (passageiro e motorista).
 
@@ -23,14 +24,13 @@ export const definirBuscaDeTeste = (f: Busca | null) => { busca = f ?? ((...a) =
 const arqTokens = (empresaId: string) => arquivo(empresaId, "push.json");
 
 export function contaServico(empresaId: string): ContaServico | null {
-  const env = process.env[`FIREBASE_SERVICO_${empresaId.toUpperCase().replace(/-/g, "_")}`]?.trim();
-  let bruto: unknown = null;
-  try {
-    if (env) bruto = JSON.parse(env.startsWith("{") ? env : fs.readFileSync(env, "utf8"));
-    else bruto = ler<unknown>(arquivo(empresaId, "firebase-servico.json"), null);
-  } catch { return null; }
-  const c = bruto as Partial<ContaServico> | null;
-  return c?.project_id && c.client_email && c.private_key ? (c as ContaServico) : null;
+  const valida = (b: unknown) => { const c = b as Partial<ContaServico> | null; return c?.project_id && c.client_email && c.private_key ? (c as ContaServico) : null; };
+  const deVariavel = (v?: string) => { const t = v?.trim(); if (!t) return null; try { return valida(JSON.parse(t.startsWith("{") ? t : fs.readFileSync(t, "utf8"))); } catch { return null; } };
+  const propria = deVariavel(process.env[`FIREBASE_SERVICO_${empresaId.toUpperCase().replace(/-/g, "_")}`]);
+  if (propria) return propria;
+  let doArquivo: ContaServico | null = null;
+  try { doArquivo = valida(ler<unknown>(arquivo(empresaId, "firebase-servico.json"), null)); } catch { /* sem arquivo */ }
+  return doArquivo ?? deVariavel(process.env.FCM_CONTA_SERVICO_JSON);
 }
 
 export const pushLigado = (empresaId: string) => contaServico(empresaId) != null;
@@ -73,7 +73,7 @@ async function tokenDeAcesso(conta: ContaServico): Promise<string> {
 // ------------------------------------------------------------------ envio
 
 export interface Aviso {
-  titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" | "chegada";
+  titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" | "chegada" | "emergencia";
   /**
    * Mensagem só de dados, com prioridade alta (chamada de corrida): chega mesmo com o app fechado ou em repouso e o aplicativo (serviço nativo)
    * mostra a chamada em tela cheia, com som e a tela acordando. Sem isto o Android só mostra uma notificação comum.
@@ -81,13 +81,18 @@ export interface Aviso {
   somenteDados?: boolean;
 }
 
-/** Manda push para todos os aparelhos da pessoa. Nunca lança erro: push é um extra. Devolve quantos foram aceitos. */
-export async function avisar(empresaId: string, alvo: Alvo, aviso: Aviso): Promise<number> {
+/** Como ficou o push do sistema (com o app fechado) de uma mensagem. */
+export type SituacaoPush = "enviado" | "sem_chave" | "sem_aparelho" | "falha";
+export interface ResultadoPush { situacao: SituacaoPush; aceitos: number; erro: string }
+
+/** Manda push para todos os aparelhos da pessoa e diz o que aconteceu. Nunca lança erro: push é um extra. */
+export async function avisarDetalhado(empresaId: string, alvo: Alvo, aviso: Aviso): Promise<ResultadoPush> {
   const conta = contaServico(empresaId);
-  if (!conta) return 0;
+  // Sem a chave do Firebase (modo simulado): a mensagem fica só dentro do app, que busca a lista de avisos.
+  if (!conta) return { situacao: "sem_chave", aceitos: 0, erro: "" };
   const tokens = ler<TokenAparelho[]>(arqTokens(empresaId), []).filter((t) => t.papel === alvo.papel && t.chave === alvo.chave);
-  if (!tokens.length) return 0;
-  let ok = 0;
+  if (!tokens.length) return { situacao: "sem_aparelho", aceitos: 0, erro: "" };
+  let ok = 0, erro = "";
   try {
     const acesso = await tokenDeAcesso(conta);
     for (const t of tokens) {
@@ -105,10 +110,21 @@ export async function avisar(empresaId: string, alvo: Alvo, aviso: Aviso): Promi
         } }),
       });
       if (r.ok) ok++;
-      else if (r.status === 404 || r.status === 400) removerToken(empresaId, t.token); // aparelho saiu ou token velho
+      else {
+        erro = `FCM respondeu ${r.status}`;
+        if (r.status === 404 || r.status === 400) removerToken(empresaId, t.token); // aparelho saiu ou token velho
+      }
     }
   } catch (e) {
-    console.error("[apps] push", empresaId, e instanceof Error ? e.message : e);
+    erro = e instanceof Error ? e.message : String(e);
+    console.error("[apps] push", empresaId, erro);
   }
-  return ok;
+  return { situacao: ok ? "enviado" : "falha", aceitos: ok, erro };
 }
+
+/** Manda push para todos os aparelhos da pessoa. Nunca lança erro: push é um extra. Devolve quantos foram aceitos. */
+export async function avisar(empresaId: string, alvo: Alvo, aviso: Aviso): Promise<number> {
+  return (await avisarDetalhado(empresaId, alvo, aviso)).aceitos;
+}
+
+export const aparelhosDaPessoa = (empresaId: string, alvo: Alvo) => ler<TokenAparelho[]>(arqTokens(empresaId), []).filter((t) => t.papel === alvo.papel && t.chave === alvo.chave).length;

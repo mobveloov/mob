@@ -27,14 +27,19 @@ import { num, txt } from "./armazem.ts";
 import { arquivoDaMidia, arquivoDoAudio, enviarAudio, enviarMidia, enviarTexto, maxAudioBytes, maxMidiaBytes, mensagens, resumoDaMensagem } from "./chat.ts";
 import * as P from "./despacho.ts";
 import { otimizarImagem } from "../comum/imagem.ts";
+import { abrirSos, atenderSos, encerrarSos, listarSos, sosDaPessoa, sosPendentes, sosProximos, type Sos } from "./sos.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
-import { ajustes } from "./ajustes.ts";
+import { gerais } from "../config/gerais.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
+import { ajustes, formasDePagamento } from "./ajustes.ts";
 import { dadosParaOApp } from "../config/personalizacao.ts";
+import { dadosParaOAppMotorista } from "../config/personalizacao-motorista.ts";
 import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { euCompleto } from "./perfil.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
+import { contarNaoLidos, listarDaPessoa, marcarLidos } from "./avisos.ts";
 import { registrarCotacao } from "../operacao/radar.ts";
 import { entrar, eu, pedirCodigo, registrarContato, sair, salvarGeneroPassageiro, salvarNomePassageiro, sessaoDoToken, PAPEIS, type PapelApp, type SessaoApp } from "./sessoes.ts";
 
@@ -51,7 +56,6 @@ const ok = (fn: Fn) => async (req: Request, res: Response) => {
   }
 };
 
-const PAGAMENTOS = ["Dinheiro", "Pix", "Cartão na maquininha", PAGAMENTO_SALDO];
 const ANTES_DE_COMECAR = new Set(["procurando", "a_caminho", "no_local"]);
 
 // ------------------------------------------------------------------ CORS e empresa
@@ -136,6 +140,7 @@ r.use(rotasPublicasExtras);
 r.use(exigirApp);
 // Personalização do app do passageiro (Configurações do painel): cores, design, veículo no mapa, tela inicial e recursos. Aplique ao abrir, sem gerar APK.
 r.get("/personalizacao", ok((req, res) => res.json(dadosParaOApp(ctx(req).empresaId))));
+r.get("/personalizacao-motorista", so("motorista"), ok((req, res) => res.json(dadosParaOAppMotorista(ctx(req).empresaId))));
 r.use(rotasExtras);
 r.use(rotasV2);
 
@@ -152,6 +157,15 @@ r.get("/eu", ok((req, res) => {
 r.post("/eu", so("passageiro"), ok((req, res) => { if (req.body?.nome !== undefined || req.body?.genero === undefined) salvarNomePassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body?.nome ?? "")); if (req.body?.genero !== undefined) salvarGeneroPassageiro(ctx(req).empresaId, ctx(req).sessao, String(req.body.genero)); res.json({ eu: euCompleto(ctx(req).empresaId, ctx(req).sessao) }); }));
 
 r.post("/push", ok((req, res) => { registrarToken(ctx(req).empresaId, alvo(req), String(req.body?.token ?? "")); res.json({ ok: true }); }));
+
+// Caixa de avisos da central (docs/PUSH_APPS.md). Abrir a lista marca como "entregue"; marcar lido muda para "lida".
+r.get("/avisos", ok((req, res) => res.json(listarDaPessoa(ctx(req).empresaId, alvo(req)))));
+r.get("/avisos/contagem", ok((req, res) => res.json({ naoLidos: contarNaoLidos(ctx(req).empresaId, alvo(req)) })));
+r.post("/avisos/lidos", ok((req, res) => {
+  const ids = req.body?.todos === true ? "todos" : Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).map(String) : [];
+  const n = marcarLidos(ctx(req).empresaId, alvo(req), ids);
+  res.json({ marcados: n, naoLidos: contarNaoLidos(ctx(req).empresaId, alvo(req)) });
+}));
 
 // Estado de agora (o app chama ao abrir e quando o tempo real volta).
 r.get("/estado", ok((req, res) => {
@@ -199,7 +213,7 @@ r.get("/opcoes", ok((req, res) => {
   const categorias = listar(empresaId, cadastroPorId("categorias")!)
     .filter((c) => c.ativa !== false && String(c.nome ?? "").trim())
     .map((c) => ({ nome: String(c.nome), descricao: String(c.descricao ?? ""), aPartirDe: estimarPreco(empresaId, { categoria: String(c.nome), distanciaKm: null }).valor }));
-  res.json({ categorias, pagamentos: PAGAMENTOS });
+  res.json({ categorias, pagamentos: formasDePagamento(empresaId) });
 }));
 
 // Endereços: primeiro a base da empresa (CNEFE); se ela não achar (ou não estiver ligada), o OpenStreetMap, perto de quem pede.
@@ -287,14 +301,21 @@ function umaVez(chave: string, fn: () => Promise<CorridaPropria>) {
   return p;
 }
 
+/** Android, iOS ou Web, pelo navegador/aplicativo que fez o pedido (aparece nas Informações de controle da OS). */
+const sistemaDoAparelho = (req: Request) => { const u = String(req.get("user-agent") ?? ""); return /android/i.test(u) ? "Android" : /iphone|ipad|ipod|ios/i.test(u) ? "iOS" : "Web"; };
+
 r.post("/corridas", so("passageiro"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const b = req.body ?? {};
   const nome = String(eu(empresaId, sessao).nome ?? "");
   if (!nome) throw new Error("Informe seu nome antes de pedir.");
   const pedidoId = typeof b.pedidoId === "string" && /^[\w-]{8,64}$/.test(b.pedidoId) ? b.pedidoId : `${Date.now()}`;
-  const pagamento = PAGAMENTOS.includes(b.pagamento) ? b.pagamento : "";
+  const pagamento = formasDePagamento(empresaId).includes(b.pagamento) ? b.pagamento : "";
   const paradas = Array.isArray(b.paradas) ? b.paradas.slice(0, 4).map(ponto) : [];
+  // Paradas: o painel liga/desliga e define o limite (Configurações › Gerais › Regras do passageiro).
+  const regraParadas = (() => { try { const p = gerais(empresaId).passageiro; return p.paradasAtivo ? p.limiteParadas : 0; } catch { return 3; } })();
+  if (!b.destino?.texto && !(() => { try { return gerais(empresaId).passageiro.destinoLivre; } catch { return true; } })()) throw new Error("Informe o destino da corrida.");
+  if (paradas.length > regraParadas) throw new Error(regraParadas ? `No máximo ${regraParadas} paradas.` : "A empresa não permite paradas na corrida.");
   const c = await umaVez(`${empresaId}:${sessao.telefone}:${pedidoId}`, async () => {
     if (pagamento === PAGAMENTO_SALDO) {
       // Confere o saldo pela estimativa (com as paradas) antes de criar.
@@ -313,7 +334,7 @@ r.post("/corridas", so("passageiro"), ok(async (req, res) => {
       categoria: txt(b.categoria, 60), pagamento, canal: "app",
       observacao: txt(b.observacao, 300), cupom: txt(b.cupom, 30), paradas,
       agendadaPara: typeof b.agendadaPara === "string" && b.agendadaPara ? b.agendadaPara : undefined,
-      valorOferecido: num(b.valorOferecido) ?? undefined,
+      valorOferecido: extraDaCategoria(empresaId, txt(b.categoria, 60)).negociacao.ativo ? num(b.valorOferecido) ?? undefined : undefined, sistema: sistemaDoAparelho(req),
       opcionais: Array.isArray(b.opcionais) ? b.opcionais.map((x: unknown) => txt(x, 20)).filter((x: string) => ajustes(empresaId).opcionais.some((o) => o.id === x)).slice(0, 8) : undefined,
     }, "app do passageiro");
   });
@@ -379,7 +400,17 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   let valor = num(req.body?.valor);
   if (valor != null && (valor < 0 || valor > 10_000)) throw new Error("Valor inválido.");
   // Maçaneta em taxímetro: o valor sai da distância e do tempo reais, pela tarifa da categoria.
-  if (novo === "finalizada") { const taxi = P.valorDoTaximetro(empresaId, c); if (taxi != null) valor = taxi; }
+  if (novo === "finalizada") {
+    const taxi = P.valorDoTaximetro(empresaId, c);
+    if (taxi != null) valor = taxi;
+    else {
+      // "Motorista pode editar o valor final" (Gerais › Regras do motorista): desligado, vale o valor combinado.
+      let editar = true;
+      try { editar = gerais(empresaId).motorista.editarValorFinal; } catch { /* padrão */ }
+      const combinado = c.valorOferecido ?? c.estimativa.valor;
+      if (!editar && combinado != null) valor = combinado;
+    }
+  }
   const feita = await mudarStatus(empresaId, c.id, novo as never, { valor }, "app do motorista");
   // pago com saldo: passa da carteira do passageiro para a do motorista. Se falhar, a corrida já está finalizada: não devolve erro.
   try { aposFinalizar(empresaId, feita); } catch (e) { console.error("[apps] após finalizar:", e instanceof Error ? e.message : e); }
@@ -387,18 +418,19 @@ r.post("/corridas/:id/status", so("motorista"), ok(async (req, res) => {
   res.json({ corrida: P.corridaParaApp(empresaId, feita, "motorista") });
 }));
 
-r.post("/corridas/:id/sos", ok((req, res) => {
+// SOS (contrato em docs/SOS.md): o mesmo alerta serve para o botão de pânico do mapa e para o SOS dentro da corrida.
+const sosParaApp = (s: Sos) => ({ id: s.id, situacao: s.situacao, em: s.em, lat: s.lat, lng: s.lng, endereco: s.endereco, os: s.os, atendidoPor: s.atendidoPor, observacao: s.situacao === "encerrado" ? s.observacao : "", avisouMotoristas: s.notificados });
+const abrir = (req: Request, res: Response, corridaId?: string) => {
   const { empresaId, sessao } = ctx(req);
-  const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
-  const quem = sessao.papel === "motorista" ? { id: sessao.chave, nome: c.motorista, telefone: c.telefoneMotorista } : undefined;
-  res.json({ alerta: P.registrarSos(empresaId, c, sessao.papel, num(req.body?.lat), num(req.body?.lng), quem) });
-}));
-
-/** Pedido de ajuda sem corrida (botão vermelho do mapa do motorista): grava o alerta e avisa quem está por perto. */
-r.post("/sos", so("motorista"), ok((req, res) => {
-  const { empresaId, sessao } = ctx(req);
-  const eu = P.dadosDoMotorista(empresaId, sessao.chave);
-  res.json({ alerta: P.registrarSos(empresaId, null, "motorista", num(req.body?.lat), num(req.body?.lng), { id: sessao.chave, nome: eu.nome, telefone: eu.telefone }) });
+  const s = abrirSos(empresaId, sessao.papel, sessao.chave, { corridaId, lat: num(req.body?.lat), lng: num(req.body?.lng), motivo: txt(req.body?.motivo, 300), telefone: sessao.telefone, nome: nomeDe(req) });
+  res.json({ alerta: sosParaApp(s) });
+};
+r.post("/sos", ok((req, res) => abrir(req, res, txt(req.body?.corridaId, 80) || undefined)));
+r.post("/corridas/:id/sos", ok((req, res) => abrir(req, res, req.params.id)));
+r.get("/sos/meu", ok((req, res) => res.json({ alertas: sosDaPessoa(ctx(req).empresaId, ctx(req).sessao.papel, ctx(req).sessao.chave) })));
+r.get("/sos/proximos", so("motorista"), ok((req, res) => {
+  const lat = num(req.query.lat), lng = num(req.query.lng);
+  res.json({ alertas: sosProximos(ctx(req).empresaId, ctx(req).sessao.chave, lat != null && lng != null ? { lat, lng } : undefined) });
 }));
 
 // ------------------------------------------------------------------ chat
@@ -533,7 +565,22 @@ r.use((_req, res) => res.status(404).json({ erro: "Caminho não encontrado." }))
 
 rotasAppsCentral.use(rotasV2Central);
 rotasAppsCentral.get("/motoristas", ok((req, res) => res.json({ motoristas: P.motoristasOnline(req.ctx!.empresaId) })));
-rotasAppsCentral.get("/alertas", ok((req, res) => res.json({ alertas: P.alertas(req.ctx!.empresaId).slice(-200).reverse() })));
-rotasAppsCentral.post("/alertas/:id/resolver", exigirPapel("admin", "operador"), ok((req, res) => res.json({ alerta: P.resolverAlerta(req.ctx!.empresaId, req.params.id, req.ctx!.usuario.email) })));
+// Alertas de SOS para o painel (a tela "Alertas de segurança", o sino e a faixa vermelha consultam a cada poucos segundos).
+const legado = (s: Sos) => ({ id: s.id, corridaId: s.corridaId, os: s.os, papel: s.papel, nome: s.nome, telefone: s.telefone, lat: s.lat, lng: s.lng, em: s.em, resolvido: s.situacao === "encerrado", resolvidoPor: s.encerradoPor });
+rotasAppsCentral.get("/alertas", ok((req, res) => res.json({ alertas: listarSos(req.ctx!.empresaId, { limite: 200 }).map(legado) })));
+rotasAppsCentral.post("/alertas/:id/resolver", exigirPapel("admin", "operador"), ok((req, res) => res.json({ alerta: legado(encerrarSos(req.ctx!.empresaId, req.params.id, req.ctx!.usuario.email, "")) })));
+rotasAppsCentral.get("/sos", ok((req, res) => {
+  const empresaId = req.ctx!.empresaId;
+  const ids = new Map(listarProprias(empresaId).map((c) => [c.id, c]));
+  const comCorrida = (s: Sos) => { const c = s.corridaId ? ids.get(s.corridaId) : null; return { ...s, corrida: c ? { os: c.os, status: c.status, embarque: c.embarque.texto, destino: c.destino?.texto ?? "", passageiro: c.passageiro.nome, telefonePassageiro: c.passageiro.telefone, motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, categoria: c.categoria } : null }; };
+  const lista = listarSos(empresaId, { situacao: String(req.query.situacao ?? ""), limite: Number(req.query.limite) || 200 }).map(comCorrida);
+  res.json({ alertas: lista, pendentes: lista.filter((s) => s.situacao !== "encerrado").length, abertos: lista.filter((s) => s.situacao === "aberto").length });
+}));
+rotasAppsCentral.get("/sos/resumo", ok((req, res) => {
+  const p = sosPendentes(req.ctx!.empresaId);
+  res.json({ abertos: p.filter((s) => s.situacao === "aberto").length, atendidos: p.filter((s) => s.situacao === "atendido").length, itens: p.slice(0, 10).map((s) => ({ id: s.id, situacao: s.situacao, papel: s.papel, nome: s.nome, em: s.em, os: s.os })) });
+}));
+rotasAppsCentral.post("/sos/:id/atender", exigirPapel("operador"), ok((req, res) => res.json({ alerta: atenderSos(req.ctx!.empresaId, req.params.id, req.ctx!.usuario.nome || req.ctx!.usuario.email) })));
+rotasAppsCentral.post("/sos/:id/encerrar", exigirPapel("operador"), ok((req, res) => res.json({ alerta: encerrarSos(req.ctx!.empresaId, req.params.id, req.ctx!.usuario.nome || req.ctx!.usuario.email, String(req.body?.observacao ?? "")) })));
 
 

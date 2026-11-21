@@ -50,7 +50,7 @@ export const ICONES = ["carro-popular", "carro-conforto", "carro-premium", "moto
 export const EXTRA_PADRAO: ExtraCategoria = {
   cidade: "", visivel: true, tipoFisico: "carro", grupo: "Carro", ordem: 1, capacidade: 4, raio: 5000,
   icone: { modo: "biblioteca", biblioteca: "carro-popular", imagem: "" },
-  negociacao: { ativo: false, descontoMaxPax: 20, acrescimoMaxMot: 50 },
+  negociacao: { ativo: true, descontoMaxPax: 20, acrescimoMaxMot: 50 },
   modoPrecoKm: "padrao", faixasKm: [], kmIncluso: 0, tempoToque: 30,
   paradas: { tipo: "fixo", valor: 0 },
   deslocamento: { ativo: false, minKm: 0, tipo: "fixo", valor: 0, teto: 0, junto: true },
@@ -86,7 +86,7 @@ export function sanearExtra(e: unknown, atual: ExtraCategoria = EXTRA_PADRAO): E
     grupo: umDe(raiz.grupo, ["Carro", "Moto"] as const, "Carro"), ordem: Math.round(numero(raiz.ordem, 1, 1, 999)), capacidade: Math.round(numero(raiz.capacidade, 4, 1, 60)),
     raio: Math.round(numero(raiz.raio, 5000, 100, 100_000)),
     icone: { modo: umDe(ic.modo, ["biblioteca", "personalizado"] as const, "biblioteca"), biblioteca: ICONES.includes(String(ic.biblioteca)) ? String(ic.biblioteca) : ICONES[0], imagem },
-    negociacao: { ativo: sim(ng.ativo), descontoMaxPax: numero(ng.descontoMaxPax, 20, 0, 100), acrescimoMaxMot: numero(ng.acrescimoMaxMot, 50, 0, 500) },
+    negociacao: { ativo: sim(ng.ativo, true), descontoMaxPax: numero(ng.descontoMaxPax, 20, 0, 100), acrescimoMaxMot: numero(ng.acrescimoMaxMot, 50, 0, 500) },
     modoPrecoKm: umDe(raiz.modoPrecoKm, ["padrao", "faixas"] as const, "padrao"),
     faixasKm: lista(raiz.faixasKm).map((f) => { const x = reg(f); return { de: numero(x.de, 0, 0, 10_000), ate: numero(x.ate, 0, 0, 10_000), valor: centavos(numero(x.valor, 0, 0, 1000)) }; }).filter((f) => f.ate > f.de).slice(0, 20),
     kmIncluso: numero(raiz.kmIncluso, 0, 0, 1000), tempoToque: Math.round(numero(raiz.tempoToque, 30, 5, 300)),

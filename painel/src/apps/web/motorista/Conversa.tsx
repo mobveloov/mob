@@ -11,10 +11,9 @@ import type { Corrida } from "./tipos";
 
 export interface MensagemM { id: string; meu: boolean; texto?: string; audio?: ReactNode; midia?: ReactNode; em: string; nome?: string }
 
-/** Respostas rápidas da empresa (rota /mensagens-rapidas) ou, sem elas, as de sempre. */
-const PADRAO = ["Estou a caminho!", "Cheguei no local", "Aguarde na frente, por favor"];
+/** Respostas rápidas da empresa (Configurações › Gerais › Motorista, rota /mensagens-rapidas). */
 export function useRespostasRapidas() {
-  const [l, setL] = useState<string[]>(PADRAO);
+  const [l, setL] = useState<string[]>([]);
   useEffect(() => {
     void api<{ mensagens: unknown[] }>("/mensagens-rapidas").then((r) => {
       const t = (r.mensagens ?? []).map((m) => (typeof m === "string" ? m : String((m as { texto?: string })?.texto ?? ""))).filter(Boolean);

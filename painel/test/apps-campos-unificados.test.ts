@@ -131,3 +131,34 @@ test("passageiro: casa e trabalho do app aparecem no cadastro e a edição do pa
     assert.equal(l.casa.texto, "Rua Nova, 99"); assert.equal(l.trabalho.texto, "Av. Verde, 500"); assert.equal(l.trabalho.lat, -23.5);
   }
 });
+
+test("passageiro: Casa e Trabalho editados no painel aparecem no app, com a regra da posição no mapa", async () => {
+  const r = await app_("POST", "/conta/criar", { papel: "passageiro", nome: "Lia Prado Alves", genero: "Feminino", telefone: "11977770002", email: "lia@u.test", senha: "segredo1" });
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  const t = r.corpo.token;
+  const cli = listar(U.id, CLI).find((c) => c.telefone === "11977770002")!;
+  // painel grava casa com posição (endereço escolhido na sugestão) e trabalho só com texto
+  const a = await painel("PUT", `/passageiros/${cli.id}`, { enderecoCasa: "Rua Lilás, 7", enderecoCasaPos: "-23.55,-46.63", enderecoTrabalho: "Av. Cinza, 90" });
+  assert.equal(a.status, 200, JSON.stringify(a.corpo));
+  let l = (await app_("GET", "/lugares", undefined, t)).corpo;
+  assert.equal(l.casa.texto, "Rua Lilás, 7"); assert.equal(l.casa.lat, -23.55); assert.equal(l.casa.lng, -46.63);
+  assert.equal(l.trabalho.texto, "Av. Cinza, 90"); assert.equal(l.trabalho.lat, undefined);
+  // texto igual: a posição que já existe fica, mesmo que o painel mande outra
+  await painel("PUT", `/passageiros/${cli.id}`, { enderecoCasa: "Rua Lilás, 7", enderecoCasaPos: "1,1" });
+  l = (await app_("GET", "/lugares", undefined, t)).corpo;
+  assert.equal(l.casa.lat, -23.55);
+  // texto novo sem posição: perde a posição antiga
+  await painel("PUT", `/passageiros/${cli.id}`, { enderecoCasa: "Rua Outra, 1" });
+  l = (await app_("GET", "/lugares", undefined, t)).corpo;
+  assert.equal(l.casa.texto, "Rua Outra, 1"); assert.equal(l.casa.lat, undefined);
+  // o painel mostra o que está gravado
+  assert.equal((await painel("GET", `/passageiros/${cli.id}`)).corpo.passageiro.enderecoTrabalho, "Av. Cinza, 90");
+  // app grava com posição -> painel mostra
+  await app_("POST", "/lugares", { tipo: "casa", ponto: { texto: "Praça Azul, 3", lat: -22.9, lng: -43.2 } }, t);
+  const p = (await painel("GET", `/passageiros/${cli.id}`)).corpo.passageiro;
+  assert.equal(p.enderecoCasa, "Praça Azul, 3"); assert.equal(p.enderecoCasaPos, "-22.9,-43.2");
+  // apagar no painel limpa também no app
+  await painel("PUT", `/passageiros/${cli.id}`, { enderecoTrabalho: "" });
+  l = (await app_("GET", "/lugares", undefined, t)).corpo;
+  assert.ok(!l.trabalho || !l.trabalho.texto);
+});

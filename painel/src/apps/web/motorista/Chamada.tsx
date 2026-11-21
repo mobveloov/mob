@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { CalendarClock, Flag, Minus, Plus, Star, UserRound, Users } from "lucide-react";
 import { pararSons, reais, tocarToque } from "../comum/api";
 import { ajustes, tremer } from "./ajustes";
+import { useConfigDoPainel } from "../comum/ui";
 import { Erro } from "./Pecas";
 import { diaHora, distanciaTexto, nomePassageiro, notaPassageiro, valorDe, type DadosChamada } from "./tipos";
 
@@ -23,6 +24,9 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
   dados: DadosChamada; distanciaKm?: number | null; expira?: number; segundos?: number; tocarSom?: boolean;
   aceitar: (valor: number | null, contraoferta: boolean) => Promise<void> | void; recusar: () => void; rotuloRecusar?: string; erro?: string;
 }) {
+  // Negociação por categoria (Tarifas e categorias): liga/desliga e o acréscimo máximo que o motorista pode pedir.
+  const neg = useConfigDoPainel()?.categorias.find((x) => x.nome === c.categoria)?.negociacao;
+  const negocia = neg?.ativo ?? true;
   const base = valorDe(c);                       // valor da corrida antes do cupom (é o que a contra-oferta muda)
   const [valor, setValor] = useState(base);
   const [ocupado, setOcupado] = useState(false);
@@ -60,6 +64,7 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
   const mudar = (d: number) => setValor((x) => {
     if (x == null) return x;
     const novo = centavos(x + d);
+    if (!negocia || (neg && base != null && novo > base * (1 + neg.acrescimoMaxMot / 100) + 0.005)) return x;
     return valores.length && (novo < Math.min(...valores) || novo > Math.max(...valores)) ? x : Math.max(1, novo);
   });
   const confirmar = async () => { setOcupado(true); try { await aceitar(valor, contra); } finally { setOcupado(false); } };
@@ -73,9 +78,9 @@ export function Chamada({ dados: c, distanciaKm, expira, segundos, tocarSom = tr
         </div>
 
         <div className="chamada-valor">
-          {base != null && <button type="button" className="redondo contorno" aria-label="Diminuir valor" disabled={(valor ?? 0) - PASSO < 1} onClick={() => mudar(-PASSO)}><Minus size={20} /></button>}
+          {base != null && negocia && <button type="button" className="redondo contorno" aria-label="Diminuir valor" disabled={(valor ?? 0) - PASSO < 1} onClick={() => mudar(-PASSO)}><Minus size={20} /></button>}
           <div className="chamada-liquido"><small>VOCÊ RECEBE</small><strong>{reais(liquido)}</strong></div>
-          {base != null && <button type="button" className="redondo marca" aria-label="Aumentar valor" onClick={() => mudar(PASSO)}><Plus size={20} /></button>}
+          {base != null && negocia && <button type="button" className="redondo marca" aria-label="Aumentar valor" onClick={() => mudar(PASSO)}><Plus size={20} /></button>}
         </div>
         {bruto != null && <div className="chamada-bruto">Bruto {reais(bruto)}{taxa ? ` · taxa ${reais(taxa)}` : ""}</div>}
         {porKm != null && (() => {

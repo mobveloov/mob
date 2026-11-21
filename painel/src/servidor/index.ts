@@ -39,6 +39,7 @@ import { rotasRelatorios } from "../relatorios/rotas.ts";
 import { rotasAreas } from "../areas/rotas.ts";
 import { rotasCentrais } from "../centrais/rotas.ts";
 import { cabecalhosDaApi, servirPainel } from "./protecao.ts";
+import { rotasMapa } from "./mapas-tiles.ts";
 import { rotasFiliais } from "../filiais/rotas.ts";
 import { rotasSuperadmin } from "../superadmin/rotas.ts";
 import { recursosDesligados } from "../superadmin/recursos.ts";
@@ -165,6 +166,8 @@ app.use("/api/bot", rotasBot);
 app.use("/api/totem", rotasTotem);
 // Apps do passageiro e do motorista: login próprio pelo telefone (token).
 app.use("/api/apps", rotasApps);
+// Imagens dos mapas (painel e apps): pública, com limite por IP; só o servidor fala com o provedor.
+app.use("/api/mapa", rotasMapa);
 
 app.use("/api", exigirLogin, exigirCargoDaRota);
 // Resposta com dado da empresa nunca fica guardada em cache de navegador ou proxy.

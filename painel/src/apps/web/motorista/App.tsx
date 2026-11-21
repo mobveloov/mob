@@ -6,10 +6,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
-import { Carregando, mensagemDeErro, ServidorTeste, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
+import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
+import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
+import { avisarNovoAviso, useNaoLidos } from "../comum/Avisos";
 import { PermissoesPasso } from "./Permissoes";
-import { carregarPersonalizacao, personalizacaoDoCache } from "../comum/personalizacao";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
@@ -20,13 +21,18 @@ import { AvisoDoMotorista, BarraBaixo, Dialogo } from "./Pecas";
 import { LogoMarca } from "./Marca";
 import { Desafios, Notificacoes, PasseLivre, Preferencias } from "./Telas";
 import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
-import { aplicarTema, NOMES_TEMA, useAjustes } from "./ajustes";
+import { aplicarTema, NOMES_TEMA, temaPadraoDaEmpresa, useAjustes } from "./ajustes";
+import { acompanharPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
 import { usarSoWifi } from "./gravador";
 import type { Corrida, Eu, Oferta } from "./tipos";
 
 export default function App() {
-  const { marca, erro } = useMarca();
+  const { marca: marcaBase, erro } = useMarca();
+  const pers = usePersonalizacao();
+  // O nome escolhido em Configurações > Personalização app motorista vale no app inteiro.
+  const marca = marcaBase && pers?.empresa.nome ? { ...marcaBase, nome: pers.empresa.nome } : marcaBase;
   const [logado, setLogado] = useState(!!token());
+  useEffect(() => { personalizacaoDoCache(); }, []);
   const [cadastrando, setCadastrando] = useState(false);
   useEffect(() => { aplicarTema(); const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
@@ -34,11 +40,16 @@ export default function App() {
   if (!logado) return cadastrando
     ? <Cadastro voltarAoLogin={() => setCadastrando(false)} concluir={() => { setCadastrando(false); setLogado(!!token()); }} />
     : <Entrar marca={marca} aoEntrar={() => setLogado(true)} cadastrar={() => setCadastrando(true)} />;
-  return <Logado marca={marca} sair={() => setLogado(false)} />;
+  return <><Logado marca={marca} sair={() => setLogado(false)} /><EmergenciaPerto ativo /><CartaoMeuSos /></>;
 }
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [ajustes, mudarAjustes] = useAjustes();
+  const pers = usePersonalizacao();
+  // Lê a personalização ao entrar, a cada minuto e ao voltar para o app (muda no painel, muda aqui, sem gerar APK).
+  useEffect(() => acompanharPersonalizacao(), []);
+  useEffect(() => { if (pers) temaPadraoDaEmpresa(pers.tema); }, [pers?.tema]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rec = (id: keyof NonNullable<typeof pers>["recursos"]) => pers?.recursos[id] !== false; // sem a personalização, tudo aparece
   const [eu, setEu] = useState<Eu | null>(null);
   const [online, setOnline] = useState(false);
   const [posicao, setPosicao] = useState<Posicao | null>(null);
@@ -49,7 +60,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [chat, setChat] = useState(false);
   const [tela, setTela] = useState("");
+  const { naoLidos } = useNaoLidos();
   const [menu, setMenu] = useState(false);
+  const regras = useConfigDoPainel();
   const [dialogo, setDialogo] = useState<"" | "online" | "offline" | "analise" | "alerta">("");
   const [folhaAberta, setFolhaAberta] = useState(false); // folha de baixo do mapa: recolhida (barra) ou aberta (aviso + Desconectar)
   const [conectado, setConectado] = useState(false);
@@ -88,8 +101,11 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   // Tempo real.
   useEffect(() => tempoReal((tipo, d) => {
+    if (tipo === "aviso") { avisarNovoAviso(d); vibrar(120); return; }
     if (tipo === "oferta") { if (document.visibilityState === "hidden") void permissoesNativas.ofertaTelaCheia("Nova corrida", "Toque para ver a chamada"); setOferta(d as Oferta); setErroOferta(""); if (!ajustes.insistente) { tocarAlerta(4); } if (ajustes.vibrar) vibrar([400, 200, 400, 200, 400]); }
-    else if (tipo === "sos") { tocarAlerta(3, "alerta"); vibrar([500, 200, 500, 200, 500]); setAviso(`ALERTA DE EMERGÊNCIA: ${String(d.nome || "um colega")} pediu ajuda${d.km != null ? ` a ${String(d.km).replace(".", ",")} km de você` : ""}.`); }
+    else if (tipo === "sos") aoChegarSos(d as SosPerto);
+    else if (tipo === "sos_fim") aoFimDoSos(d as { id: string });
+    else if (tipo === "sos_estado") aoMudarSos();
     else if (tipo === "oferta_encerrada") { setOferta((o) => (o?.id === d.id ? null : o)); pararSons(); if (d.motivo) setAviso(String(d.motivo)); }
     else if (tipo === "corrida") {
       const c = d as Corrida;
@@ -134,24 +150,12 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   }, [online]);
   useEffect(() => { void posicaoAgora().then((p) => setPosicao((a) => a ?? p)).catch(() => undefined); }, []);
   useEffect(() => { void api("/ping", { corpo: {} }).catch(() => undefined); }, []); // avisa a central que o app está aberto
-  // A cor principal e o nome da empresa vêm do painel (Configurações > Personalização): lê ao entrar, a cada minuto e ao voltar ao app, sem APK novo.
-  useEffect(() => {
-    personalizacaoDoCache();
-    void carregarPersonalizacao();
-    const t = setInterval(() => void carregarPersonalizacao(), 60000);
-    const f = () => { if (document.visibilityState === "visible") void carregarPersonalizacao(); };
-    document.addEventListener("visibilitychange", f);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", f); };
-  }, []);
   // Primeira vez (e sempre que faltar alguma): abre o passo a passo das permissões do Android.
   useEffect(() => { void permissoesNativas.faltando().then((f) => { if (f.length) setTela((t) => t || "permissoes"); }); }, []);
   useEffect(() => { void api<{ online: boolean }>("/eu").then((r) => { if (r.online) setOnline(true); }).catch(() => undefined); }, []);
 
   const ficarOnline = async () => {
     setDialogo(""); setErro("");
-    // No APK: sem as permissões essenciais (localização o tempo todo, notificações, exibir sobre outros apps, bateria) não fica online.
-    const falta = await permissoesNativas.faltando();
-    if (falta.length) { setAviso("Libere as permissões para receber corridas com o app minimizado."); setTela("permissoes"); return; }
     try {
       const p = posicao ?? await posicaoAgora();
       await api("/online", { corpo: p });
@@ -160,7 +164,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   };
   const pedirAjuda = async () => {
     setDialogo("");
-    try { await api("/sos", { corpo: posicao ?? {} }); setAviso("Alerta enviado: a central e os motoristas por perto foram avisados. Se for grave, ligue 190."); } catch (e) { setErro(mensagemDeErro(e)); }
+    try { await enviarSos(corrida?.id ?? null, posicao); } catch (e) { setErro(mensagemDeErro(e)); } // o cartão "Alerta enviado" mostra o resultado
   };
   const ficarOffline = async () => { setDialogo(""); setFolhaAberta(false); await api("/offline", { corpo: {} }).catch(() => undefined); setOnline(false); };
   const sairDaConta = async () => { await api("/sair", { corpo: {} }).catch(() => undefined); setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); };
@@ -204,7 +208,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     veiculos: <MeusVeiculos voltar={voltar} />,
     cadastro: <MeuCadastro voltar={voltar} aoMudar={() => void carregar()} irCarteira={() => setTela("carteira")} aoSairDaConta={() => { setOnline(false); window.dispatchEvent(new Event("app-sair")); sair(); }} />,
     senha: <AlterarSenha voltar={voltar} />,
-    config: <Configuracoes voltar={voltar} irPermissoes={() => setTela("permissoes")} />,
+    config: <Configuracoes voltar={voltar} />,
     diagnostico: <Diagnostico voltar={voltar} eu={eu} conectado={conectado} posicao={posicao} online={online} />,
     suporte: <Suporte voltar={voltar} marca={marca} />,
     fale: <FaleConosco voltar={voltar} marca={marca} />,
@@ -212,7 +216,6 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     preferencias: <Preferencias voltar={voltar} />,
     desafios: <Desafios voltar={voltar} marca={marca} />,
     notificacoes: <Notificacoes voltar={voltar} />,
-    permissoes: <PermissoesPasso voltar={voltar} />,
     passelivre: <PasseLivre voltar={voltar} />,
   };
   if (tela && telas[tela]) return <>{telas[tela]}{chamada}</>;
@@ -243,15 +246,15 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   );
   if (tela === "corridas") return <>{<Corridas barra={barra("corridas")} aoPegar={(c) => { setCorrida(c); setTela(""); }} />}{dialogos}{chamada}</>;
   return (
-    <div className="inicio-m">
+    <div className={`inicio-m estilo-${pers?.design.estiloTela ?? "flutuante"}`}>
       <Mapa pontos={posicao ? [{ ...posicao, rotulo: "Você", tipo: "eu" }] : []} centralizar={centro} className="cheia" />
       <div className="inicio-topo">
         <button type="button" className="pilula-menu" aria-label="Menu" onClick={() => setMenu(true)}><LogoMarca marca={marca} tamanho={40} /><IconeMenu size={24} /></button>
-        <span className="pilula-ganhos">
+        {rec("saldo") && <span className="pilula-ganhos">
           <button type="button" aria-label={ajustes.esconderGanhos ? "Mostrar ganhos" : "Esconder ganhos"} onClick={() => mudarAjustes({ esconderGanhos: !ajustes.esconderGanhos })}>{ajustes.esconderGanhos ? <EyeOff size={20} /> : <Eye size={20} />}</button>
           <button type="button" aria-label="Histórico de ganhos" onClick={() => setTela("atividades")}>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? <span className="girando" style={{ width: 16, height: 16, borderWidth: 2 }} /> : reais(hoje)} <ChevronRight size={14} style={{ opacity: .6 }} /></button>
-        </span>
-        <button type="button" className="mapa-botao" aria-label="Notificações" onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" /></button>
+        </span>}
+        {rec("notificacoes") && <button type="button" className="mapa-botao" aria-label={naoLidos ? `Notificações, ${naoLidos} não lidas` : "Notificações"} style={{ position: "relative" }} onClick={() => setTela("notificacoes")}><Bell size={22} fill="currentColor" />{naoLidos > 0 && <span aria-hidden style={{ position: "absolute", top: 4, right: 4, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: "#e5484d", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "16px", textAlign: "center" }}>{naoLidos > 9 ? "9+" : naoLidos}</span>}</button>}
       </div>
 
       {(aviso || erro || analise) && (
@@ -262,14 +265,14 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
         </div>
       )}
 
-      <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>
+      {(regras?.motorista.botaoPanico ?? true) && rec("ajuda") && <button type="button" className="botao-alerta" aria-label="Pedir ajuda" onClick={() => setDialogo("alerta")}><TriangleAlert size={26} /></button>}
 
       <div className="inicio-flutuantes">
-        {online && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
+        {online && (regras?.macaneta.ativo ?? true) && rec("macaneta") && <button type="button" className="pilula-macaneta" onClick={() => setTela("macaneta")}><Hand size={18} /> Maçaneta</button>}
         <div className="direita">
-          {online && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
-          <button type="button" className="mapa-botao" aria-label={`Aparência: ${NOMES_TEMA[ajustes.tema]}. Toque para trocar`} onClick={() => mudarAjustes({ tema: ajustes.tema === "sistema" ? "claro" : ajustes.tema === "claro" ? "escuro" : "sistema" })}>{ajustes.tema === "escuro" ? <Moon size={22} /> : <Sun size={22} />}</button>
-          <button type="button" className="mapa-botao" aria-label="Centralizar no mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={22} /></button>
+          {online && rec("preferencias") && <button type="button" className="mapa-botao" aria-label="Preferências de corrida" onClick={() => setTela("preferencias")}><SlidersHorizontal size={22} /></button>}
+          {rec("tema") && <button type="button" className="mapa-botao" aria-label={`Aparência: ${NOMES_TEMA[ajustes.tema]}. Toque para trocar`} onClick={() => mudarAjustes({ tema: ajustes.tema === "sistema" ? "claro" : ajustes.tema === "claro" ? "escuro" : "sistema" })}>{ajustes.tema === "escuro" ? <Moon size={22} /> : <Sun size={22} />}</button>}
+          {rec("centralizar") && <button type="button" className="mapa-botao" aria-label="Centralizar no mapa" onClick={() => setCentro((n) => n + 1)}><LocateFixed size={22} /></button>}
         </div>
         {!online && <button type="button" className="botao-onoff" onClick={() => setDialogo(analise ? "analise" : "online")}>INICIAR</button>}
       </div>

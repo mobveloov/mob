@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { CANAIS_ENVIO } from "../../crm/catalogo.ts";
 import { BarChart3, CalendarClock, Copy, Eye, Pause, Play, Plus, Save, Send, Sparkles, Trash2, X } from "lucide-react";
 import { BarraPausa } from "./automacao-comum";
 import { Cartao, Gaveta, Kpi, Titulo, useCarregar } from "../componentes/ui";
@@ -97,7 +98,7 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Campanha>; onSalvo: () 
     mudar({ texto: t.slice(0, i) + v + t.slice(f) });
     setTimeout(() => { el?.focus(); el?.setSelectionRange(i + v.length, i + v.length); }, 0);
   };
-  const corpo = () => ({ nome: c.nome, texto: c.texto, variacoes: c.variacoes, cupom: c.cupom, publico: c.publico, agendadaPara: c.agendadaPara || null });
+  const corpo = () => ({ canal: c.canal ?? "whatsapp", nome: c.nome, texto: c.texto, variacoes: c.variacoes, cupom: c.cupom, publico: c.publico, agendadaPara: c.agendadaPara || null });
   const salvar = async (agendar = false) => {
     const r = c.id ? await tentar(() => crm.salvarCampanha(c.id!, corpo())) : await tentar(() => crm.novaCampanha(corpo()));
     if (!r) return;
@@ -116,6 +117,10 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Campanha>; onSalvo: () 
     <div className="form">
       {caixa}
       <label>Nome da campanha<input value={c.nome ?? ""} onChange={(e) => mudar({ nome: e.target.value })} placeholder="Ex.: Volta com 10% — novembro" /></label>
+<label>Canal
+        <select value={c.canal ?? "whatsapp"} onChange={(e) => mudar({ canal: e.target.value as "whatsapp" | "app" })}>{CANAIS_ENVIO.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
+        <small>{CANAIS_ENVIO.find((x) => x.value === (c.canal ?? "whatsapp"))?.hint}</small>
+      </label>
       <h3 className="sub">Quem recebe</h3>
       <EditorRegras regras={c.publico ?? { tipo: "passageiro" }} onChange={(publico) => mudar({ publico })} listas={listas.dados?.listas} />
       <h3 className="sub">Mensagem</h3>

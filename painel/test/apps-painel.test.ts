@@ -433,26 +433,6 @@ test("fotos enviadas pelos apps viram WebP (qualidade 80, até 1600 px): foto de
   assert.equal(arquivoDoDocumento(E.id, m.id, "cnh")?.mime, "image/webp");
 });
 
-test("SOS: grava o alerta com posição, nome e telefone e avisa os motoristas por perto (não quem pediu nem quem está longe)", async () => {
-  const { alertas } = await import("../src/apps/despacho.ts");
-  const { emitir: _e } = await import("../src/apps/eventos.ts");
-  criar(E.id, cadastroPorId("motoristas")!, { nome: "Nina Pede", telefone: "11900000091", status: "Ativo", veiculo: "Hatch", placa: "NIN1A23" }, "teste");
-  criar(E.id, cadastroPorId("motoristas")!, { nome: "Otto Perto", telefone: "11900000092", status: "Ativo", veiculo: "Hatch", placa: "OTT1A23" }, "teste");
-  criar(E.id, cadastroPorId("motoristas")!, { nome: "Paulo Longe", telefone: "11900000093", status: "Ativo", veiculo: "Hatch", placa: "PAU1A23" }, "teste");
-  const tokN = await entrar("motorista", "11900000091"), tokO = await entrar("motorista", "11900000092"), tokL = await entrar("motorista", "11900000093");
-  await chamar("POST", `${API}/online`, { lat: -22.1, lng: -45.1 }, tokN);
-  await chamar("POST", `${API}/online`, { lat: -22.101, lng: -45.101 }, tokO);
-  await chamar("POST", `${API}/online`, { lat: -22.9, lng: -45.9 }, tokL);
-  const antes = alertas(E.id).length;
-  const r = await chamar("POST", `${API}/sos`, { lat: -22.1, lng: -45.1 }, tokN);
-  assert.equal(r.status, 200, JSON.stringify(r.corpo));
-  const todos = alertas(E.id);
-  assert.equal(todos.length, antes + 1);
-  const a = todos[todos.length - 1];
-  assert.equal(a.nome, "Nina Pede"); assert.equal(a.telefone, "11900000091"); assert.equal(a.papel, "motorista"); assert.equal(a.lat, -22.1);
-  assert.equal((await chamar("POST", `${API}/sos`, {}, undefined)).status, 401);
-});
-
 // ---------------------------------------------------------------------------------------------------------------------------------
 // "Mudou no painel, mudou no app": cada função do painel que afeta os apps, mudada com as mesmas funções do painel e conferida no app.
 // A tabela com o que foi testado e como está em docs/TESTE_PAINEL_APPS.md.

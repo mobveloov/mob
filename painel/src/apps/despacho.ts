@@ -13,7 +13,10 @@ import { listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, taxasDoPassageiroDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
 import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
+import { registrarEvento, registrarPonto } from "../corridas/registro.ts";
 import { ajustes } from "./ajustes.ts";
+import { gerais } from "../config/gerais.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
 import { calcularComissao, taxasDoMotorista } from "../config/comissao.ts";
 import { estatisticas, urlDaFoto } from "./perfil.ts";
 import { pessoa } from "./extras.ts";
@@ -39,7 +42,7 @@ const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
 /** Posição mais velha que isso não conta (motorista sumiu). */
 const POSICAO_MS = 10 * 60_000; // o app reenvia a cada 30 s; em segundo plano o Android pode atrasar
 /** Depois de recusar ou deixar passar, o motorista só recebe de novo a mesma corrida depois disso. */
-const REOFERTA_MS = 2 * 60_000;
+const reofertaMs = (empresaId: string) => { try { return gerais(empresaId).motorista.reofertaMinutos * 60_000; } catch { return 120_000; } };
 
 /**
  * "Enviar mais de um carro" (marcação da corrida na tela Solicitar): a oferta vai a vários motoristas ao mesmo tempo e vale o
@@ -77,15 +80,35 @@ function anotarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
   try { banco().prepare("INSERT INTO app_ofertas (empresa, motorista, resultado, em) VALUES (?, ?, ?, ?)").run(empresaId, o.motoristaId, fim, new Date().toISOString()); } catch { /* estatística: não pode travar a chamada */ }
 }
 
+/** Quantas ofertas entram na taxa de aceitação (o app mostra este número no texto de ajuda). */
+const JANELA_ACEITACAO = 100;
 /** Taxa de aceitação: das últimas 100 ofertas, quantas foram aceitas, recusadas e ignoradas (a chamada venceu). */
 export function taxaDeAceitacao(empresaId: string, motoristaId: string) {
-  const l = banco().prepare("SELECT resultado, em FROM app_ofertas WHERE empresa = ? AND motorista = ? ORDER BY seq DESC LIMIT 100").all(empresaId, motoristaId) as Array<{ resultado: string; em: string }>;
+  const l = banco().prepare("SELECT resultado, em FROM app_ofertas WHERE empresa = ? AND motorista = ? ORDER BY seq DESC LIMIT " + JANELA_ACEITACAO).all(empresaId, motoristaId) as Array<{ resultado: string; em: string }>;
   const aceitas = l.filter((x) => x.resultado === "aceitou").length, rejeitadas = l.filter((x) => x.resultado === "recusou").length, ignoradas = l.filter((x) => x.resultado === "expirou").length;
-  return { ofertas: l.length, aceitas, rejeitadas, ignoradas, porcentagem: l.length ? Math.round((aceitas / l.length) * 100) : 0, atualizadoEm: l[0]?.em ?? null };
+  return { janela: JANELA_ACEITACAO, ofertas: l.length, aceitas, rejeitadas, ignoradas, porcentagem: l.length ? Math.round((aceitas / l.length) * 100) : 0, atualizadoEm: l[0]?.em ?? null };
+}
+
+/** Linha do "Histórico da OS": o que aconteceu com cada chamada enviada a um motorista. */
+function registrarOfertaNoLog(empresaId: string, o: Oferta, fim: FimOferta) {
+  const m = motoristas(empresaId).find((x) => x.id === o.motoristaId);
+  const nome = String(m?.nome ?? "Motorista");
+  const km = o.distanciaKm != null ? ` (a ${String(o.distanciaKm).replace(".", ",")} km do embarque)` : "";
+  const T: Record<FimOferta, { tipo: Parameters<typeof registrarEvento>[2]["tipo"]; texto: string; canal: string }> = {
+    oferecida: { tipo: "oferta_enviada", texto: `Chamada enviada para ${nome}${km}`, canal: "Despacho automático" },
+    aceitou: { tipo: "oferta_aceita", texto: `${nome} aceitou a chamada`, canal: "App do motorista" },
+    recusou: { tipo: "oferta_recusada", texto: `${nome} recusou a chamada`, canal: "App do motorista" },
+    expirou: { tipo: "oferta_expirada", texto: `${nome} deixou a chamada passar (sem resposta)`, canal: "App do motorista" },
+    saiu: { tipo: "oferta_saiu", texto: `${nome} ficou offline com a chamada aberta`, canal: "App do motorista" },
+    perdeu: { tipo: "oferta_perdida", texto: `Chamada de ${nome} encerrada: outro motorista aceitou`, canal: "Despacho automático" },
+  };
+  const x = T[fim];
+  registrarEvento(empresaId, o.corridaId, { tipo: x.tipo, descricao: x.texto, usuario: x.canal === "App do motorista" ? nome : "sistema", canal: x.canal, dados: { ofertaId: o.id, motoristaId: o.motoristaId, distanciaKm: o.distanciaKm } });
 }
 
 function avisarOferta(empresaId: string, o: Oferta, fim: FimOferta) {
   anotarOferta(empresaId, o, fim);
+  registrarOfertaNoLog(empresaId, o, fim);
   for (const f of ouvintesOferta) { try { f(empresaId, o, fim); } catch (e) { console.error("[apps] ouvinte de oferta:", e instanceof Error ? e.message : e); } }
 }
 
@@ -137,6 +160,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
   const m = c.motoristaId ? motorista(empresaId, c.motoristaId) : undefined;
   return {
     id: c.id, os: c.os, status: c.status, statusTexto: STATUS_TEXTO[c.status], aberta,
+    ...(papel === "motorista" && aberta ? (({ taxaCentral, valorLiquido }) => ({ taxaCentral, valorLiquido }))(valoresDaCorrida(empresaId, c, c.motoristaId ?? undefined)) : {}),
     embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
     estimativa: c.estimativa, valor: c.valor, cupom: c.cupom, desconto: c.desconto, avaliacao: c.avaliacao,
     solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm, finalizadaEm: c.finalizadaEm, canceladaPor: culpa ? "" : c.canceladaPor,
@@ -220,6 +244,7 @@ export function atualizarPosicao(empresaId: string, motoristaId: string, lat: nu
   ficarOnline(empresaId, motoristaId, lat, lng);
   const c = corridaAtual(empresaId, "motorista", motoristaId);
   if (c && ABERTA_COM_MOTORISTA.has(c.status)) emitir(empresaId, passageiroAlvo(c), "posicao", { corridaId: c.id, lat, lng, em: Date.now() });
+  if (c && (c.status === "a_caminho" || c.status === "no_local" || c.status === "em_andamento")) registrarPonto(empresaId, c.id, lat, lng, c.status === "em_andamento" ? "viagem" : "embarque"); // trajeto real da corrida (Trajeto da OS)
   if (c?.macaneta?.modo === "taximetro" && c.status === "em_andamento") somarTaximetro(empresaId, c.id, lat, lng);
 }
 
@@ -330,6 +355,9 @@ function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: { li
   return (prioritarios.length ? prioritarios : ordenados).slice(0, Math.min(limite, Math.max(1, regras.prioritarios)));
 }
 
+/** Corridas que já avisaram "nenhum motorista disponível" (some quando aparece alguém). */
+const semMotoristaAvisado = new Set<string>();
+
 export function despachar(empresaId: string) {
   const e = estado(empresaId);
   if (!e.online.size) return 0;
@@ -381,7 +409,7 @@ export function despachar(empresaId: string) {
       if ((busy.has(id) && !(regras.permitirProxima && pertoDoDestino(id, p))) || comOferta.has(id) || agora - p.em > POSICAO_MS) continue;
       if (agora - p.visto > VISTO_MS && !conectado(empresaId, motoristaAlvo(id))) continue; // fechou o app
       if (!filtros.podeAtender(c, id)) continue; // bloqueio de um dos lados ou categoria que ele não quer
-      if ((tentados.get(id) ?? 0) > agora - REOFERTA_MS) continue;
+      if ((tentados.get(id) ?? 0) > agora - reofertaMs(empresaId)) continue;
       const cad = cadastro.get(id);
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
       if (!gestao.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
@@ -394,7 +422,12 @@ export function despachar(empresaId: string) {
       };
       candidatos.push(cand);
     }
-    if (!candidatos.length) continue;
+    if (!candidatos.length) {
+      // Histórico da OS: avisa uma vez só que não havia motorista disponível (a verificação roda a cada 2 s).
+      if (!semMotoristaAvisado.has(c.id)) { semMotoristaAvisado.add(c.id); if (semMotoristaAvisado.size > 5000) semMotoristaAvisado.clear(); registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: "Nenhum motorista disponível por perto no momento", usuario: "sistema", canal: "Despacho automático" }); }
+      continue;
+    }
+    semMotoristaAvisado.delete(c.id);
     candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0));
     // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
     // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
@@ -409,6 +442,23 @@ export function despachar(empresaId: string) {
       continue;
     }
     e.rodadas.set(c.id, { ...rod, n: rod.n + 1 });
+    // Histórico da OS: quem foi consultado nesta rodada, a que distância (linha reta) e quem recebeu a chamada.
+    {
+      const raioKm = process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000;
+      const metodoTexto = regras.metodo === "fila_virtual" ? "fila virtual" : regras.metodo === "primeiro_aceitar" ? "grupo (primeiro a aceitar)" : "proximidade";
+      registrarEvento(empresaId, c.id, { tipo: "despacho_consulta", descricao: `Consultando motoristas por ${metodoTexto}`, usuario: "sistema", canal: "Despacho automático" });
+      registrarEvento(empresaId, c.id, {
+        tipo: "despacho_encontrados", usuario: "sistema", canal: "Despacho automático",
+        descricao: `Foram encontrados ${candidatos.length} ${candidatos.length === 1 ? "motorista" : "motoristas"} em até ${String(arred(raioKm, 1)).replace(".", ",")} km (${regras.metodo === "primeiro_aceitar" ? "Disputa sem eleição" : regras.metodo === "fila_virtual" ? "Fila virtual" : "Mais próximo"})`,
+        dados: {
+          metodo: regras.metodo, raioKm, rodada: rod.n + 1, embarque: { lat: c.embarque.lat ?? null, lng: c.embarque.lng ?? null },
+          candidatos: candidatos.slice(0, 30).map((x) => {
+            const cad = cadastro.get(x.id), pos = e.online.get(x.id);
+            return { id: x.id, nome: String(cad?.nome ?? ""), vtr: String(cad?.viatura ?? ""), kmReta: x.km != null ? arred(x.km, 3) : null, favorito: x.fav, recebeu: escolhidos.some((y) => y.id === x.id), lat: pos?.lat ?? null, lng: pos?.lng ?? null };
+          }),
+        },
+      });
+    }
     for (const melhor of escolhidos) {
     const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
@@ -579,7 +629,8 @@ export function iniciarApps(intervaloMs = 2000) {
 // ------------------------------------------------------------------ corridas abertas, pegar e contra-oferta
 
 export interface Contraoferta { id: string; corridaId: string; motoristaId: string; valor: number; expira: number; distanciaKm: number | null }
-const CONTRA_MS = 60_000;
+/** Validade da contra-oferta: Configurações › Gerais › Regras do motorista (padrão 60 s). */
+const contraMs = (empresaId: string) => { try { return gerais(empresaId).motorista.contraofertaSegundos * 1000; } catch { return 60_000; } };
 
 /** Valor mínimo da categoria (o passageiro e o motorista não passam abaixo disso). */
 export const descontoPeloValor = (empresaId: string, c: CorridaPropria, valor: number) => descontoDoCupom(empresaId, c.cupom, valor, c.categoria);
@@ -650,8 +701,10 @@ export function registrarContraoferta(empresaId: string, motoristaId: string, co
   const base = c.valorOferecido ?? c.estimativa.valor;
   if (!(valor > 0)) throw new Error("Valor inválido.");
   if (valor < minimoDaCategoria(empresaId, c.categoria)) throw new Error("O valor está abaixo do mínimo da categoria.");
-  if (base != null && valor > base * 3) throw new Error("O valor está muito acima do oferecido.");
-  const o: Contraoferta = { id: crypto.randomUUID(), corridaId, motoristaId, valor, expira: Date.now() + CONTRA_MS, distanciaKm: kmAteEmbarque(e, motoristaId, c) };
+  const neg = extraDaCategoria(empresaId, c.categoria).negociacao;
+  if (!neg.ativo) throw new Error("Esta categoria não aceita negociação de valor.");
+  if (base != null && valor > base * (1 + neg.acrescimoMaxMot / 100) + 0.005) throw new Error(`O valor passa do limite de ${neg.acrescimoMaxMot}% acima do oferecido.`);
+  const o: Contraoferta = { id: crypto.randomUUID(), corridaId, motoristaId, valor, expira: Date.now() + contraMs(empresaId), distanciaKm: kmAteEmbarque(e, motoristaId, c) };
   const outras = (e.contraofertas.get(corridaId) ?? []).filter((x) => x.motoristaId !== motoristaId && x.expira > Date.now());
   e.contraofertas.set(corridaId, [...outras, o]);
   emitir(empresaId, passageiroAlvo(c), "contraoferta", { corridaId, id: o.id, valor });
@@ -688,7 +741,7 @@ export function atualizarOferta(empresaId: string, corridaId: string) {
 // ------------------------------------------------------------------ maçaneta (corrida de rua)
 
 /** O motorista pega um passageiro na rua: a corrida já nasce com ele e já em andamento. */
-export async function criarMacaneta(empresaId: string, motoristaId: string, d: { modo: "taximetro" | "destino"; categoria: string; destino?: Ponto; lat: number; lng: number; passageiro?: { nome?: string; telefone?: string } }): Promise<CorridaPropria> {
+export async function criarMacaneta(empresaId: string, motoristaId: string, d: { modo: "taximetro" | "destino"; categoria: string; destino?: Ponto; lat: number; lng: number; passageiro?: { nome?: string; telefone?: string; cpf?: string; email?: string } }): Promise<CorridaPropria> {
   const e = estado(empresaId);
   if (!e.online.has(motoristaId)) throw new Error("Fique online para abrir uma corrida.");
   const lista = listarProprias(empresaId);
@@ -705,6 +758,7 @@ export async function criarMacaneta(empresaId: string, motoristaId: string, d: {
     passageiro: { nome: String(d.passageiro?.nome ?? "").trim() || "Passageiro de rua", telefone },
     embarque: { texto: aqui?.texto ?? "Embarque na rua (posição do motorista)", lat: d.lat, lng: d.lng },
     destino: d.modo === "destino" ? d.destino : undefined, categoria: d.categoria, pagamento: "Dinheiro", canal: "macaneta", semCadastro: !temFone,
+    observacao: [d.passageiro?.cpf ? `CPF do passageiro: ${d.passageiro.cpf}` : "", d.passageiro?.email ? `E-mail do passageiro: ${d.passageiro.email}` : ""].filter(Boolean).join(". ") || undefined,
   }, "maçaneta");
   await atribuirMotorista(empresaId, nova.id, motoristaId, "maçaneta");
   await mudarStatus(empresaId, nova.id, "em_andamento", {}, "maçaneta");
@@ -839,63 +893,6 @@ export function motoristasOnline(empresaId: string) {
     id, nome: String(cad.get(id)?.nome ?? ""), placa: String(cad.get(id)?.placa ?? ""), lat: p.lat, lng: p.lng, atualizadoEm: new Date(p.em).toISOString(),
     situacao: busy.has(id) ? "em corrida" : [...e.ofertas.values()].some((o) => o.motoristaId === id) ? "recebendo chamada" : "livre",
   }));
-}
-
-// ------------------------------------------------------------------ SOS
-
-export interface Alerta { id: string; corridaId: string; os: string; papel: PapelApp; nome: string; telefone: string; lat: number | null; lng: number | null; em: string; resolvido: boolean; resolvidoPor: string }
-const arqAlertas = (empresaId: string) => arquivo(empresaId, "alertas.json");
-export const alertas = (empresaId: string) => ler<Alerta[]>(arqAlertas(empresaId), []);
-
-/** Raio (km) em que os outros motoristas online recebem o alerta de emergência. */
-export const RAIO_SOS_KM = 5;
-
-/**
- * Pedido de ajuda (botão de pânico). Grava o alerta (OS, posição, quem é e o telefone) para o painel e avisa na hora os motoristas online
- * por perto (tempo real + push de alta prioridade). `c` é a corrida, quando há; o pedido de ajuda do mapa (sem corrida) passa `null`.
- */
-export function registrarSos(empresaId: string, c: CorridaPropria | null, papel: PapelApp, lat?: number, lng?: number, quem?: { id: string; nome: string; telefone: string }): Alerta {
-  const a: Alerta = {
-    id: crypto.randomUUID(), corridaId: c?.id ?? "", os: c?.os ?? "", papel,
-    nome: quem?.nome ?? (c ? (papel === "passageiro" ? c.passageiro.nome : c.motorista) : ""), telefone: quem?.telefone ?? (c ? (papel === "passageiro" ? c.passageiro.telefone : c.telefoneMotorista) : ""),
-    lat: lat ?? null, lng: lng ?? null, em: new Date().toISOString(), resolvido: false, resolvidoPor: "",
-  };
-  gravar(arqAlertas(empresaId), [...alertas(empresaId).slice(-999), a]);
-  console.warn(`[apps] SOS na empresa ${empresaId}, OS ${a.os || "—"} (${papel})`);
-  void distribuirSos(empresaId, a, quem?.id);
-  return a;
-}
-
-/** Avisa os motoristas online dentro de RAIO_SOS_KM (menos quem pediu) e, quando a corrida tem motorista, ele também. Nunca lança erro. */
-async function distribuirSos(empresaId: string, a: Alerta, excluirId?: string) {
-  try {
-    const e = estado(empresaId);
-    const c = a.corridaId ? listarProprias(empresaId).find((x) => x.id === a.corridaId) : undefined;
-    const alvos = new Map<string, number | null>();
-    for (const [id, p] of e.online) {
-      if (id === excluirId) continue;
-      const km = a.lat != null && a.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: a.lat, lng: a.lng }) : null;
-      if (km != null && km <= RAIO_SOS_KM) alvos.set(id, arred(km, 1));
-    }
-    if (c?.motoristaId && c.motoristaId !== excluirId && !alvos.has(c.motoristaId)) alvos.set(c.motoristaId, null);
-    for (const [id, km] of alvos) {
-      const dados = { id: a.id, nome: a.nome, papel: a.papel, os: a.os, lat: a.lat, lng: a.lng, km };
-      emitir(empresaId, motoristaAlvo(id), "sos", dados);
-      void avisar(empresaId, motoristaAlvo(id), {
-        titulo: "ALERTA DE EMERGÊNCIA", texto: `${a.nome || "Um colega"} pediu ajuda${km != null ? ` a ${km.toString().replace(".", ",")} km de você` : ""}. Se puder, ajude e avise a central.`,
-        dados: { tipo: "sos", alertaId: a.id }, canal: "corridas",
-      });
-    }
-  } catch (err) { console.error("[apps] distribuir SOS:", err instanceof Error ? err.message : err); }
-}
-
-export function resolverAlerta(empresaId: string, id: string, por: string) {
-  const l = structuredClone(alertas(empresaId)); // cópia: o cache é só leitura
-  const a = l.find((x) => x.id === id);
-  if (!a) throw new Error("Alerta não encontrado.");
-  a.resolvido = true; a.resolvidoPor = por.slice(0, 120);
-  gravar(arqAlertas(empresaId), l);
-  return a;
 }
 
 export const temAlguem = (empresaId: string) => temOuvinte(empresaId) || estado(empresaId).online.size > 0;

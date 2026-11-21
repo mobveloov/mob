@@ -278,7 +278,7 @@ let corridaChamada: { id: string; pax: { token: string; telefone: string } };
 test("contra-oferta: o motorista propõe, a passageira vê com os dados dele e aceita; vale o valor combinado", async () => {
   const { id, pax } = corridaChamada;
   assert.match((await chamar("POST", `${API}/corridas/${id}/contraoferta`, { valor: 2 }, tokDuda)).corpo.erro, /abaixo do mínimo/);
-  assert.match((await chamar("POST", `${API}/corridas/${id}/contraoferta`, { valor: 500 }, tokDuda)).corpo.erro, /muito acima/);
+  assert.match((await chamar("POST", `${API}/corridas/${id}/contraoferta`, { valor: 500 }, tokDuda)).corpo.erro, /limite de 50% acima/);
   assert.match((await chamar("POST", `${API}/corridas/${id}/contraoferta`, { valor: 30 }, tokNovo)).corpo.erro, /online/, "só quem está online");
   const c = await chamar("POST", `${API}/corridas/${id}/contraoferta`, { valor: 30 }, tokDuda);
   assert.equal(c.status, 200, JSON.stringify(c.corpo));

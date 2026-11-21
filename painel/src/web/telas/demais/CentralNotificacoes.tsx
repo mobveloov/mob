@@ -4,6 +4,7 @@ import { BannerGlobal, type ItemBanner } from "../../componentes/BannerGlobal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Check, CheckCircle2, RefreshCw, X } from "lucide-react";
+import { useSosAbertos } from "../../sos-vivo";
 import { pedirConfig } from "./comum";
 import "./demais.css";
 
@@ -11,6 +12,7 @@ interface Item { chave: string; nivel: "urgente" | "atencao" | "aviso" | "info";
 const hora = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}`;
 
 export function Sino() {
+  const sos = useSosAbertos();
   const [aberto, setAberto] = useState(false);
   const [so, setSo] = useState(false);
   const [dados, setDados] = useState<{ total: number; naoLidas: number; itens: Item[] } | null>(null);
@@ -35,7 +37,7 @@ export function Sino() {
   const alternar = (c: string) => setSel((s) => { const n = new Set(s); if (n.has(c)) n.delete(c); else n.add(c); return n; });
   return (
     <div className="dm-sino" ref={caixa}>
-      <button className="botao-tema" onClick={() => { setAberto(!aberto); if (!aberto) carregar(); }} aria-label={`Central de notificações${dados?.naoLidas ? `, ${dados.naoLidas} não lidas` : ""}`} aria-expanded={aberto} title="Central de notificações">
+      <button className={`botao-tema${sos.abertos ? " dm-sino-sos" : ""}`} onClick={() => { setAberto(!aberto); if (!aberto) carregar(); }} aria-label={`Central de notificações${sos.abertos ? `, ${sos.abertos} alerta de SOS aberto` : ""}${dados?.naoLidas ? `, ${dados.naoLidas} não lidas` : ""}`} aria-expanded={aberto} title="Central de notificações">
         <Bell size={18} />{!!dados?.naoLidas && <span className="dm-sino-n">{dados.naoLidas > 99 ? "99+" : dados.naoLidas}</span>}
       </button>
       {aberto && (
@@ -77,6 +79,7 @@ export function Sino() {
 
 /** Faixa no topo do conteúdo: alertas para empresas valendo agora e, se houver, o aviso de corridas que pedem atenção do operador. */
 export function FaixaAlerta() {
+  const sos = useSosAbertos();
   const [alertas, setAlertas] = useState<Array<{ id: string; tipo: string; conteudo: string; empresaAlvo: string }>>([]);
   const [ocorrencias, setOcorrencias] = useState(0);
   const [fechados, setFechados] = useState<string[]>([]);
@@ -90,8 +93,12 @@ export function FaixaAlerta() {
     return () => { vivo = false; clearInterval(t); };
   }, []);
   const itens: ItemBanner[] = [
+    ...(sos.abertos + sos.atendidos > 0 ? [{
+      id: "sos:vivo", tom: "vermelho" as const,
+      titulo: <><strong>SOS:</strong> {sos.abertos > 0 ? `${sos.abertos} pedido${sos.abertos > 1 ? "s" : ""} de ajuda em aberto` : `${sos.atendidos} alerta${sos.atendidos > 1 ? "s" : ""} de segurança em atendimento`}{sos.itens[0] ? ` (${sos.itens[0].nome || sos.itens[0].papel}${sos.itens[0].os ? `, OS ${sos.itens[0].os}` : ""})` : ""}. <Link to="/alertas-seguranca">Abrir alertas de segurança</Link></>,
+    }] : []),
     ...alertas.filter((a) => !fechados.includes(a.id)).map((a) => ({ id: a.id, tom: (a.tipo === "Urgente" ? "vermelho" : "amarelo") as "vermelho" | "amarelo", titulo: <><strong>{a.tipo}{a.empresaAlvo !== "Todos" ? ` (${a.empresaAlvo})` : ""}:</strong> {a.conteudo}</> })),
     ...(ocorrencias > 0 ? [{ id: "ocorrencia_aberta", tom: "amarelo" as const, titulo: <>Há corridas que podem requerer atenção do operador. Acione a <Link to="/ocorrencias">tela de ocorrências</Link> e registre ciência nas corridas para liberar este alerta</> }] : []),
   ].sort((a, b) => (a.tom === b.tom ? 0 : a.tom === "vermelho" ? -1 : 1));
-  return <BannerGlobal itens={itens} aoFechar={(id) => id !== "ocorrencia_aberta" && setFechados((f) => [...f, id])} />;
+  return <BannerGlobal itens={itens} aoFechar={(id) => id !== "ocorrencia_aberta" && id !== "sos:vivo" && setFechados((f) => [...f, id])} />;
 }

@@ -12,9 +12,12 @@ import { otimizarImagem } from "../comum/imagem.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import express, { type Request, type Response } from "express";
+import { sosProximos } from "./sos.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
-import { configDosApps, tiposDeDocumento } from "../config/apps.ts";
+import { assuntosDeOcorrencia, configDosApps, tiposDeDocumento } from "../config/apps.ts";
+import { pagamentos as pagamentosDoPainel } from "../config/pagamentos.ts";
 import { gerais } from "../config/gerais.ts";
+import { carteiraParaApp } from "../config/carteiras-credito.ts";
 import { mensagensDaPessoa, receberDaPessoa } from "../config/comunicacao.ts";
 import { criar, listar } from "../cadastros/armazem.ts";
 import { aindaAgendada, avaliarPassageiro, listarProprias, STATUS_TEXTO, type CorridaPropria } from "../corridas/index.ts";
@@ -311,19 +314,27 @@ export function conferirPagamento(empresaId: string, telefone: string, pagamento
 
 // ------------------------------------------------------------------ saques do motorista
 
-export interface Saque { id: string; motoristaId: string; nome: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string; resolvidoEm: string | null; resolvidoPor: string }
+export interface Saque { id: string; motoristaId: string; nome: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string; resolvidoEm: string | null; resolvidoPor: string; /** Taxa fixa do saque (Integrações › Pagamentos): fica com a central; o Pix sai de valor menos taxa. */ taxa?: number }
 
-/** Valor mínimo de saque/depósito: vem daqui para o app (o app não guarda número fixo). */
-export const SAQUE_MINIMO = 10;
+/** Regras de saque e de recarga do motorista: Configurações › Integrações › Pagamentos. */
+export function regrasDeSaque(empresaId: string) {
+  const p = pagamentosDoPainel(empresaId);
+  return { ativo: p.saque.ativo, minimo: p.saque.minimo, taxaFixa: p.saque.taxaFixa };
+}
+const reaisTexto = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
+
 export function pedirSaque(empresaId: string, motoristaId: string, nome: string, valor: number, chavePix: string): Saque {
   const v = arred(valor);
   const pix = chavePix.trim().slice(0, 120);
-  if (!(v >= SAQUE_MINIMO)) throw new Error(`O saque mínimo é ${SAQUE_MINIMO.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`);
+  const regra = regrasDeSaque(empresaId);
+  if (!regra.ativo) throw new Error("Os saques estão desligados no momento. Fale com a central.");
+  if (!(v >= regra.minimo) || !(v > 0)) throw new Error(`O saque mínimo é ${reaisTexto(regra.minimo)}.`);
   if (pix.length < 5) throw new Error("Informe a chave Pix.");
+  if (regra.taxaFixa >= v) throw new Error(`O valor precisa ser maior que a taxa de saque de ${reaisTexto(regra.taxaFixa)}.`);
   return transacao(() => {
     if (saldo(empresaId, "motorista", motoristaId) < v) throw new Error("Saldo insuficiente para este saque.");
     if (banco().prepare("SELECT 1 FROM saques WHERE empresa = ? AND motorista = ? AND situacao = 'Pendente'").get(empresaId, motoristaId)) throw new Error("Você já tem um saque esperando a central.");
-    const s: Saque = { id: crypto.randomUUID(), motoristaId, nome: nome.slice(0, 80), valor: v, chavePix: pix, situacao: "Pendente", motivo: "", em: agoraBr().toISOString(), resolvidoEm: null, resolvidoPor: "" };
+    const s: Saque = { id: crypto.randomUUID(), motoristaId, nome: nome.slice(0, 80), valor: v, chavePix: pix, situacao: "Pendente", motivo: "", em: agoraBr().toISOString(), resolvidoEm: null, resolvidoPor: "", ...(regra.taxaFixa > 0 ? { taxa: regra.taxaFixa } : {}) };
     banco().prepare("INSERT INTO saques (empresa, id, motorista, situacao, em, dados) VALUES (?, ?, ?, ?, ?, ?)").run(empresaId, s.id, motoristaId, s.situacao, s.em, JSON.stringify(s));
     // O valor fica reservado (sai do saldo agora; volta se a central recusar).
     lancar(empresaId, "motorista", motoristaId, -v, "Saque solicitado (Pix)", "app do motorista");
@@ -670,8 +681,12 @@ rotasExtras.get("/carteira", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const m = D.marca(empresaId);
   res.json({
-    saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave), minimoSaque: SAQUE_MINIMO,
+    saldo: saldo(empresaId, sessao.papel, sessao.chave), extrato: extrato(empresaId, sessao.papel, sessao.chave),
     saques: sessao.papel === "motorista" ? saques(empresaId, sessao.chave) : undefined,
+    saque: sessao.papel === "motorista" ? regrasDeSaque(empresaId) : undefined,
+    // Configurações › Carteiras de crédito: o que aparece na carteira do motorista (recarga, saque, telefone, presencial) e o aviso de saldo baixo.
+    ...(sessao.papel === "motorista" ? carteiraParaApp(empresaId, saldo(empresaId, sessao.papel, sessao.chave)) : {}),
+    recargaRegras: (() => { const r = pagamentosDoPainel(empresaId).recarga; return sessao.papel === "motorista" ? { ativa: r.motorista, minimo: r.minimoMotorista } : { ativa: r.passageiro, minimo: r.minimoPassageiro }; })(),
     recarga: `Depois de pedir o depósito, a central confirma e o valor entra no seu saldo${m.textos.suporteTelefone ? `. Dúvidas: ${m.textos.suporteTelefone}` : ""}.`,
   });
 }));
@@ -713,7 +728,12 @@ rotasExtras.get("/desafios", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   res.json({ codigo: pessoa(empresaId, sessao.papel, sessao.chave).codigo, desafios: desafios(empresaId, sessao.papel, sessao.chave) });
 }));
-rotasExtras.get("/notificacoes", ok((req, res) => res.json({ notificacoes: notificacoes(ctx(req).empresaId, ctx(req).sessao.papel) })));
+rotasExtras.get("/notificacoes", ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  // Emergências por perto (SOS de outros motoristas e passageiros) vão no topo, mesmo sem push do Firebase.
+  const sos = sessao.papel === "motorista" ? sosProximos(empresaId, sessao.chave).map((s) => ({ id: `sos-${s.id}`, titulo: "EMERGÊNCIA perto de você", texto: s.texto, em: s.em.slice(0, 10), emergencia: true, lat: s.lat, lng: s.lng, sosId: s.id })) : [];
+  res.json({ notificacoes: [...sos, ...notificacoes(empresaId, sessao.papel)] });
+}));
 
 // Objeto perdido e reclamação/contestação: viram registros nos cadastros da central.
 rotasExtras.post("/corridas/:id/objeto", ok((req, res) => {
@@ -727,7 +747,7 @@ rotasExtras.post("/corridas/:id/objeto", ok((req, res) => {
   }, `app do ${sessao.papel}`);
   res.json({ registro: { id: r.id, situacao: r.situacao } });
 }));
-const ASSUNTOS = ["Cobrança", "Comportamento", "Atraso", "Rota", "Veículo", "Outro"];
+const ASSUNTOS = assuntosDeOcorrencia();
 rotasExtras.post("/corridas/:id/ocorrencia", ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = minhaCorrida(req);

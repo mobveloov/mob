@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BellOff, Check, Gift, Share2, SlidersHorizontal, Wallet } from "lucide-react";
 import { api, reais } from "../comum/api";
 import { mensagemDeErro, type MarcaApp } from "../comum/ui";
+import { ListaDeAvisos } from "../comum/Avisos";
 import { Erro, Info, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
 import { diaHora } from "./tipos";
 
@@ -79,9 +80,10 @@ export function Preferencias({ voltar }: { voltar: () => void }) {
 // ====================================================================== carteira
 
 interface DadosCarteira {
-  saldo: number; recarga: string; minimoSaque?: number;
+  saque?: { ativo: boolean; minimo: number; taxaFixa: number };
+  saldo: number; recarga: string;
   extrato: Array<{ id?: string; valor: number; descricao: string; em: string }>;
-  saques?: Array<{ id?: string; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string }>;
+  saques?: Array<{ id?: string; taxa?: number; valor: number; chavePix: string; situacao: "Pendente" | "Pago" | "Recusado"; motivo: string; em: string }>;
 }
 
 export function Carteira({ voltar }: { voltar: () => void }) {
@@ -102,6 +104,7 @@ export function Carteira({ voltar }: { voltar: () => void }) {
   if (!d) return <Pagina><Topo titulo="Carteira" voltar={voltar} />{erro ? <div className="conteudo"><Erro texto={erro} /></div> : <Carregando />}</Pagina>;
   const pendente = d.saques?.some((s) => s.situacao === "Pendente");
   const v = Number(valor.replace(",", "."));
+  const minimo = d.saque?.minimo ?? 0.01;
   return (
     <Pagina>
       <Topo titulo="Carteira" voltar={voltar} />
@@ -109,12 +112,13 @@ export function Carteira({ voltar }: { voltar: () => void }) {
         <div className="cartao-ganhos"><div className="linha-topo"><span>Saldo disponível</span></div><p className="valor">{reais(d.saldo)}</p></div>
         <form className="cartao-m" onSubmit={(e) => { e.preventDefault(); void pedir(); }}>
           <h3>Retirar saldo</h3>
-          {pendente ? <p className="dica">Você já tem uma retirada esperando a central. Assim que ela for resolvida, pode pedir outra.</p> : (
+          {d.saque && !d.saque.ativo ? <p className="dica">Os saques estão desligados no momento. Fale com a central.</p> : pendente ? <p className="dica">Você já tem uma retirada esperando a central. Assim que ela for resolvida, pode pedir outra.</p> : (
             <>
-              <label className="campo"><span className="campo-rotulo">Valor (mínimo {reais(d.minimoSaque ?? 10)})</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
+              <label className="campo"><span className="campo-rotulo">Valor (mínimo {reais(minimo)})</span><span className="campo-caixa"><input inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="0,00" /></span></label>
               <label className="campo"><span className="campo-rotulo">Chave Pix</span><span className="campo-caixa"><input value={pix} maxLength={120} onChange={(e) => setPix(e.target.value)} placeholder="CPF, celular, e-mail ou chave aleatória" /></span></label>
-              <button className="botao-m" disabled={ocupado || !(v >= (d.minimoSaque ?? 10)) || v > d.saldo || pix.trim().length < 5}>RETIRAR</button>
+              <button className="botao-m" disabled={ocupado || !(v >= minimo) || v > d.saldo || pix.trim().length < 5}>RETIRAR</button>
               {v > d.saldo && <p className="dica">O valor é maior que o saldo.</p>}
+              {!!d.saque?.taxaFixa && <p className="dica">Taxa de saque: {reais(d.saque.taxaFixa)}.{v > d.saque.taxaFixa ? ` Você recebe ${reais(v - d.saque.taxaFixa)} no Pix.` : ""}</p>}
             </>
           )}
           <Erro texto={erroSaque} /><Info texto={ok} tipo="ok" />
@@ -190,27 +194,26 @@ export function Desafios({ voltar, marca }: { voltar: () => void; marca: MarcaAp
 // ====================================================================== notificações
 
 export function Notificacoes({ voltar }: { voltar: () => void }) {
-  const { dados: d, erro } = useBuscar<{ notificacoes: Array<{ id?: string; titulo: string; texto: string; em: string }> }>("/notificacoes");
+  const { dados: fixas } = useBuscar<{ notificacoes: Array<{ id?: string; titulo: string; texto: string; em: string }> }>("/notificacoes");
   return (
     <Pagina>
       <Topo estilo="escuro" titulo="Notificações" voltar={voltar} />
-      {!d ? (erro ? <div className="conteudo"><Erro texto={erro} /></div> : <Carregando />) : !d.notificacoes.length ? (
-        <div className="vazio-centro" style={{ background: "var(--m-bg)" }}>
-          <span className="vazio-icone"><BellOff size={44} /></span>
-          <strong style={{ color: "var(--m-tx)", fontSize: "1.2rem" }}>Sem notificações</strong>
-          <span style={{ maxWidth: "24ch" }}>Você ainda não possui avisos ou mensagens importantes.</span>
-        </div>
-      ) : (
-        <div className="conteudo">
-          {d.notificacoes.map((n, i) => (
-            <div key={n.id ?? i} className="cartao-m">
-              <strong>{n.titulo}</strong>
-              {n.em && <small className="dica">{dataCurta(n.em)}</small>}
-              <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{n.texto}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="conteudo">
+        <ListaDeAvisos classeCartao="cartao-m" vazio={!fixas?.notificacoes.length && (
+          <div className="vazio-centro" style={{ background: "var(--m-bg)" }}>
+            <span className="vazio-icone"><BellOff size={44} /></span>
+            <strong style={{ color: "var(--m-tx)", fontSize: "1.2rem" }}>Sem notificações</strong>
+            <span style={{ maxWidth: "24ch" }}>Você ainda não possui avisos ou mensagens importantes.</span>
+          </div>
+        )} />
+        {fixas?.notificacoes.map((n, i) => (
+          <div key={n.id ?? i} className="cartao-m">
+            <strong>{n.titulo}</strong>
+            {n.em && <small className="dica">{dataCurta(n.em)}</small>}
+            <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{n.texto}</p>
+          </div>
+        ))}
+      </div>
     </Pagina>
   );
 }

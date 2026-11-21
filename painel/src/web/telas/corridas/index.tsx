@@ -2,6 +2,7 @@
 //   solicitar -> Nova Solicitação, recuperacao -> Recuperação de Vendas, monitoramento -> Monitoramento, mapa -> Mapa Real-Time,
 //   historico -> Histórico, ocorrencias -> Retorno/Ocorrências, programadas -> Programadas, pagamentos-pendentes -> Pagamentos Pend., objetos -> Objetos Perdidos.
 import type { JSX } from "react";
+import AlertasSeguranca from "./AlertasSeguranca";
 import Historico from "./Historico";
 import MapaReal from "./MapaReal";
 import Monitoramento from "./Monitoramento";
@@ -20,6 +21,7 @@ export const TELAS_CORRIDAS: Record<string, JSX.Element> = {
   mapa: <MapaReal />,
   historico: <Historico />,
   ocorrencias: <Ocorrencias />,
+  "alertas-seguranca": <AlertasSeguranca />,
   programadas: <Programadas />,
   "pagamentos-pendentes": <Pendentes />,
   "taxas-cancelamento": <Taxas />,

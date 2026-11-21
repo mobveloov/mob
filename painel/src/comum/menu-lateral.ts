@@ -28,7 +28,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   },
   {
     id: "corridas", nome: "Corridas", cor: "azul", blocos: [
-      { ids: ["solicitar", "monitoramento", "ocorrencias", "historico", "mapa", "programadas", "taxas-cancelamento", "indice-relatorios", "alterar-os", "entrega-voucher", "objetos", "engajamento"] },
+      { ids: ["solicitar", "monitoramento", "ocorrencias", "alertas-seguranca", "historico", "mapa", "programadas", "taxas-cancelamento", "indice-relatorios", "alterar-os", "entrega-voucher", "objetos", "engajamento"] },
     ],
   },
   {
@@ -47,7 +47,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   { id: "comunicacao", nome: "Comunicação", cor: "ciano", blocos: [{ ids: ["conversas", "notificacoes", "alertas-empresas"] }] },
   {
     id: "configuracoes", nome: "Configurações", cor: "rosa", blocos: [
-      { ids: ["config-gerais", "personalizacao-app", "carteiras-credito", "taxas-central", "regras-despacho", "transbordos", "categorias", "tarifas-dinamicas", "descontos", "integracoes", "config-nps", "termos-app", "regras-credito"] },
+      { ids: ["config-gerais", "personalizacao-app", "personalizacao-motorista", "carteiras-credito", "taxas-central", "regras-despacho", "transbordos", "categorias", "tarifas-dinamicas", "descontos", "integracoes", "config-nps", "termos-app", "regras-credito"] },
     ],
   },
   { id: "cobranca", nome: "Cobrança", cor: "ambar", blocos: [{ ids: ["ultimo-boleto", "demonstrativo-mensal", "meus-planos", "extrato-central", "controle-centrais"] }] },

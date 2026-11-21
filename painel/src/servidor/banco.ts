@@ -109,6 +109,14 @@ export function banco(): Banco {
       empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, de TEXT NOT NULL,
       texto TEXT, audio TEXT, em TEXT NOT NULL, lida INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (empresa, id));
     CREATE INDEX IF NOT EXISTS app_suporte_conversa ON app_suporte (empresa, papel, chave, em);
+    CREATE TABLE IF NOT EXISTS sos_alertas (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', telefone TEXT NOT NULL DEFAULT '',
+      lat REAL, lng REAL, endereco TEXT NOT NULL DEFAULT '', corrida_id TEXT NOT NULL DEFAULT '', os TEXT NOT NULL DEFAULT '', motivo TEXT NOT NULL DEFAULT '',
+      em TEXT NOT NULL, situacao TEXT NOT NULL DEFAULT 'aberto', atendido_por TEXT NOT NULL DEFAULT '', atendido_em TEXT NOT NULL DEFAULT '',
+      encerrado_por TEXT NOT NULL DEFAULT '', encerrado_em TEXT NOT NULL DEFAULT '', observacao TEXT NOT NULL DEFAULT '',
+      notificados INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (empresa, id));
+    CREATE INDEX IF NOT EXISTS sos_alertas_situacao ON sos_alertas (empresa, situacao, em);
+    CREATE INDEX IF NOT EXISTS sos_alertas_pessoa ON sos_alertas (empresa, papel, chave, em);
     CREATE TABLE IF NOT EXISTS voucher_faixas (
       empresa TEXT NOT NULL, id TEXT NOT NULL, conveniada TEXT NOT NULL, serie TEXT NOT NULL DEFAULT '', inicial INTEGER NOT NULL, final INTEGER NOT NULL,
       em TEXT NOT NULL, por TEXT NOT NULL, PRIMARY KEY (empresa, id));
@@ -127,6 +135,14 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS app_ofertas (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, motorista TEXT NOT NULL, resultado TEXT NOT NULL, em TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS app_ofertas_motorista ON app_ofertas (empresa, motorista, seq);
+    CREATE TABLE IF NOT EXISTS app_avisos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, id TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL,
+      titulo TEXT NOT NULL, texto TEXT NOT NULL, origem TEXT NOT NULL DEFAULT '', origem_id TEXT NOT NULL DEFAULT '', envio_ref TEXT NOT NULL DEFAULT '',
+      estado TEXT NOT NULL DEFAULT 'enviada', push TEXT NOT NULL DEFAULT 'sem_chave', erro TEXT NOT NULL DEFAULT '',
+      em INTEGER NOT NULL, entregue_em INTEGER, lida_em INTEGER, UNIQUE (empresa, id));
+    CREATE INDEX IF NOT EXISTS app_avisos_pessoa ON app_avisos (empresa, papel, chave, em);
+    CREATE INDEX IF NOT EXISTS app_avisos_origem ON app_avisos (empresa, origem, origem_id);
+    CREATE INDEX IF NOT EXISTS app_avisos_envio ON app_avisos (empresa, envio_ref);
     CREATE TABLE IF NOT EXISTS app_contatos (
       empresa TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, em TEXT NOT NULL, PRIMARY KEY (empresa, papel, chave));
     CREATE TABLE IF NOT EXISTS enderecos_correcoes (
@@ -138,6 +154,13 @@ export function banco(): Banco {
       UNIQUE (empresa, id));
     CREATE INDEX IF NOT EXISTS ondas_corrida ON ondas (empresa, corrida_id);
     CREATE INDEX IF NOT EXISTS ondas_ordem ON ondas (empresa, seq);
+    CREATE TABLE IF NOT EXISTS corrida_eventos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, em TEXT NOT NULL, tipo TEXT NOT NULL,
+      descricao TEXT NOT NULL, usuario TEXT NOT NULL DEFAULT '', canal TEXT NOT NULL DEFAULT '', dados TEXT NOT NULL DEFAULT '');
+    CREATE INDEX IF NOT EXISTS corrida_eventos_corrida ON corrida_eventos (empresa, corrida_id, seq);
+    CREATE TABLE IF NOT EXISTS corrida_pontos (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, em TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, fase TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS corrida_pontos_corrida ON corrida_pontos (empresa, corrida_id, seq);
     CREATE TABLE IF NOT EXISTS chat_mensagens (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, corrida_id TEXT NOT NULL, id TEXT NOT NULL, de TEXT NOT NULL,
       tem_audio INTEGER NOT NULL DEFAULT 0, audio_id TEXT, em TEXT NOT NULL, dados TEXT NOT NULL);

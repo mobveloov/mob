@@ -6,18 +6,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import { arquivo, idCorridaValido, ler, gravar } from "./armazem.ts";
-import { alertas } from "./despacho.ts";
+import { sosDaCorrida } from "./sos.ts";
+import { gerais } from "../config/gerais.ts";
 
-export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number }
-export const GRAVACAO_PADRAO: ConfigGravacao = { ativa: true, obrigatoria: false, video: false, dias: 30 };
+export interface ConfigGravacao { ativa: boolean; obrigatoria: boolean; video: boolean; dias: number; diasNoAparelho: number }
+export const GRAVACAO_PADRAO: ConfigGravacao = { ativa: true, obrigatoria: false, video: false, dias: 30, diasNoAparelho: 3 };
 
-/** Configuração da empresa (ajustes.json › gravacao). O painel edita esse arquivo; sem ele valem os padrões. */
+/** Configuração da empresa: Configurações › Gerais › Regras do motorista (o arquivo ajustes.json › gravacao ainda vale, se existir, para quem já usava). */
 export function configGravacao(empresaId: string): ConfigGravacao {
-  const a = ler<{ gravacao?: Partial<ConfigGravacao> }>(arquivo(empresaId, "ajustes.json"), {}).gravacao ?? {};
+  let doPainel: Partial<ConfigGravacao> = {};
+  try { doPainel = gerais(empresaId).motorista.gravacao; } catch { /* sem configuração: valem os padrões */ }
+  const a = { ...doPainel, ...(ler<{ gravacao?: Partial<ConfigGravacao> }>(arquivo(empresaId, "ajustes.json"), {}).gravacao ?? {}) };
   const dias = Number(a.dias);
   return {
     ativa: a.ativa ?? GRAVACAO_PADRAO.ativa, obrigatoria: !!a.obrigatoria && (a.ativa ?? true), video: !!a.video,
     dias: Number.isFinite(dias) ? Math.min(365, Math.max(1, Math.round(dias))) : GRAVACAO_PADRAO.dias,
+    diasNoAparelho: Number.isFinite(Number(a.diasNoAparelho)) ? Math.min(30, Math.max(1, Math.round(Number(a.diasNoAparelho)))) : GRAVACAO_PADRAO.diasNoAparelho,
   };
 }
 
@@ -85,7 +89,7 @@ export function marcarParaGuardar(empresaId: string, corridaId: string, guardar:
 /** Apaga as gravações mais velhas que o prazo da empresa, menos as de corrida com SOS/ocorrência ou marcadas para guardar. */
 export function limparGravacoes(empresaId: string, agora = Date.now()): number {
   const limite = agora - configGravacao(empresaId).dias * 86_400_000;
-  const comOcorrencia = new Set(alertas(empresaId).map((a) => a.corridaId));
+  const comOcorrencia = sosDaCorrida(empresaId);
   let apagadas = 0;
   for (const idx of listarGravacoes(empresaId)) {
     const ultima = Date.parse(idx.partes.at(-1)?.em ?? idx.consentimento.em);

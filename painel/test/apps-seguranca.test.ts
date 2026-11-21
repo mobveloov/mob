@@ -55,7 +55,7 @@ function rotasDe(stack: any[], prefixo = ""): Array<{ metodo: string; caminho: s
 }
 
 // Rotas que de propósito não pedem token (login, cadastro, marca, download do APK, recuperar senha, acompanhar viagem pelo link).
-const PUBLICAS = /^(\/:empresa)?\/(entrar|entrar\/codigo|marca|apks|apks\/:app|conta\/criar|conta\/entrar|conta\/esqueci|conta\/nova-senha|conta\/senha\/esqueci|conta\/senha\/redefinir|acompanhar\/:codigo|cidades|publico|conta\/existe|conta\/verificar|termos|eventos\/espera|eventos)(\/.*)?$/;
+const PUBLICAS = /^(\/:empresa)?\/(entrar|entrar\/codigo|marca|apks|apks\/:app|conta\/criar|conta\/entrar|conta\/esqueci|conta\/nova-senha|conta\/senha\/esqueci|conta\/senha\/redefinir|acompanhar\/:codigo|cidades|publico|conta\/existe|conta\/verificar|termos|banners|regras-cadastro|eventos\/espera|eventos)(\/.*)?$/;
 
 test("toda rota dos apps que não é pública recusa quem não mandou o token (e o token falso)", async () => {
   const todas = rotasDe((rotasApps as any).stack);

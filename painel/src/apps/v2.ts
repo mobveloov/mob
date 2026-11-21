@@ -16,6 +16,8 @@ import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/
 import { exigirPapel } from "../servidor/sessao.ts";
 import { abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
+import { extraDaCategoria } from "../config/categorias.ts";
+import { arquivoDoBanner, gerais as geraisDoPainel, termos as termosDoPainel } from "../config/gerais.ts";
 import { ajustes, contatos } from "./ajustes.ts";
 import { arquivo, ler, limitador, num, soDigitos, txt } from "./armazem.ts";
 import { marcarLida } from "./chat.ts";
@@ -69,6 +71,31 @@ const podeCriar = limitador(() => Number(process.env.APPS_CADASTROS_POR_IP) || 1
 
 rotasPublicasV2.get("/cidades", ok((req, res) => {
   res.json({ cidades: cidadesAtendidas(emp(req)).map((c) => ({ id: c.codigo, nome: c.nome, uf: c.uf })) });
+}));
+
+/** Regras de cadastro que a tela de criar conta precisa antes do login (Gerais › Regras do passageiro). */
+rotasPublicasV2.get("/regras-cadastro", ok((req, res) => res.json({ cpfObrigatorio: geraisDoPainel(emp(req)).passageiro.cpfObrigatorio })));
+
+/** Banners de Configurações › Gerais › Banners (tipo "app" na tela inicial, "login" na entrada). Só o que a imagem precisa para aparecer. */
+rotasPublicasV2.get("/banners", ok((req, res) => {
+  const tipo = req.query.tipo === "login" ? "login" : "app";
+  res.json({ banners: geraisDoPainel(emp(req)).banners.filter((b) => b.tipo === tipo).map((b) => ({ id: b.id, link: b.link, imagem: `/banners/${b.id}/imagem` })) });
+}));
+rotasPublicasV2.get("/banners/:id/imagem", ok((req, res) => {
+  const a = arquivoDoBanner(emp(req), req.params.id);
+  if (!a) return res.status(404).json({ erro: "Banner não encontrado." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+  fs.createReadStream(a.caminho).pipe(res);
+}));
+
+/** Termos de uso e privacidade escritos no painel (Configurações › Termos de uso). Texto vazio = a empresa não exibe. */
+rotasPublicasV2.get("/termos/:tipo", ok((req, res) => {
+  const t = termosDoPainel(emp(req)), tipo = req.params.tipo;
+  if (tipo !== "passageiro" && tipo !== "motorista" && tipo !== "privacidade") return res.status(404).json({ erro: "Texto não encontrado." });
+  const modo = tipo === "passageiro" ? t.modoPassageiro : tipo === "motorista" ? t.modoMotorista : "proprio";
+  res.json({ tipo, texto: modo === "nenhum" ? "" : t[tipo], versao: t.versao, atualizadoEm: t.atualizadoEm });
 }));
 
 rotasPublicasV2.post("/conta/existe", ok((req, res) => {
@@ -251,6 +278,9 @@ rotasV2.post("/corridas/:id/oferta", so("passageiro"), ok(async (req, res) => {
   if (!(v > 0)) throw new Error("Valor inválido.");
   const minimo = P.minimoDaCategoria(empresaId, c.categoria);
   if (v < minimo) throw new Error(`O valor não pode ficar abaixo de R$ ${minimo.toFixed(2).replace(".", ",")}.`);
+  const neg = extraDaCategoria(empresaId, c.categoria).negociacao;
+  if (!neg.ativo && c.estimativa.valor != null && v !== c.estimativa.valor) throw new Error("Esta categoria não aceita negociação de valor.");
+  if (c.estimativa.valor != null && v < c.estimativa.valor * (1 - neg.descontoMaxPax / 100) - 0.005) throw new Error(`O desconto passa do limite de ${neg.descontoMaxPax}%.`);
   if (c.estimativa.valor != null && v > c.estimativa.valor * 3) throw new Error("O valor está muito acima do preço estimado.");
   const feita = await alterarCorrida(empresaId, c.id, (x) => {
     x.valorOferecido = x.estimativa.valor != null && v === x.estimativa.valor ? null : v;
@@ -283,10 +313,14 @@ rotasV2.post("/corridas/:id/contraofertas/:oferta/aceitar", so("passageiro"), ok
 }));
 
 /** Edita a rota com a corrida aberta (paradas e destino): recalcula a estimativa e avisa o motorista. */
+const permiteEditarRota = (empresaId: string) => { try { return geraisDoPainel(empresaId).passageiro.editarRota; } catch { return true; } };
+
 rotasV2.post("/corridas/:id/rota", so("passageiro"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, "passageiro", sessao.chave);
   if (!ABERTA.has(c.status)) throw new Error("Esta corrida já terminou.");
+  // Liga/desliga em Configurações › Gerais › Regras do passageiro (Passageiro pode editar rota).
+  if (!permiteEditarRota(empresaId)) throw new Error("A empresa não permite mudar a rota depois de pedir.");
   const pedidas = req.body?.paradas !== undefined ? (Array.isArray(req.body.paradas) ? req.body.paradas : []) : c.paradas ?? [];
   const paradas = pedidas.map(ponto).filter((p: Ponto) => p.texto).slice(0, 3).map((p: Ponto) => completarPonto(empresaId, p)!);
   if (Array.isArray(req.body?.paradas) && req.body.paradas.filter((p: Ponto) => p?.texto).length > 3) throw new Error("No máximo 3 paradas.");
@@ -339,11 +373,19 @@ rotasV2.get("/ofertas", so("motorista"), ok((req, res) => {
 rotasV2.post("/macaneta", so("motorista"), ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const modo = req.body?.modo === "destino" ? "destino" : "taximetro";
+  // Corrida Maçaneta: liga/desliga, categorias e dados do passageiro vêm de Configurações › Gerais › Maçaneta.
+  const mc = geraisDoPainel(empresaId).macaneta, pax = (req.body?.passageiro ?? {}) as Record<string, unknown>;
+  if (!mc.ativo) throw new Error("A empresa não usa a corrida Maçaneta.");
+  if (mc.categorias.length && !mc.categorias.includes(txt(req.body?.categoria, 60))) throw new Error("Esta categoria não faz corrida Maçaneta.");
+  if (mc.pedeNome && txt(pax.nome, 80).length < 2) throw new Error("Informe o nome do passageiro.");
+  if (mc.pedeTelefone && soDigitos(pax.telefone).length < 10) throw new Error("Informe o telefone do passageiro.");
+  if (mc.pedeCpf && soDigitos(pax.cpf).length !== 11) throw new Error("Informe o CPF do passageiro.");
+  if (mc.pedeEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(pax.email ?? ""))) throw new Error("Informe o e-mail do passageiro.");
   const lat = num(req.body?.lat), lng = num(req.body?.lng);
   if (lat == null || lng == null) throw new Error("Ligue o GPS para abrir a corrida.");
   const c = await P.criarMacaneta(empresaId, sessao.chave, {
     modo, categoria: txt(req.body?.categoria, 60), destino: req.body?.destino ? ponto(req.body.destino) : undefined, lat, lng,
-    passageiro: { nome: txt(req.body?.passageiro?.nome, 80), telefone: soDigitos(req.body?.passageiro?.telefone) },
+    passageiro: { nome: txt(pax.nome, 80), telefone: soDigitos(pax.telefone), cpf: soDigitos(pax.cpf), email: txt(pax.email, 100) },
   });
   res.json({ corrida: P.corridaParaApp(empresaId, c, "motorista") });
 }));

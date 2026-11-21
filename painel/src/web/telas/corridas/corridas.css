@@ -92,3 +92,47 @@
 .oc-solic { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .oc-mapa-solic { height: 300px; margin-top: 12px; }
 @media (max-width: 900px) { .oc-solic, .oc-rastreio, .oc-grid2, .oc-grid3 { grid-template-columns: 1fr; } .oc-mapa-solic { height: 240px; } .oc-janela { border-radius: 14px; } }
+
+@media (max-width: 820px) { .sos-grade { grid-template-columns: minmax(0, 1fr) !important; } }
+/* Detalhes da corrida, Histórico da OS e Trajeto da OS */
+.oc-resumo { padding: 0 0 8px; }
+.oc td.icn, .oc th.icn { width: 28px; padding-left: 4px; padding-right: 4px; text-align: center; }
+.oc-linha-aberta td { background: var(--oc-card2); }
+.oc-linha-detalhe > td { padding: 0; background: var(--oc-fundo); border-bottom: 2px solid var(--oc-pri); }
+.oc-det-embutida { position: relative; padding: 18px 22px 22px 54px; }
+.oc-det-voltar { position: absolute; left: 14px; top: 18px; background: none; border: 0; color: var(--oc-suave); cursor: pointer; padding: 2px; border-radius: 8px; }
+.oc-det-voltar:hover { color: var(--oc-pri); }
+.oc-det-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+.oc-det-titulo { font-size: 22px !important; margin: 0 0 6px !important; }
+.oc-det-sub { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; font-weight: 800; }
+.oc-det-sub label { margin-right: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--oc-suave); font-weight: 800; }
+.oc-det-botoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.oc-btn.ok { background: #34d39922; border-color: #34d39966; color: var(--oc-ok); }
+.oc-btn.info { background: #60a5fa22; border-color: #60a5fa66; color: var(--oc-info); }
+.oc-det-celulas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+.oc-det-cel { background: var(--oc-card); border: 1px solid var(--oc-borda); border-radius: 14px; padding: 14px 16px; }
+.oc-det-cel h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--oc-suave); font-weight: 800; display: flex; gap: 8px; align-items: center; }
+.oc-det-lin { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; border-bottom: 1px solid var(--oc-borda); }
+.oc-det-lin:last-child { border-bottom: 0; }
+.oc-det-lin > label { font-size: 11px; color: var(--oc-suave); font-weight: 700; }
+.oc-det-lin > span { font-weight: 700; word-break: break-word; }
+.oc-det-lin a { color: var(--oc-info); }
+.oc-det-conversa { margin: 14px 0 6px; display: flex; gap: 10px; align-items: center; }
+.oc-link { background: none; border: 0; padding: 0; font: inherit; color: var(--oc-info); cursor: pointer; text-decoration: underline; }
+.oc-det-extras { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--oc-borda); }
+.oc-conversa { display: flex; flex-direction: column; gap: 10px; }
+.oc-conversa-lin { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.oc-conversa-lin em { color: var(--oc-suave); font-size: 12px; }
+.oc-log h4 { margin: 14px 0 6px; font-size: 15px; font-weight: 700; }
+.oc-log h4 small { font-weight: 600; }
+.oc-log-tabela { margin: 6px 0 14px; }
+.oc-ajuda { color: var(--oc-suave); cursor: help; vertical-align: middle; }
+.oc-trajeto-pag { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.oc-etapas { background: var(--oc-card); border: 1px solid var(--oc-borda); border-radius: 14px; padding: 14px 16px; }
+.oc-etapas h3 { margin: 0 0 12px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--oc-suave); }
+.oc-etapa { display: flex; gap: 10px; margin-bottom: 14px; }
+.oc-etapa > i { flex: none; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-style: normal; font-weight: 800; display: grid; place-items: center; font-size: 13px; }
+.oc-etapa p { margin: 2px 0 0; font-size: 13px; }
+.oc-etapa-extra { border-top: 1px solid var(--oc-borda); padding-top: 10px; font-size: 13px; }
+.oc-etapa-extra p { margin: 4px 0; }
+@media (max-width: 900px) { .oc-trajeto-pag { grid-template-columns: 1fr; } .oc-det-embutida { padding: 14px 12px 18px 12px; } .oc-det-voltar { position: static; } }

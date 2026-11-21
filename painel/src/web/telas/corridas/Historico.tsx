@@ -1,21 +1,22 @@
 // Histórico (Consultar corridas): filtros avançados, atalhos de tempo, atualização automática, janela da corrida.
 // Mantém os extras da central: planilha e análise com IA.
-import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, FileDown, Filter, HelpCircle, Loader2, Send, Sparkles, X } from "lucide-react";
+import { Fragment, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { AlertTriangle, FileDown, Filter, HelpCircle, Loader2, Send, Smartphone, Sparkles, X } from "lucide-react";
 import { api, baixar, corridasCsv, type CorridaPainel, type Relatorio } from "../../api";
 import { useSessao } from "../../App";
 import { RelatorioIa } from "../../componentes/RelatorioIa";
 import { Aviso, Paginacao, Selo, GRUPO_CLASSE, Janela, Vazio, dh, op, qs, reais, useDados, msgErro } from "./comum";
 import { mascaraData, mascaraHora } from "../../componentes/DataBr";
 import { JanelaCorrida, JanelaExterna } from "./JanelaCorrida";
+import { PaginaLog, PaginaTrajeto } from "./DetalheCorrida";
 
 // Atalhos da Machine (15 minutos a 4 horas). "Hoje" é nosso, no fim, e é o padrão.
 const ATALHOS: Array<[string, string]> = [["15min", "15 minutos"], ["30min", "30 minutos"], ["1h", "1 hora"], ["2h", "2 horas"], ["3h", "3 horas"], ["4h", "4 horas"], ["hoje", "Hoje"]];
-/** Status da Machine que o nosso fluxo não usa: aparecem no filtro (como na Machine) e devolvem lista vazia. */
-const STATUS_SEM_FLUXO: Array<[string, string]> = [["aguardando_aceite", "Aguardando aceite"], ["aguardando_liberacao", "Aguardando liberação"], ["pagamento_pendente", "Pagamento pendente"], ["negociacao", "Em negociação"]];
-/** Ordem dos status no filtro da Machine. */
-const ORDEM_STATUS = ["distribuindo", "a_caminho", "nao_atendida", "cancelada", "cancelada_pax", "cancelada_mot", "andamento", "finalizada", "pendente", "espera"];
+/** Lista de status do filtro, na ordem do painel de referência (as outras variações de cancelada seguem valendo pela URL, mas não entram na lista). */
+const LISTA_STATUS: Array<[string, string]> = [["distribuindo", "Distribuindo"], ["aguardando_aceite", "Aguardando aceite"], ["aguardando_liberacao", "Aguardando liberação"], ["a_caminho", "A caminho"], ["nao_atendida", "Não atendida"], ["cancelada", "Cancelada"], ["andamento", "Em andamento"], ["finalizada", "Finalizada"], ["pendente", "Pendente"], ["espera", "Em espera"], ["pagamento_pendente", "Pagamento pendente"], ["negociacao", "Em negociação"]];
+/** Hora da corrida na lista, com segundos ("12:40:46"). */
+const horaDaLinha = (s?: string | null) => (s ? s.slice(11, 19) : "---");
 const hojeBrTxt = () => { const d = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10); return `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}`; };
 const VAZIO = { os: "", osExterna: "", centralChamada: "", centralCorrida: "", empresa: "", categoria: "", nomePax: "", telPax: "", cpfPax: "", endereco: "", motorista: "", dataIni: "", dataFim: "", horaIni: "", horaFim: "", pagamento: "", status: "", urgencia: "", via: "", cashback: "", fonte: "", filial: "" };
 type Filtros = typeof VAZIO;
@@ -25,15 +26,19 @@ const dataIso = (s: string) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s.
 
 export default function Historico({ programadas = false }: { programadas?: boolean }) {
   const { marca } = useSessao();
-  const [rapido, setRapido] = useState(new URLSearchParams(window.location.search).get("motorista") ? "" : "hoje");
-  const [params] = useSearchParams();
-  const inicial: Filtros = { ...VAZIO, motorista: params.get("motorista") ?? "" };
+  const [sp, setSp] = useSearchParams();
+  const [rapido, setRapido] = useState(new URLSearchParams(window.location.search).get("motorista") ? "" : "4h");
+  const inicial: Filtros = { ...VAZIO, motorista: sp.get("motorista") ?? "" };
   const [f, setF] = useState<Filtros>(inicial);
   const [rasc, setRasc] = useState<Filtros>(inicial);
   const [filtroAberto, setFiltroAberto] = useState(false);
   const [auto, setAuto] = useState(true);
   const [pagina, setPagina] = useState(1);
   const [aberta, setAberta] = useState<CorridaPainel | null>(null);
+  const navegar = useNavigate();
+  const paginaTrajeto = sp.get("trajeto"), paginaLog = sp.get("log");
+  const abrirPagina = (k: "trajeto" | "log", id: string) => { const p = new URLSearchParams(sp); p.set(k, id); setSp(p); };
+  const voltarPagina = () => { const p = new URLSearchParams(sp); p.delete("trajeto"); p.delete("log"); setSp(p); };
   const [legenda, setLegenda] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [rel, setRel] = useState<Relatorio | null>(null);
@@ -46,7 +51,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
   const consulta = { ...f, dataIni: dataIso(f.dataIni), dataFim: dataIso(f.dataFim), rapido: f.dataIni || f.dataFim ? "" : rapido };
   const { dados, erro, carregando } = useDados<any>(() => op(`/historico${qs({ ...consulta, pagina })}`), [JSON.stringify(consulta), pagina], auto ? 30_000 : undefined);
   const aplicar = () => { setF(rasc); setPagina(1); setFiltroAberto(false); };
-  const limpar = () => { setRasc(VAZIO); setF(VAZIO); setRapido("hoje"); setPagina(1); setFiltroAberto(false); };
+  const limpar = () => { setRasc(VAZIO); setF(VAZIO); setRapido("4h"); setPagina(1); setFiltroAberto(false); };
   const nFiltros = Object.values(f).filter(Boolean).length;
   const nomeBase = `relatorio-corridas-${new Date().toISOString().slice(0, 10)}`;
   const s = dados?.stats;
@@ -79,6 +84,9 @@ export default function Historico({ programadas = false }: { programadas?: boole
       {itens.map((x) => typeof x === "string" ? <option key={x} value={x}>{x}</option> : <option key={x.id} value={x.id}>{x.nome}</option>)}</select></label>
   );
   const op_ = dados?.opcoes;
+
+  if (paginaTrajeto) return <PaginaTrajeto id={paginaTrajeto} onVoltar={voltarPagina} />;
+  if (paginaLog) return <PaginaLog id={paginaLog} onVoltar={voltarPagina} />;
 
   return (
     <div className="oc">
@@ -126,19 +134,33 @@ export default function Historico({ programadas = false }: { programadas?: boole
         {carregando && !dados && <Vazio><Loader2 size={16} className="gira" /> Carregando...</Vazio>}
         {dados && !dados.total && <Vazio>Nenhum resultado encontrado.</Vazio>}
         {!!dados?.total && <>
+          <div className="oc-resumo">
+            <span className="suave" style={{ fontWeight: 800 }}>Exibindo {(dados.pagina - 1) * 30 + 1}-{(dados.pagina - 1) * 30 + dados.corridas.length} de {dados.total} resultados</span>
+          </div>
           <div className="oc-rola"><table>
-            <thead><tr><th>Alerta</th><th>Nº OS</th><th>Partida</th><th>Passageiro</th><th>Motorista</th><th>Empresa</th><th>Status</th></tr></thead>
+            <thead><tr><th style={{ textAlign: "center" }}>Alerta</th><th className="icn">{"ﾠ"}</th><th className="icn">{"ﾠ"}</th><th style={{ textAlign: "center" }}>Nº OS</th><th>Partida</th><th>Passageiro</th><th>Motorista</th><th>Empresa</th><th style={{ textAlign: "center" }}>Status</th></tr></thead>
             <tbody>
               {dados.corridas.map((c: CorridaPainel & { alerta?: boolean; empresa?: string; osExterna?: string }) => (
-                <tr key={c.id} className="clic" onClick={() => setAberta(c)}>
-                  <td>{c.alerta ? <AlertTriangle size={14} color="var(--oc-alerta)" aria-label="Com alerta" /> : ""}</td>
-                  <td className="forte">{c.os}<br /><small className="suave">{rapido !== "hoje" || f.dataIni || f.dataFim ? dh(c.solicitadaEm) : c.solicitadaEm?.slice(11, 19)}</small>{c.osExterna && <><br /><small className="suave">ext. {c.osExterna}</small></>}</td>
-                  <td><span className="corta">{c.embarque || "—"}</span></td>
-                  <td>{c.passageiro || c.telefonePassageiro || "—"}</td>
-                  <td>{c.motorista || "—"}</td>
-                  <td>{c.empresa || "---"}</td>
-                  <td><Selo tom={GRUPO_CLASSE[c.grupo]}>{c.statusTexto}</Selo></td>
-                </tr>
+                <Fragment key={c.id}>
+                  <tr className={`clic ${aberta?.id === c.id ? "oc-linha-aberta" : ""}`} onClick={() => setAberta(aberta?.id === c.id ? null : c)}>
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{horaDaLinha(c.solicitadaEm)}</td>
+                    <td className="icn">{c.alerta ? <AlertTriangle size={14} color="var(--oc-alerta)" aria-label="Com alerta" /> : ""}</td>
+                    <td className="icn">{c.origem === "propria" && /app|maçaneta/i.test(c.canal) ? <Smartphone size={14} aria-label={`Corrida via ${c.canal}`} /> : ""}</td>
+                    <td className="forte" style={{ textAlign: "center" }}>{c.os}{c.osExterna && <><br /><small className="suave">ext. {c.osExterna}</small></>}</td>
+                    <td><span className="corta">{c.embarque || "---"}</span></td>
+                    <td>{c.passageiro || c.telefonePassageiro || "---"}</td>
+                    <td>{c.motorista || "---"}</td>
+                    <td>{c.empresa || "---"}</td>
+                    <td style={{ textAlign: "center" }}><Selo tom={GRUPO_CLASSE[c.grupo]}>{c.statusTexto}</Selo></td>
+                  </tr>
+                  {aberta?.id === c.id && (
+                    <tr className="oc-linha-detalhe"><td colSpan={9}>
+                      {c.origem === "propria"
+                        ? <JanelaCorrida embutida id={c.id} onFechar={() => setAberta(null)} onTrajeto={(id) => abrirPagina("trajeto", id)} onLog={(id) => abrirPagina("log", id)} onCopia={(id) => navegar(`/solicitar?copiar=${encodeURIComponent(id)}`)} />
+                        : <JanelaExterna c={c} onFechar={() => setAberta(null)} />}
+                    </td></tr>
+                  )}
+                </Fragment>
               ))}
             </tbody></table></div>
           <Paginacao pagina={dados.pagina} paginas={dados.paginas} total={dados.total} onMudar={setPagina} rotulo="corridas" />
@@ -160,8 +182,7 @@ export default function Historico({ programadas = false }: { programadas?: boole
             <div className="oc-grid2">
               {lista("pagamento", "Forma de pagamento", op_?.pagamentos, "Selecione")}
               <label className="oc-l">Status<select value={rasc.status} onChange={(e) => setRasc({ ...rasc, status: e.target.value })}><option value="">Selecione</option>
-                {Object.entries<string>(dados?.status ?? {}).sort((a, b) => ORDEM_STATUS.indexOf(a[0]) - ORDEM_STATUS.indexOf(b[0])).map(([k, r]) => <option key={k} value={k}>{String(r)}</option>)}
-                {STATUS_SEM_FLUXO.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select></label>
+                {LISTA_STATUS.map(([k, r]) => <option key={k} value={k}>{r}</option>)}</select></label>
               {lista("urgencia", "Urgência", op_?.urgencias, "Selecione")}
               {lista("via", "Corrida via", op_?.vias, "Selecione")}
               {(op_?.filiais?.length ?? 0) > 0 && lista("filial", "Filial", op_.filiais, "Todas")}
@@ -184,7 +205,6 @@ export default function Historico({ programadas = false }: { programadas?: boole
           </div>
         </Janela>
       )}
-      {aberta && (aberta.origem === "propria" ? <JanelaCorrida id={aberta.id} onFechar={() => setAberta(null)} /> : <JanelaExterna c={aberta} onFechar={() => setAberta(null)} />)}
       <RelatorioIa rel={rel} onFechar={() => setRel(null)} nomeBase={nomeBase} onCsv={planilha} />
     </div>
   );

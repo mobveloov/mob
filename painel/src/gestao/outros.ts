@@ -8,6 +8,7 @@ import { lancar, pessoa, salvarPessoa } from "../apps/extras.ts";
 import { banco } from "../servidor/banco.ts";
 import { hashSenha } from "../servidor/dados.ts";
 import { arred, celulaCsv, normal } from "../servidor/util.ts";
+import { posicaoAoEditar } from "../comum/lugares-passageiro.ts";
 import { gravarG, lerG } from "./armazem.ts";
 import { cad, contem, digitos, emp, hojeBr, ok, paginar, perfisApp, periodo, quem, registros, soAdmin, soGestor, texto } from "./comum.ts";
 import { contaParaDesafio, corridaFicouPendente, TIPOS_DESAFIO_CORRIDA } from "./desafio-regra.ts";
@@ -96,10 +97,17 @@ function rotasPassageiros(r: Router) {
   }));
 
   const CAMPOS = ["nome", "genero", "telefone", "email", "nascimento", "avaliouApp", "notaApp", "origemCadastro", "motoristaOrigem", "cidade", "status", "dispositivo", "cpf", "observacao"];
+  const LUGARES = ["enderecoCasa", "enderecoTrabalho"];
   const salvar = (req: import("express").Request, anterior: Registro | null) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const d: Record<string, unknown> = { ...(anterior ?? { status: "Ativo", origemCadastro: "Painel" }) };
     for (const k of CAMPOS) if (k in b) d[k] = b[k];
+    // Casa e trabalho: mesma regra do app (texto igual mantém a posição do mapa; texto novo usa a posição enviada).
+    for (const k of LUGARES) {
+      if (!(k in b)) continue;
+      d[k] = String(b[k] ?? "").trim().slice(0, 200) || null;
+      d[`${k}Pos`] = posicaoAoEditar(anterior?.[k], d[k], anterior?.[`${k}Pos`], b[`${k}Pos`]);
+    }
     const reg = anterior ? atualizar(emp(req), cad("clientes"), anterior.id, d, quem(req)) : criar(emp(req), cad("clientes"), d, quem(req));
     if (typeof b.senha === "string" && b.senha.trim()) {
       if (b.senha.trim().length < 6) throw new Error("A senha precisa de pelo menos 6 caracteres.");

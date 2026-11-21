@@ -47,6 +47,7 @@ export const FUNCOES: Funcao[] = [
   { id: "solicitar", grupo: "Corridas", nome: "Solicitar nova corrida", rota: "/solicitar" },
   { id: "monitoramento", grupo: "Corridas", nome: "Acompanhamento", rota: "/monitoramento", antigas: ["/acompanhamento"] },
   { id: "ocorrencias", grupo: "Corridas", nome: "Retorno e Ocorrências", rota: "/ocorrencias" },
+  { id: "alertas-seguranca", grupo: "Corridas", nome: "Alertas de segurança", rota: "/alertas-seguranca", minimo: "operador" },
   { id: "historico", grupo: "Corridas", nome: "Consultar corridas", rota: "/historico", antigas: ["/corridas", "/raiox"] },
   { id: "mapa", grupo: "Corridas", nome: "Mapa de motoristas", rota: "/mapa" },
   { id: "programadas", grupo: "Corridas", nome: "Consultar programadas", rota: "/programadas" },
@@ -95,6 +96,7 @@ export const FUNCOES: Funcao[] = [
 
   { id: "config-gerais", grupo: "Configurações", nome: "Gerais", rota: "/config-gerais", minimo: "gestor" },
   { id: "personalizacao-app", grupo: "Configurações", nome: "Personalização app passageiro", rota: "/personalizacao-app", minimo: "admin" },
+  { id: "personalizacao-motorista", grupo: "Configurações", nome: "Personalização app motorista", rota: "/personalizacao-motorista", minimo: "admin" }, // item nosso: a Machine só personaliza o app do passageiro
   { id: "carteiras-credito", grupo: "Configurações", nome: "Carteiras de crédito", rota: "/carteiras-credito", minimo: "gestor" },
   { id: "taxas-central", grupo: "Configurações", nome: "Taxas da central", rota: "/taxas-central", minimo: "admin" },
   { id: "regras-despacho", grupo: "Configurações", nome: "Despacho", rota: "/regras-despacho", antigas: ["/despacho"], minimo: "gestor" },

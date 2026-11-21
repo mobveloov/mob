@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./corridas.css";
+import { baseDoMapa } from "../../../comum/mapa-base.ts";
 
 export class ErroOp extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
@@ -121,7 +122,7 @@ export function useMapa(centro: [number, number] = CENTRO_PADRAO, zoom = 12, ati
   useEffect(() => {
     if (!ativo || !ref.current) return;
     const m = L.map(ref.current, { zoomControl: true }).setView(centro, zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(m);
+    baseDoMapa(L, m);
     setMapa(m);
     const t = setTimeout(() => m.invalidateSize(), 150);
     return () => { clearTimeout(t); m.remove(); setMapa(null); };

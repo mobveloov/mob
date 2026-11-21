@@ -17,6 +17,7 @@ import { conferirCupom, cuponsDaEmpresa } from "./cupons.ts";
 import * as E from "./envio.ts";
 import { montarTexto, spintextComIa, variacoesComIa, variaveisDesconhecidas } from "./mensagem.ts";
 import { aplicarRegras, destinatarios, opcoes, publico, sanearRegras, selecionar } from "./publico.ts";
+import { canalValido } from "./canal-app.ts";
 import { VARIAVEIS, type Campanha, type Jornada, type Lista } from "./tipos.ts";
 import { caixaSimulada, provedorDaEmpresa } from "./whatsapp.ts";
 
@@ -119,7 +120,7 @@ function lerCampanha(e: string, b: Record<string, unknown>, atual?: Campanha): C
   const agendadaPara = b.agendadaPara ? dataAgendada(b.agendadaPara) : null;
   if (b.agendadaPara && !agendadaPara) throw new Error("Data de agendamento inválida.");
   return {
-    id: atual?.id ?? A.novoId(), nome: texto(b.nome, 80) || "Campanha sem nome", canal: "whatsapp",
+    id: atual?.id ?? A.novoId(), nome: texto(b.nome, 80) || "Campanha sem nome", canal: canalValido(b.canal),
     publico: sanearRegras(b.publico), texto: t, variacoes, cupom: conferirCupom(e, texto(b.cupom, 40), false),
     agendadaPara, estado: atual?.estado ?? "rascunho", criadaEm: atual?.criadaEm ?? agoraIso(), atualizadaEm: agoraIso(),
     disparadaEm: atual?.disparadaEm ?? null, concluidaEm: atual?.concluidaEm ?? null, destinatarios: atual?.destinatarios ?? 0,
@@ -251,7 +252,7 @@ function lerJornada(e: string, b: Record<string, unknown>, atual?: Jornada): Jor
   const g = (b.gatilho ?? {}) as Record<string, unknown>;
   const dias = Math.min(365, Math.max(1, Math.floor(Number(g.dias)) || 15));
   return {
-    id: atual?.id ?? A.novoId(), nome: texto(b.nome, 80) || "Jornada sem nome", ativa: b.ativa === true,
+    id: atual?.id ?? A.novoId(), nome: texto(b.nome, 80) || "Jornada sem nome", ativa: b.ativa === true, canal: canalValido(b.canal),
     gatilho: { tipo: g.tipo === "cancelou" ? "cancelou" : "sem-corrida", dias }, publico: sanearRegras(b.publico),
     texto: t, cupom: conferirCupom(e, texto(b.cupom, 40), b.ativa === true),
     criadaEm: atual?.criadaEm ?? agoraIso(), atualizadaEm: agoraIso(), ultimaRodada: atual?.ultimaRodada ?? null,

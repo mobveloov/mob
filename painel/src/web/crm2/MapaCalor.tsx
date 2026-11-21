@@ -5,6 +5,7 @@ import { Flame, MapPin, RefreshCw, TrendingUp } from "lucide-react";
 import { Cartao } from "../componentes/ui";
 import { useGestor, useRetorno } from "../crm/comum";
 import { crm2, dataHora, erroTexto, type Celula, type Cidade } from "./api";
+import { baseDoMapa } from "../../comum/mapa-base.ts";
 
 /** CRM › Análises › Mapa de Calor: embarques e desembarques por região (círculos coloridos pela intensidade). */
 export default function MapaCalor() {
@@ -33,7 +34,7 @@ export default function MapaCalor() {
   useEffect(() => {
     if (!mostrar || !caixa.current || mapa.current) return;
     const m = L.map(caixa.current, { zoomControl: false, attributionControl: false }).setView([-14.2, -51.9], 4);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(m);
+    baseDoMapa(L, m);
     L.control.zoom({ position: "bottomright" }).addTo(m);
     camada.current = L.layerGroup().addTo(m);
     mapa.current = m;

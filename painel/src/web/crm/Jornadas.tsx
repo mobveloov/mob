@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CANAIS_ENVIO } from "../../crm/catalogo.ts";
 import { Play, Plus, Save, Trash2 } from "lucide-react";
 import { Cartao, Gaveta, Titulo, useCarregar } from "../componentes/ui";
 import { crm, quando, type Jornada } from "./api";
@@ -63,7 +64,7 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Jornada>; onSalvo: () =
   }, [JSON.stringify([g, j.publico])]);
   const inserir = (v: string) => { const t = j.texto ?? "", i = campo.current?.selectionStart ?? t.length; setJ({ ...j, texto: t.slice(0, i) + v + t.slice(i) }); };
   const salvar = async () => {
-    const corpo = { nome: j.nome, ativa: j.ativa, gatilho: g, publico: j.publico, texto: j.texto, cupom: j.cupom };
+    const corpo = { canal: j.canal ?? "whatsapp", nome: j.nome, ativa: j.ativa, gatilho: g, publico: j.publico, texto: j.texto, cupom: j.cupom };
     const r = j.id ? await tentar(() => crm.salvarJornada(j.id!, corpo)) : await tentar(() => crm.novaJornada(corpo));
     if (r) onSalvo();
   };
@@ -71,6 +72,10 @@ function Editor({ inicial, onSalvo }: { inicial: Partial<Jornada>; onSalvo: () =
     <div className="form">
       {caixa}
       <label>Nome<input value={j.nome ?? ""} onChange={(e) => setJ({ ...j, nome: e.target.value })} placeholder="Ex.: Sumiu há 15 dias" /></label>
+<label>Canal
+        <select value={j.canal ?? "whatsapp"} onChange={(e) => setJ({ ...j, canal: e.target.value as "whatsapp" | "app" })}>{CANAIS_ENVIO.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
+        <small>{CANAIS_ENVIO.find((c) => c.value === (j.canal ?? "whatsapp"))?.hint}</small>
+      </label>
       <h3 className="sub">Gatilho</h3>
       <div className="grade" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
         <label>Quando

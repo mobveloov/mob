@@ -4,9 +4,10 @@
 // avaliar com etiquetas, histórico, agendadas e conta.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { aoMudarSos, CartaoMeuSos } from "../comum/sos";
 import { api, avisoDoMarco, manterTelaLigada, hora, ligarPush, posicaoAgora, reais, tempoReal, token, vibrar, type Posicao } from "../comum/api";
 import { Clock, House, User, Wallet } from "lucide-react";
-import { carregarPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
+import { acompanharPersonalizacao, personalizacaoDoCache, usePersonalizacao } from "../comum/personalizacao";
 import { Aviso, Carregando, Cartao, Chat, ServidorTeste, useMarca, type MarcaApp, type Mensagem } from "../comum/ui";
 import { duracaoDaViagem, esperandoHorario, lerLugares, quandoAgendada, type Corrida, type Endereco, type Eu, type Lugares, type Ponto, type Rota } from "./apoio";
 import { Agendadas, CarteiraTela, Conta } from "./Conta";
@@ -17,6 +18,7 @@ import { Inicio } from "./Inicio";
 import { Opcoes } from "./Opcoes";
 import { ParaOnde, type ModoParaOnde } from "./ParaOnde";
 import { Avaliar, OpcoesDaCorrida } from "./PosCorrida";
+import { avisarNovoAviso } from "../comum/Avisos";
 import "./passageiro.css";
 import "./passageiro-m.css";
 
@@ -31,19 +33,12 @@ export default function App() {
   const [logado, setLogado] = useState(!!token());
   useEffect(() => { personalizacaoDoCache(); }, []);
   // Logado: lê a personalização ao entrar, a cada minuto e ao voltar para o app (muda no painel, muda aqui, sem gerar APK).
-  useEffect(() => {
-    if (!logado) return;
-    void carregarPersonalizacao();
-    const t = setInterval(() => void carregarPersonalizacao(), 60000);
-    const f = () => { if (document.visibilityState === "visible") void carregarPersonalizacao(); };
-    document.addEventListener("visibilitychange", f);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", f); };
-  }, [logado]);
+  useEffect(() => (logado ? acompanharPersonalizacao() : undefined), [logado]);
   useEffect(() => { const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
   if (!marca) return <Carregando />;
   if (!logado) return <Entrar marca={marca} aoEntrar={() => setLogado(true)} />;
-  return <Logado marca={marca} sair={() => setLogado(false)} />;
+  return <><Logado marca={marca} sair={() => setLogado(false)} /><CartaoMeuSos /></>;
 }
 
 const avisoDaTaxa = (c: Corrida) => (c.status === "cancelada" && c.mensagemCancelamento ? c.mensagemCancelamento : c.status === "cancelada" && c.taxaCancelamento ? `Corrida cancelada. Foi cobrada uma taxa de cancelamento de ${reais(c.taxaCancelamento)}.` : "");
@@ -97,7 +92,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   useEffect(() => { void manterTelaLigada(true); return () => { void manterTelaLigada(false); }; }, []); // tela acesa enquanto acompanha a viagem
 
   useEffect(() => tempoReal((tipo, d) => {
-    if (tipo === "corrida") {
+    if (tipo === "aviso") { avisarNovoAviso(d); return; }
+    if (tipo === "sos_estado") aoMudarSos();
+    else if (tipo === "corrida") {
       const c = d as Corrida;
       if (esperandoHorario(c)) return; // agendada: aparece na aba Agendadas até chegar a hora
       const visto = statusVisto.current[c.id];
