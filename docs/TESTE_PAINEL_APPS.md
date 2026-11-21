@@ -60,7 +60,7 @@ Legenda do resultado: **ok** = testado; **pendente** = tem efeito no app e ainda
 | Financeiro > Poder público > Km rodados por motorista | Sem efeito no app | - | sem efeito |
 | Financeiro > Recompensas por indicação | Indique e ganhe: código, desafio de indicação e prêmio na carteira | apps-extras.test.ts (indicação e prêmio) | ok |
 | Comunicação > Conversas | Chat de suporte do app e conversa da corrida | apps-v2.test.ts (suporte), chat em apps.test.ts | ok |
-| Comunicação > Notificações app | Aviso do painel chega ao app (caixa de avisos e push) | Testes da sessão do painel (aviso/push do CRM); chegada em aparelho depende de Firebase | depende do dono |
+| Comunicação > Notificações app | Aviso do painel chega ao app (caixa de avisos e push do sistema) | Servidor com a chave do Firebase instalada (OAuth do Google 200 e FCM v1 aceitou a credencial: 400 INVALID_ARGUMENT só pelo token falso); APKs com o plugin de push. Chegada no aparelho: só em celular | ok |
 | Comunicação > Alertas para empresas | Sem efeito no app | - | sem efeito |
 | Configurações > Gerais | Motivos de cancelamento, documentos obrigatórios, contatos, preferências, banners, indicação: o app lê de /config | apps-painel.test.ts (documentos e motivos) ; banners/contatos: sem teste | ok |
 | Configurações > Personalização app passageiro | Cores, nome, marca, veículo no mapa, recursos e ordem do passageiro | personalizacao-app.test.ts (servidor) + visual no navegador (início do passageiro) | ok |
@@ -72,7 +72,7 @@ Legenda do resultado: **ok** = testado; **pendente** = tem efeito no app e ainda
 | Configurações > Tarifas e categorias | Tarifa, nome, ícone, extras da categoria: estimativa e lista do passageiro | apps-painel.test.ts (tarifa muda a estimativa) | ok |
 | Configurações > Tarifas dinâmicas | Tarifa dinâmica global (multiplicador) muda a estimativa do passageiro; desligada, volta | apps-painel.test.ts "onda 1": multiplicador 1,5 sobe a estimativa. Dinâmicas por área/horário/demanda: sem teste | ok |
 | Configurações > Descontos | Desconto por regra aplicado à estimativa do passageiro | descontos-integracao.test.ts (servidor); no app: sem teste | pendente |
-| Configurações > Integrações | Chaves (Google, WhatsApp, Firebase): só o Firebase muda o app (push) | Depende de chave externa (Firebase) | depende do dono |
+| Configurações > Integrações | Chaves (Google, WhatsApp, Firebase): o Firebase liga o push dos apps | Firebase configurado: marca.push = true em produção, google-services nos dois APKs. Pix/cartão: sem chave | ok |
 | Configurações > NPS | Etiquetas da avaliação e quando pedir a nota | apps-v2.test.ts (etiquetas) | ok |
 | Configurações > Termos de uso | Termos aparecem ao entrar conforme o modo (mostrar / não mostrar) | apps-v2.test.ts (termos) | ok |
 | Configurações > Regras de Crédito | Comissão por faixa de valor (substitui a da categoria) | config-financeiro.test.ts (servidor); extrato do app usa a mesma função (apps-painel.test.ts) | ok |
@@ -92,7 +92,7 @@ Legenda do resultado: **ok** = testado; **pendente** = tem efeito no app e ainda
 | Bot & Totem > App do Totem | Sem efeito no app | - | sem efeito |
 | Bot & Totem > Apps e SOS | Apps e SOS: lista de alertas e distribuição do APK; página de download | Download conferido em up.veloov.com; SOS: veja alertas-seguranca | ok |
 | Bot & Totem > Endereços | Cidades atendidas, casas importadas, busca e número da casa no app | casas-importacao.test.ts, apps-painel; prova em produção: docs/evidencias/numero-casa-api-producao.txt | ok |
-| CRM > CRM & Engajamento | Push do CRM ao app (caixa de avisos + notificação); registra eventos do app (cotou, pediu, finalizou) | Servidor/CRM: testes da sessão do painel; chegada em aparelho depende de Firebase | depende do dono |
+| CRM > CRM & Engajamento | Push do CRM ao app (caixa de avisos + notificação); registra eventos do app (cotou, pediu, finalizou) | Servidor/CRM: testes da sessão do painel; push real: chave instalada, APKs com plugin; entrega no aparelho só em celular | ok |
 | CRM > Recuperação de Vendas | O app registra cada cotação do passageiro (radar de intenções) para a Recuperação de Vendas | Código: /estimativa chama registrarCotacao; sem teste próprio | pendente |
 | CRM > Funil de Clientes | Sem efeito no app (análise) | - | sem efeito |
 | CRM > Mapa de Bairros e Demanda | Sem efeito no app (análise) | - | sem efeito |
@@ -109,9 +109,9 @@ Legenda do resultado: **ok** = testado; **pendente** = tem efeito no app e ainda
 | Mais telas > Conta e plataforma > Painel do dono | Sem efeito no app | - | sem efeito |
 | Mais telas > Conta e plataforma > Trocar senha | Sem efeito no app | - | sem efeito |
 
-**Contagem:** 100 itens do menu: **41 ok**, **10 pendentes**, **41 sem efeito no app**, **8 dependem do dono**.
+**Contagem:** 100 itens do menu: **44 ok**, **10 pendentes**, **41 sem efeito no app**, **5 dependem do dono**.
 
 ## O que o dono precisa fazer para o push e o pagamento funcionarem
 
-1. **Firebase (push com o app fechado, CRM, chamada em tela cheia):** criar o projeto no Firebase; baixar `google-services.json` de cada app (pacotes em `tenants/up-corridas/brand.json`) para `tenants/up-corridas/firebase/google-services-motorista.json` e `google-services-passageiro.json`; gerar a chave de conta de serviço e salvar como `/dados/empresas/up-corridas/apps/firebase-servico.json`; gerar os APKs de novo.
+1. **Firebase: FEITO em 21/11.** Chave instalada no servidor de produção (`/dados/empresas/up-corridas/apps/firebase-servico.json`, com permissão 600, arquivo novo: nada foi sobrescrito); `google-services` embutido nos dois APKs; o motorista inclui o serviço nativo que mostra a chamada em tela cheia a partir do push só de dados. Só dá para provar em celular real: chamada com o app fechado e a tela bloqueada, o token chegando ao servidor depois do login, o CRM e o SOS tocando no aparelho. Passo a passo original, para outra empresa: criar o projeto no Firebase; baixar `google-services.json` de cada app (pacotes em `tenants/up-corridas/brand.json`) para `tenants/up-corridas/firebase/google-services-motorista.json` e `google-services-passageiro.json`; gerar a chave de conta de serviço e salvar como `/dados/empresas/up-corridas/apps/firebase-servico.json`; gerar os APKs de novo.
 2. **Pix e cartão (Mercado Pago ou outro provedor):** criar a conta do provedor e entregar as credenciais; o app já mostra a instrução de recarga e o painel já tem as telas de cartão.

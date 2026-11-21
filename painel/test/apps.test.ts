@@ -316,6 +316,12 @@ test("push: usa a conta de serviço da própria empresa e manda a oferta ao moto
   const envio = chamadas.find((c) => c.url.includes("fcm.googleapis.com/v1/projects/projeto-a"));
   assert.ok(envio, "mandou para o FCM do projeto da empresa");
   assert.equal(JSON.parse(envio!.corpo).message.token, "tokenaparelho-carlos-1234567890");
+  // A chamada de corrida vai como mensagem SÓ DE DADOS com prioridade alta: o serviço nativo do APK a transforma em chamada em tela cheia mesmo com o app fechado.
+  const msg = JSON.parse(envio!.corpo).message;
+  assert.equal(msg.data.tipo, "oferta");
+  assert.ok(msg.data.titulo && msg.data.texto, "título e texto vão nos dados");
+  assert.equal(msg.notification, undefined, "sem bloco notification (o sistema não mostra por conta própria)");
+  assert.equal(msg.android.priority, "high");
   definirBuscaDeTeste(null);
 });
 
