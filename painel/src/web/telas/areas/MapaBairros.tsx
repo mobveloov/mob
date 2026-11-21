@@ -11,6 +11,8 @@ import { Cabecalho, Janela, useAviso, Vazio } from "../cadastro/base";
 import { baixar, chamarAreas, usePeriodo } from "./comum";
 import { baseDoMapa } from "../../../comum/mapa-base.ts";
 import { ajustarSeguro, invalidarDepois } from "../../../comum/mapa-seguro.ts";
+import { CENTRO_BRASIL } from "../../../comum/mapa-centro.ts";
+import { abrirNaCidade } from "../../centro-mapa";
 
 type Situacao = "nunca" | "ativos" | "naoAtendidas" | "canceladas" | "concluidas";
 interface Bairro { bairro: string; cidade: string; lat: number | null; lng: number | null; corridas: number; passageiros: number; deserto: boolean; nunca: number; ativos: number; naoAtendidas: number; canceladas: number; concluidas: number }
@@ -31,8 +33,9 @@ function Mapa({ bairros, ativas, desertos, onEscolher, centralizar, cheio }: { b
 
   useEffect(() => {
     if (!caixa.current || mapa.current) return;
-    const m = L.map(caixa.current, { center: [-14.2, -51.9], zoom: 4 });
+    const m = L.map(caixa.current, { center: CENTRO_BRASIL, zoom: 4 });
     baseDoMapa(L, m);
+    abrirNaCidade(L, m, "", () => pontos.current.length > 0);
     L.control.scale({ imperial: false }).addTo(m);
     camada.current = L.layerGroup().addTo(m);
     mapa.current = m;

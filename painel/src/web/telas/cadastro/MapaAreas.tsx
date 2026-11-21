@@ -6,6 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { baseDoMapa, type BaseDoMapa } from "../../../comum/mapa-base.ts";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
+import { abrirNaCidade } from "../../centro-mapa";
 
 export type Ponto = [number, number];
 export interface AreaMapa { id: string; nome: string; poligono: Ponto[]; cor?: string; bloqueio?: boolean }
@@ -54,6 +55,8 @@ export default function MapaAreas({ areas = [], desenho, onDesenho, corDesenho =
     });
     m.on("moveend", () => { const c = m.getCenter(); aoMover.current?.({ lat: c.lat, lng: c.lng, zoom: m.getZoom() }); });
     mapa.current = m;
+    // Sem vista gravada e sem áreas para mostrar, abre na cidade da empresa (nunca num ponto fixo do país).
+    if (!vistaInicial) abrirNaCidade(L, m, "", () => ajustou.current);
     return () => { base.current?.remover(); m.remove(); mapa.current = null; base.current = null; };
   }, []);
 
