@@ -274,3 +274,21 @@ label { line-height: 1.3; overflow-wrap: anywhere; }
 .bloco-inicio { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .75rem .9rem; border: 0; border-radius: 18px; background: var(--cartao); color: var(--texto); text-align: left; cursor: pointer; min-height: 56px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
 .bloco-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
 .bloco-texto small { opacity: .75; }
+
+/* Chat do passageiro no modo escuro: bolhas claras e contrastantes */
+html[data-tema="escuro"] .balao { background: #2f3f46; color: #eef4f2; }
+html[data-tema="escuro"] .balao.meu { background: #2e7d4f; color: #fff; }
+
+/* Ofertas dos motoristas: textos separados (nome / veículo, embarque / destino), carrossel "1 de N" e nada colado */
+.contra-motorista > span:not(.contra-total) { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.contra-motorista > span strong, .contra-motorista > span small, .linha-tempo span small, .linha-tempo span strong { display: block; overflow-wrap: anywhere; }
+.linha-tempo > div > span { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
+.linha-tempo > div { display: flex; gap: .6rem; align-items: flex-start; }
+.contra-total { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.contra-total button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--borda); background: var(--cartao); color: var(--texto); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.contra-total button:disabled { opacity: .35; }
+.cartao-contra { max-height: 72vh; overflow-y: auto; }
+
+/* Número da casa ao escolher uma rua */
+.pedir-numero { display: flex; flex-direction: column; gap: .7rem; padding: 1rem; margin: .6rem 0; border-radius: 18px; background: var(--cartao); color: var(--texto); box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+.pedir-numero strong { overflow-wrap: anywhere; line-height: 1.3; }

@@ -8,6 +8,7 @@
 // - Link público para acompanhar a viagem ("compartilhar").
 // Tudo por empresa: a empresa vem do token do app (ou do login do painel, nas rotas da central).
 
+import { otimizarImagem } from "../comum/imagem.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import express, { type Request, type Response } from "express";
@@ -401,12 +402,15 @@ export const TIPOS_DOCUMENTO: Record<string, string> = {
   veiculo: "Documento do veículo (CRLV)", foto: "Foto do rosto",
   ...DOCUMENTOS_MACHINE,
 };
-const MIME_DOC: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf" };
+const MIME_DOC: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" };
 export const MAX_DOC = 5 * 1024 * 1024;
+/** O que o servidor aceita receber (foto de câmera é grande); o limite de MAX_DOC/MAX_FOTO vale depois da conversão para WebP. */
+export const ENVIO_MAXIMO = 15 * 1024 * 1024;
 
 function cabecalhoDoc(ext: string, b: Uint8Array) {
   if (ext === "jpg") return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
   if (ext === "png") return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+  if (ext === "webp") return b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50;
   if (ext === "pdf") return Buffer.from(b.subarray(0, 5)).toString("latin1") === "%PDF-";
   return false;
 }
@@ -710,11 +714,12 @@ rotasExtras.get("/documentos", so("motorista"), ok((req, res) => {
   res.json({ tipos: tiposDoApp(empresaId), obrigatorios: documentosObrigatorios(empresaId), documentos: Object.fromEntries(Object.entries(docs).map(([k, d]) => [k, { situacao: d.situacao, motivo: d.motivo, em: d.em }])) });
 }));
 rotasExtras.post("/documentos/:tipo", so("motorista"), (req, res, next) => {
-  if (Number(req.headers["content-length"] ?? 0) > MAX_DOC) return res.status(413).json({ erro: "Arquivo maior que 5 MB." });
-  express.raw({ type: () => true, limit: MAX_DOC })(req, res, (err?: unknown) => (err ? res.status(413).json({ erro: "Arquivo maior que 5 MB." }) : next()));
-}, ok((req, res) => {
+  if (Number(req.headers["content-length"] ?? 0) > ENVIO_MAXIMO) return res.status(413).json({ erro: "Arquivo maior que 15 MB." });
+  express.raw({ type: () => true, limit: ENVIO_MAXIMO })(req, res, (err?: unknown) => (err ? res.status(413).json({ erro: "Arquivo maior que 15 MB." }) : next()));
+}, ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
-  const d = enviarDocumento(empresaId, sessao.chave, String(req.params.tipo), String(req.headers["content-type"] ?? ""), Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
+  const img = await otimizarImagem(Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), String(req.headers["content-type"] ?? "")); // foto de documento vira WebP
+  const d = enviarDocumento(empresaId, sessao.chave, String(req.params.tipo), img.mime, img.bytes);
   res.json({ documento: { situacao: d.situacao, em: d.em } });
 }));
 

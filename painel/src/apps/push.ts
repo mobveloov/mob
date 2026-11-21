@@ -72,7 +72,14 @@ async function tokenDeAcesso(conta: ContaServico): Promise<string> {
 
 // ------------------------------------------------------------------ envio
 
-export interface Aviso { titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" | "chegada" | "emergencia" }
+export interface Aviso {
+  titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" | "chegada" | "emergencia";
+  /**
+   * Mensagem só de dados, com prioridade alta (chamada de corrida): chega mesmo com o app fechado ou em repouso e o aplicativo (serviço nativo)
+   * mostra a chamada em tela cheia, com som e a tela acordando. Sem isto o Android só mostra uma notificação comum.
+   */
+  somenteDados?: boolean;
+}
 
 /** Como ficou o push do sistema (com o app fechado) de uma mensagem. */
 export type SituacaoPush = "enviado" | "sem_chave" | "sem_aparelho" | "falha";
@@ -93,9 +100,13 @@ export async function avisarDetalhado(empresaId: string, alvo: Alvo, aviso: Avis
         method: "POST", headers: { authorization: `Bearer ${acesso}`, "content-type": "application/json" },
         body: JSON.stringify({ message: {
           token: t.token,
-          notification: { title: aviso.titulo.slice(0, 80), body: aviso.texto.slice(0, 200) },
-          data: aviso.dados ?? {},
-          android: { priority: "high", notification: { channel_id: aviso.canal ?? "geral", sound: "default" } },
+          ...(aviso.somenteDados
+            ? { data: { ...(aviso.dados ?? {}), titulo: aviso.titulo.slice(0, 80), texto: aviso.texto.slice(0, 200) }, android: { priority: "high", ttl: "45s" } }
+            : {
+              notification: { title: aviso.titulo.slice(0, 80), body: aviso.texto.slice(0, 200) },
+              data: aviso.dados ?? {},
+              android: { priority: "high", notification: { channel_id: aviso.canal ?? "geral", sound: "default" } },
+            }),
         } }),
       });
       if (r.ok) ok++;

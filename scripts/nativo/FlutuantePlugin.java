@@ -81,16 +81,16 @@ public class FlutuantePlugin extends Plugin {
         call.resolve();
     }
 
+    /** Liga a bolha para quando o app for minimizado (quem mostra e esconde é a MainActivity, no onStop/onStart). Dentro do app ela nunca aparece. */
     @PluginMethod
     public void mostrar(PluginCall call) {
-        if (Settings.canDrawOverlays(getContext())) {
-            getContext().startService(new Intent(getContext(), FlutuanteService.class));
-        }
+        getContext().getSharedPreferences("flutuante", Context.MODE_PRIVATE).edit().putBoolean("bolha", true).apply();
         call.resolve();
     }
 
     @PluginMethod
     public void esconder(PluginCall call) {
+        getContext().getSharedPreferences("flutuante", Context.MODE_PRIVATE).edit().putBoolean("bolha", false).apply();
         getContext().stopService(new Intent(getContext(), FlutuanteService.class));
         call.resolve();
     }
@@ -212,37 +212,7 @@ public class FlutuantePlugin extends Plugin {
      */
     @PluginMethod
     public void ofertaTelaCheia(PluginCall call) {
-        Context c = getContext();
-        String titulo = call.getString("titulo", "Nova corrida");
-        String texto = call.getString("texto", "Toque para ver a chamada");
-        try {
-            PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
-                @SuppressWarnings("deprecation")
-                PowerManager.WakeLock w = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE, c.getPackageName() + ":oferta");
-                w.acquire(15000);
-            }
-            Intent abrir = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
-            if (abrir != null) {
-                abrir.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-                PendingIntent pi = PendingIntent.getActivity(c, 7, abrir, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-                NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel("oferta") == null) {
-                    NotificationChannel canal = new NotificationChannel("oferta", "Chamada de corrida", NotificationManager.IMPORTANCE_HIGH);
-                    canal.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-                    canal.enableVibration(true);
-                    nm.createNotificationChannel(canal);
-                }
-                Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(c, "oferta") : new Notification.Builder(c);
-                b.setContentTitle(titulo).setContentText(texto).setSmallIcon(c.getApplicationInfo().icon)
-                    .setCategory(Notification.CATEGORY_CALL).setPriority(Notification.PRIORITY_MAX)
-                    .setAutoCancel(true).setContentIntent(pi).setFullScreenIntent(pi, true).setVisibility(Notification.VISIBILITY_PUBLIC);
-                nm.notify(4712, b.build());
-                if (Settings.canDrawOverlays(c)) c.startActivity(abrir); // com "exibir sobre outros apps" o sistema deixa abrir direto, por cima do que estiver aberto
-            }
-        } catch (Exception e) {
-            // o sistema recusou: a notificação (ou o próprio app aberto) continua avisando
-        }
+        OfertaTelaCheia.mostrar(getContext(), call.getString("titulo", "Nova corrida"), call.getString("texto", "Toque para ver a chamada"));
         call.resolve();
     }
 

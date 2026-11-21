@@ -3,6 +3,7 @@
 // Lista com filtros e contadores por situação, janela do motorista (Geral, Veículos, Financeiro, Documentos,
 // Cerca eletrônica e Controle de créditos), alterar situação, nova senha, punições e destravar.
 
+import { otimizarImagem } from "../comum/imagem.ts";
 import { gerais } from "../config/gerais.ts";
 import { comSessaoRecente, ultimosContatos } from "../apps/sessoes.ts";
 import { podeCargo } from "../comum/cargos.ts";
@@ -350,11 +351,11 @@ export function rotasMotoristas(r: Router) {
     res.json({ ok: true });
   }));
 
-  r.post("/motoristas/:id/documentos/:tipo", express.raw({ type: ["image/*", "application/pdf"], limit: MAX_DOC }), ok((req, res) => {
+  r.post("/motoristas/:id/documentos/:tipo", express.raw({ type: ["image/*", "application/pdf"], limit: MAX_DOC }), ok(async (req, res) => {
     const e = emp(req), m = achar(e, req.params.id);
-    const bytes = req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array();
-    if (!bytes.length) throw new Error("Arquivo vazio.");
-    res.json({ documento: enviarDocumento(e, m.id, req.params.tipo, String(req.headers["content-type"] ?? "").split(";")[0], bytes) });
+    if (!(req.body instanceof Buffer) || !req.body.length) throw new Error("Arquivo vazio.");
+    const img = await otimizarImagem(req.body, String(req.headers["content-type"] ?? "").split(";")[0]); // documento enviado pelo painel também vira WebP
+    res.json({ documento: enviarDocumento(e, m.id, req.params.tipo, img.mime, img.bytes) });
   }));
 
   r.delete("/motoristas/:id/documentos/:tipo", ok((req, res) => {

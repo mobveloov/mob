@@ -128,7 +128,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   // Ícone flutuante: online, com a opção ligada e o app minimizado, mostra a bolinha por cima de outros apps; ao voltar, some.
   useEffect(() => {
     if (!online || !ajustes.flutuante || !flutuante.disponivel()) { void flutuante.esconder(); return; }
-    const mudou = () => { void (document.hidden ? flutuante.mostrar() : flutuante.esconder()); };
+    void flutuante.mostrar();
+    const mudou = () => { void flutuante.mostrar(); }; // liga para quando minimizar; quem mostra a bolha é a Activity do Android (só com o app fora da tela)
     document.addEventListener("visibilitychange", mudou);
     return () => { document.removeEventListener("visibilitychange", mudou); void flutuante.esconder(); };
   }, [online, ajustes.flutuante]);

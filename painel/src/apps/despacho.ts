@@ -137,6 +137,8 @@ export const limparDespacho = () => estados.clear();
 
 const motoristas = (empresaId: string) => listar(empresaId, cadastroPorId("motoristas")!);
 const motorista = (empresaId: string, id: string) => motoristas(empresaId).find((m) => m.id === id);
+/** Nome e telefone de um motorista (para o alerta de emergência). */
+export const dadosDoMotorista = (empresaId: string, id: string) => { const m = motorista(empresaId, id); return { nome: String(m?.nome ?? ""), telefone: String(m?.telefone ?? "") }; };
 const passageiroAlvo = (c: CorridaPropria): Alvo => ({ papel: "passageiro", chave: c.passageiro.telefone });
 const motoristaAlvo = (id: string): Alvo => ({ papel: "motorista", chave: id });
 
@@ -465,7 +467,7 @@ export function despachar(empresaId: string) {
     emitir(empresaId, motoristaAlvo(melhor.id), "oferta", ofertaParaApp(empresaId, o));
     void avisar(empresaId, motoristaAlvo(melhor.id), {
       titulo: "Nova corrida", texto: `${c.embarque.texto}${o.distanciaKm != null ? ` · ${o.distanciaKm} km de você` : ""}`,
-      dados: { tipo: "oferta", ofertaId: o.id, corridaId: c.id }, canal: "corridas",
+      dados: { tipo: "oferta", ofertaId: o.id, corridaId: c.id }, canal: "corridas", somenteDados: true, // vira chamada em tela cheia pelo serviço nativo do APK
     });
     n++;
     }

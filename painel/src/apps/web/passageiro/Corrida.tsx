@@ -75,7 +75,10 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
   };
 
   const visiveis = contra.filter((o) => !recusadas.includes(o.id));
-  const primeira = visiveis[0];
+  // Várias ofertas: carrossel ("1 de N", anterior/próxima); a escolhida é a que Recusar e Aceitar usam.
+  const [indice, setIndice] = useState(0);
+  const atual = Math.min(indice, Math.max(0, visiveis.length - 1));
+  const primeira = visiveis[atual];
   const faixa = sugerido != null ? faixaDaOferta(sugerido, null) : null;
 
   return (
@@ -110,7 +113,7 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
       {primeira && (
         <div className="modal-fundo baixo transparente">
           <div className="topo-flutuante"><button className="pilula-branca vermelho" onClick={() => setRecusadas((l) => [...l, primeira.id])}>Recusar</button></div>
-          <CartaoContraOferta c={c} o={primeira} aceitar={() => void aceitar(primeira)} ocupado={ocupado} total={visiveis.length} />
+          <CartaoContraOferta c={c} o={primeira} aceitar={() => void aceitar(primeira)} ocupado={ocupado} total={visiveis.length} posicao={atual} anterior={() => setIndice(Math.max(0, atual - 1))} proxima={() => setIndice(Math.min(visiveis.length - 1, atual + 1))} />
         </div>
       )}
       {cancelar && <Cancelar corrida={c} fechar={() => setCancelar(false)} mudou={mudou} />}
@@ -118,11 +121,12 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
   );
 }
 
-function CartaoContraOferta({ c, o, aceitar, ocupado, total }: { c: Corrida; o: ContraOferta; aceitar: () => void; ocupado: boolean; total: number }) {
+function CartaoContraOferta({ c, o, aceitar, ocupado, total, posicao, anterior, proxima }: { c: Corrida; o: ContraOferta; aceitar: () => void; ocupado: boolean; total: number; posicao: number; anterior: () => void; proxima: () => void }) {
   const [resta, setResta] = useState<number | null>(null);
   useEffect(() => {
     if (!o.expira) return;
     const fim = Date.parse(o.expira);
+    if (!Number.isFinite(fim)) return; // data inválida: não mostra contagem ("NaNs")
     const t = setInterval(() => setResta(Math.max(0, Math.round((fim - Date.now()) / 1000))), 1000);
     return () => clearInterval(t);
   }, [o.expira]);
@@ -133,10 +137,10 @@ function CartaoContraOferta({ c, o, aceitar, ocupado, total }: { c: Corrida; o: 
       <div className="contra-motorista">
         <Avatar foto={o.motorista.foto} nome={o.motorista.nome} tamanho={44} />
         <span><strong>{o.motorista.nome}</strong><small>{[o.motorista.veiculo, o.motorista.placa].filter(Boolean).join(" · ")}{o.motorista.viagens != null ? ` · ${o.motorista.viagens} viagens` : ""}</small></span>
-        {total > 1 && <span className="contra-total">1 de {total}</span>}
+        {total > 1 && <span className="contra-total"><button type="button" aria-label="Oferta anterior" disabled={posicao === 0} onClick={anterior}>‹</button> {posicao + 1} de {total} <button type="button" aria-label="Próxima oferta" disabled={posicao >= total - 1} onClick={proxima}>›</button></span>}
       </div>
       <div className="contra-valor">{reais(o.valor)}</div>
-      <div className="centro"><Nota nota={o.motorista.nota} />{resta != null && <small className="suave"> · {resta}s</small>}</div>
+      <div className="centro"><Nota nota={o.motorista.nota} />{resta != null && Number.isFinite(resta) && <small className="suave"> · {resta}s</small>}</div>
       <div className="linha-tempo">
         <div><User size={16} /><span><small>Embarque{o.distanciaKm != null ? ` - ${o.distanciaKm.toFixed(1).replace(".", ",")} km de você` : ""}</small><strong>{e1}{e2 ? ` - ${e2}` : ""}</strong></span></div>
         {c.destino && <div><Flag size={16} /><span><small>Destino{c.estimativa.distanciaKm != null ? ` - ${c.estimativa.distanciaKm.toFixed(1).replace(".", ",")} km` : ""}</small><strong>{d1}{d2 ? ` - ${d2}` : ""}</strong></span></div>}

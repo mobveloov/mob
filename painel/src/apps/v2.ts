@@ -5,6 +5,8 @@
 //   rotasV2Central   no painel (login do painel): aprovar motoristas, conversas de suporte e fotos.
 // Tudo por empresa: a empresa vem da URL e o token só vale na empresa em que foi criado.
 
+import { ENVIO_MAXIMO } from "./extras.ts";
+import { otimizarImagem } from "../comum/imagem.ts";
 import express, { type NextFunction, type Request, type Response } from "express";
 import fs from "node:fs";
 import { cadastroPorId } from "../comum/cadastros.ts";
@@ -202,9 +204,11 @@ rotasV2.post("/conta/excluir", ok((req, res) => {
   res.json({ ok: true });
 }));
 
-rotasV2.post("/foto", bruto(MAX_FOTO), ok((req, res) => {
+rotasV2.post("/foto", bruto(ENVIO_MAXIMO), // aceita foto grande da câmera (até 15 MB): vira WebP e o limite de MAX_FOTO vale depois da conversão
+   ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
-  salvarFoto(empresaId, sessao.papel, sessao.chave, String(req.headers["content-type"] ?? ""), corpo(req));
+  const img = await otimizarImagem(corpo(req), String(req.headers["content-type"] ?? "")); // foto vira WebP (qualidade 80, até 1600 px)
+  salvarFoto(empresaId, sessao.papel, sessao.chave, img.mime, img.bytes);
   res.json({ foto: urlDaFoto(empresaId, sessao.papel, sessao.chave) });
 }));
 

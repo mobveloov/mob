@@ -91,7 +91,7 @@ const canto = await sharp(icone, { density: 384 }).resize(64, 64).ensureAlpha().
 const fundoIcone = canto[3] > 200 ? `#${[canto[0], canto[1], canto[2]].map((n) => n.toString(16).padStart(2, "0")).join("")}` : primaria;
 await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", background: fundoIcone }).png().toFile(path.join(saida, "assets", "icon-only.png"));
 // Ícone adaptativo do Android: só ~66% do centro aparece. O desenho vai para 660 px no meio (nada é cortado).
-const desenho = await sharp(icone, { density: 384 }).resize(660, 660, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+const desenho = await sharp(icone, { density: 384 }).resize(680, 680, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: desenho, gravity: "center" }]).png().toFile(path.join(saida, "assets", "icon-foreground.png"));
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: fundoIcone } }).png().toFile(path.join(saida, "assets", "icon-background.png"));
 const abertura = asset("abertura") ?? icone;
@@ -152,11 +152,18 @@ if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsW
 if (papel === "motorista") {
   const pastaJava = path.join(saida, "android", "app", "src", "main", "java", ...pacote.split("."));
   fs.mkdirSync(pastaJava, { recursive: true });
-  for (const f of ["MainActivity.java", "FlutuantePlugin.java", "FlutuanteService.java", "PosicaoService.java"]) {
+  for (const f of ["MainActivity.java", "FlutuantePlugin.java", "FlutuanteService.java", "PosicaoService.java", "OfertaTelaCheia.java", ...(googleServices ? ["OfertaMessagingService.java"] : [])]) {
     fs.writeFileSync(path.join(pastaJava, f), fs.readFileSync(path.join(RAIZ, "scripts", "nativo", f), "utf8").replaceAll("__PACOTE__", pacote));
   }
   if (!xml.includes("FlutuanteService")) xml = xml.replace("</application>", '    <service android:name=".FlutuanteService" android:exported="false" />\n    </application>');
   if (!xml.includes("PosicaoService")) xml = xml.replace("</application>", '    <service android:name=".PosicaoService" android:exported="false" android:foregroundServiceType="location" />\n    </application>');
+  // Com Firebase: o push só de dados vira chamada em tela cheia mesmo com o app fechado (serviço nativo com prioridade sobre o do plugin).
+  if (googleServices) {
+    if (!xml.includes("OfertaMessagingService")) xml = xml.replace("</application>", '    <service android:name=".OfertaMessagingService" android:exported="false"><intent-filter android:priority="100"><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter></service>\n    </application>');
+    const gradleApp = path.join(saida, "android", "app", "build.gradle");
+    let g = fs.readFileSync(gradleApp, "utf8");
+    if (!g.includes("firebase-messaging")) { g = g.replace(/dependencies\s*\{/, "dependencies {\n    implementation 'com.google.firebase:firebase-messaging:24.1.0'"); fs.writeFileSync(gradleApp, g); }
+  }
   if (!xml.includes("showWhenLocked")) xml = xml.replace("<activity", '<activity android:showWhenLocked="true" android:turnScreenOn="true"');
 }
 // Passageiro: só a Activity com a tela sempre acesa (sem plugins nativos).

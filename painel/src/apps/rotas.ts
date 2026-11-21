@@ -26,6 +26,7 @@ import { exigirPapel } from "../servidor/sessao.ts";
 import { num, txt } from "./armazem.ts";
 import { arquivoDaMidia, arquivoDoAudio, enviarAudio, enviarMidia, enviarTexto, maxAudioBytes, maxMidiaBytes, mensagens, resumoDaMensagem } from "./chat.ts";
 import * as P from "./despacho.ts";
+import { otimizarImagem } from "../comum/imagem.ts";
 import { abrirSos, atenderSos, encerrarSos, listarSos, sosDaPessoa, sosPendentes, sosProximos, type Sos } from "./sos.ts";
 import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasExtras, rotasPublicasExtras } from "./extras.ts";
 import { gerais } from "../config/gerais.ts";
@@ -493,14 +494,15 @@ r.post("/corridas/:id/midia", (req, res, next) => {
   const erro = () => res.status(413).json({ erro: `Arquivo grande demais (máximo ${Math.round(max / 1024 / 1024)} MB).` });
   if (Number(req.headers["content-length"] ?? 0) > max) return erro();
   express.raw({ type: () => true, limit: max })(req, res, (err?: unknown) => (err ? erro() : next()));
-}, ok((req, res) => {
+}, ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
   chatAberto(c);
   const corpo = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
   let legenda = "";
   try { legenda = decodeURIComponent(String(req.headers["x-legenda"] ?? "")); } catch { /* cabeçalho torto: sem legenda */ }
-  const m = enviarMidia(empresaId, c.id, sessao.papel, nomeDe(req), String(req.headers["content-type"] ?? ""), corpo, legenda);
+  const img = await otimizarImagem(corpo, String(req.headers["content-type"] ?? "")); // fotos do chat viram WebP; vídeo passa como está
+  const m = enviarMidia(empresaId, c.id, sessao.papel, nomeDe(req), img.mime || String(req.headers["content-type"] ?? ""), img.bytes, legenda);
   aposMensagem(req, c, m);
   res.json({ mensagem: m });
 }));
