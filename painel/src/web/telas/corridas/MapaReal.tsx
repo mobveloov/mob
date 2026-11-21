@@ -5,6 +5,7 @@ import { Eye, EyeOff, MoreVertical } from "lucide-react";
 import { Aviso, L, Selo, hora, op, pino, qs, useDados, useMapa } from "./comum";
 import "./corridas.css";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
+import { dentroDaCobertura } from "../../../comum/mapa-centro.ts";
 import { decimal } from "../../../comum/formato-br.ts";
 
 const SIT: Record<string, { rotulo: string; cor: string; tom: string }> = {
@@ -19,7 +20,8 @@ export default function MapaReal() {
   const [cat, setCat] = useState("");
   const [busca, setBusca] = useState("");
   const [offline, setOffline] = useState(false);
-  const { ref, mapa } = useMapa([-15.78, -47.93], 12);
+  // O mapa abre na cidade da filial escolhida (ou ajusta para caber todas), com a área de cobertura desenhada.
+  const { ref, mapa, vista } = useMapa(undefined, 12, true, { filial });
   const camada = useRef<L.LayerGroup | null>(null);
   const ajustou = useRef(false);
 
@@ -32,15 +34,19 @@ export default function MapaReal() {
     camada.current?.remove();
     const g = L.layerGroup().addTo(mapa); camada.current = g;
     const pts: Array<[number, number]> = [];
+    const areas = vista?.areas ?? [];
     for (const m of lista) {
       if (m.lat == null) continue;
       const s = SIT[m.situacao] ?? SIT.offline;
-      L.marker([m.lat, m.lng], { icon: pino(s.cor, "🚗") })
-        .bindPopup(`<b>${m.nome}</b><br>${[m.veiculo, m.placa].filter(Boolean).join(" · ")}<br>${s.rotulo}${m.corrida ? `<br>OS ${m.corrida.os} · ${m.corrida.passageiro}` : ""}<br><small>Posição às ${hora(m.atualizadoEm)}</small>`).addTo(g);
+      // Dentro da área: pino cheio com o status. Fora dela: ponto pequeno e apagado.
+      const dentro = dentroDaCobertura(m.lat, m.lng, areas);
+      L.marker([m.lat, m.lng], { icon: dentro ? pino(s.cor, "🚗") : pino(s.cor, "", "ponto"), opacity: dentro ? 1 : 0.55, zIndexOffset: dentro ? 0 : -500 })
+        .bindPopup(`<b>${m.nome}</b><br>${[m.veiculo, m.placa].filter(Boolean).join(" · ")}<br>${s.rotulo}${m.corrida ? `<br>OS ${m.corrida.os} · ${m.corrida.passageiro}` : ""}<br><small>Posição às ${hora(m.atualizadoEm)}${dentro ? "" : " · fora da área de cobertura"}</small>`).addTo(g);
       pts.push([m.lat, m.lng]);
     }
-    if (pts.length && !ajustou.current) { if (ajustarSeguro(mapa, L.latLngBounds(pts).pad(0.3), { maxZoom: 14 })) ajustou.current = true; }
-  }, [mapa, lista]);
+    // Só sem centro nenhum (empresa nova) o mapa se ajusta aos motoristas.
+    if (pts.length && !ajustou.current && vista && !vista.centro) { if (ajustarSeguro(mapa, L.latLngBounds(pts).pad(0.3), { maxZoom: 14 })) ajustou.current = true; }
+  }, [mapa, lista, vista]);
 
   const s = dados?.stats;
   const [ordem, setOrdem] = useState<{ por: "nome" | "situacao"; asc: boolean }>({ por: "nome", asc: true });
@@ -69,7 +75,14 @@ export default function MapaReal() {
         <select style={{ maxWidth: 200 }} value={sit} onChange={(e) => setSit(e.target.value)} aria-label="Situação"><option value="">Todos os status</option>{Object.entries(SIT).map(([k2, v]) => <option key={k2} value={k2}>{v.rotulo}</option>)}</select>
         <button className={`oc-chip ${offline ? "on" : ""}`} onClick={() => setOffline(!offline)}>{offline ? <Eye size={13} /> : <EyeOff size={13} />} Desconectados</button>
       </div>
-      <div className="oc-card" style={{ padding: 0, overflow: "hidden" }}><div ref={ref} className="oc-mapa" style={{ height: 460 }} /></div>
+      <div className="oc-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div ref={ref} className="oc-mapa" style={{ height: 460 }} />
+        <div className="oc-legenda" aria-label="Legenda do mapa" style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "8px 12px", fontSize: 12 }}>
+          {Object.entries(SIT).filter(([k2]) => k2 !== "offline" || offline).map(([k2, v]) => <span key={k2} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><i style={{ width: 11, height: 11, borderRadius: "50%", background: v.cor, display: "inline-block" }} />{v.rotulo}</span>)}
+          {!!vista?.areas.length && <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><i style={{ width: 14, height: 11, borderRadius: 3, border: "2px solid #2563eb", background: "rgba(37,99,235,.12)", display: "inline-block" }} />Área de cobertura{vista.filialId ? ` de ${vista.nome}` : ""}</span>}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, opacity: 0.7 }}><i style={{ width: 8, height: 8, borderRadius: "50%", background: "#64748b", display: "inline-block" }} />Ponto pequeno: fora da área</span>
+        </div>
+      </div>
       <div className="oc-card">
         {!ordenada.length ? <p className="oc-vazio">Nenhum motorista nesta visão.</p> : <div className="oc-rola"><table>
           <thead><tr>
