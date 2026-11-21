@@ -66,7 +66,9 @@ const asset = (tipo) => {
   return p && fs.existsSync(p) ? p : null;
 };
 // Ícone próprio de cada app (arquivos.iconeMotorista / iconePassageiro); sem ele, o ícone da empresa (iconeApp) vale para os dois (white-label).
-const icone = asset(papel === "motorista" ? "iconeMotorista" : "iconePassageiro") ?? asset("iconeApp") ?? asset("favicon");
+const iconeDoPapel = asset(papel === "motorista" ? "iconeMotorista" : "iconePassageiro");
+const arteSangrada = !!iconeDoPapel;
+const icone = iconeDoPapel ?? asset("iconeApp") ?? asset("favicon");
 if (!icone) falhar("Falta o ícone do app (arquivos.iconeApp em assets/, de preferência PNG 1024×1024).");
 
 const saida = path.join(RAIZ, "build", "apps", `${empresa}-${papel}`);
@@ -90,8 +92,9 @@ passo("Preparando ícone e tela de abertura");
 const canto = await sharp(icone, { density: 384 }).resize(64, 64).ensureAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
 const fundoIcone = canto[3] > 200 ? `#${[canto[0], canto[1], canto[2]].map((n) => n.toString(16).padStart(2, "0")).join("")}` : primaria;
 await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", background: fundoIcone }).png().toFile(path.join(saida, "assets", "icon-only.png"));
-// Ícone adaptativo do Android: só ~66% do centro aparece. O desenho vai para 660 px no meio (nada é cortado).
-const desenho = await sharp(icone, { density: 384 }).resize(680, 680, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+// Ícone adaptativo do Android: o capacitor-assets já põe o primeiro plano num inset de 16,7% (zona segura). Arte de ícone própria do app (sangrada até a borda,
+// como a do motorista/passageiro) ocupa 92% desse quadro e preenche o ícone; logo comum de empresa (white-label) fica em 66% para não ser cortado pela máscara.
+const desenho = await sharp(icone, { density: 384 }).resize(arteSangrada ? 940 : 660, arteSangrada ? 940 : 660, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: desenho, gravity: "center" }]).png().toFile(path.join(saida, "assets", "icon-foreground.png"));
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: fundoIcone } }).png().toFile(path.join(saida, "assets", "icon-background.png"));
 const abertura = asset("abertura") ?? icone;
