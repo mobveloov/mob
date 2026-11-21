@@ -1,0 +1,10 @@
+Prova na API de PRODUÇÃO (contêiner mob-painel, dados reais, após importar 312.528 casas e ligar as 8 cidades), 21/11/2026:
+
+BUSCA "Rua Arthur Mesquita, 245, Pitangueiras" => Rua Arthur Mesquita, 245 - Jardim Santa Vitoria, Pitangueiras/SP  (exato=true, lat -21.014654, lng -48.229216)
+BUSCA "Rua João Risk, 200, Pitangueiras"        => Rua Joao Risk, 200 - Centro, Pitangueiras/SP                      (exato=false: a casa 200 não existe na tabela; usa a rua)
+BUSCA "Avenida Café, 100, Pitangueiras"         => Avenida Cafe, 100 - Centro, Pitangueiras/SP                       (exato=false)
+BUSCA "Rua Arthur Mesquita, Pitangueiras"       => Rua Arthur Mesquita, 70 - Centro ... (sem número digitado: devolve a casa mais perto da rua)
+PONTO (-21.014757, -48.226115) (busca reversa) => Rua Arthur Mesquita, 15 - Jardim Santa Vitoria, Pitangueiras/SP    (exato=true)
+CASAS_PERTO do mesmo ponto => 15, 120, 116 (Rua Arthur Mesquita) e 147, 160 (Rua Doutor Clovis Guimaraes Spinolla)
+
+Antes da importação: enderecos_correcoes = 0 linhas e enderecos.json com municipios = [] (por isso o celular não mostrava número).

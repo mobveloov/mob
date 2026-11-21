@@ -292,3 +292,6 @@ html[data-tema="escuro"] .balao.meu { background: #2e7d4f; color: #fff; }
 /* Número da casa ao escolher uma rua */
 .pedir-numero { display: flex; flex-direction: column; gap: .7rem; padding: 1rem; margin: .6rem 0; border-radius: 18px; background: var(--cartao); color: var(--texto); box-shadow: 0 4px 14px rgba(0,0,0,.1); }
 .pedir-numero strong { overflow-wrap: anywhere; line-height: 1.3; }
+.numeros-da-rua { display: flex; flex-wrap: wrap; gap: .4rem; }
+.numeros-da-rua button { min-width: 48px; min-height: 44px; padding: 0 .7rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--cartao); color: var(--texto); font-weight: 700; cursor: pointer; }
+.numeros-da-rua button.ativa { background: var(--cor); color: var(--cor-texto); border-color: var(--cor); }
