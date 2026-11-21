@@ -479,3 +479,68 @@ test("painel → app: motorista bloqueado no painel perde o acesso ao app; reati
   atualizar(E.id, cadastroPorId("motoristas")!, m.id, { ...m, status: "Ativo" }, "teste");
   assert.equal((await chamar("GET", `${API}/estado`, undefined, tokM)).status, 200, "reativado: volta");
 });
+
+test("painel → app (onda 1): Passe Livre criado no painel aparece e a compra debita o saldo; tarifa dinâmica global muda a estimativa", async () => {
+  const { salvarOferta } = await import("../src/config/passe-livre.ts");
+  const { salvarGlobal, dinamicaGlobal } = await import("../src/config/dinamica.ts");
+  const { lancar } = await import("../src/apps/extras.ts");
+  const { listar } = await import("../src/cadastros/armazem.ts");
+  // Passe Livre
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Teo Passe", telefone: "11900000121", status: "Ativo", veiculo: "Hatch", placa: "TEO1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000121");
+  const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000121")!;
+  const ofs = salvarOferta(E.id, { valor: 20, horas: 24 });
+  const antes = (await chamar("GET", `${API}/passe-livre`, undefined, tokM)).corpo;
+  assert.ok(antes.ofertas.some((o: any) => o.valor === 20 && o.horas === 24), "a oferta criada no painel aparece no app");
+  lancar(E.id, "motorista", m.id, 50, "Crédito de teste", "admin@ponta.test");
+  const oferta = ofs.find((o) => o.valor === 20 && o.horas === 24)!;
+  const comp = await chamar("POST", `${API}/passe-livre/comprar`, { ofertaId: oferta.id, chave: "compra-teo-1" }, tokM);
+  assert.equal(comp.status, 200, JSON.stringify(comp.corpo));
+  assert.ok(comp.corpo.vigente, "passe vigente depois de comprar");
+  assert.equal(Math.round((comp.corpo.saldo - antes.saldo) * 100), 3000, "50 de crédito − 20 do passe = +30 no saldo");
+  // Tarifa dinâmica global: multiplicador 1,5 sobe a estimativa; desligada, volta.
+  const tokP = await entrar("passageiro", "11988887002");
+  const consulta = `/estimativa?latEmbarque=-23.55&lngEmbarque=-46.63&latDestino=-23.6&lngDestino=-46.66&categoria=${encodeURIComponent("Econômico")}`;
+  const sem = (await chamar("GET", `${API}${consulta}`, undefined, tokP)).corpo.valor;
+  const g0 = dinamicaGlobal(E.id);
+  salvarGlobal(E.id, { ativa: true, cobranca: "multiplicador", valor: 1.5, minimo: 0 });
+  const com = (await chamar("GET", `${API}${consulta}`, undefined, tokP)).corpo.valor;
+  salvarGlobal(E.id, g0);
+  assert.ok(com > sem, `dinâmica sobe a estimativa: ${sem} -> ${com}`);
+});
+
+test("painel → app (onda 1): Carteiras de crédito mudam os botões e o aviso da carteira; saldo mínimo impede receber corrida até recarregar", async () => {
+  const { carteirasCredito, salvarCarteirasCredito } = await import("../src/config/carteiras-credito.ts");
+  const { lancar } = await import("../src/apps/extras.ts");
+  const { listar } = await import("../src/cadastros/armazem.ts");
+  const original = carteirasCredito(E.id);
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Uma Saldo", telefone: "11900000131", status: "Ativo", veiculo: "Hatch", placa: "UMA1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000131");
+  const m = listar(E.id, cadastroPorId("motoristas")!).find((x) => x.telefone === "11900000131")!;
+  try {
+    // Botões e aviso
+    salvarCarteirasCredito(E.id, { motorista: { ...original.motorista, saque: false, recarga: true, mensagemRecargaAtiva: true, mensagemRecargaValor: 5 } });
+    const c1 = (await chamar("GET", `${API}/carteira`, undefined, tokM)).corpo;
+    assert.equal(c1.movimentos.saque, false, "painel desligou o saque: o app esconde Retirar");
+    assert.equal(c1.movimentos.recarga, true);
+    assert.match(c1.avisoRecarga, /saldo está baixo/i, "aviso de saldo baixo vem do painel");
+    // Saldo mínimo: com R$ 50 exigidos e saldo 0, não recebe corrida; com crédito, recebe.
+    salvarCarteirasCredito(E.id, { motorista: { ...original.motorista, saldoMinimoAtivo: true, saldoMinimo: 50 } });
+    await chamar("POST", `${API}/online`, { lat: -23.55, lng: -46.63 }, tokM);
+    const tokP = await entrar("passageiro", "11988887003");
+    const LONGE3 = EMBARQUE; // com saldo mínimo de R$ 50, só quem tem crédito concorre: os outros motoristas dos testes têm saldo zero
+    const pedido = await chamar("POST", `${API}/corridas`, { embarque: LONGE3, destino: DESTINO, categoria: "Econômico", pagamento: "Pix", pedidoId: "ponta-saldo-minimo" }, tokP);
+    await new Promise((r) => setTimeout(r, 1800));
+    assert.equal((await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta, null, "sem saldo mínimo: nenhuma oferta");
+    await chamar("POST", `${API}/corridas/${pedido.corpo.corrida.id}/cancelar`, { motivo: "Pedi por engano" }, tokP);
+    lancar(E.id, "motorista", m.id, 60, "Crédito de teste", "admin@ponta.test");
+    const pedido2 = await chamar("POST", `${API}/corridas`, { embarque: LONGE3, destino: DESTINO, categoria: "Econômico", pagamento: "Pix", pedidoId: "ponta-saldo-minimo-2" }, tokP);
+    let of = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta;
+    for (let i = 0; i < 12 && !of; i++) { await new Promise((r) => setTimeout(r, 300)); of = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta; }
+    assert.ok(of, "com saldo acima do mínimo: recebe a oferta");
+    await chamar("POST", `${API}/ofertas/${of.id}/recusar`, {}, tokM);
+    await chamar("POST", `${API}/corridas/${pedido2.corpo.corrida.id}/cancelar`, { motivo: "Pedi por engano" }, tokP);
+  } finally {
+    salvarCarteirasCredito(E.id, original);
+  }
+});
