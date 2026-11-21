@@ -116,7 +116,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
     if (await tentar(() => (novo ? chamar("POST", "/passageiros", corpo) : chamar("PUT", `/passageiros/${id}`, corpo)), "Cliente salvo.")) { onSalvo(); onFechar(); }
   };
   return (
-    <Janela cheia aberta titulo="Cadastro de passageiro" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>{novo ? "Criar novo cliente" : "Salvar"}</button></>}>
+    <Janela cheia aberta titulo="Cadastro de passageiro" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>Gravar</button></>}>
       {aviso}
       <h4 className="cg-secao">Informações gerais</h4>
       <div className="cg-grade">
