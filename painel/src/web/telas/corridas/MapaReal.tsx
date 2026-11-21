@@ -13,21 +13,36 @@ const SIT: Record<string, { rotulo: string; cor: string; tom: string }> = {
   no_local: { rotulo: "Aguardando", cor: "#f59e0b", tom: "alerta" }, em_andamento: { rotulo: "Em andamento", cor: "#ef4444", tom: "ruim" }, offline: { rotulo: "Desconectado", cor: "#64748b", tom: "" },
 };
 
+/** "há 12 min", "há 3 h", "ontem", "há 5 dias" (a partir de um instante ISO real); sem registro: "sem registro". */
+export function tempoDesde(iso?: string | null, agora = Date.now()): string {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(t)) return "sem registro";
+  const min = Math.max(0, Math.round((agora - t) / 60_000));
+  if (min < 1) return "agora há pouco";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "ontem" : `há ${d} dias`;
+}
+
 export default function MapaReal() {
   const [filial, setFilial] = useState("");
   const { dados, erro, carregando } = useDados<any>(() => op(`/mapa${qs({ filial })}`), [filial], 10_000);
   const [sit, setSit] = useState("");
   const [cat, setCat] = useState("");
   const [busca, setBusca] = useState("");
-  const [offline, setOffline] = useState(false);
+  // Quem aparece: conectados (padrão), desconectados (pin cinza na última posição) ou todos.
+  const [exibir, setExibir] = useState<"conectados" | "desconectados" | "ambos">("conectados");
+  const offline = exibir !== "conectados";
   // O mapa abre na cidade da filial escolhida (ou ajusta para caber todas), com a área de cobertura desenhada.
   const { ref, mapa, vista } = useMapa(undefined, 12, true, { filial });
   const camada = useRef<L.LayerGroup | null>(null);
   const ajustou = useRef(false);
 
   const lista = useMemo(() => (dados?.motoristas ?? []).filter((m: any) =>
-    (offline || m.situacao !== "offline") && (!sit || m.situacao === sit) && (!cat || !m.categorias || m.categorias.split(",").map((x: string) => x.trim()).includes(cat))
-    && (!busca || `${m.nome} ${m.placa}`.toLowerCase().includes(busca.toLowerCase()))), [dados, sit, cat, busca, offline]);
+    (sit ? m.situacao === sit : exibir === "ambos" || (exibir === "conectados") === (m.situacao !== "offline")) && (!cat || !m.categorias || m.categorias.split(",").map((x: string) => x.trim()).includes(cat))
+    && (!busca || `${m.nome} ${m.placa}`.toLowerCase().includes(busca.toLowerCase()))), [dados, sit, cat, busca, exibir]);
 
   useEffect(() => {
     if (!mapa) return;
@@ -40,8 +55,9 @@ export default function MapaReal() {
       const s = SIT[m.situacao] ?? SIT.offline;
       // Dentro da área: pino cheio com o status. Fora dela: ponto pequeno e apagado.
       const dentro = dentroDaCobertura(m.lat, m.lng, areas);
-      L.marker([m.lat, m.lng], { icon: dentro ? pino(s.cor, "🚗") : pino(s.cor, "", "ponto"), opacity: dentro ? 1 : 0.55, zIndexOffset: dentro ? 0 : -500 })
-        .bindPopup(`<b>${m.nome}</b><br>${[m.veiculo, m.placa].filter(Boolean).join(" · ")}<br>${s.rotulo}${m.corrida ? `<br>OS ${m.corrida.os} · ${m.corrida.passageiro}` : ""}<br><small>Posição às ${hora(m.atualizadoEm)}${dentro ? "" : " · fora da área de cobertura"}</small>`).addTo(g);
+      const off = m.situacao === "offline";
+      L.marker([m.lat, m.lng], { icon: dentro ? pino(s.cor, "🚗") : pino(s.cor, "", "ponto"), opacity: off ? 0.75 : dentro ? 1 : 0.55, zIndexOffset: off ? -800 : dentro ? 0 : -500 })
+        .bindPopup(`<b>${m.nome}</b><br>${[m.veiculo, m.placa].filter(Boolean).join(" · ")}<br>${s.rotulo}${m.corrida ? `<br>OS ${m.corrida.os} · ${m.corrida.passageiro}` : ""}<br><small>${off ? `Último contato ${tempoDesde(m.ultimoContatoEm)} (última posição conhecida)` : `Posição às ${hora(m.atualizadoEm)}`}${dentro ? "" : " · fora da área de cobertura"}</small>`).addTo(g);
       pts.push([m.lat, m.lng]);
     }
     // Só sem centro nenhum (empresa nova) o mapa se ajusta aos motoristas.
@@ -73,7 +89,9 @@ export default function MapaReal() {
         {!!dados?.filiais?.length && <select style={{ maxWidth: 200 }} value={filial} onChange={(e) => setFilial(e.target.value)} aria-label="Filial"><option value="">Todas as filiais</option>{dados.filiais.map((x: { id: string; nome: string }) => <option key={x.id} value={x.id}>{x.nome}</option>)}</select>}
         <select style={{ maxWidth: 200 }} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria"><option value="">Todas as categorias</option>{(dados?.categorias ?? []).map((c: string) => <option key={c}>{c}</option>)}</select>
         <select style={{ maxWidth: 200 }} value={sit} onChange={(e) => setSit(e.target.value)} aria-label="Situação"><option value="">Todos os status</option>{Object.entries(SIT).map(([k2, v]) => <option key={k2} value={k2}>{v.rotulo}</option>)}</select>
-        <button className={`oc-chip ${offline ? "on" : ""}`} onClick={() => setOffline(!offline)}>{offline ? <Eye size={13} /> : <EyeOff size={13} />} Desconectados</button>
+        {([["conectados", "Conectados"], ["desconectados", "Desconectados"], ["ambos", "Ambos"]] as const).map(([v, r]) => (
+          <button key={v} className={`oc-chip ${exibir === v ? "on" : ""}`} aria-pressed={exibir === v} onClick={() => setExibir(v)}>{exibir === v ? <Eye size={13} /> : <EyeOff size={13} />} {r}</button>
+        ))}
       </div>
       <div className="oc-card" style={{ padding: 0, overflow: "hidden" }}>
         <div ref={ref} className="oc-mapa" style={{ height: 460 }} />
@@ -92,7 +110,7 @@ export default function MapaReal() {
           <tbody>{ordenada.map((m: any) => { const s2 = SIT[m.situacao] ?? SIT.offline; const cats = String(m.categorias || "").split(",").map((x: string) => x.trim()).filter(Boolean); return (
             <tr key={m.id} className={m.lat != null ? "clic" : ""} onClick={() => m.lat != null && mapa?.setView([m.lat, m.lng], 16)}>
               <td className="forte">{m.nome}<br /><small className="suave">{[m.veiculo, m.placa].filter(Boolean).join(" ") || "—"}</small></td>
-              <td><Selo tom={s2.tom}>{s2.rotulo}</Selo>{m.corrida && <><br /><small className="suave">OS {m.corrida.os} · {m.corrida.passageiro}</small></>}</td>
+              <td><Selo tom={s2.tom}>{s2.rotulo}</Selo>{m.situacao === "offline" && <><br /><small className="suave">Último contato {tempoDesde(m.ultimoContatoEm)}</small></>}{m.corrida && <><br /><small className="suave">OS {m.corrida.os} · {m.corrida.passageiro}</small></>}</td>
               <td>{cats.slice(0, 2).join(", ") || "—"}{cats.length > 2 && ` +${cats.length - 2}`}</td>
               <td style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
                 <button className="oc-btn peq" aria-label={`Ações de ${m.nome}`} onClick={() => setMenu(menu === m.id ? null : m.id)}><MoreVertical size={14} /></button>
