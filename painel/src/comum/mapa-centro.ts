@@ -52,7 +52,7 @@ export function desenharCobertura(L: L, mapa: Leaflet.Map, areas: AreaDoMapa[], 
   antigo?.remove();
   const g = L.layerGroup().addTo(mapa);
   for (const a of areas) {
-    const estilo = { color: a.cor, weight: 2, opacity: 0.7, fillColor: a.cor, fillOpacity: 0.08, interactive: false };
+    const estilo = { color: a.cor, weight: 3, opacity: 0.9, fillColor: a.cor, fillOpacity: 0.18, interactive: false };
     if (a.tipo === "raio" && a.centro && a.raioM) L.circle([a.centro.lat, a.centro.lng], { ...estilo, radius: a.raioM }).addTo(g);
     else if (a.poligono && a.poligono.length >= 3) L.polygon(a.poligono, estilo).addTo(g);
   }
