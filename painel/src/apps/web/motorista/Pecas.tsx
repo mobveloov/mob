@@ -186,6 +186,21 @@ export function useImagem(caminho: string | null | undefined) {
   return url;
 }
 
+/** Foto de perfil em tela cheia: toque para ampliar/reduzir (e pinça no celular), botão Fechar. Usada ao tocar na foto ou em "Ver perfil". */
+export function VisualizadorDeFoto({ foto, nome, detalhe, fechar }: { foto?: string | null; nome: string; detalhe?: string; fechar: () => void }) {
+  const url = useImagem(foto);
+  const [ampliada, setAmpliada] = useState(false);
+  return (
+    <div className="visualizador-foto" role="dialog" aria-modal="true" aria-label={`Foto de ${nome}`} onClick={fechar}>
+      <button type="button" className="visualizador-fechar" aria-label="Fechar" onClick={fechar}>✕</button>
+      <div className="visualizador-area" onClick={(e) => e.stopPropagation()}>
+        {url ? <img src={url} alt={nome} className={ampliada ? "ampliada" : ""} onClick={() => setAmpliada((v) => !v)} /> : <span className="visualizador-iniciais">{iniciais(nome)}</span>}
+      </div>
+      <div className="visualizador-legenda" onClick={(e) => e.stopPropagation()}><strong>{nome}</strong>{detalhe && <span>{detalhe}</span>}</div>
+    </div>
+  );
+}
+
 export function Avatar({ foto, nome, tamanho = 48, selo }: { foto?: string | null; nome: string; tamanho?: number; selo?: ReactNode }) {
   const url = useImagem(foto);
   return (

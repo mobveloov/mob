@@ -1,4 +1,4 @@
-:root { --ink: #111; }
+:root { --ink: #111; --fundo-suave: #f2f3f7; }
 /* Visual novo do app do passageiro: mapa em tela cheia, folhas de baixo, login, cadastro, pedido e acompanhamento. */
 .suave { color: var(--suave); } .centro { text-align: center; } .coluna { display: flex; flex-direction: column; align-items: center; gap: .6rem; }
 .cor-texto { color: var(--cor); } .texto-vermelho { color: var(--perigo) !important; } .texto-forte { font-weight: 700; } .perigo { color: var(--perigo); }
@@ -38,11 +38,11 @@
 .chips { display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; } .chips span { padding: .25rem .7rem; border-radius: 999px; background: color-mix(in srgb, var(--suave) 15%, transparent); font-size: .78rem; font-weight: 700; }
 
 /* login */
-.login { min-height: 100vh; display: flex; flex-direction: column; background: #f4f4f4; color: #111; position: relative; overflow: hidden; }
+.login { min-height: 100vh; display: flex; flex-direction: column; background: var(--fundo-suave); color: #111; position: relative; overflow: hidden; }
 .login-topo { padding: calc(3.4rem + env(safe-area-inset-top)) 1.2rem 8rem; display: flex; flex-direction: column; align-items: center; gap: .6rem; position: relative; background: var(--cor); color: var(--cor-texto); } .login-topo::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 64px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'%3E%3Cpath d='M0 60V34C90 4 200 70 400 14V60z' fill='%23f4f4f4'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
 .pilula-ajuda { border: 0; font-family: inherit; cursor: pointer; position: absolute; right: 1rem; top: calc(1rem + env(safe-area-inset-top)); display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .8rem; border-radius: 999px; background: rgba(0,0,0,.2); color: inherit; text-decoration: none; font-weight: 700; font-size: .85rem; }
 .login-logo { max-width: 200px; max-height: 80px; object-fit: contain; } .login-logo-texto { font-size: 2rem; font-weight: 800; }
-.login-cartao { margin: -5rem 1rem 0; background: var(--cartao); color: var(--ink); border-radius: 28px; padding: 1.3rem 1.2rem; display: flex; flex-direction: column; gap: .8rem; box-shadow: 0 10px 28px rgba(0,0,0,.2); position: relative; z-index: 2; max-width: 520px; width: calc(100% - 2rem); align-self: center; --texto: #111; --borda: #e3e7e5; --suave: #667; --cartao: #fff; color-scheme: light; } .login-cartao .botao:disabled { background: #e0e0e0; color: #fff; opacity: 1; } .login-cartao .campo-caixa { background: #fafafa; } .login-cartao .campo-icone { color: var(--cor-forte, #111); }
+.login-cartao { margin: -5rem 1rem 0; background: var(--cartao); color: var(--ink); border-radius: 28px; padding: 1.3rem 1.2rem; display: flex; flex-direction: column; gap: .8rem; box-shadow: 0 10px 28px rgba(0,0,0,.2); position: relative; z-index: 2; max-width: 520px; width: calc(100% - 2rem); align-self: center; --texto: #111; --borda: #e3e7e5; --suave: #667; --cartao: #fff; color-scheme: light; } .login-cartao .botao:disabled { background: #e0e0e0; color: #fff; opacity: 1; } .login-cartao .campo-caixa { background: var(--fundo-suave); } .login-cartao .campo-icone { color: var(--cor-forte, #111); }
 .login-cartao form { display: flex; flex-direction: column; gap: 1rem; } .login-cartao h1, .login-cartao h2 { margin: 0; } .login-cartao input { background: var(--cartao); color: var(--ink); }
 .login-onda { flex: 1; min-height: 96px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 90' preserveAspectRatio='none'%3E%3Cpath d='M0 90V46C80 6 190 4 400 52V90z' fill='%23111'/%3E%3C/svg%3E") bottom/100% 90px no-repeat; margin-bottom: -1px; } .login-rodape { margin: 0; padding: .2rem 1.4rem calc(1.2rem + env(safe-area-inset-bottom)); text-align: center; font-size: .8rem; color: #9a9a9a; background: #111; position: relative; z-index: 2; } .login-rodape b { color: #cfcfcf; }
 .etiqueta-login { align-self: flex-start; display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .8rem; border-radius: 999px; border: 0; background: color-mix(in srgb, var(--cor) 22%, #fff); font-weight: 600; cursor: pointer; color: #111; }
@@ -131,7 +131,7 @@
 .bola-rota { width: 14px; height: 14px; border-radius: 50%; background: #2563eb; margin-top: 4px; flex: none; } .bola-rota.parada { background: #f59e0b; color: #fff; font-size: .65rem; display: grid; place-items: center; width: 18px; height: 18px; margin-top: 2px; } .bola-rota.fim { background: #ef4444; border-radius: 4px; }
 .duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; } .mini-cartao { display: flex; align-items: center; gap: .6rem; padding: .7rem; border-radius: 14px; background: color-mix(in srgb, var(--suave) 12%, transparent); } .mini-cartao small { display: block; color: var(--suave); }
 .linha-editar { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border: 1px solid var(--borda); border-radius: 12px; } .linha-editar > :nth-child(2) { flex: 1; min-width: 0; } .linha-editar.travada { opacity: .7; }
-.placa { display: inline-flex; flex-direction: column; align-items: center; border: 2px solid #1f2937; border-radius: 8px; overflow: hidden; background: #f3f4f6; color: #111; min-width: 100px; } .placa-faixa { width: 100%; background: #1d4ed8; color: #fff; font-size: .55rem; font-weight: 800; text-align: center; letter-spacing: .15em; } .placa-numero { font: 800 1.2rem/1.3 ui-monospace, monospace; letter-spacing: .08em; padding: 0 .4rem; }
+.placa { display: inline-flex; flex-direction: column; align-items: center; border: 2px solid #1f2937; border-radius: 8px; overflow: hidden; background: var(--fundo-suave); color: #111; min-width: 100px; } .placa-faixa { width: 100%; background: #1d4ed8; color: #fff; font-size: .55rem; font-weight: 800; text-align: center; letter-spacing: .15em; } .placa-numero { font: 800 1.2rem/1.3 ui-monospace, monospace; letter-spacing: .08em; padding: 0 .4rem; }
 .avatar { display: inline-grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--cor) 25%, var(--cartao)); font-weight: 800; flex: none; overflow: hidden; } .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .nota { display: inline-flex; align-items: center; gap: 3px; color: #d97706; font-weight: 800; } .pilulas { display: flex; gap: .4rem; flex-wrap: wrap; } .pilulas button { padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--cartao); cursor: pointer; color: var(--texto); } .pilulas .ativa { background: var(--cor); color: var(--cor-texto); border-color: transparent; }
 
@@ -157,7 +157,7 @@
 .mapa-claro .leaflet-tile-pane { filter: grayscale(.85) brightness(1.06) contrast(.92); }
 .linha-endereco-campo { display: flex; flex-direction: column; } .linha-endereco-campo small { font-size: .68rem; font-weight: 700; letter-spacing: .08em; color: #667; } .linha-endereco-campo input { outline: 0 !important; box-shadow: none !important; font-weight: 800; } .linha-endereco-campo > span { font-weight: 800; }
 .linha-endereco-campo > span.suave { font-weight: 500; }
-.linha-endereco.ativa { outline: 0; background: transparent; } .linha-endereco.ativa small { color: var(--cor-forte, #b38600); }
+.linha-endereco.ativa { outline: 0; background: transparent; } .linha-endereco.ativa small { color: var(--cor-forte, color-mix(in srgb, var(--cor) 55%, #000)); }
 .marcador.bola { background: #1f2937; } .marcador.quadrado { background: var(--cor); color: var(--cor-texto); border-radius: 6px; }
 .cartao-enderecos { border: 0; border-radius: 22px; box-shadow: 0 6px 22px rgba(0,0,0,.12); }
 
@@ -180,7 +180,7 @@
 .motivos { gap: .7rem; } .motivos button { border: 2px solid #eceeed !important; border-radius: 16px; padding: 1.05rem 1rem; background: var(--cartao); } .motivos button.marcado { border-color: var(--cor) !important; }
 
 /* Minha Conta: topo na cor da marca, cartão do perfil com foto, cartão da carteira e grupos de itens */
-.minha-conta { background: #f4f5fa; min-height: 100vh; padding-bottom: 110px; }
+.minha-conta { background: var(--fundo); min-height: 100vh; padding-bottom: 110px; }
 .conta-topo { background: var(--cor); color: var(--cor-texto); height: 170px; text-align: center; padding-top: calc(1.4rem + env(safe-area-inset-top)); position: relative; overflow: hidden; }
 .conta-topo::before, .conta-topo::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255,255,255,.14); } .conta-topo::before { width: 160px; height: 160px; right: -40px; top: -50px; } .conta-topo::after { width: 120px; height: 120px; left: -50px; bottom: -30px; }
 .conta-topo strong { position: relative; font-size: 1.05rem; }
@@ -195,13 +195,13 @@
 .conta-grupo { margin: 0 1rem; background: var(--cartao); border-radius: 22px; box-shadow: 0 6px 20px rgba(20,30,60,.06); overflow: hidden; }
 .conta-item { width: 100%; display: flex; align-items: center; gap: .9rem; padding: .95rem 1rem; border: 0; background: none; text-align: left; cursor: pointer; color: var(--ink); border-bottom: 1px solid #f0f1f5; font-family: inherit; } .conta-item:last-child { border-bottom: 0; }
 .conta-icone { width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; flex: none; } .conta-texto { flex: 1; display: flex; flex-direction: column; min-width: 0; } .conta-texto strong { font-size: 1rem; } .conta-texto small { color: #8a8f98; } .conta-seta { color: #b4b8c2; flex: none; }
-.conta-icone.azul { background: #e3edff; color: #2563eb; } .conta-icone.laranja { background: #ffe8d6; color: #ea580c; } .conta-icone.roxo { background: #ece3ff; color: #7c3aed; } .conta-icone.verde { background: #d9f6ea; color: #059669; } .conta-icone.amarelo { background: #fff0cc; color: #d97706; } .conta-icone.vermelho { background: #ffe0e0; color: #dc2626; }
+.conta-icone.azul { background: #e3edff; color: #2563eb; } .conta-icone.laranja { background: #ffe8d6; color: #ea580c; } .conta-icone.roxo { background: #ece3ff; color: #7c3aed; } .conta-icone.verde { background: #d9f6ea; color: #059669; } .conta-icone.amarelo { background: color-mix(in srgb, var(--cor) 18%, #fff); color: #d97706; } .conta-icone.vermelho { background: #ffe0e0; color: #dc2626; }
 /* editar perfil */
 .editar-perfil .conteudo { gap: 1rem; } .perfil-foto { align-self: center; position: relative; display: inline-flex; cursor: pointer; } .perfil-foto .avatar { border: 4px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.18); } .perfil-foto .foto-camera { right: 4px; bottom: 4px; }
 .editar-perfil .conta-item { background: transparent; padding-left: 0; border: 0; }
 body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display: none; }
 .botao-saldo { align-self: flex-start; margin-top: .6rem; border: 0; border-radius: 999px; padding: .7rem 1.2rem; background: var(--cor); color: var(--cor-texto); font-weight: 800; cursor: pointer; font-family: inherit; }
-.cartao-form { border: 0; border-radius: 24px; box-shadow: 0 6px 20px rgba(20,30,60,.06); background: var(--cartao); } .cartao-form .campo-caixa { background: #f4f6fb; border-color: transparent; border-radius: 16px; } .tela-cheia.clara { --fundo: #f5f7fb; }
+.cartao-form { border: 0; border-radius: 24px; box-shadow: 0 6px 20px rgba(20,30,60,.06); background: var(--cartao); } .cartao-form .campo-caixa { background: var(--fundo-suave); border-color: transparent; border-radius: 16px; } .tela-cheia.clara { --fundo: #f5f7fb; }
 
 /* acompanhar viagem: balão de status na cor da marca, cartão do motorista centralizado */
 .etiqueta-etapa { background: var(--cor); color: var(--cor-texto); border-radius: 22px; padding: .6rem 1.4rem; text-align: center; display: flex; flex-direction: column; gap: 2px; font-size: .95rem; } .etiqueta-etapa span { display: inline-flex; align-items: center; gap: .3rem; font-weight: 600; font-size: .8rem; justify-content: center; }
@@ -211,7 +211,7 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .faixa-chegando { background: var(--cor); color: var(--cor-texto); border-radius: 14px; margin: .5rem; padding: .85rem 1rem; text-align: left; box-shadow: 0 3px 10px rgba(0,0,0,.12); }
 
 /* chat do passageiro: topo na cor da marca com foto e telefone, bolhas e campo arredondado */
-.chat { background: #f2f3f7; }
+.chat { background: var(--fundo-suave); }
 .chat .chat-topo { background: var(--cor); color: var(--cor-texto); border: 0; border-radius: 0 0 24px 24px; justify-content: flex-start; gap: .7rem; } .chat-topo .botao-link { color: inherit; font-size: 2rem; line-height: 1; padding: 0 .4rem; } .chat-topo strong { flex: 1; font-size: 1.1rem; } .chat-ligar { text-decoration: none; font-size: 1.3rem; }
 .chat-lista { padding: 1.2rem 1rem; }
 .balao { background: var(--cartao); border: 0; border-radius: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06); } .balao.meu { background: #d6f7d4; color: var(--ink); border-radius: 18px; } .balao time { color: #8a8f98; opacity: 1; }
@@ -223,8 +223,8 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .pino-selo { position: absolute; left: 36px; top: -6px; width: 38px; padding: 2px 0; border-radius: 6px; background: var(--cor); color: var(--cor-texto); display: flex; flex-direction: column; align-items: center; line-height: 1.05; box-shadow: 0 2px 6px rgba(0,0,0,.3); } .pino-selo b { font-size: .8rem; } .pino-selo small { font-size: .5rem; font-weight: 700; }
 
 /* Carros e motos livres por perto, e o número das casas (zoom alto). */
-.pino-perto { width: 30px; height: 30px; border-radius: 50%; background: var(--cor, #ffc400); color: #111; border: 2px solid #111; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
-.pino-perto-moto { background: #111; color: var(--cor, #ffc400); border-color: var(--cor, #ffc400); }
+.pino-perto { width: 30px; height: 30px; border-radius: 50%; background: var(--cor, var(--cor)); color: #111; border: 2px solid #111; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.pino-perto-moto { background: #111; color: var(--cor, var(--cor)); border-color: var(--cor, var(--cor)); }
 .casa-num { display: block; min-width: 22px; padding: 1px 4px; text-align: center; font: 700 11px/14px system-ui, sans-serif; color: #333; background: rgba(255,255,255,.88); border: 1px solid rgba(0,0,0,.25); border-radius: 4px; white-space: nowrap; pointer-events: none; }
 .detalhe-valor { display: flex; flex-direction: column; align-items: center; padding: 6px 0 10px; } .detalhe-valor small { color: #777; } .detalhe-valor strong { font-size: 30px; }
 
@@ -242,7 +242,7 @@ body:has(.editar-perfil) .menu-baixo, body:has(.tela-mapa) .menu-baixo { display
 .faixa-gravacao { display: flex; align-items: center; gap: .5rem; padding: .5rem .8rem; border-radius: 12px; background: #fff3f3; color: #8a1c1c; font-weight: 700; font-size: .85rem; } .faixa-gravacao i { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; animation: pisca 1.2s infinite; } @keyframes pisca { 50% { opacity: .25; } }
 
 /* Tema escuro do passageiro (Conta › Aparência, ou o do aparelho em Automático) */
-html[data-tema="escuro"] { --ink: #e9efed !important; --fundo: #0e1316 !important; --texto: #e9efed !important; --cartao: #172024 !important; --borda: #28343a !important; --suave: #9aa9a5 !important; color-scheme: dark; } /* !important: a marca da empresa põe estas cores direto no <html> */
+html[data-tema="escuro"] { --fundo-suave: #141414; --ink: #e9efed !important; --fundo: #000000 !important; --texto: #e9efed !important; --cartao: #0d0d0d !important; --borda: #262626 !important; --suave: #9aa9a5 !important; color-scheme: dark; } /* !important: a marca da empresa põe estas cores direto no <html> */
 html[data-tema="escuro"] .conta-item, html[data-tema="escuro"] .conta-grupo { background: var(--cartao); color: var(--texto); }
 html[data-tema="escuro"] input, html[data-tema="escuro"] select, html[data-tema="escuro"] textarea { background: var(--cartao); color: var(--texto); border-color: var(--borda); }
 .seletor-tema { display: flex; gap: .4rem; padding: .7rem 1rem; }
@@ -254,7 +254,7 @@ html[data-tema="escuro"] .conta-secao { color: var(--suave); }
 /* Personalização (Configurações do painel): ícone do carro da empresa e estilo da tela inicial */
 .pino-veiculo { display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
 .inicio.estilo-neutro, .inicio.estilo-marcante { background: #fff; }
-.inicio.estilo-neutro .inicio-topo { background: #fff; color: #111827; }
+.inicio.estilo-neutro .inicio-topo { background: #fff; color: #0a0a0a; }
 .inicio.estilo-marcante .inicio-topo { background: var(--cor); color: var(--cor-texto); }
 .inicio-marca { display: flex; align-items: center; gap: .5rem; min-height: 32px; } .inicio-marca img { height: 32px; max-width: 120px; object-fit: contain; border-radius: 6px; } .inicio-marca.imagem_alongada img { max-width: 184px; } .inicio-marca strong { font-size: 1.05rem; }
 
@@ -276,7 +276,7 @@ label { line-height: 1.3; overflow-wrap: anywhere; }
 .bloco-texto small { opacity: .75; }
 
 /* Chat do passageiro no modo escuro: bolhas claras e contrastantes */
-html[data-tema="escuro"] .balao { background: #2f3f46; color: #eef4f2; }
+html[data-tema="escuro"] .balao { background: #2b2b2b; color: #eef4f2; }
 html[data-tema="escuro"] .balao.meu { background: #2e7d4f; color: #fff; }
 
 /* Ofertas dos motoristas: textos separados (nome / veículo, embarque / destino), carrossel "1 de N" e nada colado */
@@ -295,3 +295,11 @@ html[data-tema="escuro"] .balao.meu { background: #2e7d4f; color: #fff; }
 .numeros-da-rua { display: flex; flex-wrap: wrap; gap: .4rem; }
 .numeros-da-rua button { min-width: 48px; min-height: 44px; padding: 0 .7rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--cartao); color: var(--texto); font-weight: 700; cursor: pointer; }
 .numeros-da-rua button.ativa { background: var(--cor); color: var(--cor-texto); border-color: var(--cor); }
+
+/* AVATAR ÚNICO (passageiro): círculo perfeito, foto preenche sem esticar */
+.avatar { position: relative; aspect-ratio: 1 / 1; border-radius: 50%; }
+.avatar > img { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover; border-radius: 50%; display: block; }
+
+/* Personalização ao vivo: os ícones coloridos da Conta seguem a cor da marca (só "Sair" fica vermelho) */
+.conta-icone.azul, .conta-icone.laranja, .conta-icone.roxo, .conta-icone.verde, .conta-icone.amarelo { background: color-mix(in srgb, var(--cor) 18%, #fff); color: color-mix(in srgb, var(--cor) 62%, #000); }
+html[data-tema="escuro"] .conta-icone.azul, html[data-tema="escuro"] .conta-icone.laranja, html[data-tema="escuro"] .conta-icone.roxo, html[data-tema="escuro"] .conta-icone.verde, html[data-tema="escuro"] .conta-icone.amarelo { background: color-mix(in srgb, var(--cor) 28%, #000); color: var(--cor); }

@@ -9,7 +9,7 @@ import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons
 import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
 import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
-import { avisarNovoAviso, useNaoLidos } from "../comum/Avisos";
+import { avisarNovoAviso, PopupDeAvisos, useNaoLidos } from "../comum/Avisos";
 import { PermissoesPasso } from "./Permissoes";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
@@ -40,7 +40,7 @@ export default function App() {
   if (!logado) return cadastrando
     ? <Cadastro voltarAoLogin={() => setCadastrando(false)} concluir={() => { setCadastrando(false); setLogado(!!token()); }} />
     : <Entrar marca={marca} aoEntrar={() => setLogado(true)} cadastrar={() => setCadastrando(true)} />;
-  return <><Logado marca={marca} sair={() => setLogado(false)} /><EmergenciaPerto ativo /><CartaoMeuSos /></>;
+  return <><Logado marca={marca} sair={() => setLogado(false)} /><EmergenciaPerto ativo /><CartaoMeuSos /><PopupDeAvisos /></>;
 }
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
