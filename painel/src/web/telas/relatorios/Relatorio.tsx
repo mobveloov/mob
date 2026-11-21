@@ -53,7 +53,9 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
     return u.toString() + extra;
   };
   const consulta = qs(aplicado, `&pagina=${pagina}${ordem ? `&ordem=${encodeURIComponent(ordem)}&dir=${dir}` : ""}`);
-  const obrigatorioFalta = !!def && (def.filtros as any[]).some((f) => f.obrigatorio && !String(aplicado[f.chave] ?? "").trim());
+  // Enquanto as definições não chegam, não se sabe o que é obrigatório: não consulta (evita o 400 "Escolha a empresa." ao abrir).
+  const faltando: string[] = def ? (def.filtros as any[]).filter((f) => f.obrigatorio && !String(aplicado[f.chave] ?? "").trim()).map((f) => String(f.rotulo)) : [];
+  const obrigatorioFalta = !def || faltando.length > 0;
   const d = useCarregar(() => (obrigatorioFalta ? Promise.resolve(null) : pedirRel<any>(`/relatorio/${id}?${consulta}`)), [id, consulta, obrigatorioFalta]);
   const x = d.dados;
   const opc = defs.dados?.opcoes;
@@ -103,7 +105,7 @@ export default function Relatorio({ id, filtrosIniciais, aoVoltar }: { id: strin
         <button type="button" className="botao" onClick={limpar}>Limpar filtros</button>
       </form>
       <Aviso erro={d.erro} />
-      {obrigatorioFalta ? <p className="vazio">Nenhum resultado encontrado.</p> : !x ? <Carregando /> : (
+      {obrigatorioFalta ? <p className="vazio" role="note">{faltando.length ? `Escolha ${faltando.map((n) => n.toLowerCase()).join(" e ")} e clique em Filtrar para gerar o relatório.` : "Nenhum resultado encontrado."}</p> : !x ? <Carregando /> : (
         <div className="dm-cartao tabela-rola">
           <p><small>Período: {dataBrDia(x.periodo.inicio)} a {dataBrDia(x.periodo.fim)}. {x.total ? `Exibindo ${de}-${ate} de ${x.total} resultados.` : ""}</small></p>
           <table>
