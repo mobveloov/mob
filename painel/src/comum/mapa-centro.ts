@@ -72,9 +72,12 @@ export function aplicarVista(L: L, mapa: Leaflet.Map, c: CentroDoMapa | null): v
   if (!ir()) invalidarDepois(mapa, 200, () => { ir(); });
 }
 
-/** Mapa que ainda está onde foi criado (ninguém mexeu): só então o centro que chegou do servidor pode mandar na vista. */
-export const mapaNaoMexido = (mapa: Leaflet.Map, inicial: PontoLL): boolean => {
+/**
+ * Mapa que ainda está onde foi criado (ninguém mexeu): só então o centro que chegou do servidor pode mandar na vista.
+ * Com tolerância, porque o Leaflet desloca um pouco o centro quando a caixa muda de tamanho.
+ */
+export const mapaNaoMexido = (mapa: Leaflet.Map, inicial: PontoLL, zoomInicial = 4): boolean => {
   if (!mapaVivo(mapa)) return false;
   const c = mapa.getCenter();
-  return Math.abs(c.lat - inicial[0]) < 1e-6 && Math.abs(c.lng - inicial[1]) < 1e-6;
+  return mapa.getZoom() === zoomInicial && Math.abs(c.lat - inicial[0]) < 1.5 && Math.abs(c.lng - inicial[1]) < 1.5;
 };
