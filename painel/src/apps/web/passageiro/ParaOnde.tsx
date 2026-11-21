@@ -15,7 +15,9 @@ type Ativo = "partida" | "destino" | number;
 async function enderecoDoPonto(p: Posicao, padrao: string): Promise<Ponto> {
   try {
     const r = await api<{ endereco: Endereco | null }>(`/enderecos/ponto?lat=${p.lat}&lng=${p.lng}`);
-    return { texto: r.endereco?.texto ?? padrao, lat: p.lat, lng: p.lng };
+    // Casa achada a menos de ~60 m (base de casas do painel): o endereço sai COM número e o pino gruda na casa.
+    const e = r.endereco;
+    return e?.exato && e.numero ? { texto: e.texto, lat: e.lat, lng: e.lng } : { texto: e?.texto ?? padrao, lat: p.lat, lng: p.lng };
   } catch { return { texto: padrao, lat: p.lat, lng: p.lng }; }
 }
 
@@ -63,8 +65,17 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
   // Rua escolhida sem número: pede o número da casa e resolve pela base de casas do painel (com número: a casa; sem número: a rua).
   const [semNumero, setSemNumero] = useState<Endereco | null>(null);
   const [numeroDigitado, setNumeroDigitado] = useState("");
+  const [numerosDaRua, setNumerosDaRua] = useState<number[]>([]);
   const escolherSugestao = (s: Endereco) => {
-    if (!s.numero && s.rua) { setSemNumero(s); setNumeroDigitado(""); setSugestoes([]); return; }
+    if (!s.numero && s.rua) {
+      setSemNumero(s); setNumeroDigitado(""); setSugestoes([]); setNumerosDaRua([]);
+      // Números que existem nessa rua, perto do ponto da rua (da base de casas): toque para escolher.
+      void api<{ casas: Array<{ numero: number; rua: string }> }>(`/enderecos/casas?lat=${s.lat}&lng=${s.lng}&raio=250`).then((r) => {
+        const sem = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        setNumerosDaRua([...new Set(r.casas.filter((c) => sem(c.rua).includes(sem(s.rua ?? "").replace(/^(rua|avenida|av\.?|travessa|alameda|praça|estrada)\s+/, ""))).map((c) => c.numero))].sort((a, b) => a - b).slice(0, 24));
+      }).catch(() => undefined);
+      return;
+    }
     void escolher({ texto: s.texto, lat: s.lat, lng: s.lng });
   };
   const confirmarNumero = async (usarRua: boolean) => {
@@ -161,6 +172,7 @@ export function ParaOnde({ aqui, lugares, modo, voltar, seguir, mudouLugares }: 
         {semNumero && (
           <div className="pedir-numero">
             <strong>{semNumero.rua}{semNumero.bairro ? ` - ${semNumero.bairro}` : ""}</strong>
+            {numerosDaRua.length > 0 && <div className="numeros-da-rua" role="group" aria-label="Números nesta rua">{numerosDaRua.map((n) => <button key={n} type="button" className={numeroDigitado === String(n) ? "ativa" : ""} onClick={() => setNumeroDigitado(String(n))}>{n}</button>)}</div>}
             <label>Número da casa<input inputMode="numeric" autoFocus value={numeroDigitado} maxLength={6} onChange={(e) => setNumeroDigitado(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 120" /></label>
             <button type="button" className="botao largo" disabled={!numeroDigitado} onClick={() => void confirmarNumero(false)}>USAR ESTE NÚMERO</button>
             <button type="button" className="botao secundario largo" onClick={() => void confirmarNumero(true)}>Sem número (só a rua)</button>

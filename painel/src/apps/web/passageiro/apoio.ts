@@ -18,7 +18,7 @@ export interface Corrida {
   taxas?: Array<{ nome: string; valor: number }>; mensagemCancelamento?: string; gravada?: boolean; distanciaMotoristaKm?: number | null; minutosMotorista?: number | null; chegando?: boolean;
 }
 export interface Eu { nome: string; telefone: string; foto?: string | null; email?: string; genero?: string; cidadeId?: string | null }
-export interface Endereco { texto: string; lat: number; lng: number; rua?: string; numero?: string; bairro?: string; cidade?: string; uf?: string }
+export interface Endereco { texto: string; lat: number; lng: number; exato?: boolean; rua?: string; numero?: string; bairro?: string; cidade?: string; uf?: string }
 export interface Categoria { nome: string; descricao: string; aPartirDe: number | null }
 export interface Perfil { email: string; codigo: string; indicadoPor: string; favoritos?: string[]; bloqueados?: string[] }
 export interface Lugares { casa: Ponto | null; trabalho: Ponto | null; favoritos: Array<{ id: string; nome: string; ponto: Ponto }>; recentes: Ponto[] }

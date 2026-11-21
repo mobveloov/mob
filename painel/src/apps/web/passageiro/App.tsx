@@ -48,7 +48,8 @@ async function partidaAgora(aqui: Posicao | null): Promise<Ponto> {
   const p = aqui ?? await posicaoAgora();
   try {
     const r = await api<{ endereco: Endereco | null }>(`/enderecos/ponto?lat=${p.lat}&lng=${p.lng}`);
-    return { texto: r.endereco?.texto ?? "Minha localização", lat: p.lat, lng: p.lng };
+    const e = r.endereco;
+    return e?.exato && e.numero ? { texto: e.texto, lat: e.lat, lng: e.lng } : { texto: e?.texto ?? "Minha localização", lat: p.lat, lng: p.lng };
   } catch { return { texto: "Minha localização", lat: p.lat, lng: p.lng }; }
 }
 
