@@ -65,6 +65,7 @@ export async function pedir<T>(url: string, init: RequestInit = {}): Promise<T> 
   const r = await fetch(url, { ...init, headers, credentials: "same-origin" });
   const body = await r.json().catch(() => ({}));
   if (!r.ok) throw new ErroApi((body as { erro?: string }).erro || `Erro ${r.status}`, r.status);
+  guardarVersoes((body as { marca?: { versoes?: Record<string, string> } }).marca?.versoes);
   return body as T;
 }
 export const json = (method: string, body: unknown): RequestInit => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -117,9 +118,12 @@ export const api = {
 };
 
 // A versão muda a cada envio/remoção de imagem: trocar a logo pelo mesmo nome de arquivo não fica preso no cache do navegador.
-let versaoImagens = 0;
-const depoisDeImagem = <T,>(r: T): T => { versaoImagens = Date.now(); return r; };
-export const urlImagem = (empresaId: string, nome: string) => (nome ? `/api/publico/arquivo/${empresaId}/${nome}?v=${encodeURIComponent(nome)}${versaoImagens ? "." + versaoImagens : ""}` : "");
+// A versão vem do servidor (na marca: data de gravação + tamanho do arquivo), então continua valendo depois de F5 e em outro aparelho.
+const versoesImagens: Record<string, string> = {};
+function guardarVersoes(v?: Record<string, string>) { if (v) Object.assign(versoesImagens, v); }
+export const versaoDaImagem = (nome: string) => versoesImagens[nome] ?? nome;
+const depoisDeImagem = <T,>(r: T): T => r;
+export const urlImagem = (empresaId: string, nome: string) => (nome ? `/api/publico/arquivo/${empresaId}/${nome}?v=${encodeURIComponent(versaoDaImagem(nome))}` : "");
 
 // ---------- formatos (as datas já vêm em horário de Brasília guardado como UTC: mostrar com timeZone "UTC")
 

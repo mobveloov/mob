@@ -1,6 +1,6 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useState } from "react";
 import { MARCA_PADRAO, imagemDaEmpresa, variaveisTema, type Marca } from "../comum/marca.ts";
-import { api, ErroApi, escolherEmpresa, urlImagem, type Sessao } from "./api";
+import { api, ErroApi, escolherEmpresa, urlImagem, versaoDaImagem, type Sessao } from "./api";
 import Entrar from "./paginas/Entrar";
 import { useSecurityShield } from "./useSecurityShield";
 import { definirEmpresaDoMapa } from "../comum/mapa-base.ts";
@@ -39,7 +39,7 @@ export function aplicarMarca(m: Marca, empresaId: string | null, escuro: boolean
     if (antigo) antigo.replaceWith(novo); else document.head.appendChild(novo);
   }
   const man = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
-  if (man && empresaId) man.href = `/manifest.webmanifest?empresa=${empresaId}&v=${encodeURIComponent(img)}`;
+  if (man && empresaId) man.href = `/manifest.webmanifest?empresa=${empresaId}&v=${encodeURIComponent(versaoDaImagem(img))}`;
 }
 
 function usaEscuro(m: Marca): boolean {
