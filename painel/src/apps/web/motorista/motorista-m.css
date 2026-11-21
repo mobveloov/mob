@@ -574,3 +574,16 @@ html[data-tema="escuro"] .chat-m-topo, html[data-tema="escuro"] .chat-m-entrada 
 html[data-tema="escuro"] .balao { background: #37455c; color: #f4f7fb; }
 html[data-tema="escuro"] .balao.meu { background: var(--cor); color: var(--cor-texto); }
 html[data-tema="escuro"] .chat-m-entrada input { background: #37455c; color: #f4f7fb; }
+
+/* MENU LATERAL: nada encolhe (era a causa do cabeçalho cortado e dos itens sobrepostos: filhos de uma coluna flex de altura fixa encolhiam),
+   respeita a barra de status e a barra de navegação (no Android o env() pode vir 0, então há um mínimo) e rola quando não cabe. */
+.menu-lateral > div { overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(max(env(safe-area-inset-bottom), 28px) + .6rem); }
+.menu-lateral > div > * { flex-shrink: 0; }
+.menu-perfil { flex: none; min-height: 92px; margin-top: calc(max(env(safe-area-inset-top), 28px) + .6rem); overflow: hidden; align-items: center; }
+.menu-perfil .avatar { flex: none; }
+.menu-perfil .nome { flex: 1 1 0; min-width: 0; }
+.menu-perfil .fechar { flex: none; align-self: flex-start; }
+.menu-lateral .item { flex-shrink: 0; min-height: 56px; align-items: center; }
+.menu-lateral .item-textos { min-width: 0; flex: 1 1 0; }
+.menu-lateral .item-textos strong, .menu-lateral .item-textos small { overflow-wrap: break-word; word-break: normal; hyphens: manual; }
+.menu-lateral .item-textos strong { white-space: normal; }
