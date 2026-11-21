@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, HelpCircle, Loader2 } from "lucide-react";
 import { Aviso, Janela, L, Selo, dh, msgErro, op, pino, soDig, useDados, useMapa, zap } from "./comum";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
+import { kmBr } from "../../../comum/formato-br.ts";
 
 // ------------------------------------------------------------------ formatos
 
@@ -12,7 +13,7 @@ const dd = (n: number) => String(n).padStart(2, "0");
 export const dataHoraSeg = (s?: string | null) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)} ${s.slice(11, 19)}` : "---");
 export const horaSeg = (s?: string | null) => (s ? s.slice(11, 19) : "---");
 const km2 = (n?: number | null) => (n == null ? "---" : `${n.toFixed(2).replace(".", ",")} km`);
-const km3 = (n?: number | null) => (n == null ? "---" : `${n.toFixed(3)} km`);
+const km3 = (n?: number | null) => kmBr(n, 3);
 const min = (n?: number | null) => (n == null ? "---" : `${n} min`);
 const brl = (n?: number | null) => (n == null ? "---" : `R$ ${n.toFixed(2).replace(".", ",")}`);
 const foneBr = (s?: string | null) => { const d = soDig(s ?? ""); return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : s || "---"; };
@@ -178,7 +179,7 @@ export function PaginaLog({ id, onVoltar, semTitulo }: { id: string; onVoltar: (
                 </tr></thead>
                 <tbody>{l.tabela.map((t, i) => (
                   <tr key={i}><td>{t.vtr || "---"}</td><td>{t.nome}</td><td>{t.recebeu ? "Sim" : "Não"}</td><td>{t.rejeitou ? "Sim" : "Não"}</td><td>{t.candidatou ? "Sim" : "Não"}</td><td>{t.priorizadoPorDestino ? "Sim" : "Não"}</td>
-                    <td>{t.kmReta != null ? `${t.kmReta.toFixed(3).replace(".", ",")} km` : "---"}</td><td>{t.kmRota != null ? `${t.kmRota.toFixed(3).replace(".", ",")} km` : "---"}</td><td>{t.minutos != null ? `${t.minutos} min` : "---"}</td><td>{t.vencedor ? "Sim" : "Não"}</td></tr>
+                    <td>{t.kmReta != null ? kmBr(t.kmReta, 3) : "---"}</td><td>{t.kmRota != null ? kmBr(t.kmRota, 3) : "---"}</td><td>{t.minutos != null ? `${t.minutos} min` : "---"}</td><td>{t.vencedor ? "Sim" : "Não"}</td></tr>
                 ))}</tbody>
               </table></div>
             )}

@@ -8,6 +8,7 @@ import { Aviso, Carregando, useCarregar, useSalvar } from "../demais/comum";
 import { useAvisoRelatorio } from "../../componentes/AvisoRelatorio";
 import { buscarCsvRel, mesAtual, pedirRel } from "./comum";
 import "./relatorios.css";
+import { decimal } from "../../../comum/formato-br.ts";
 
 type Valores = { inicio: string; fim: string };
 const TITULOS: Record<string, string> = {
@@ -22,7 +23,7 @@ const ALINHA_NUM = ["numero", "dinheiro", "pct", "km"];
 // A Machine mostra "12.07%" (ponto) e dinheiro em reais.
 function celula(tipo: string, v: unknown) {
   if (v == null || v === "") return "";
-  if (tipo === "pct") return `${Number(v).toFixed(2)}%`;
+  if (tipo === "pct") return `${decimal(Number(v), 2)}%`;
   if (tipo === "dinheiro") return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   if (tipo === "numero") return Number(v).toLocaleString("pt-BR");
   return String(v);

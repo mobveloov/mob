@@ -5,6 +5,7 @@ import { Eye, EyeOff, MoreVertical } from "lucide-react";
 import { Aviso, L, Selo, hora, op, pino, qs, useDados, useMapa } from "./comum";
 import "./corridas.css";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
+import { decimal } from "../../../comum/formato-br.ts";
 
 const SIT: Record<string, { rotulo: string; cor: string; tom: string }> = {
   livre: { rotulo: "Livre", cor: "#22c55e", tom: "ok" }, chamada: { rotulo: "Recebendo chamada", cor: "#a78bfa", tom: "rox" }, a_caminho: { rotulo: "A caminho", cor: "#3b82f6", tom: "info" },
@@ -49,7 +50,7 @@ export default function MapaReal() {
     return (ordem.asc ? 1 : -1) * String(vx).localeCompare(String(vy), "pt-BR");
   }), [lista, ordem]);
   const ordenar = (por: "nome" | "situacao") => setOrdem({ por, asc: ordem.por === por ? !ordem.asc : true });
-  const pct = (n: number | undefined) => (s?.cadastrosAtivos ? `${(((n ?? 0) / s.cadastrosAtivos) * 100).toFixed(2)}%` : "0%");
+  const pct = (n: number | undefined) => (s?.cadastrosAtivos ? `${decimal(((n ?? 0) / s.cadastrosAtivos) * 100, 2)}%` : "0%");
   const k = (r: string, v: number | undefined, tom = "", detalhe = "") => <div className={`oc-kpi ${tom}`}><span>{r}</span><strong>{v ?? 0}</strong>{detalhe && <small>{detalhe}</small>}</div>;
   return (
     <div className="oc">

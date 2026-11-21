@@ -4,6 +4,7 @@ import { Cartao, useCarregar } from "../componentes/ui";
 import { useGestor, useRetorno } from "../crm/comum";
 import { RFM_SEGMENTOS } from "../../crm2/catalogo";
 import { baixarCsv, crm2, dataCurta, dinheiroBr } from "./api";
+import { decimal } from "../../comum/formato-br.ts";
 
 /** CRM › Análises › RFM: Recência, Frequência e Monetário (nota de 1 a 5 comparando com a base), por segmento. */
 export default function Rfm() {
@@ -55,7 +56,7 @@ export default function Rfm() {
                 <p style={{ fontSize: 26, fontWeight: 800, margin: "6px 0" }}>{r.contacts.toLocaleString("pt-BR")}</p>
                 <div className="sub" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <span>{r.avg_recency_days != null ? `${Math.round(r.avg_recency_days)}d sem` : "-"}</span>
-                  <span>{r.avg_rides != null ? `${r.avg_rides.toFixed(1)} corridas` : "-"}</span>
+                  <span>{r.avg_rides != null ? `${decimal(r.avg_rides, 1)} corridas` : "-"}</span>
                   <span>LTV {dinheiroBr(r.ltv)}</span>
                 </div>
                 <p className="sub">{info.action}</p>

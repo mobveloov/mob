@@ -6,6 +6,7 @@ import { BandeiraDespacho } from "../grupoc/BandeiraDespacho";
 import { BandeiraAbas } from "../grupoc/BandeiraAbas";
 import { ABAS_FORM } from "../../../comum/bandeira-form.ts";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
+import { decimal } from "../../../comum/formato-br.ts";
 
 type Aba = "motorista" | "passageiro" | "despacho" | "financeiro" | "filtros" | "pagamentos" | "premium" | "geral" | "regras_motorista" | "preferencias" | "regras_passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
 // As sete primeiras são as da Machine (mesma ordem); as demais são do painel de referência.
@@ -266,7 +267,7 @@ function SimuladorCusto({ distancia }: { distancia: number }) {
     <div className="dm-simulador">
       <h4>Simulador de Custo (serviço de mapas)</h4>
       <div className="dm-duplo"><Campo rotulo="Corridas Diárias:"><input type="number" min={0} value={corridas} onChange={(e) => setCorridas(Number(e.target.value))} /></Campo><Campo rotulo="Preço por 1.000 consultas (R$)"><Num v={preco} on={setPreco} /></Campo></div>
-      <div className="dm-duplo"><div><small>Estimativa Mensal</small><p><strong>{dinheiro(mensal)}</strong></p></div><div><small>Recálculos/Viagem</small><p><strong>{recalc.toFixed(1)}</strong></p></div></div>
+      <div className="dm-duplo"><div><small>Estimativa Mensal</small><p><strong>{dinheiro(mensal)}</strong></p></div><div><small>Recálculos/Viagem</small><p><strong>{decimal(recalc, 1)}</strong></p></div></div>
     </div>
   );
 }
