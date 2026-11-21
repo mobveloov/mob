@@ -99,7 +99,7 @@ rotasApps.use("/:empresa", empresaAtiva, r);
 
 r.get("/marca", ok((req, res) => {
   const id = req.params.empresa, m = D.marca(id);
-  const arq = (n: string) => (n ? `/api/publico/arquivo/${id}/${n}` : null);
+  const arq = (n: string) => (n ? `/api/publico/arquivo/${id}/${n}?v=${encodeURIComponent(D.versaoImagem(id, n) || n)}` : null);
   res.json({
     empresaId: id, nome: m.app.nome || m.nomeExibido, nomeExibido: m.nomeExibido, cores: m.cores, fonte: m.fonte, tema: m.tema,
     logoClaro: arq(m.arquivos.logoClaro), logoEscuro: arq(m.arquivos.logoEscuro), icone: arq(m.arquivos.iconeApp || m.arquivos.favicon),

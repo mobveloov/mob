@@ -86,8 +86,19 @@ export function empresaDoDominio(host: string | undefined): Empresa | null {
 
 // ------------------------------------------------------------------ marca
 
-export const marca = (id: string): Marca => sanearMarca(ler(path.join(pastaEmpresa(id), "marca.json"), MARCA_PADRAO));
-export const salvarMarca = (id: string, m: Marca) => gravar(path.join(pastaEmpresa(id), "marca.json"), m);
+/** Versão de uma imagem da empresa: muda quando o arquivo é trocado (data de gravação + tamanho). "" se o arquivo não existe. */
+export function versaoImagem(id: string, nome: string): string {
+  if (!nome || !/^[\w-]+\.(png|jpg|webp|svg|ico)$/.test(nome)) return "";
+  try { const s = fs.statSync(path.join(pastaEmpresa(id), "arquivos", nome)); return `${Math.round(s.mtimeMs).toString(36)}${s.size.toString(36)}`; } catch { return ""; }
+}
+/** A marca da empresa, com a versão de cada imagem (para as urls não ficarem presas no cache do navegador). */
+export const marca = (id: string): Marca => {
+  const m = sanearMarca(ler(path.join(pastaEmpresa(id), "marca.json"), MARCA_PADRAO));
+  const versoes: Record<string, string> = {};
+  for (const nome of Object.values(m.arquivos)) { const v = nome ? versaoImagem(id, nome) : ""; if (v) versoes[nome] = v; }
+  return { ...m, versoes };
+};
+export const salvarMarca = (id: string, m: Marca) => { const { versoes: _versoes, ...gravada } = m; void _versoes; gravar(path.join(pastaEmpresa(id), "marca.json"), gravada); };
 
 const TIPOS_IMAGEM: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico" };
 export const MAX_IMAGEM = 2 * 1024 * 1024;

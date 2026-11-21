@@ -151,7 +151,7 @@ const podeBaixar = limitador(60, 10 * 60_000);
 /** Quais APKs a empresa publicou (DADOS_DIR/empresas/<id>/apps/apks/<app>.apk, com <app>.json opcional: versão, nome e pacote). */
 rotasPublicasV2.get("/apks", ok((req, res) => {
   const id = emp(req), m = D.marca(id);
-  const arq = (n: string) => (n ? `/api/publico/arquivo/${id}/${n}` : null);
+  const arq = (n: string) => (n ? `/api/publico/arquivo/${id}/${n}?v=${encodeURIComponent(D.versaoImagem(id, n) || n)}` : null);
   const info = (app: (typeof APPS_APK)[number]) => {
     const caminho = caminhoApk(id, app);
     const extra = ler<{ versao?: string; nome?: string }>(arquivo(id, "apks", `${app}.json`), {});

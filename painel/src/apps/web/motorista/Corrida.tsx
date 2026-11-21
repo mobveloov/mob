@@ -16,6 +16,7 @@ import { enviarSos } from "../comum/sos";
 import { definirRetencao, iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
 import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, VisualizadorDeFoto, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
+import { decimal } from "../../../comum/formato-br.ts";
 
 /** Pontos da viagem em ordem: embarque, paradas e destino. */
 export function pontosDaViagem(c: { embarque: Ponto; paradas?: Ponto[]; destino?: Ponto | null }): PontoMapa[] {
@@ -192,7 +193,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           <button type="button" className="avatar-botao" aria-label="Ver a foto do passageiro" onClick={() => setFoto(true)}><Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={56} /></button>
           <div className="passageiro-nome">
             <strong>{c.passageiro.nome}</strong>
-            <small className="passageiro-meta">{c.passageiro.nota != null && <span className="nota-inline"><Star size={12} fill="currentColor" /> {c.passageiro.nota.toFixed(1).replace(".", ",")}</span>}{c.passageiro.corridas != null && <span>{c.passageiro.corridas} corridas</span>}</small>
+            <small className="passageiro-meta">{c.passageiro.nota != null && <span className="nota-inline"><Star size={12} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span>}{c.passageiro.corridas != null && <span>{c.passageiro.corridas} corridas</span>}</small>
             <button type="button" className="chip marca" onClick={() => setFolha("perfil")}>VER PERFIL <ChevronRight size={12} /></button>
           </div>
           <button type="button" className="redondo" aria-label="Chat com o passageiro" onClick={abrirChat}><MessageCircle size={20} />{naoLidas > 0 && <span className="bolha">{naoLidas}</span>}</button>
@@ -261,7 +262,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
         </Folha>
       )}
       {folha === "editar" && <EditarRota corrida={c} fechar={() => setFolha("")} mudou={mudou} />}
-      {foto && <VisualizadorDeFoto foto={c.passageiro.foto} nome={c.passageiro.nome} detalhe={[c.passageiro.nota != null ? `★ ${c.passageiro.nota.toFixed(1).replace(".", ",")}` : "", c.passageiro.corridas != null ? `${c.passageiro.corridas} corridas` : ""].filter(Boolean).join(" · ")} fechar={() => setFoto(false)} />}
+      {foto && <VisualizadorDeFoto foto={c.passageiro.foto} nome={c.passageiro.nome} detalhe={[c.passageiro.nota != null ? `★ ${decimal(c.passageiro.nota, 1)}` : "", c.passageiro.corridas != null ? `${c.passageiro.corridas} corridas` : ""].filter(Boolean).join(" · ")} fechar={() => setFoto(false)} />}
       {folha === "opcoes" && (
         <Folha titulo="Opções da corrida" fechar={() => setFolha("")}>
           <button type="button" className="opcao-folha perigo" onClick={() => setFolha("cancelar")}><span><Ban size={18} /> {c.status === "a_caminho" ? "Desistir da corrida" : "Cancelar corrida"}</span></button>
@@ -276,7 +277,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
             <button type="button" className="avatar-botao" aria-label="Ampliar a foto" onClick={() => setFoto(true)}><Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={120} /></button>
             <strong>{c.passageiro.nome}</strong>
             <div className="chips centro">
-              {c.passageiro.nota != null && <span className="chip ok"><Star size={13} fill="currentColor" /> {c.passageiro.nota.toFixed(1)}</span>}
+              {c.passageiro.nota != null && <span className="chip ok"><Star size={13} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span>}
               {c.passageiro.corridas != null && <span className="chip">{c.passageiro.corridas} corridas</span>}
             </div>
           </div>

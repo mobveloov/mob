@@ -246,3 +246,25 @@ test("passageiros, cupons, empresas, desafios e indicações respondem por empre
   assert.equal((await chamar("POST", `/api/gestao/desafios/${d.corpo.desafio.id}/cancelar`, c, {})).corpo.desafio.cancelado, true);
   assert.equal((await chamar("GET", "/api/gestao/indicacoes", c)).status, 200);
 });
+
+test("motorista que veio do app: dá para gravar um ajuste sem os campos que o app não preenche; ativar exige", async () => {
+  const c = await cookie(admin.id);
+  const doApp = criar(E, MOT, { nome: "Gil do App", telefone: "11910009999", status: "Aguardando aprovação" }, "app");
+  // Ajuste simples: nome e cidade, sem nascimento, e-mail, CPF nem relação.
+  const ajuste = await chamar("PUT", `/api/gestao/motoristas/${doApp.id}`, c, { dados: { nome: "Gil Silva do App", cidade: "Campinas" } });
+  assert.equal(ajuste.status, 200, JSON.stringify(ajuste.corpo));
+  assert.equal(ajuste.corpo.motorista.nome, "Gil Silva do App");
+  // Campo preenchido de forma inválida continua barrado.
+  assert.equal((await chamar("PUT", `/api/gestao/motoristas/${doApp.id}`, c, { dados: { email: "sem-arroba" } })).status, 400);
+  // Ativar sem os dados: diz o que falta.
+  const ativar = await chamar("PUT", `/api/gestao/motoristas/${doApp.id}`, c, { dados: { status: "Ativo" } });
+  assert.equal(ativar.status, 400);
+  assert.match(ativar.corpo.erro, /^Para ativar o motorista faltam: Nascimento, E-mail, CPF/);
+  // Com tudo preenchido, ativa.
+  const completo = { status: "Ativo", nascimento: "1990-05-10", email: "gil@exemplo.com", cpf: "52998224725", nivel: "Secundário", endereco: "Rua A", numero: "10", cep: "13000000", uf: "SP", cidade: "Campinas", bairro: "Centro" };
+  const ok = await chamar("PUT", `/api/gestao/motoristas/${doApp.id}`, c, { dados: completo });
+  assert.equal(ok.status, 200, JSON.stringify(ok.corpo));
+  assert.equal(ok.corpo.motorista.status, "Ativo");
+  // Quem já está Ativo pode ser ajustado de novo mesmo que falte algo.
+  assert.equal((await chamar("PUT", `/api/gestao/motoristas/${ana.id}`, c, { dados: { nome: "Ana Ativa Souza" } })).status, 200);
+});

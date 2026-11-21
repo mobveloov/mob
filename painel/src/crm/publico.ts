@@ -126,6 +126,23 @@ export function destinatarios(lista: Contato[]): Contato[] {
   });
 }
 
+/** Últimos 11 dígitos dos telefones do cadastro do app (motoristas ou passageiros): quem está aqui tem caixa de avisos no app. */
+export function telefonesNoApp(empresaId: string, tipo: TipoPublico): Set<string> {
+  const cad = cadastroPorId(tipo === "passageiro" ? "clientes" : "motoristas");
+  const m = new Set<string>();
+  if (!cad) return m;
+  for (const r of Cad.listar(empresaId, cad)) { const d = String(r.telefone ?? "").replace(/\D/g, "").slice(-11); if (d.length >= 8) m.add(d); }
+  return m;
+}
+
+/** Quem recebe pelo canal: WhatsApp (telefone válido, sem opt-out) ou push do app (além disso, só quem tem cadastro no app). */
+export function destinatariosDoCanal(empresaId: string, lista: Contato[], canal: "whatsapp" | "app" = "whatsapp"): Contato[] {
+  const base = destinatarios(lista);
+  if (canal !== "app") return base;
+  const no: Record<string, Set<string>> = {};
+  return base.filter((c) => (no[c.tipo] ??= telefonesNoApp(empresaId, c.tipo)).has(c.telefone.replace(/\D/g, "").slice(-11)));
+}
+
 /** Limpa regras vindas da tela. */
 export function sanearRegras(o: unknown): Regras {
   const r = (o ?? {}) as Record<string, unknown>;
@@ -169,7 +186,9 @@ export async function publico(empresaId: string, tipo: TipoPublico): Promise<{ c
   const r = await corridasDoPublico(empresaId);
   const cad = cadastroPorId(tipo === "passageiro" ? "clientes" : "motoristas");
   const registros = cad ? Cad.listar(empresaId, cad) : [];
-  const contatos = montarContatos(r.corridas, tipo, agoraBr(), A.optOuts(empresaId), registros);
+  let contatos = montarContatos(r.corridas, tipo, agoraBr(), A.optOuts(empresaId), registros);
+  // Motoristas vêm só do CADASTRO da empresa: o nome que aparece no histórico de corridas (de outras fontes) não é o motorista dela.
+  if (tipo === "motorista") contatos = contatos.filter((c) => c.noCadastro);
   if (tipo === "passageiro") {
     // Segmento RFM de cada pessoa (da última análise): é o que faz o segmento dinâmico "reavaliar" a lista a cada uso.
     const notas = new Map((bd().prepare("SELECT chave, rfm_segmento AS seg FROM crm_contatos WHERE empresa = ? AND rfm_segmento IS NOT NULL").all(empresaId) as Array<{ chave: string; seg: string }>).map((x) => [x.chave, x.seg]));

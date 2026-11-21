@@ -565,3 +565,17 @@ h2.secao { font-size: 17px; margin: 22px 0 10px; }
 
 /* No celular o menu fixo some (a regra de cima perdia para .ml-lateral, declarada depois). */
 @media (max-width: 1023px) { .app > .ml-lateral { display: none; } }
+
+/* ---- Topo fixo: altura usada para rolar campos e tabelas para a vista sem ficarem escondidos atrás dele ---- */
+:root { --topo-fixo: 64px; }
+:root:has(main.conteudo.pc-ativa) { --topo-fixo: 190px; } /* tela cheia: barra do topo + "Voltar + título" + abas colados */
+html { scroll-padding-top: calc(var(--topo-fixo) + 16px); scroll-padding-bottom: 80px; }
+input, select, textarea, button, [id], [tabindex] { scroll-margin-top: calc(var(--topo-fixo) + 16px); scroll-margin-bottom: 80px; }
+
+/* ---- Cabeçalho de tabela fixo ao rolar listas longas ----
+   A caixa da tabela vira a área de rolagem (altura limitada à tela) e o cabeçalho cola no alto dela.
+   Telas que já definem a própria altura (max-height no estilo) continuam mandando. */
+.tabela-rola, .cg-rolagem, .oc-rola { max-height: max(320px, calc(100vh - var(--topo-fixo) - 32px)); overflow: auto; }
+.tabela-rola table thead th, .tabela-rola th { position: sticky; top: 0; z-index: 2; background: var(--cartao); }
+.cg-rolagem table thead th, .oc-rola table thead th { position: sticky; top: 0; z-index: 2; background: var(--cg-cartao, var(--oc-cartao, var(--cartao))); }
+.tabela-rola th:hover, .cg-rolagem th:hover { z-index: 3; }

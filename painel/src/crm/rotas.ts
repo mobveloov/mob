@@ -16,7 +16,7 @@ import { extractVariables, processTemplate, validateSpinText } from "./spintext.
 import { conferirCupom, cuponsDaEmpresa } from "./cupons.ts";
 import * as E from "./envio.ts";
 import { montarTexto, spintextComIa, variacoesComIa, variaveisDesconhecidas } from "./mensagem.ts";
-import { aplicarRegras, destinatarios, opcoes, publico, sanearRegras, selecionar } from "./publico.ts";
+import { aplicarRegras, destinatarios, destinatariosDoCanal, opcoes, publico, sanearRegras, selecionar } from "./publico.ts";
 import { canalValido } from "./canal-app.ts";
 import { VARIAVEIS, type Campanha, type Jornada, type Lista } from "./tipos.ts";
 import { caixaSimulada, provedorDaEmpresa } from "./whatsapp.ts";
@@ -67,8 +67,12 @@ router.post("/publico", ok(async (req, res) => {
 
 /** Só a contagem (tela de campanha, antes de salvar). */
 router.post("/publico/contar", ok(async (req, res) => {
-  const { lista, avisos } = await selecionar(emp(req), sanearRegras(req.body?.regras));
-  res.json({ total: lista.length, destinatarios: destinatarios(lista).length, avisos });
+  const e = emp(req);
+  const { lista, avisos } = await selecionar(e, sanearRegras(req.body?.regras));
+  const canal = canalValido(req.body?.canal);
+  const dest = destinatarios(lista), noCanal = destinatariosDoCanal(e, lista, canal);
+  // `destinatarios` já vale para o canal pedido; `semCadastroApp` mostra quem o push do app deixa de fora.
+  res.json({ total: lista.length, destinatarios: noCanal.length, canal, semCadastroApp: canal === "app" ? dest.length - noCanal.length : 0, avisos });
 }));
 
 router.post("/publico/optout", ok((req, res) => {
@@ -143,7 +147,7 @@ router.post("/campanhas", ok(async (req, res) => {
   const c = lerCampanha(e, req.body ?? {});
   const { lista } = await selecionar(e, c.publico);
   A.salvarCampanhas(e, [...A.campanhas(e), c]);
-  res.json({ campanha: c, destinatarios: destinatarios(lista).length });
+  res.json({ campanha: c, destinatarios: destinatariosDoCanal(e, lista, c.canal).length });
 }));
 
 router.put("/campanhas/:id", ok(async (req, res) => {
@@ -174,7 +178,7 @@ router.post("/campanhas/previa", ok(async (req, res) => {
   const { lista } = await selecionar(e, c.publico);
   const empresa = D.marca(e).nomeExibido;
   const exemplo = { nome: "Maria Silva", cidade: "sua cidade", diasSemCorrida: 12, corridas: 5 };
-  const pessoas = destinatarios(lista).slice(0, 3);
+  const pessoas = destinatariosDoCanal(e, lista, c.canal).slice(0, 3);
   res.json({ previas: (pessoas.length ? pessoas : [exemplo]).map((p) => ({ nome: p.nome, texto: montarTexto(c.texto, { contato: p, cupom: c.cupom, empresa }) })) });
 }));
 
@@ -293,7 +297,7 @@ router.post("/jornadas/contar", ok(async (req, res) => {
   const e = emp(req);
   const j = lerJornada(e, { ...(req.body ?? {}), texto: "", cupom: "", ativa: false });
   const { lista } = await selecionar(e, j.publico);
-  const alvo = destinatarios(j.gatilho.tipo === "sem-corrida" ? lista.filter((c) => c.diasSemCorrida != null && c.diasSemCorrida >= j.gatilho.dias) : lista.filter((c) => c.ultimoGrupo === "cancelada" && c.diasSemCorrida != null && c.diasSemCorrida <= j.gatilho.dias));
+  const alvo = destinatariosDoCanal(e, j.gatilho.tipo === "sem-corrida" ? lista.filter((c) => c.diasSemCorrida != null && c.diasSemCorrida >= j.gatilho.dias) : lista.filter((c) => c.ultimoGrupo === "cancelada" && c.diasSemCorrida != null && c.diasSemCorrida <= j.gatilho.dias), j.canal ?? "whatsapp");
   res.json({ total: alvo.length });
 }));
 router.post("/jornadas/:id/rodar", admin, ok(async (req, res) => {

@@ -29,6 +29,8 @@ export interface Marca {
   dominios: string[];
   /** Mostrar a etiqueta de origem (qual sistema trouxe a corrida). */
   mostrarOrigem: boolean;
+  /** Só nas respostas do servidor (não é gravado): versão de cada imagem em `arquivos` (data de gravação e tamanho). Vai na url da imagem (?v=) para a troca aparecer na hora, mesmo depois de F5. */
+  versoes?: Record<string, string>;
   app: { nome: string; pacote: string; urlPainel: string };
 }
 

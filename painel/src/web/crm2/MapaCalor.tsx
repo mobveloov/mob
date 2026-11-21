@@ -6,6 +6,7 @@ import { Cartao } from "../componentes/ui";
 import { useGestor, useRetorno } from "../crm/comum";
 import { crm2, dataHora, erroTexto, type Celula, type Cidade } from "./api";
 import { baseDoMapa } from "../../comum/mapa-base.ts";
+import { ajustarSeguro, invalidarDepois, mapaVivo } from "../../comum/mapa-seguro.ts";
 
 /** CRM › Análises › Mapa de Calor: embarques e desembarques por região (círculos coloridos pela intensidade). */
 export default function MapaCalor() {
@@ -64,9 +65,9 @@ export default function MapaCalor() {
         .addTo(g);
       limites.push([p.grid_lat, p.grid_lng]);
     }
-    if (limites.length) m.fitBounds(L.latLngBounds(limites), { padding: [60, 60], maxZoom: 15 });
-    else if (c && c.lat != null && c.lng != null) m.setView([c.lat, c.lng], 13);
-    setTimeout(() => m.invalidateSize(), 100);
+    const ajusta = () => { if (limites.length) ajustarSeguro(m, L.latLngBounds(limites), { padding: [60, 60], maxZoom: 15 }); else if (c && c.lat != null && c.lng != null && mapaVivo(m)) m.setView([c.lat, c.lng], 13); };
+    ajusta();
+    return invalidarDepois(m, 100, ajusta);
   }, [pontos, modo, cidade, cidades, mostrar]);
 
   if (pontos == null) return <p className="vazio">Carregando...</p>;

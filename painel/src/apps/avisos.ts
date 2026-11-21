@@ -106,14 +106,14 @@ export function marcarLidos(empresaId: string, alvo: Alvo, ids: string[] | "todo
 export const ROTULO_ESTADO: Record<EstadoAviso, string> = { enviada: "Enviada", entregue: "Entregue no app", lida: "Lida", falha: "Falha" };
 export const ROTULO_PUSH: Record<SituacaoPush, string> = { enviado: "Push do sistema enviado", sem_chave: "Push do sistema pendente de chave", sem_aparelho: "Sem aparelho registrado", falha: "Push do sistema falhou" };
 
-export interface StatusApp { estado: EstadoAviso; push: SituacaoPush; erro: string; entregueEm: number | null; lidaEm: number | null }
+export interface StatusApp { papel: "passageiro" | "motorista"; estado: EstadoAviso; push: SituacaoPush; erro: string; entregueEm: number | null; lidaEm: number | null }
 
 /** Situação dos avisos ligados a linhas do histórico do CRM (envio_ref = id da linha em crm_envios). */
 export function statusPorEnvio(empresaId: string, refs: string[]): Map<string, StatusApp> {
   const m = new Map<string, StatusApp>();
   if (!refs.length) return m;
-  const l = banco().prepare(`SELECT envio_ref, estado, push, erro, entregue_em, lida_em FROM app_avisos WHERE empresa = ? AND envio_ref IN (${refs.map(() => "?").join(",")})`).all(empresaId, ...refs) as unknown as Array<{ envio_ref: string; estado: EstadoAviso; push: SituacaoPush; erro: string; entregue_em: number | null; lida_em: number | null }>;
-  for (const x of l) m.set(x.envio_ref, { estado: x.estado, push: x.push, erro: x.erro, entregueEm: x.entregue_em, lidaEm: x.lida_em });
+  const l = banco().prepare(`SELECT envio_ref, papel, estado, push, erro, entregue_em, lida_em FROM app_avisos WHERE empresa = ? AND envio_ref IN (${refs.map(() => "?").join(",")})`).all(empresaId, ...refs) as unknown as Array<{ envio_ref: string; papel: "passageiro" | "motorista"; estado: EstadoAviso; push: SituacaoPush; erro: string; entregue_em: number | null; lida_em: number | null }>;
+  for (const x of l) m.set(x.envio_ref, { papel: x.papel === "motorista" ? "motorista" : "passageiro", estado: x.estado, push: x.push, erro: x.erro, entregueEm: x.entregue_em, lidaEm: x.lida_em });
   return m;
 }
 

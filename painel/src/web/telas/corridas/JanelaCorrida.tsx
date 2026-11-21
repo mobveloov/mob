@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Ban, ChevronDown, FileText, Gavel, Info, Loader2, MapPin, MessageCircle, Navigation, Phone, Radar, RefreshCw, Share2, ArrowLeft } from "lucide-react";
 import { Aviso, Dado, GRUPO_CLASSE, Janela, L, dh, dhAno, fone, km, msgErro, op, pino, reais, Selo, useDados, useMapa, zap } from "./comum";
 import { BlocosDaCorrida, Conversa, EnviarRecibo, JanelaLog, JanelaTrajeto, type DadosMachine } from "./DetalheCorrida";
+import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 
 export interface Detalhe {
   corrida: any; statusTexto: string; painel: any; passageiro: any; motorista: any; datas: any; repasses: any[]; financeiro: any; machine: DadosMachine;
@@ -210,7 +211,7 @@ function Rastreio({ id, onFechar, onLegenda }: { id: string; onFechar: () => voi
       L.marker([r.posicao.lat, r.posicao.lng], { icon: pino("#4f8cff", "🚗") }).bindPopup(r.motorista?.nome ?? "Motorista").addTo(g);
       pts.push([r.posicao.lat, r.posicao.lng]);
     }
-    if (pts.length && !ajustou.current) { mapa.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16 }); ajustou.current = true; }
+    if (pts.length && !ajustou.current) { if (ajustarSeguro(mapa, L.latLngBounds(pts).pad(0.25), { maxZoom: 16 })) ajustou.current = true; }
   }, [mapa, r, estimada, real]);
 
   async function compartilhar() {

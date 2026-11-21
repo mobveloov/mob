@@ -6,6 +6,7 @@ import { BandeiraDespacho } from "../grupoc/BandeiraDespacho";
 import { BandeiraAbas } from "../grupoc/BandeiraAbas";
 import { ABAS_FORM } from "../../../comum/bandeira-form.ts";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
+import { decimal } from "../../../comum/formato-br.ts";
 
 type Aba = "motorista" | "passageiro" | "despacho" | "financeiro" | "filtros" | "pagamentos" | "premium" | "geral" | "regras_motorista" | "preferencias" | "regras_passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
 // As sete primeiras são as da Machine (mesma ordem); as demais são do painel de referência.
@@ -44,7 +45,9 @@ export function ConfigGerais() {
       <Abas abas={ABAS} valor={aba} onChange={setAba} />
       <Aviso erro={msg?.erro} ok={msg?.ok} />
       {aba === "despacho" && <BandeiraDespacho />}
-      {ABAS_FORM.filter((a) => a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : undefined} />)}
+      {ABAS_FORM.filter((a) => a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : undefined} extra={a.id === "motorista" ? (<Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
+              <Campo rotulo="Dias sem contato para o app aparecer como OFF" dica="Define há quantos dias sem contato do app o diagnóstico mostra APP OFF"><input type="number" min={1} max={90} step={1} disabled={!admin} value={g.motorista.diasSemContatoApp} onChange={(e) => set(["motorista", "diasSemContatoApp"], Math.min(90, Math.max(1, Math.round(Number(e.target.value)) || 1)))} /></Campo>
+            </Secao>) : undefined} />)}
       {aba === "motorista" && <NovoDocumento aberto={novoDoc} onFechar={() => setNovoDoc(false)} onAdd={(d) => { set(["motorista", "documentos"], [...g.motorista.documentos, d]); setNovoDoc(false); }} />}
       {aba === "geral" && (
         <Secao titulo="Suporte e Contato">
@@ -79,9 +82,6 @@ export function ConfigGerais() {
                 <SimuladorCusto distancia={g.motorista.distanciaRecalculo} />
               </>
             )}
-          </Secao>
-          <Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
-            <Campo rotulo="Dias sem contato para o app aparecer como OFF" dica="Define há quantos dias sem contato do app o diagnóstico mostra APP OFF"><input type="number" min={1} max={90} step={1} disabled={!admin} value={g.motorista.diasSemContatoApp} onChange={(e) => set(["motorista", "diasSemContatoApp"], Math.min(90, Math.max(1, Math.round(Number(e.target.value)) || 1)))} /></Campo>
           </Secao>
           <Secao titulo="Mensagens Rápidas (Chat)" sub="Textos prontos para o motorista enviar com 1 toque.">
             <ul className="dm-lista-edit">{g.motorista.mensagensRapidas.map((m: string, i: number) => (
@@ -267,7 +267,7 @@ function SimuladorCusto({ distancia }: { distancia: number }) {
     <div className="dm-simulador">
       <h4>Simulador de Custo (serviço de mapas)</h4>
       <div className="dm-duplo"><Campo rotulo="Corridas Diárias:"><input type="number" min={0} value={corridas} onChange={(e) => setCorridas(Number(e.target.value))} /></Campo><Campo rotulo="Preço por 1.000 consultas (R$)"><Num v={preco} on={setPreco} /></Campo></div>
-      <div className="dm-duplo"><div><small>Estimativa Mensal</small><p><strong>{dinheiro(mensal)}</strong></p></div><div><small>Recálculos/Viagem</small><p><strong>{recalc.toFixed(1)}</strong></p></div></div>
+      <div className="dm-duplo"><div><small>Estimativa Mensal</small><p><strong>{dinheiro(mensal)}</strong></p></div><div><small>Recálculos/Viagem</small><p><strong>{decimal(recalc, 1)}</strong></p></div></div>
     </div>
   );
 }
