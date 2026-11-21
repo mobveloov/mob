@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Eye, EyeOff, MoreVertical } from "lucide-react";
 import { Aviso, L, Selo, hora, op, pino, qs, useDados, useMapa } from "./comum";
 import "./corridas.css";
+import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 
 const SIT: Record<string, { rotulo: string; cor: string; tom: string }> = {
   livre: { rotulo: "Livre", cor: "#22c55e", tom: "ok" }, chamada: { rotulo: "Recebendo chamada", cor: "#a78bfa", tom: "rox" }, a_caminho: { rotulo: "A caminho", cor: "#3b82f6", tom: "info" },
@@ -37,7 +38,7 @@ export default function MapaReal() {
         .bindPopup(`<b>${m.nome}</b><br>${[m.veiculo, m.placa].filter(Boolean).join(" · ")}<br>${s.rotulo}${m.corrida ? `<br>OS ${m.corrida.os} · ${m.corrida.passageiro}` : ""}<br><small>Posição às ${hora(m.atualizadoEm)}</small>`).addTo(g);
       pts.push([m.lat, m.lng]);
     }
-    if (pts.length && !ajustou.current) { mapa.fitBounds(L.latLngBounds(pts).pad(0.3), { maxZoom: 14 }); ajustou.current = true; }
+    if (pts.length && !ajustou.current) { if (ajustarSeguro(mapa, L.latLngBounds(pts).pad(0.3), { maxZoom: 14 })) ajustou.current = true; }
   }, [mapa, lista]);
 
   const s = dados?.stats;

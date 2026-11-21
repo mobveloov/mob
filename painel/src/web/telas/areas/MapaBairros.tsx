@@ -10,6 +10,7 @@ import { useCarregar } from "../../componentes/ui";
 import { Cabecalho, Janela, useAviso, Vazio } from "../cadastro/base";
 import { baixar, chamarAreas, usePeriodo } from "./comum";
 import { baseDoMapa } from "../../../comum/mapa-base.ts";
+import { ajustarSeguro, invalidarDepois } from "../../../comum/mapa-seguro.ts";
 
 type Situacao = "nunca" | "ativos" | "naoAtendidas" | "canceladas" | "concluidas";
 interface Bairro { bairro: string; cidade: string; lat: number | null; lng: number | null; corridas: number; passageiros: number; deserto: boolean; nunca: number; ativos: number; naoAtendidas: number; canceladas: number; concluidas: number }
@@ -58,13 +59,13 @@ function Mapa({ bairros, ativas, desertos, onEscolher, centralizar, cheio }: { b
       c.addTo(g);
       pontos.current.push([b.lat, b.lng]);
     }
-    if (pontos.current.length) m.fitBounds(L.latLngBounds(pontos.current), { padding: [30, 30], maxZoom: 14 });
+    if (pontos.current.length) ajustarSeguro(m, L.latLngBounds(pontos.current), { padding: [30, 30], maxZoom: 14 });
   }, [bairros, ativas, desertos]);
 
   useEffect(() => { // centralizar e tela cheia
     const m = mapa.current;
     if (!m) return;
-    setTimeout(() => { m.invalidateSize(); if (pontos.current.length) m.fitBounds(L.latLngBounds(pontos.current), { padding: [30, 30], maxZoom: 14 }); }, 60);
+    return invalidarDepois(m, 60, () => { if (pontos.current.length) ajustarSeguro(m, L.latLngBounds(pontos.current), { padding: [30, 30], maxZoom: 14 }); });
   }, [centralizar, cheio]);
 
   return <div ref={caixa} className="cg-mapa" />;

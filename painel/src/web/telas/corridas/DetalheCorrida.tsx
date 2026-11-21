@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, HelpCircle, Loader2 } from "lucide-react";
 import { Aviso, Janela, L, Selo, dh, msgErro, op, pino, soDig, useDados, useMapa, zap } from "./comum";
+import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 
 // ------------------------------------------------------------------ formatos
 
@@ -230,7 +231,7 @@ export function PaginaTrajeto({ id, onVoltar, semTitulo }: { id: string; onVolta
     for (const p of t.paradasDetectadas ?? []) {
       L.marker([p.lat, p.lng], { icon: pino("#64748b", "P", "ponto") }).bindPopup(`Parada de ${p.minutos} min (${horaSeg(p.desde)} a ${horaSeg(p.ate)})`).addTo(g);
     }
-    if (todos.length) mapa.fitBounds(L.latLngBounds(todos).pad(0.2), { maxZoom: 17 });
+    if (todos.length) ajustarSeguro(mapa, L.latLngBounds(todos).pad(0.2), { maxZoom: 17 });
   }, [mapa, t]);
 
   const e = t?.etapas;
