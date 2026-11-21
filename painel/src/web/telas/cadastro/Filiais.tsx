@@ -4,9 +4,14 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
+import { CampoEndereco } from "../../componentes/CampoEndereco";
+import { esquecerCentros } from "../../centro-mapa";
 import { Cabecalho, Campo, chamar, Interruptor, Janela, MenuAcoes, Selo, useAviso, Vazio } from "./base";
 
-interface Filial { id: string; nome: string; cidade: string; endereco: string; responsavel: string; telefone: string; ativa: boolean; motoristas: number; operadores: number }
+interface Filial {
+  id: string; nome: string; cidade: string; endereco: string; responsavel: string; telefone: string; ativa: boolean; motoristas: number; operadores: number;
+  uf: string; lat: number | null; lng: number | null; zoom: number | null; raioKm: number; areaIds: string[];
+}
 interface Detalhe { filial: Filial; motoristas: Array<{ id: string; nome: string; telefone: string; status: string }>; operadores: Array<{ id: string; nome: string; email: string; papel: string }>; equipeLivre: Array<{ id: string; nome: string; email: string; papel: string }> }
 
 const api = <T,>(metodo: "GET" | "POST" | "PUT" | "DELETE", caminho: string, corpo?: unknown) => chamar<T>(metodo, caminho, corpo, "/api/filiais");
@@ -52,17 +57,41 @@ export default function Filiais() {
 }
 
 function FormFilial({ f, onFechar, onSalvo }: { f: Filial | null; onFechar: () => void; onSalvo: () => void }) {
-  const [v, setV] = useState({ nome: f?.nome ?? "", cidade: f?.cidade ?? "", endereco: f?.endereco ?? "", responsavel: f?.responsavel ?? "", telefone: f?.telefone ?? "", ativa: f?.ativa ?? true });
+  const [v, setV] = useState({
+    nome: f?.nome ?? "", cidade: f?.cidade ?? "", uf: f?.uf ?? "", endereco: f?.endereco ?? "", responsavel: f?.responsavel ?? "", telefone: f?.telefone ?? "", ativa: f?.ativa ?? true,
+    lat: f?.lat == null ? "" : String(f.lat), lng: f?.lng == null ? "" : String(f.lng), zoom: f?.zoom == null ? "" : String(f.zoom), raioKm: f?.raioKm ? String(f.raioKm) : "", areaIds: f?.areaIds ?? [] as string[],
+  });
   const { aviso, tentar } = useAviso();
-  const salvar = async () => { if (await tentar(() => (f ? api("PUT", `/${f.id}`, v) : api("POST", "", v)))) { onSalvo(); onFechar(); } };
-  const set = (k: keyof typeof v, x: string | boolean) => setV({ ...v, [k]: x });
+  const areas = useCarregar(() => chamar<{ areas: Array<{ id: string; nome: string }> }>("GET", "/areas"), []);
+  const salvar = async () => {
+    const corpo = { ...v, lat: v.lat.trim(), lng: v.lng.trim(), zoom: v.zoom.trim(), raioKm: v.raioKm.trim() };
+    if (await tentar(() => (f ? api("PUT", `/${f.id}`, corpo) : api("POST", "", corpo)))) { esquecerCentros(); onSalvo(); onFechar(); }
+  };
+  const set = (k: keyof typeof v, x: string | boolean | string[]) => setV({ ...v, [k]: x });
   return (
     <Janela aberta titulo={f ? "Editar filial" : "Nova filial"} sub="Preencha os dados abaixo" onFechar={onFechar} largura="pequena" rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar</button></>}>
       {aviso}
       <div style={{ display: "grid", gap: 12 }}>
         <Campo rotulo="Nome *"><input value={v.nome} maxLength={80} onChange={(e) => set("nome", e.target.value)} /></Campo>
-        <Campo rotulo="Cidade"><input value={v.cidade} maxLength={80} onChange={(e) => set("cidade", e.target.value)} /></Campo>
-        <Campo rotulo="Endereço"><input value={v.endereco} maxLength={160} onChange={(e) => set("endereco", e.target.value)} /></Campo>
+        <div className="cg-duplo">
+          <Campo rotulo="Cidade"><input value={v.cidade} maxLength={80} onChange={(e) => set("cidade", e.target.value)} /></Campo>
+          <Campo rotulo="UF"><input value={v.uf} maxLength={2} placeholder="SP" onChange={(e) => set("uf", e.target.value.toUpperCase())} /></Campo>
+        </div>
+        <CampoEndereco rotulo="Endereço (escolha uma sugestão para marcar no mapa)" valor={{ texto: v.endereco }} onChange={(p) => setV({ ...v, endereco: p.texto.slice(0, 160), ...(p.lat != null && p.lng != null ? { lat: String(p.lat), lng: String(p.lng) } : {}) })} />
+        <div className="cg-duplo">
+          <Campo rotulo="Latitude" dica="Onde o mapa abre para esta filial."><input value={v.lat} inputMode="decimal" placeholder="-21.0128" onChange={(e) => set("lat", e.target.value)} /></Campo>
+          <Campo rotulo="Longitude"><input value={v.lng} inputMode="decimal" placeholder="-48.2217" onChange={(e) => set("lng", e.target.value)} /></Campo>
+        </div>
+        <div className="cg-duplo">
+          <Campo rotulo="Zoom do mapa" dica="3 a 19. Vazio: o sistema escolhe."><input value={v.zoom} inputMode="numeric" placeholder="13" onChange={(e) => set("zoom", e.target.value)} /></Campo>
+          <Campo rotulo="Raio de cobertura (km)" dica="Círculo em volta do ponto. Vazio: sem círculo."><input value={v.raioKm} inputMode="decimal" placeholder="5" onChange={(e) => set("raioKm", e.target.value)} /></Campo>
+        </div>
+        <Campo rotulo="Áreas desenhadas que a filial cobre" dica="De Gestão de áreas > Áreas. Sem escolha, vale a área que contém o ponto da filial.">
+          <div style={{ display: "grid", gap: 4 }}>
+            {(areas.dados?.areas ?? []).map((a) => <label key={a.id} style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={v.areaIds.includes(a.id)} onChange={(e) => set("areaIds", e.target.checked ? [...v.areaIds, a.id] : v.areaIds.filter((x) => x !== a.id))} />{a.nome}</label>)}
+            {areas.dados && !areas.dados.areas.length && <small>Nenhuma área desenhada ainda.</small>}
+          </div>
+        </Campo>
         <div className="cg-duplo">
           <Campo rotulo="Responsável"><input value={v.responsavel} maxLength={80} onChange={(e) => set("responsavel", e.target.value)} /></Campo>
           <Campo rotulo="Telefone"><input value={v.telefone} maxLength={20} onChange={(e) => set("telefone", e.target.value)} /></Campo>

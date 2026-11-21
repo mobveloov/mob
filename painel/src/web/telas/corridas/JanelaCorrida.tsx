@@ -181,7 +181,7 @@ function RaioX({ id, os, onFechar }: { id: string; os: string; onFechar: () => v
 
 function Rastreio({ id, onFechar, onLegenda }: { id: string; onFechar: () => void; onLegenda: () => void }) {
   const { dados: r, erro } = useDados<any>(() => op(`/corridas/${id}/rastreio`), [id], 5000);
-  const { ref, mapa } = useMapa([-15.78, -47.93], 13);
+  const { ref, mapa } = useMapa(undefined, 13, true, { areas: false });
   const [estimada, setEstimada] = useState(true);
   const [real, setReal] = useState(true);
   const camadas = useRef<L.LayerGroup | null>(null);

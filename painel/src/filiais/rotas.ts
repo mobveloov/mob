@@ -1,5 +1,6 @@
 // Rotas das filiais (montadas em /api/filiais, depois do login). A empresa vem SEMPRE do login (req.ctx).
 //   GET    /opcoes                         lista curta (id e nome) para filtros: qualquer cargo
+//   GET    /centro?filial=                 centro, zoom, limites e áreas de cobertura para os mapas (qualquer cargo; quem está preso a uma filial só recebe a dela)
 //   GET    /                               lista com totais (Gestor e acima)
 //   POST   /   PUT /:id   DELETE /:id      cadastro (Gestor e acima)
 //   GET    /:id                            filial com motoristas e operadores ligados
@@ -12,7 +13,8 @@ import express, { type Request, type Response } from "express";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { listarUsuarios } from "../servidor/dados.ts";
-import { atualizarFilial, criarFilial, desvincular, ErroFilial, filial, listarFiliais, pessoasDaFilial, removerFilial, vincular } from "./filiais.ts";
+import { centroDoMapa } from "./centro.ts";
+import { atualizarFilial, criarFilial, desvincular, ErroFilial, filial, filialForcada, listarFiliais, pessoasDaFilial, removerFilial, vincular } from "./filiais.ts";
 
 export const rotasFiliais = express.Router();
 const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request, res: Response) => {
@@ -23,6 +25,10 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
 const emp = (req: Request) => req.ctx!.empresaId;
 
 rotasFiliais.get("/opcoes", ok((req, res) => res.json({ filiais: listarFiliais(emp(req)).map((f) => ({ id: f.id, nome: f.nome, ativa: f.ativa })) })));
+rotasFiliais.get("/centro", ok((req, res) => {
+  const presa = filialForcada(emp(req), req.ctx!.usuario);
+  res.json(centroDoMapa(emp(req), presa ?? String(req.query.filial ?? "").slice(0, 80)));
+}));
 rotasFiliais.get("/", ok((req, res) => res.json({ filiais: listarFiliais(emp(req)) })));
 rotasFiliais.post("/", ok((req, res) => res.status(201).json({ filial: criarFilial(emp(req), req.body ?? {}, req.ctx!.usuario.email) })));
 

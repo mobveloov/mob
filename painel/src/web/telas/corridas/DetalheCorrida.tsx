@@ -197,7 +197,7 @@ const DEG = (n: number) => n.toFixed(5);
 
 export function PaginaTrajeto({ id, onVoltar, semTitulo }: { id: string; onVoltar: () => void; semTitulo?: boolean }) {
   const { dados: t, erro, carregando } = useDados<any>(() => op(`/corridas/${encodeURIComponent(id)}/trajeto`), [id], undefined);
-  const { ref, mapa } = useMapa([-15.78, -47.93], 13);
+  const { ref, mapa } = useMapa(undefined, 13, true, { areas: false });
   const grupo = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {

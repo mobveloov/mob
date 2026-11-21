@@ -7,6 +7,8 @@ import { useGestor, useRetorno } from "../crm/comum";
 import { crm2, dataHora, erroTexto, type Celula, type Cidade } from "./api";
 import { baseDoMapa } from "../../comum/mapa-base.ts";
 import { ajustarSeguro, invalidarDepois, mapaVivo } from "../../comum/mapa-seguro.ts";
+import { CENTRO_BRASIL } from "../../comum/mapa-centro.ts";
+import { abrirNaCidade } from "../centro-mapa";
 
 /** CRM › Análises › Mapa de Calor: embarques e desembarques por região (círculos coloridos pela intensidade). */
 export default function MapaCalor() {
@@ -34,8 +36,9 @@ export default function MapaCalor() {
   // O mapa só existe quando a caixa está na tela.
   useEffect(() => {
     if (!mostrar || !caixa.current || mapa.current) return;
-    const m = L.map(caixa.current, { zoomControl: false, attributionControl: false }).setView([-14.2, -51.9], 4);
+    const m = L.map(caixa.current, { zoomControl: false, attributionControl: false }).setView(CENTRO_BRASIL, 4);
     baseDoMapa(L, m);
+    abrirNaCidade(L, m); // antes dos pontos de calor, o mapa já abre na cidade da empresa
     L.control.zoom({ position: "bottomright" }).addTo(m);
     camada.current = L.layerGroup().addTo(m);
     mapa.current = m;

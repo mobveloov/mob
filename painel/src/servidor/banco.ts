@@ -132,6 +132,9 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS app_contato (
       empresa TEXT NOT NULL, papel TEXT NOT NULL, chave TEXT NOT NULL, em INTEGER NOT NULL,
       PRIMARY KEY (empresa, papel, chave));
+    CREATE TABLE IF NOT EXISTS motorista_ultima_posicao (
+      empresa TEXT NOT NULL, motorista TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, em INTEGER NOT NULL,
+      PRIMARY KEY (empresa, motorista));
     CREATE TABLE IF NOT EXISTS app_ofertas (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, empresa TEXT NOT NULL, motorista TEXT NOT NULL, resultado TEXT NOT NULL, em TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS app_ofertas_motorista ON app_ofertas (empresa, motorista, seq);
@@ -225,6 +228,9 @@ export function banco(): Banco {
     CREATE TABLE IF NOT EXISTS filiais_vinculos (
       empresa TEXT NOT NULL, tipo TEXT NOT NULL, chave TEXT NOT NULL, filial_id TEXT NOT NULL, PRIMARY KEY (empresa, tipo, chave));
     CREATE INDEX IF NOT EXISTS filiais_vinculos_filial ON filiais_vinculos (empresa, filial_id, tipo);
+    CREATE TABLE IF NOT EXISTS filiais_geo (
+      empresa TEXT NOT NULL, id TEXT NOT NULL, uf TEXT NOT NULL DEFAULT '', lat REAL, lng REAL, zoom INTEGER, raio_km REAL NOT NULL DEFAULT 0,
+      areas TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (empresa, id));
   `);
   aberto = { arquivo, db };
   db.exec("BEGIN");
