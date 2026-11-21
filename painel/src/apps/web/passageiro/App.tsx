@@ -18,7 +18,7 @@ import { Inicio } from "./Inicio";
 import { Opcoes } from "./Opcoes";
 import { ParaOnde, type ModoParaOnde } from "./ParaOnde";
 import { Avaliar, OpcoesDaCorrida } from "./PosCorrida";
-import { avisarNovoAviso } from "../comum/Avisos";
+import { avisarNovoAviso, PopupDeAvisos } from "../comum/Avisos";
 import "./passageiro.css";
 import "./passageiro-m.css";
 
@@ -38,7 +38,7 @@ export default function App() {
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
   if (!marca) return <Carregando />;
   if (!logado) return <Entrar marca={marca} aoEntrar={() => setLogado(true)} />;
-  return <><Logado marca={marca} sair={() => setLogado(false)} /><CartaoMeuSos /></>;
+  return <><Logado marca={marca} sair={() => setLogado(false)} /><CartaoMeuSos /><PopupDeAvisos /></>;
 }
 
 const avisoDaTaxa = (c: Corrida) => (c.status === "cancelada" && c.mensagemCancelamento ? c.mensagemCancelamento : c.status === "cancelada" && c.taxaCancelamento ? `Corrida cancelada. Foi cobrada uma taxa de cancelamento de ${reais(c.taxaCancelamento)}.` : "");

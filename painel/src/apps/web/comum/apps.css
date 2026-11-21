@@ -94,3 +94,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--cor); outli
 .faixa-banners { display: flex; gap: .6rem; overflow-x: auto; padding: .4rem 0; scroll-snap-type: x mandatory; }
 .faixa-banners > * { flex: 0 0 100%; scroll-snap-align: center; }
 .faixa-banners img { width: 100%; max-height: 140px; object-fit: cover; border-radius: 12px; display: block; }
+
+/* Pop-up de aviso no meio da tela (central, CRM): fila, imagem e botões opcionais */
+.popup-aviso-fundo { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.55); display: grid; place-items: center; padding: 1.2rem; }
+.popup-aviso { width: min(100%, 380px); max-height: 85vh; overflow-y: auto; background: var(--cartao, #fff); color: var(--texto, #111); border-radius: 24px; padding: 1.4rem 1.2rem 1.2rem; display: flex; flex-direction: column; gap: .8rem; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+.popup-aviso h2 { margin: 0; font-size: 1.3rem; line-height: 1.25; overflow-wrap: anywhere; }
+.popup-aviso p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+.popup-aviso-imagem { width: 100%; border-radius: 16px; object-fit: cover; max-height: 200px; }
+.popup-aviso-acao, .popup-aviso-fechar { display: block; min-height: 52px; line-height: 52px; border-radius: 14px; font-weight: 800; text-decoration: none; cursor: pointer; font-size: 1rem; }
+.popup-aviso-acao { background: var(--cor, #111); color: var(--cor-texto, #fff); border: 0; }
+.popup-aviso-fechar { background: transparent; color: inherit; border: 1.5px solid color-mix(in srgb, currentColor 35%, transparent); padding: 0; }
+.popup-aviso-fila { opacity: .65; }

@@ -74,3 +74,54 @@ export function ListaDeAvisos({ classeCartao, vazio }: { classeCartao: string; v
     </div>
   );
 }
+
+// ------------------------------------------------------------------ POP-UP NO MEIO DA TELA (igual ao da Machine)
+
+interface AvisoPopup extends AvisoApp { imagem?: string; botoes?: Array<{ rotulo: string; link: string }> }
+
+/**
+ * Avisos da central/CRM abrem como janela no meio da tela assim que chegam com o app aberto (e os não lidos, ao abrir o app), um de cada vez, em fila.
+ * Fechar marca como lido no servidor (o sino atualiza). Os avisos continuam guardados na caixa do sino. Imagem e botões de ação aparecem
+ * quando o aviso os trouxer (`imagem`, `botoes`).
+ */
+export function PopupDeAvisos() {
+  const [fila, setFila] = useState<AvisoPopup[]>([]);
+  const [vistos] = useState(() => new Set<string>());
+  const enfileirar = useCallback((lista: AvisoPopup[]) => {
+    const novos = lista.filter((a) => a.id && a.estado !== "lida" && !vistos.has(a.id));
+    if (!novos.length) return;
+    novos.forEach((a) => vistos.add(a.id));
+    setFila((f) => [...f, ...novos.sort((a, b) => a.em - b.em)]);
+  }, [vistos]);
+  useEffect(() => {
+    // Ao abrir o app: os não lidos entram na fila.
+    void api<{ avisos: AvisoPopup[] }>("/avisos").then((r) => enfileirar(r.avisos)).catch(() => undefined);
+    // Em tempo real: o aviso que acabou de chegar.
+    const chegou = (e: Event) => {
+      const d = (e as CustomEvent).detail as Partial<AvisoPopup> | undefined;
+      if (d?.id && d.titulo) enfileirar([{ estado: "enviada", em: Date.now(), texto: "", ...d } as AvisoPopup]);
+    };
+    window.addEventListener(eventoAviso, chegou);
+    return () => window.removeEventListener(eventoAviso, chegou);
+  }, [enfileirar]);
+
+  const atual = fila[0];
+  if (!atual) return null;
+  const fechar = () => {
+    void api("/avisos/lidos", { corpo: { ids: [atual.id] } }).catch(() => undefined); // confirma a leitura ao servidor
+    window.dispatchEvent(new Event(eventoLido));
+    setFila((f) => f.slice(1));
+  };
+  return (
+    <div className="popup-aviso-fundo" role="dialog" aria-modal="true" aria-label={atual.titulo}>
+      <div className="popup-aviso">
+        {atual.imagem && <img src={atual.imagem} alt="" className="popup-aviso-imagem" />}
+        <h2>{atual.titulo}</h2>
+        <p>{atual.texto}</p>
+        {(atual.botoes ?? []).map((b) => <a key={b.rotulo} className="popup-aviso-acao" href={b.link} target="_blank" rel="noreferrer" onClick={fechar}>{b.rotulo}</a>)}
+        <button type="button" className="popup-aviso-fechar" onClick={fechar}>Fechar</button>
+        {fila.length > 1 && <small className="popup-aviso-fila">{fila.length - 1} {fila.length - 1 === 1 ? "aviso a seguir" : "avisos a seguir"}</small>}
+      </div>
+    </div>
+  );
+}

@@ -311,7 +311,7 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
     const p = await Push.requestPermissions();
     if (p.receive !== "granted") return;
     for (const [id, nome] of [["corridas", "Corridas"], ["chegada", "Motorista no local"], ["chat", "Mensagens"], ["geral", "Avisos"]]) {
-      await Push.createChannel({ id, name: nome, importance: id === "corridas" || id === "chegada" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: "chamada" } : id === "chegada" ? { sound: "buzina" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
+      await Push.createChannel({ id, name: nome, importance: id === "corridas" || id === "chegada" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: config().papel === "passageiro" ? "aceite" : "chamada" } : id === "chegada" ? { sound: "buzina" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
     }
     await Push.addListener("registration", (t: { value: string }) => { void api("/push", { corpo: { token: t.value } }).catch(() => undefined); });
     await Push.addListener("pushNotificationActionPerformed", (a: { notification?: { data?: Record<string, string> } }) => aoTocar(a.notification?.data ?? {}));
@@ -390,7 +390,7 @@ export const vibrar = (ms: number | number[]) => { try { navigator.vibrate?.(ms)
 /** Toque curto (chamada de corrida), sem arquivo de som. */
 export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado" | "buzina" | "iniciada" | "finalizada";
 /** Toques da chamada do motorista (3 à escolha em Ajustes). */
-export type Toque = "pulso" | "campanario" | "radar";
+export type Toque = "xperia" | "pulso" | "campanario" | "radar";
 const ARQUIVOS: Record<Som, string> = {
   chamada: new URL("./sons/chamada.wav", import.meta.url).href,
   mensagem: new URL("./sons/mensagem.wav", import.meta.url).href,
@@ -402,6 +402,7 @@ const ARQUIVOS: Record<Som, string> = {
   finalizada: new URL("./sons/finalizada.wav", import.meta.url).href,
 };
 const TOQUES: Record<Toque, string> = {
+  xperia: new URL("./sons/toque_xperia.mp3", import.meta.url).href, // toque escolhido pelo dono: padrão da chamada do motorista
   pulso: new URL("./sons/toque_pulso.wav", import.meta.url).href,
   campanario: new URL("./sons/toque_campanario.wav", import.meta.url).href,
   radar: new URL("./sons/toque_radar.wav", import.meta.url).href,
@@ -410,21 +411,72 @@ const TOQUES: Record<Toque, string> = {
 export function tocarToque(toque: Toque, laco: boolean) {
   pararSons();
   const minha = geracaoDeSom;
-  try {
-    const a = new Audio(TOQUES[toque] ?? TOQUES.pulso);
-    a.loop = laco; a.volume = 1;
-    tocando.add(a);
-    a.onended = () => tocando.delete(a);
-    void a.play().catch(() => { if (minha === geracaoDeSom) bipe(); });
-  } catch { bipe(); }
+  const url = TOQUES[toque] ?? TOQUES.xperia;
+  const comAudio = () => {
+    try {
+      const a = new Audio(url);
+      a.loop = laco; a.volume = 1;
+      tocando.add(a);
+      a.onended = () => tocando.delete(a);
+      void a.play().catch(() => { if (minha === geracaoDeSom) bipe(); });
+    } catch { bipe(); }
+  };
+  // Primeiro pelo contexto de áudio já liberado (toca em laço mesmo com o app em segundo plano e sem toque novo na tela); senão <audio>.
+  void (async () => {
+    try {
+      const c = ctxAudio();
+      if (c.state !== "running") await c.resume().catch(() => undefined);
+      if (c.state === "running") {
+        const src = c.createBufferSource(); src.buffer = await bufferDe(url); src.loop = laco; src.connect(c.destination);
+        if (minha !== geracaoDeSom) return; // já mandaram parar
+        src.start(); emContexto.add(src); src.onended = () => emContexto.delete(src);
+        return;
+      }
+    } catch { /* cai para o <audio> */ }
+    if (minha === geracaoDeSom) comAudio();
+  })();
 }
 /** Toca um dos sons do app (arquivos em comum/sons, gerados por scripts/gerar-sons.mjs). `vezes` repete o som; sem `som`, escolhe pelo número de repetições. */
+// ÁUDIO DESBLOQUEADO: o WebView do Android não toca som sem um toque do usuário. Ao primeiro toque na tela o contexto de áudio é liberado e os sons
+// já ficam decodificados; depois disso o aceite, "chegou" e os outros marcos tocam sozinhos, mesmo sem ninguém mexer no app.
+let contextoDeAudio: AudioContext | null = null;
+const bufferes = new Map<string, AudioBuffer>();
+const ctxAudio = () => (contextoDeAudio ??= new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)());
+async function bufferDe(url: string) {
+  let b = bufferes.get(url);
+  if (!b) { const ab = await (await fetch(url)).arrayBuffer(); b = await ctxAudio().decodeAudioData(ab); bufferes.set(url, b); }
+  return b;
+}
+async function tocarNoContexto(url: string): Promise<AudioBufferSourceNode | null> {
+  try {
+    const c = ctxAudio();
+    if (c.state !== "running") await c.resume().catch(() => undefined);
+    if (c.state !== "running") return null;
+    const src = c.createBufferSource(); src.buffer = await bufferDe(url); src.connect(c.destination); src.start();
+    return src;
+  } catch { return null; }
+}
+if (typeof window !== "undefined") {
+  const liberar = () => {
+    try { void ctxAudio().resume().then(() => { for (const u of [...Object.values(ARQUIVOS), ...Object.values(TOQUES)]) void bufferDe(u).catch(() => undefined); }); } catch { /* sem áudio */ }
+  };
+  for (const ev of ["pointerdown", "touchstart", "keydown"]) window.addEventListener(ev, liberar, { passive: true });
+}
+const emContexto = new Set<AudioBufferSourceNode>();
+
 export function tocarAlerta(vezes = 3, som?: Som) {
   const qual: Som = som ?? (vezes <= 1 ? "mensagem" : vezes === 2 ? "cancelado" : "chamada");
   let n = 0;
   const minha = ++geracaoDeSom;
   const uma = () => {
     if (minha !== geracaoDeSom) return; // alguém mandou parar
+    // 1º: contexto de áudio já liberado (toca mesmo sem gesto novo); 2º: <audio>; 3º: bipe.
+    void tocarNoContexto(ARQUIVOS[qual]).then((src) => {
+      if (src) { emContexto.add(src); src.onended = () => { emContexto.delete(src); if (++n < Math.min(vezes, 3)) setTimeout(uma, 250); }; return; }
+      tocarComAudio();
+    });
+  };
+  const tocarComAudio = () => {
     try {
       const a = new Audio(ARQUIVOS[qual]);
       a.volume = 1;
@@ -440,6 +492,8 @@ let geracaoDeSom = 0;
 /** Para na hora o toque da chamada (aceitou, recusou, venceu ou outro motorista pegou a corrida) e a vibração. */
 export function pararSons() {
   geracaoDeSom++;
+  for (const s of emContexto) { try { s.stop(); } catch { /* já parou */ } }
+  emContexto.clear();
   void permissoesNativas.cancelarOferta(); // some a notificação de chamada em tela cheia
   for (const a of tocando) { try { a.pause(); a.currentTime = 0; } catch { /* já parou */ } }
   tocando.clear();

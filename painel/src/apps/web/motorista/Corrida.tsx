@@ -14,7 +14,7 @@ import { Mapa, type PontoMapa } from "./Mapa";
 import { textoMetros, useNavegacao } from "./Navegacao";
 import { enviarSos } from "../comum/sos";
 import { definirRetencao, iniciarGravacao, pararGravacao, type ConfigGravacao } from "./gravador";
-import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, semRota } from "./Pecas";
+import { Avatar, Deslizar, Dialogo, Erro, Folha, Info, Pagina, Topo, VisualizadorDeFoto, semRota } from "./Pecas";
 import { distanciaKm, distanciaTexto, soHora, temPosicao, valorDe, type Corrida, type Ponto } from "./tipos";
 import { decimal } from "../../../comum/formato-br.ts";
 
@@ -48,7 +48,8 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [parada, setParada] = useState(() => lerParada(c.id));
-  const [folha, setFolha] = useState<"" | "rota" | "editar" | "perfil" | "finalizar" | "cancelar" | "sos" | "problema">("");
+  const [foto, setFoto] = useState(false); // visualizador da foto do passageiro em tela cheia
+  const [folha, setFolha] = useState<"" | "rota" | "editar" | "perfil" | "opcoes" | "finalizar" | "cancelar" | "sos" | "problema">("");
   // Folha de baixo com 3 alturas: 0 recolhida (só o passageiro e o botão de deslizar), 1 meio, 2 aberta. Lembra a última.
   const [nivel, setNivel] = useState<0 | 1 | 2>(() => { try { const n = Number(localStorage.getItem("folha-corrida-nivel")); return n === 0 || n === 1 || n === 2 ? n : 1; } catch { return 1; } });
   const mudarNivel = (n: number) => { const v = Math.max(0, Math.min(2, n)) as 0 | 1 | 2; setNivel(v); try { localStorage.setItem("folha-corrida-nivel", String(v)); } catch { /* sem armazenamento */ } };
@@ -189,10 +190,10 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
           onPointerUp={(e) => { const d = arraste.current == null ? 0 : e.clientY - arraste.current; arraste.current = null; if (d < -30) mudarNivel(nivel + 1); else if (d > 30) mudarNivel(nivel - 1); else mudarNivel(nivel === 2 ? 0 : nivel + 1); }}
           onPointerCancel={() => { arraste.current = null; }}><span className="puxador" /></button>
         <div className="passageiro">
-          <Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={58} selo={c.passageiro.nota != null ? <span className="avatar-nota"><Star size={10} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span> : undefined} />
+          <button type="button" className="avatar-botao" aria-label="Ver a foto do passageiro" onClick={() => setFoto(true)}><Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={56} /></button>
           <div className="passageiro-nome">
             <strong>{c.passageiro.nome}</strong>
-            {c.passageiro.corridas != null && <small>{c.passageiro.corridas} corridas</small>}
+            <small className="passageiro-meta">{c.passageiro.nota != null && <span className="nota-inline"><Star size={12} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span>}{c.passageiro.corridas != null && <span>{c.passageiro.corridas} corridas</span>}</small>
             <button type="button" className="chip marca" onClick={() => setFolha("perfil")}>VER PERFIL <ChevronRight size={12} /></button>
           </div>
           <button type="button" className="redondo" aria-label="Chat com o passageiro" onClick={abrirChat}><MessageCircle size={20} />{naoLidas > 0 && <span className="bolha">{naoLidas}</span>}</button>
@@ -244,7 +245,10 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
         {marca.suporte.telefone && <p className="dica centro">Central: <a href={`tel:${marca.suporte.telefone.replace(/\D/g, "")}`}>{marca.suporte.telefone}</a></p>}
       </div>
 
-      <div className="deslizar-fixo"><Deslizar texto={etapa.texto} aoConcluir={etapa.f} ocupado={ocupado} cor={etapa.texto === "Finalizar" ? "verde" : undefined} /></div>
+      <div className="deslizar-fixo">
+        <Deslizar texto={etapa.texto} aoConcluir={etapa.f} ocupado={ocupado} cor={etapa.texto === "Finalizar" ? "verde" : undefined} />
+        <button type="button" className="mais-opcoes" aria-label="Mais opções: cancelar, avisar problema, SOS" onClick={() => setFolha("opcoes")}>⋯</button>
+      </div>
       {emViagem && parada > 0 && <button type="button" className="voltar-parada" onClick={() => { const n = parada - 1; setParada(n); gravarParada(c.id, n); }}>Voltar uma parada</button>}
 
       {folha === "rota" && (
@@ -258,10 +262,19 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
         </Folha>
       )}
       {folha === "editar" && <EditarRota corrida={c} fechar={() => setFolha("")} mudou={mudou} />}
+      {foto && <VisualizadorDeFoto foto={c.passageiro.foto} nome={c.passageiro.nome} detalhe={[c.passageiro.nota != null ? `★ ${decimal(c.passageiro.nota, 1)}` : "", c.passageiro.corridas != null ? `${c.passageiro.corridas} corridas` : ""].filter(Boolean).join(" · ")} fechar={() => setFoto(false)} />}
+      {folha === "opcoes" && (
+        <Folha titulo="Opções da corrida" fechar={() => setFolha("")}>
+          <button type="button" className="opcao-folha perigo" onClick={() => setFolha("cancelar")}><span><Ban size={18} /> {c.status === "a_caminho" ? "Desistir da corrida" : "Cancelar corrida"}</span></button>
+          <button type="button" className="opcao-folha" onClick={() => setFolha("problema")}><span><CircleAlert size={18} /> Avisar um problema</span></button>
+          <button type="button" className="opcao-folha" onClick={() => { setFolha(""); void compartilhar(); }}><span><Share2 size={18} /> Compartilhar a corrida</span></button>
+          <button type="button" className="opcao-folha perigo" onClick={() => setFolha("sos")}><span><ShieldAlert size={18} /> SOS (pedir ajuda)</span></button>
+        </Folha>
+      )}
       {folha === "perfil" && (
         <Folha titulo="Passageiro" fechar={() => setFolha("")}>
           <div className="perfil-centro">
-            <Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={88} />
+            <button type="button" className="avatar-botao" aria-label="Ampliar a foto" onClick={() => setFoto(true)}><Avatar foto={c.passageiro.foto} nome={c.passageiro.nome} tamanho={120} /></button>
             <strong>{c.passageiro.nome}</strong>
             <div className="chips centro">
               {c.passageiro.nota != null && <span className="chip ok"><Star size={13} fill="currentColor" /> {decimal(c.passageiro.nota, 1)}</span>}
