@@ -2,7 +2,7 @@
 // Também a lista de corridas agendadas.
 
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, FileText, ShieldCheck, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
+import { Trophy, ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, FileText, ShieldCheck, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
 import { api, reais, telefoneBonito } from "../comum/api";
 import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { ListaDeAvisos, useNaoLidos } from "../comum/Avisos";
@@ -12,7 +12,7 @@ import { useConfigDoPainel } from "../comum/ui";
 import { Avatar, Campo, TextoDoPainel } from "./pecas";
 import { NOMES_TEMA_APP, useTemaApp, type TemaApp } from "../comum/tema";
 
-type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "avisos" | "ajuda";
+type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "desafios" | "avisos" | "ajuda";
 
 function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => void; children: ReactNode }) {
   return (
@@ -24,11 +24,13 @@ function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => vo
   );
 }
 
+import { ListaDeDesafios, useDesafiosAtivos } from "../comum/Desafios";
 export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: MarcaApp; sair: () => void; irPara: (a: "historico" | "carteira" | "agendadas") => void; mudouEu?: () => void }) {
   const [tela, setTela] = useState<Tela>("");
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [saldo, setSaldo] = useState<number | null>(null);
   const [texto, setTexto] = useState<"passageiro" | "privacidade" | null>(null);
+  const desafiosAtivos = useDesafiosAtivos();
   const temAjuda = !!(marca.suporte.email || marca.suporte.telefone);
   const carregar = () => {
     void api<Perfil>("/perfil").then(setPerfil).catch(() => undefined);
@@ -43,6 +45,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
   if (tela === "cartoes") return <Voltar titulo="Meus Cartões" voltar={voltar}><Cartoes /></Voltar>;
   if (tela === "favoritos") return <Voltar titulo="Motoristas favoritos e bloqueados" voltar={voltar}><Favoritos /></Voltar>;
   if (tela === "carteira") return <Voltar titulo="Carteira" voltar={voltar}><Carteira /></Voltar>;
+  if (tela === "desafios") return <Voltar titulo="Desafios" voltar={voltar}><ListaDeDesafios classeCartao="cartao" /></Voltar>;
   if (tela === "indique" && perfil) return <Voltar titulo="Indique e ganhe" voltar={voltar}><Indique perfil={perfil} marca={marca} mudou={setPerfil} /></Voltar>;
   if (tela === "avisos") return <Voltar titulo="Notificações" voltar={voltar}><Avisos /></Voltar>;
   if (tela === "ajuda") return <Voltar titulo="Ajuda" voltar={voltar}><Ajuda marca={marca} /></Voltar>;
@@ -64,6 +67,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
       <h3 className="conta-secao">FINANCEIRO</h3>
       <div className="conta-grupo">
         <ItemConta icone={<CreditCard size={22} />} cor="azul" titulo="Meus Cartões" sub="Gerencie seus cartões" ir={() => setTela("cartoes")} />
+        <ItemConta icone={<Trophy size={22} />} cor="amarelo" titulo="Desafios" sub={desafiosAtivos ? `${desafiosAtivos} em andamento` : "Metas com prêmio"} ir={() => setTela("desafios")} />
         <ItemConta icone={<Megaphone size={22} />} cor="laranja" titulo="Indique e Ganhe" sub="Convide amigos e ganhe bônus" ir={() => setTela("indique")} />
         <ItemConta icone={<Tag size={22} />} cor="roxo" titulo="Meus Cupons" sub="Descontos exclusivos para você" ir={() => setTela("cupons")} />
       </div>

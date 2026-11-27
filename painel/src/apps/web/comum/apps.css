@@ -105,3 +105,19 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--cor); outli
 .popup-aviso-acao { background: var(--cor, #111); color: var(--cor-texto, #fff); border: 0; }
 .popup-aviso-fechar { background: transparent; color: inherit; border: 1.5px solid color-mix(in srgb, currentColor 35%, transparent); padding: 0; }
 .popup-aviso-fila { opacity: .65; }
+
+/* Desafios (motorista e passageiro): abas, cartões, progresso */
+.abas-desafios { display: flex; gap: .4rem; margin-bottom: .8rem; overflow-x: auto; }
+.abas-desafios button { flex: 1; min-height: 48px; padding: 0 .9rem; border-radius: 999px; border: 1.5px solid color-mix(in srgb, currentColor 22%, transparent); background: transparent; color: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
+.abas-desafios button.ativa { background: var(--cor, #111); color: var(--cor-texto, #fff); border-color: var(--cor, #111); }
+.selo-aba { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: rgba(0,0,0,.18); font-size: .78rem; display: inline-grid; place-items: center; }
+.cartao-desafio { display: flex; flex-direction: column; gap: .5rem; margin-bottom: .7rem; overflow-wrap: anywhere; }
+.cartao-desafio.expirado { opacity: .7; }
+.desafio-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: .6rem; }
+.desafio-topo strong { font-size: 1.05rem; line-height: 1.25; }
+.desafio-regras { margin: 0; line-height: 1.4; }
+.desafio-meta, .desafio-progresso { margin: 0; }
+.vazio-desafios { display: flex; flex-direction: column; align-items: center; gap: .6rem; text-align: center; padding: 2rem 1rem; opacity: .75; }
+.cartao-desafio .barra { height: 10px; border-radius: 6px; background: color-mix(in srgb, currentColor 14%, transparent); overflow: hidden; }
+.cartao-desafio .barra span { display: block; height: 100%; background: var(--cor, #16a34a); border-radius: 6px; }
+.abas-desafios { overflow-x: visible; } .abas-desafios button { flex: 1 1 0; min-width: 0; padding: 0 .35rem; font-size: .9rem; }

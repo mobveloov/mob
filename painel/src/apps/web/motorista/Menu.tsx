@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import {
   Bell, BadgeCheck, Banknote, Calendar, Car, ChevronDown, ChevronRight, ClipboardList, FileText, Gauge, GitFork, Gift, Hand, Headphones, Headset, Info, LifeBuoy, LocateFixed, LogOut, Lock,
   MapPin, MessageCircle, MessageSquare, Navigation, Pencil, Phone, Play, Plus, Radar, RefreshCw, ScanFace, Settings, ShieldCheck, SlidersHorizontal, Trash2, User, UserRound, Wallet, X,
-  BatteryCharging, Globe, Layers, Map as IconeMapa, Music, Smartphone, SquareDashed, Volume2, Vibrate, Timer, Mic, Radio, Bolt, Wifi,
+  BatteryCharging, Trophy, Globe, Layers, Map as IconeMapa, Music, Smartphone, SquareDashed, Volume2, Vibrate, Timer, Mic, Radio, Bolt, Wifi,
 } from "lucide-react";
+import { useDesafiosAtivos } from "../comum/Desafios";
 import { api, flutuante, hora, reais, telefoneBonito, tempoReal, type Posicao } from "../comum/api";
 import { Banners, mensagemDeErro, useConfigDoPainel, type MarcaApp } from "../comum/ui";
 import { FormDados, FormDocumentos, FormEndereco, FormFoto, FormVeiculo, type DadosCadastro } from "./Cadastro";
@@ -457,6 +458,7 @@ export function FaleConosco({ voltar, marca }: Voltar & { marca: MarcaApp }) {
 // ------------------------------------------------------------------ menu lateral
 
 export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: MarcaApp; fechar: () => void; ir: (t: string) => void; sair: () => void }) {
+  const desafiosAtivos = useDesafiosAtivos();
   const c = useContatos(marca.suporte);
   const macanetaLigada = useConfigDoPainel()?.macaneta.ativo ?? true;
   const [confirmar, setConfirmar] = useState(false);
@@ -476,6 +478,7 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
         <div className="menu-titulo">Operação</div>
         {macanetaLigada && item(Hand, "Abrir corrida (Maçaneta)", "macaneta", "Iniciar viagem direta na rua")}
         {item(Wallet, "Histórico de ganhos", "historico", "Resumo financeiro e corridas")}
+        {item(Trophy, "Desafios", "desafios-lista", "Metas com prêmio na carteira", desafiosAtivos ? String(desafiosAtivos) : undefined)}
         {item(Gift, "Indique e ganhe", "desafios", undefined, "Bônus")}
         {item(Wallet, "Passe Livre", "passelivre", "Sem taxa da central por um período")}
         <div className="menu-sep" />

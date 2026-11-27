@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BellOff, Check, Gift, Share2, SlidersHorizontal, Wallet } from "lucide-react";
 import { api, reais } from "../comum/api";
+import { ListaDeDesafios } from "../comum/Desafios";
 import { mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { ListaDeAvisos } from "../comum/Avisos";
 import { Erro, Info, Pagina, Topo, useBuscar, Vazio } from "./Pecas";
@@ -173,19 +174,7 @@ export function Desafios({ voltar, marca }: { voltar: () => void; marca: MarcaAp
           <button type="button" className="botao-m" onClick={() => void compartilhar()}><Share2 size={18} /> Compartilhar código</button>
           <Info texto={aviso} tipo="ok" />
         </div>
-        {!d.desafios.length && <p className="dica" style={{ textAlign: "center" }}>Nenhum desafio agora. Volte mais tarde.</p>}
-        {d.desafios.map((x, i) => {
-          const pct = x.meta > 0 ? Math.min(100, Math.round((x.feito / x.meta) * 100)) : 0;
-          return (
-            <div key={x.id ?? i} className="cartao-m">
-              <div style={{ display: "flex", justifyContent: "space-between", gap: ".5rem", alignItems: "center" }}><strong>{x.nome}</strong>{x.ganho && <span className="chip ok">Prêmio ganho</span>}</div>
-              <p className="dica" style={{ margin: 0 }}>{x.tipo}{x.fim ? ` · até ${dataCurta(x.fim)}` : ""}</p>
-              <div className="barra" role="progressbar" aria-valuemin={0} aria-valuemax={x.meta} aria-valuenow={Math.min(x.feito, x.meta)}><span style={{ width: `${pct}%` }} /></div>
-              <p style={{ margin: 0 }}><strong>{Math.min(x.feito, x.meta)} de {x.meta}</strong>{x.premio ? ` · prêmio ${reais(x.premio)}` : ""}</p>
-              {x.regras && <p className="dica" style={{ margin: 0 }}>{x.regras}</p>}
-            </div>
-          );
-        })}
+        <ListaDeDesafios classeCartao="cartao-m" />
       </div>
     </Pagina>
   );

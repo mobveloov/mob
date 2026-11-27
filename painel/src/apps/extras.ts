@@ -477,14 +477,23 @@ export function documentosDosMotoristas(empresaId: string) {
 
 // ====================================================================== desafios e indicações
 
-export interface Progresso { id: string; nome: string; tipo: string; meta: number; feito: number; premio: number | null; fim: string | null; regras: string; ganho: boolean }
+/** Situação do desafio para a pessoa: ativo (em andamento), em_analise (meta batida, esperando a central aprovar o prêmio), concluido (prêmio pago) ou expirado (passou o prazo sem bater a meta). */
+export type SituacaoDesafio = "ativo" | "em_analise" | "concluido" | "expirado";
+export interface Progresso { id: string; nome: string; tipo: string; meta: number; feito: number; premio: number | null; fim: string | null; regras: string; ganho: boolean; situacao: SituacaoDesafio; inicio: string | null; premioDescricao: string; aprovacao: string; categorias: string[] }
 
-/** Desafios ativos para esta pessoa, com o progresso. Meta atingida: o prêmio entra na carteira (uma vez). */
+/** Desafios desta pessoa (ativos, em análise, concluídos e expirados), com o progresso. Meta atingida: o prêmio entra na carteira (uma vez). */
 export function desafios(empresaId: string, papel: PapelApp, chave: string): Progresso[] {
   const hoje = hojeIso();
   const p = pessoa(empresaId, papel, chave);
   const corridas = listarProprias(empresaId);
-  const lista = listar(empresaId, cadastroPorId("desafios")!).filter((d) => d.ativo === true && d.cancelado !== true && String(d.inicio ?? "") <= hoje && (!d.fim || String(d.fim) >= hoje));
+  // O desafio por categoria só aparece para o motorista que atende alguma delas.
+  const minhasCategorias = papel === "motorista"
+    ? String(listar(empresaId, cadastroPorId("motoristas")!).find((m) => m.id === chave)?.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean) : [];
+  const lista = listar(empresaId, cadastroPorId("desafios")!).filter((d) => {
+    if (d.ativo !== true || d.cancelado === true || String(d.inicio ?? "") > hoje) return false;
+    const cats = String(d.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
+    return papel !== "motorista" || !cats.length || !minhasCategorias.length || cats.some((c) => minhasCategorias.includes(c));
+  });
   const out: Progresso[] = [];
   for (const d of lista) {
     const tipo = String(d.tipo ?? "");
@@ -510,7 +519,14 @@ export function desafios(empresaId: string, papel: PapelApp, chave: string): Pro
       salvarPessoa(empresaId, papel, chave, p);
       ganho = true;
     }
-    out.push({ id: d.id, nome: String(d.nome), tipo, meta, feito, premio, fim: d.fim ? String(d.fim) : null, regras: String(d.regras ?? ""), ganho });
+    const venceu = !!d.fim && String(d.fim) < hoje;
+    const bateu = meta > 0 && feito >= meta;
+    const situacao: SituacaoDesafio = ganho ? "concluido" : bateu && (d.aprovacao === "Manual" || !premio) ? (premio ? "em_analise" : "concluido") : venceu ? "expirado" : "ativo";
+    out.push({
+      id: d.id, nome: String(d.nome), tipo, meta, feito, premio, fim: d.fim ? String(d.fim) : null, regras: String(d.regras ?? ""), ganho, situacao,
+      inicio: d.inicio ? String(d.inicio) : null, premioDescricao: String(d.premioDescricao ?? ""), aprovacao: String(d.aprovacao ?? "Automático"),
+      categorias: String(d.categorias ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+    });
   }
   return out;
 }

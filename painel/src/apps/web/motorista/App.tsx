@@ -11,13 +11,14 @@ import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca,
 import { Cadastro } from "./Cadastro";
 import { avisarNovoAviso, PopupDeAvisos, useNaoLidos } from "../comum/Avisos";
 import { PermissoesPasso } from "./Permissoes";
+import { ListaDeDesafios } from "../comum/Desafios";
 import { ChatCorrida } from "./Conversa";
 import { Chamada } from "./Chamada";
 import { DepoisDaCorrida, EmCorrida } from "./Corrida";
 import { Entrar } from "./Entrar";
 import { Mapa } from "./Mapa";
 import { AlterarSenha, Configuracoes, Corridas, Diagnostico, FaleConosco, Macaneta, MenuLateral, MeuCadastro, MeusVeiculos, Suporte } from "./Menu";
-import { AvisoDoMotorista, BarraBaixo, Dialogo } from "./Pecas";
+import { AvisoDoMotorista, BarraBaixo, Dialogo, Pagina, Topo } from "./Pecas";
 import { LogoMarca } from "./Marca";
 import { Desafios, Notificacoes, PasseLivre, Preferencias } from "./Telas";
 import { Atividades, CarteiraDoMotorista, HistoricoDeGanhos, TaxaDeAceitacao } from "./Atividades";
@@ -215,6 +216,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     carteira: <CarteiraDoMotorista voltar={() => setTela("atividades")} />,
     preferencias: <Preferencias voltar={voltar} />,
     desafios: <Desafios voltar={voltar} marca={marca} />,
+    "desafios-lista": <Pagina><Topo estilo="esquerda" titulo="Desafios" voltar={voltar} /><div className="conteudo"><ListaDeDesafios classeCartao="cartao-m" /></div></Pagina>,
     notificacoes: <Notificacoes voltar={voltar} />,
     passelivre: <PasseLivre voltar={voltar} />,
   };
