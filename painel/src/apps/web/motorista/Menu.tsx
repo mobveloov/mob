@@ -48,13 +48,14 @@ export function Corridas({ barra, aoPegar, aoMudar }: { barra: React.ReactNode; 
         ) : (
           <div className="conteudo">
             {l.map((c) => (
-              <button key={c.id} type="button" className="cartao-m" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => aba === "pendentes" ? undefined : setAberta(c)}>
+              <button key={c.id} type="button" className="cartao-m" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => aba === "pendentes" && !c.emPendencia ? undefined : setAberta(c)}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: ".5rem" }}><strong>{c.categoria}</strong><strong className="cor-ok">{reais(c.valorLiquido ?? c.valorBruto ?? c.estimativa?.valor ?? null)}</strong></div>
                 <div className="rota-mini"><span className="bolinha embarque" /><span>{c.embarque.texto}</span></div>
                 {c.destino && <div className="rota-mini"><span className="bolinha destino" /><span>{c.destino.texto}</span></div>}
                 <div className="chips">
                   {c.distanciaKm != null && <span className="chip">{c.distanciaKm} km de você</span>}
                   {c.agendadaPara && <span className="chip aviso">{diaHora(c.agendadaPara)}</span>}
+                  {c.emPendencia && <span className="chip aviso">Pendência · sem motorista{c.esperaMinutos != null ? ` há ${Math.max(1, c.esperaMinutos)} min` : ""}{c.pendenciaAte ? ` · cancela em ${Math.max(1, Math.ceil((Date.parse(c.pendenciaAte) - Date.now()) / 60000))} min` : ""}</span>}
                 </div>
               </button>
             ))}

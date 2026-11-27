@@ -576,3 +576,50 @@ test("desafios: criado no painel aparece no app com progresso; cumprido (automá
   assert.ok(cart.saldo > saldoAntes, "o prêmio entrou no saldo");
   assert.ok(!cart.extrato.some((l: any) => /Meta com análise/.test(l.descricao)), "manual ainda não pagou");
 });
+
+test("pendência: sem aceite nas tentativas a corrida vira PENDÊNCIA (aba Pend. do motorista, qualquer um pega); passado o tempo do painel é cancelada e o passageiro lê que não há motorista", async () => {
+  const { controlarPendencias, pendenciaAte, OFERTA_MS, TEXTO_SEM_MOTORISTA, corridaParaApp } = await import("../src/apps/despacho.ts");
+  const { regrasDespacho } = await import("../src/config/despacho.ts");
+  const { listarProprias } = await import("../src/corridas/index.ts");
+  const regras = regrasDespacho(E.id);
+  assert.equal(regras.tempoPendencia, 10, "padrão do painel: 10 min em pendência");
+  const LONGE = { lat: -10.0, lng: -40.0 }; // longe de qualquer motorista dos outros testes
+  const pedir = async (tel: string, id: string) => {
+    const tokP = await entrar("passageiro", tel);
+    const r = await chamar("POST", `${API}/corridas`, { embarque: { texto: "Rua da Pendência, 1", ...LONGE }, destino: { texto: "Av. Fim, 9", lat: -10.03, lng: -40.03 }, categoria: "Econômico", pagamento: "Dinheiro", pedidoId: id }, tokP);
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    return r.corpo.corrida.id as string;
+  };
+  const c1 = await pedir("11988887301", "pend-1"), c2 = await pedir("11988887302", "pend-2");
+  const achar = (id: string) => listarProprias(E.id).find((c) => c.id === id)!;
+  assert.equal(pendenciaAte(E.id, c1), null, "recém-pedida: ainda não é pendência");
+  controlarPendencias(E.id, Date.now() + 5_000);
+  assert.equal(pendenciaAte(E.id, c1), null, "recém-pedida e sem rodada: não vira pendência de cara (a hora da corrida é de Brasília, 3 h atrás do UTC)");
+  // Passou o tempo das tentativas sem ninguém (mesmo sem motorista online): entra em pendência pelo tempo do painel.
+  const t1 = Date.now() + regras.maxTentativas * OFERTA_MS() + 31_000;
+  controlarPendencias(E.id, t1);
+  const ate1 = pendenciaAte(E.id, c1);
+  assert.ok(ate1 && Math.abs(ate1 - (t1 + regras.tempoPendencia * 60_000)) < 1000, "pendência dura o tempo configurado no painel");
+  assert.equal(achar(c1).status, "procurando", "na pendência ainda procura");
+  // Motorista online perto enxerga as duas na aba Pend. (não em Disp.) e pega uma.
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Pat Pendência", telefone: "11900000301", status: "Ativo", veiculo: "Hatch", placa: "PAT1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000301");
+  await chamar("POST", `${API}/online`, LONGE, tokM);
+  const lista = (await chamar("GET", `${API}/corridas-abertas`, undefined, tokM)).corpo;
+  const pend = lista.pendentes.filter((c: any) => c.emPendencia);
+  assert.ok(pend.some((c: any) => c.id === c1) && pend.some((c: any) => c.id === c2), "as duas aparecem como pendência");
+  assert.ok(!lista.disponiveis.some((c: any) => c.id === c1), "pendência sai de Disponíveis");
+  assert.ok(pend.every((c: any) => c.pendenciaAte), "cada pendência diz até quando vale");
+  const pegou = await chamar("POST", `${API}/corridas/${c1}/pegar`, {}, tokM);
+  assert.equal(pegou.status, 200, JSON.stringify(pegou.corpo));
+  assert.equal(achar(c1).status, "a_caminho", "o motorista pegou a pendência");
+  // A outra ninguém pegou: passado o tempo de pendência (+ a busca parada) é cancelada de vez.
+  const t2 = (pendenciaAte(E.id, c2) ?? 0) + 31_000;
+  await controlarPendencias(E.id, t2);
+  assert.equal(achar(c2).status, "nao_atendida", "sem aceite no tempo do painel: cancelada");
+  assert.equal(corridaParaApp(E.id, achar(c2), "passageiro").mensagemCancelamento, TEXTO_SEM_MOTORISTA);
+  assert.match(TEXTO_SEM_MOTORISTA, /nenhum motorista dispon[ií]vel/i);
+  // limpeza: encerra a corrida pegada para não atrapalhar os outros testes
+  await chamar("POST", `${API}/corridas/${c1}/cancelar`, { motivo: "Teste" }, tokM);
+  await chamar("POST", `${API}/offline`, {}, tokM);
+});
