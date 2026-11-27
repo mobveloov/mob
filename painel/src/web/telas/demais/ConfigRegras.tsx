@@ -141,6 +141,12 @@ const METODOS: Array<[string, string, string, string]> = [
 export function RegrasDespacho() {
   const admin = useGestor();
   const d = useCarregar(() => pedirConfig("/despacho"), []);
+  const fil = useCarregar(async () => {
+    const h: Record<string, string> = {};
+    try { const e = localStorage.getItem("empresa"); if (e) h["X-Empresa"] = e; } catch { /* sem armazenamento */ }
+    const x = await fetch("/api/filiais/opcoes", { credentials: "same-origin", headers: h });
+    return x.ok ? x.json() : { filiais: [] };
+  }, []);
   const [r, setR] = useState<any>(null), [lido, setLido] = useState<unknown>(null);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setR(structuredClone(d.dados)); }
   const { msg, salvando, salvar } = useSalvar();
@@ -148,6 +154,14 @@ export function RegrasDespacho() {
   const set = (k: string, v: unknown) => setR({ ...r, [k]: v });
   const n = (k: string, rotulo: string, un?: string, dica?: string) => <Campo rotulo={rotulo} dica={dica}><span className="dm-linha"><input type="number" min={0} disabled={!admin} value={r[k]} onChange={(e) => set(k, Number(e.target.value))} />{un && <small>{un}</small>}</span></Campo>;
   const salvarTudo = () => salvar(async () => setR(await pedirConfig("/despacho", "PUT", r)), "Regras de despacho salvas.");
+  const filiais: Array<{ id: string; nome: string; ativa: boolean }> = fil.dados?.filiais ?? [];
+  const pend: Record<string, number> = r.pendenciaFilial ?? {};
+  // Campo vazio = a filial herda o tempo da empresa (some da lista); número = valor próprio daquela filial.
+  const setPend = (id: string, v: string) => {
+    const novo = { ...pend };
+    if (v === "") delete novo[id]; else novo[id] = Math.max(0, Math.min(1440, Math.round(Number(v)) || 0));
+    set("pendenciaFilial", novo);
+  };
   return (
     <>
       <Cab titulo="Central de Despacho" sub="Configuração de distribuição">{admin && <button className="botao primario" disabled={salvando} onClick={salvarTudo}>Salvar</button>}</Cab>
@@ -181,6 +195,20 @@ export function RegrasDespacho() {
           <Campo rotulo="Notificar Grupo"><select disabled={!admin} value={r.notificarGrupo} onChange={(e) => set("notificarGrupo", e.target.value)}><option value="prioritario">Apenas Prioritários</option><option value="todos">Todos os Motoristas</option></select></Campo>
           {n("distanciaProxima", "Dist. Aceitar Próxima (m)", undefined, "Para pegar corrida em viagem.")}
         </div>
+        {filiais.length > 0 && (
+          <div className="dm-filiais-pend">
+            <h4>Tempo em Pendência por filial</h4>
+            <p className="sub">Deixe em branco para a filial seguir o tempo da empresa ({r.tempoPendencia} min). Vale para as corridas pedidas na filial.</p>
+            <div className="tabela-rola"><table>
+              <thead><tr><th>Filial</th><th>Tempo em Pendência (Min)</th><th>Vale</th></tr></thead>
+              <tbody>{filiais.map((f) => (
+                <tr key={f.id}><td>{f.nome}{!f.ativa && <small> (inativa)</small>}</td>
+                  <td><input type="number" min={0} max={1440} aria-label={`Tempo em pendência da filial ${f.nome}`} disabled={!admin} placeholder={`Herda ${r.tempoPendencia}`} value={pend[f.id] ?? ""} onChange={(e) => setPend(f.id, e.target.value)} /></td>
+                  <td>{pend[f.id] != null ? `${pend[f.id]} min (própria)` : `${r.tempoPendencia} min (da empresa)`}</td></tr>
+              ))}</tbody>
+            </table></div>
+          </div>
+        )}
         <Interruptor valor={r.permitirProxima} onChange={(v) => set("permitirProxima", v)} rotulo="Permitir aceitar próxima corrida?" descricao="Motorista em viagem pode aceitar outra se estiver perto do destino final." desabilitado={!admin} />
         <Interruptor valor={r.permitirTransbordo} onChange={(v) => set("permitirTransbordo", v)} rotulo="Permitir transbordo (motorista de outra cidade)" descricao="Se desligado, só motoristas da cidade da categoria recebem a corrida." desabilitado={!admin} />
       </section>

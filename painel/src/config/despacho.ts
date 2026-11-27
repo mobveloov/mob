@@ -16,10 +16,12 @@ export interface RegrasDespacho {
   distanciaProxima: number; permitirProxima: boolean;
   /** Transbordo: motorista de outra cidade pode atender corridas desta cidade. */
   permitirTransbordo: boolean;
+  /** Tempo em pendência (min) por filial. Filial que não está aqui herda `tempoPendencia` da empresa. */
+  pendenciaFilial: Record<string, number>;
 }
 export const DESPACHO_PADRAO: RegrasDespacho = {
   metodo: "mais_proximo", raioMetros: 20_000, tempoTela: 20, limiteMotoristas: 20, prioritarios: 20, secundarios: 15, reserva: 10,
-  maxTentativas: 4, tempoPendencia: 10, notificarGrupo: "prioritario", distanciaProxima: 500, permitirProxima: false, permitirTransbordo: true,
+  maxTentativas: 4, tempoPendencia: 10, notificarGrupo: "prioritario", distanciaProxima: 500, permitirProxima: false, permitirTransbordo: true, pendenciaFilial: {},
 };
 
 export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADRAO): RegrasDespacho {
@@ -31,8 +33,25 @@ export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADR
     prioritarios: n("prioritarios", 0, 500), secundarios: n("secundarios", 0, 500), reserva: n("reserva", 0, 500),
     maxTentativas: n("maxTentativas", 1, 50), tempoPendencia: n("tempoPendencia", 0, 1440), notificarGrupo: umDe(o.notificarGrupo, ["prioritario", "todos"] as const, "prioritario"),
     distanciaProxima: n("distanciaProxima", 0, 500_000), permitirProxima: sim(o.permitirProxima), permitirTransbordo: sim(o.permitirTransbordo, true),
+    pendenciaFilial: pendenciasPorFilial(o.pendenciaFilial),
   };
 }
+
+/** Só ids de filial (texto curto) com minutos entre 0 e 1440; o resto some. Máximo de 200 filiais. */
+function pendenciasPorFilial(v: unknown): Record<string, number> {
+  const saida: Record<string, number> = {};
+  if (!v || typeof v !== "object" || Array.isArray(v)) return saida;
+  for (const [id, min] of Object.entries(v as Record<string, unknown>).slice(0, 200)) {
+    if (!id || id.length > 80 || id === "__proto__" || min === "" || min == null) continue;
+    const m = Number(min);
+    if (Number.isFinite(m)) saida[id] = Math.round(Math.min(1440, Math.max(0, m)));
+  }
+  return saida;
+}
+
+/** Tempo em pendência (min) que vale para a filial; sem filial, ou filial sem valor próprio, vale o da empresa. */
+export const tempoPendenciaDaFilial = (r: RegrasDespacho, filialId?: string | null): number =>
+  filialId && Object.prototype.hasOwnProperty.call(r.pendenciaFilial, filialId) ? r.pendenciaFilial[filialId] : r.tempoPendencia;
 export const regrasDespacho = (empresaId: string): RegrasDespacho => sanearDespacho(lerConfig(empresaId, "despacho", {}), DESPACHO_PADRAO);
 export function salvarDespacho(empresaId: string, entrada: unknown): RegrasDespacho {
   const r = sanearDespacho(entrada, regrasDespacho(empresaId));

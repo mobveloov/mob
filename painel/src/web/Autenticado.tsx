@@ -15,7 +15,6 @@ import ConsultarCorridas from "./paginas/ConsultarCorridas";
 import Acompanhamento from "./paginas/Acompanhamento";
 import Avaliacoes from "./paginas/Avaliacoes";
 import AlterarSenha from "./paginas/AlterarSenha";
-import { EmConstrucao } from "./componentes/ui";
 import { TELAS_ENTREGUES } from "./telas/registro";
 import { FaixaAlerta, Sino } from "./telas/demais/CentralNotificacoes";
 import { SeletorCentral } from "./telas/centrais/Seletor";
@@ -38,7 +37,7 @@ import { CrmPainel } from "./crm";
 // ------------------------------------------------------------------ telas por id do menu
 // Telas provisórias: apontam para a tela nossa mais parecida que já existe. As frentes entregam as telas
 // novas em src/web/telas/<grupo>/index.tsx (TELAS_CADASTRO, TELAS_CORRIDAS, TELAS_DEMAIS); o que chegar
-// por lá passa na frente (ver src/web/telas/registro.ts). O que não tiver tela mostra "Em construção".
+// por lá passa na frente (ver src/web/telas/registro.ts). Todo item do menu tem tela: o teste test/menu-todas-telas.test.ts barra item sem tela.
 const cad = (id: string) => <TelaCadastro key={id} id={id} />;
 const PROVISORIAS: Record<string, JSX.Element> = {
   painel: <Painel />, "alterar-senha": <AlterarSenha />,
@@ -53,7 +52,7 @@ const PROVISORIAS: Record<string, JSX.Element> = {
   bot: <BotWhatsApp />, totem: <LocaisTotem />, "app-totem": <AppTotem />, analise: <Analise />, apps: <AppsCentral />, documentos: <DocumentosMotoristas />,
   enderecos: <Enderecos />, marca: <MarcaAparencia />,
 };
-const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <EmConstrucao titulo={f.nome} sub="Em breve nesta versão do painel." />;
+const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <p className="vazio">Tela não encontrada.</p>;
 
 // ------------------------------------------------------------------ menu
 

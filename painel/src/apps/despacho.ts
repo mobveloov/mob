@@ -25,7 +25,7 @@ import { filtrosDoDespacho } from "./extras.ts";
 import { fantasmas, regrasDoDespacho } from "../gestao/regras.ts";
 import { fotoDeAreas } from "../areas/areas.ts";
 import { motoristasEmPlantao } from "../areas/plantao.ts";
-import { regrasDespacho, transbordoPermitido } from "../config/despacho.ts";
+import { regrasDespacho, tempoPendenciaDaFilial, transbordoPermitido } from "../config/despacho.ts";
 import { enderecoDoPonto, linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -447,8 +447,9 @@ export function despachar(empresaId: string) {
     const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
     if (rod.pausaAte > agora) continue;
     if (rod.n >= regras.maxTentativas) {
-      if (rod.pendencias >= 1 || regras.tempoPendencia <= 0) { void mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined); e.rodadas.delete(c.id); continue; }
-      e.rodadas.set(c.id, { n: 0, pausaAte: agora + regras.tempoPendencia * 60_000, pendencias: rod.pendencias + 1 });
+      const tpend = tempoPendenciaDaFilial(regras, c.filialId);
+      if (rod.pendencias >= 1 || tpend <= 0) { void mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined); e.rodadas.delete(c.id); continue; }
+      e.rodadas.set(c.id, { n: 0, pausaAte: agora + tpend * 60_000, pendencias: rod.pendencias + 1 });
       void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
       continue;
     }
@@ -660,12 +661,13 @@ export function controlarPendencias(empresaId: string, agora = Date.now()): Prom
     const ref = Math.max(e.movimento.get(c.id) ?? 0, pedidaEmMs(c), rod?.pausaAte ?? 0);
     if (!rod || rod.pendencias < 1) {
       if (agora - ref < regras.maxTentativas * OFERTA_MS() + 30_000) continue;
-      if (regras.tempoPendencia <= 0) { feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined)); e.rodadas.delete(c.id); continue; }
-      e.rodadas.set(c.id, { n: 0, pausaAte: agora + regras.tempoPendencia * 60_000, pendencias: 1 });
-      registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: `Corrida em pendência por ${regras.tempoPendencia} min: ninguém aceitou; qualquer motorista pode pegar pela aba Pend.`, usuario: "sistema", canal: "Despacho automático" });
+      const tpend = tempoPendenciaDaFilial(regras, c.filialId);
+      if (tpend <= 0) { feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined)); e.rodadas.delete(c.id); continue; }
+      e.rodadas.set(c.id, { n: 0, pausaAte: agora + tpend * 60_000, pendencias: 1 });
+      registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: `Corrida em pendência por ${tpend} min: ninguém aceitou; qualquer motorista pode pegar pela aba Pend.`, usuario: "sistema", canal: "Despacho automático" });
       void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
     } else if (agora - ref >= 30_000) {
-      feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: `Ninguém aceitou no tempo de pendência (${regras.tempoPendencia} min).` }, "despacho").catch(() => undefined));
+      feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: `Ninguém aceitou no tempo de pendência (${tempoPendenciaDaFilial(regras, c.filialId)} min).` }, "despacho").catch(() => undefined));
       e.rodadas.delete(c.id);
     }
   }

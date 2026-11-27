@@ -305,10 +305,6 @@ tbody tr { cursor: pointer; transition: background .15s; } tbody tr:hover { back
 .botao-escuro:active { transform: scale(.97); } .botao-escuro:disabled { opacity: .6; }
 
 /* ------------------------------------------------------------------ Em construção */
-.construcao { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 48px 24px; }
-.construcao .ind-icone { width: 56px; height: 56px; margin-bottom: 8px; }
-.construcao h2 { margin: 0; font-size: 18px; }
-.construcao p { margin: 0; max-width: 480px; color: var(--suave); }
 
 /* ------------------------------------------------------------------ telas pequenas */
 @media (max-width: 1180px) { .usuario-nome { display: none; } .usuario-botao { padding-right: 6px; } }
