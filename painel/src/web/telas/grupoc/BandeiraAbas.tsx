@@ -1,14 +1,17 @@
 // Config › Gerais: as abas da "Alterando Bandeira" da Machine que são só formulário (Motorista, Passageiro, Financeiro, Filtros,
 // Formas de pagamento e Recursos Premium). O desenho vem de comum/bandeira-form.ts: cada linha tem rótulo, campos e o texto de ajuda.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ehLinha, type AbaForm, type ControleForm, type LinhaForm, type ValoresForm } from "../../../comum/bandeira-form.ts";
 import { Aviso, Carregando, pedirConfig, useCarregar, useGestor, useSalvar } from "../demais/comum";
 
 const contador = (c: ControleForm, v: unknown) => (c.tipo === "area" || (c.tipo === "texto" && (c.tamanho ?? 0) > 0 && (c.tamanho ?? 0) <= 100 && /titulo|mensagem/.test(c.nome)) ? `${String(v ?? "").length}/${c.tamanho ?? 500}` : "");
 
-export function BandeiraAbas({ aba, especiais, aoGravar, extra }: { aba: AbaForm; especiais?: Partial<Record<"documentos", ReactNode>>; aoGravar?: () => Promise<void>; extra?: ReactNode }) {
+/** Comandos que a tela de fora usa quando os campos da aba entram no "Salvar alterações" dela (sem Voltar/Gravar próprios). */
+export type ComandosAba = { gravar: () => Promise<void>; desfazer: () => void };
+
+export function BandeiraAbas({ aba, especiais, aoGravar, extra, comandos }: { aba: AbaForm; especiais?: Partial<Record<"documentos", ReactNode>>; aoGravar?: () => Promise<void>; extra?: ReactNode; comandos?: MutableRefObject<ComandosAba | null> }) {
   const gestor = useGestor();
   const navegar = useNavigate();
   const d = useCarregar(() => pedirConfig("/bandeira-campos"), []);
@@ -19,12 +22,15 @@ export function BandeiraAbas({ aba, especiais, aoGravar, extra }: { aba: AbaForm
   const categorias: Array<{ id: string; nome: string }> = d.dados?.categorias ?? [];
   const set = (nome: string, valor: string | number | boolean) => setV({ ...v, [nome]: valor });
   const habilitado = (c: ControleForm) => gestor && (!c.de || c.de.em.includes(String(v[c.de.nome])));
-  const gravar = () => salvar(async () => {
+  const enviarValores = async () => {
     const nomes = aba.itens.filter(ehLinha).flatMap((l) => l.controles.map((c) => c.nome));
     const r = await pedirConfig("/bandeira-campos", "PUT", { valores: Object.fromEntries(nomes.map((n) => [n, v[n]])) });
     setV({ ...v, ...r.valores });
     await aoGravar?.();
-  }, "Configurações gravadas.");
+  };
+  const gravar = () => salvar(enviarValores, "Configurações gravadas.");
+  // Com "comandos", quem manda é a tela de fora: um só "Salvar alterações" grava estes campos junto com o resto.
+  if (comandos) comandos.current = { gravar: enviarValores, desfazer: () => d.dados && setV(structuredClone(d.dados.valores)) };
 
   const controle = (c: ControleForm, linha: LinhaForm) => {
     const nome = `${aba.id}-${c.nome}`;
@@ -64,7 +70,7 @@ export function BandeiraAbas({ aba, especiais, aoGravar, extra }: { aba: AbaForm
         ))}
       </section>
       {extra}
-      <div className="dm-salvar"><button type="button" className="botao" onClick={() => navegar(-1)}>Voltar</button>{gestor && <button className="botao primario" disabled={salvando} onClick={gravar}>Gravar</button>}</div>
+      {!comandos && <div className="dm-salvar"><button type="button" className="botao" onClick={() => navegar(-1)}>Voltar</button>{gestor && <button className="botao primario" disabled={salvando} onClick={gravar}>Gravar</button>}</div>}
     </>
   );
 }

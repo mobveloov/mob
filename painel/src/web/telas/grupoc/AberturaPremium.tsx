@@ -1,11 +1,11 @@
 // Personalização dos apps: "Imagem de abertura" (tela que aparece ao abrir o app) e "Recursos Premium" daquele app.
 // A imagem é enviada crua (PNG, JPG ou WEBP, até 8 MB) e o servidor guarda em WebP; "Voltar ao padrão" apaga o arquivo da empresa.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MutableRefObject } from "react";
 import { Image as ImagemIcone, Sparkles, Trash2, Upload } from "lucide-react";
 import { ABA_PREMIUM_MOTORISTA, ABA_PREMIUM_PASSAGEIRO } from "../../../comum/bandeira-form.ts";
 import { Aviso, pedirConfig, useAdmin } from "../demais/comum";
-import { BandeiraAbas } from "./BandeiraAbas";
+import { BandeiraAbas, type ComandosAba } from "./BandeiraAbas";
 import type { SecaoMenu } from "./PersonalizacaoPecas";
 
 const MAX = 8 * 1024 * 1024;
@@ -16,7 +16,8 @@ export const MENU_ABERTURA: SecaoMenu = {
   itens: [{ id: "imagem-de-abertura", rotulo: "Imagem de abertura", icone: <ImagemIcone size={16} /> }, { id: "recursos-premium", rotulo: "Recursos Premium", icone: <Sparkles size={16} /> }],
 };
 
-export function SecaoAberturaPremium({ app }: { app: "passageiro" | "motorista" }) {
+/** `premium`: a tela de fora lê dali os comandos para gravar/desfazer os Recursos Premium junto com o seu "Salvar alterações". */
+export function SecaoAberturaPremium({ app, premium }: { app: "passageiro" | "motorista"; premium: MutableRefObject<ComandosAba | null> }) {
   const admin = useAdmin();
   const [ab, setAb] = useState<Abertura | undefined>(undefined);
   const [msg, setMsg] = useState<{ erro?: string; ok?: string } | null>(null);
@@ -50,7 +51,7 @@ export function SecaoAberturaPremium({ app }: { app: "passageiro" | "motorista" 
         )}
       </section>
       <div id="recursos-premium"><h2 style={{ margin: "16px 0 4px" }}>Recursos Premium</h2>
-        <BandeiraAbas aba={app === "motorista" ? ABA_PREMIUM_MOTORISTA : ABA_PREMIUM_PASSAGEIRO} />
+        <BandeiraAbas aba={app === "motorista" ? ABA_PREMIUM_MOTORISTA : ABA_PREMIUM_PASSAGEIRO} comandos={premium} />
       </div>
     </>
   );
