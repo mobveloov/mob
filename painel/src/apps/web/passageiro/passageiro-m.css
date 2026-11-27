@@ -308,3 +308,22 @@ html[data-tema="escuro"] .conta-icone.azul, html[data-tema="escuro"] .conta-icon
 .acompanhar-baixo .folha.meia { max-height: 56vh; }
 .acompanhar-baixo .folha.aberta { max-height: calc(100vh - 9rem); }
 .acompanhar-baixo .folha-detalhe h2 { margin: 0; line-height: 1.25; } .acompanhar-baixo .folha-detalhe p { margin: 0; line-height: 1.35; }
+
+/* ======================= REVISÃO VISUAL (nov/2026) ======================= */
+/* ouvir mensagem: ícone discreto em vez de palavra solta */
+.balao .ouvir-icone { display: inline-grid; place-items: center; width: 26px; height: 26px; margin: .15rem 0 0; border: 0; border-radius: 50%; background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; cursor: pointer; padding: 0; }
+.chat-topo .botao-link, .chat-topo .chat-ligar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.28); color: inherit; padding: 0; filter: none; }
+/* folha "Procurando": respiro no rodapé e Cancelar sempre visível */
+.folha-procurando { padding-bottom: calc(1.1rem + env(safe-area-inset-bottom)); }
+.folha-procurando .botao.contorno { min-height: 48px; }
+/* avaliação */
+.avaliar-tela { gap: .5rem; padding-top: calc(2rem + env(safe-area-inset-top)); }
+.avaliar-tela h1 { margin: .3rem 0 0; font-size: 1.35rem; }
+.avaliar-valor { margin: 0; font-size: 2.4rem; font-weight: 800; }
+.avaliar-pergunta { margin: .2rem 0 .4rem; color: var(--suave); }
+.avaliar-tela .estrelas button { color: color-mix(in srgb, var(--suave) 45%, transparent); } .avaliar-tela .estrelas button.acesa { color: #f5b301; }
+.avaliar-tela .linha { position: sticky; bottom: 0; padding: .8rem 0 calc(.8rem + env(safe-area-inset-bottom)); background: linear-gradient(transparent, var(--fundo-suave) 30%); }
+/* topo "Acompanhar viagem" centralizado */
+.topo-marca.arredondado .topo-titulo { text-align: center; align-items: center; }
+/* subtelas sem cabeçalho (Desafios): título forte */
+.cartao { box-shadow: 0 1px 2px rgba(16,24,40,.05); }

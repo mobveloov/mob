@@ -108,6 +108,7 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
         </div>
         <div className="chips"><span>{c.categoria.toUpperCase()}</span><span>{c.pagamento}</span></div>
         <Aviso texto={erro} />
+        <button type="button" className="botao contorno largo texto-vermelho" onClick={() => setCancelar(true)}>Cancelar corrida</button>
       </FolhaBaixo>
 
       {primeira && (

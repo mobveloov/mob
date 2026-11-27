@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, reais } from "../comum/api";
 import { Aviso, Cartao, Estrelas, mensagemDeErro, useConfigDoPainel } from "../comum/ui";
 import type { Corrida, Perfil } from "./apoio";
+import { Avatar } from "./pecas";
 
 
 /** Favorito do motorista (lido do perfil). Devolve o estado e a função para trocar. */
@@ -108,10 +109,11 @@ export function Avaliar({ corrida, fechar }: { corrida: Corrida; fechar: () => v
     );
   }
   return (
-    <div className="tela centro">
+    <div className="tela centro avaliar-tela">
+      <Avatar foto={corrida.motorista?.foto} nome={corrida.motorista?.nome ?? ""} tamanho={96} />
       <h1>Corrida finalizada</h1>
-      <p className="numero-grande">{reais(corrida.valor)}</p>
-      <p>Como foi a viagem com {corrida.motorista?.nome ?? "o motorista"}?</p>
+      <p className="avaliar-valor">{reais(corrida.valor)}</p>
+      <p className="avaliar-pergunta">Como foi a viagem com {corrida.motorista?.nome ?? "o motorista"}?</p>
       <Estrelas valor={nota} aoEscolher={setNota} />
       {sugeridas.length > 0 && (
         <div className="pilulas" style={{ justifyContent: "center" }}>

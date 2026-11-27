@@ -1,6 +1,7 @@
 // Peças de tela comuns aos dois apps: marca da empresa, login, chat (texto e áudio), mapa simples e estrelas.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronLeft, Phone, Square, Volume2 } from "lucide-react";
 import { reaplicarPersonalizacao } from "./personalizacao";
 import { ACEITA_MIDIA, api, urlApi, config, enviarMidiaDoChat, ErroApi, guardarToken, Gravador, problemaDaMidia, trocarServidor, urlArquivo, urlDaMidia, urlDoAudio, type Papel, type Posicao } from "./api";
 
@@ -204,7 +205,7 @@ function BotaoOuvir({ texto, voz }: { texto: string; voz: SpeechSynthesisVoice }
     setFalando(true);
     s.speak(f);
   };
-  return <button type="button" className="botao-link ouvir" style={{ padding: "0 .2rem", fontSize: ".8rem", color: "inherit", opacity: 0.85 }} aria-label={falando ? "Parar de ler a mensagem" : "Ouvir a mensagem"} onClick={ouvir}>{falando ? "Parar" : "Ouvir"}</button>;
+  return <button type="button" className="ouvir-icone" aria-label={falando ? "Parar de ler a mensagem" : "Ouvir a mensagem"} onClick={ouvir}>{falando ? <Square size={13} fill="currentColor" /> : <Volume2 size={15} />}</button>;
 }
 
 export function Chat({ corridaId, papel, mensagens, aberto, fechar, titulo, avatar, telefone }: { corridaId: string; papel: Papel; mensagens: Mensagem[]; aberto: boolean; fechar: () => void; titulo?: string; avatar?: ReactNode; telefone?: string }) {
@@ -244,7 +245,7 @@ export function Chat({ corridaId, papel, mensagens, aberto, fechar, titulo, avat
 
   return (
     <div className="chat">
-      <div className="chat-topo"><button className="botao-link" onClick={fechar} aria-label="Voltar">‹</button>{avatar}<strong>{titulo ?? "Mensagens"}</strong>{telefone ? <a className="chat-ligar" href={`tel:${telefone}`} aria-label="Ligar">📞</a> : <span />}</div>
+      <div className="chat-topo"><button className="botao-link" onClick={fechar} aria-label="Voltar"><ChevronLeft size={26} /></button>{avatar}<strong>{titulo ?? "Mensagens"}</strong>{telefone ? <a className="chat-ligar" href={`tel:${telefone}`} aria-label="Ligar"><Phone size={20} /></a> : <span />}</div>
       <div className="chat-lista">
         {!mensagens.length && <p className="dica centro">Nenhuma mensagem ainda.</p>}
         {mensagens.map((m) => (
