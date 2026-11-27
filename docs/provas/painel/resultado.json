@@ -1,0 +1,915 @@
+{
+  "quando": "2026-11-27T17:28:43.584Z",
+  "res": [
+    {
+      "grupo": "Painel",
+      "bloco": "",
+      "id": "painel",
+      "nome": "Painel",
+      "rota": "/",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "equipe",
+      "nome": "Minha equipe",
+      "rota": "/equipe",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "cupons",
+      "nome": "Cupons",
+      "rota": "/cupons",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "passe-livre",
+      "nome": "Passe Livre",
+      "rota": "/passe-livre",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "empresas",
+      "nome": "Empresas",
+      "rota": "/empresas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "filiais",
+      "nome": "Filiais",
+      "rota": "/filiais",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "faixas-vouchers",
+      "nome": "Faixa de Vouchers",
+      "rota": "/faixas-vouchers",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "Gestão de áreas",
+      "id": "areas",
+      "nome": "Áreas",
+      "rota": "/areas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "Gestão de áreas",
+      "id": "plantao",
+      "nome": "Plantão",
+      "rota": "/plantao",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "motoristas",
+      "nome": "Motoristas",
+      "rota": "/motoristas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "punicoes",
+      "nome": "Punições",
+      "rota": "/punicoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "Clientes",
+      "id": "passageiros",
+      "nome": "Clientes",
+      "rota": "/passageiros",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "Clientes",
+      "id": "consulta-cartoes",
+      "nome": "Consulta de cartões",
+      "rota": "/consulta-cartoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "ruas",
+      "nome": "Ruas",
+      "rota": "/ruas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cadastro",
+      "bloco": "",
+      "id": "desafios",
+      "nome": "Desafios",
+      "rota": "/desafios",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "solicitar",
+      "nome": "Solicitar nova corrida",
+      "rota": "/solicitar",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "monitoramento",
+      "nome": "Acompanhamento",
+      "rota": "/monitoramento",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "ocorrencias",
+      "nome": "Retorno e Ocorrências",
+      "rota": "/ocorrencias",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "alertas-seguranca",
+      "nome": "Alertas de segurança",
+      "rota": "/alertas-seguranca",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "gravacoes",
+      "nome": "Gravações",
+      "rota": "/gravacoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "historico",
+      "nome": "Consultar corridas",
+      "rota": "/historico",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "mapa",
+      "nome": "Mapa de motoristas",
+      "rota": "/mapa",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "programadas",
+      "nome": "Consultar programadas",
+      "rota": "/programadas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "taxas-cancelamento",
+      "nome": "Taxas de cancelamento",
+      "rota": "/taxas-cancelamento",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "indice-relatorios",
+      "nome": "Relatórios",
+      "rota": "/indice-relatorios",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "alterar-os",
+      "nome": "Alteração de dados da OS",
+      "rota": "/alterar-os",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "entrega-voucher",
+      "nome": "Entrega de voucher",
+      "rota": "/entrega-voucher",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "objetos",
+      "nome": "Objetos perdidos",
+      "rota": "/objetos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Corridas",
+      "bloco": "",
+      "id": "engajamento",
+      "nome": "Mapa de engajamento",
+      "rota": "/engajamento",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Créditos",
+      "id": "carteiras",
+      "nome": "Carteiras de crédito",
+      "rota": "/carteiras",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Créditos",
+      "id": "creditos-recargas-saques",
+      "nome": "Recargas e Saques",
+      "rota": "/creditos-recargas-saques",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Créditos",
+      "id": "creditos-extrato",
+      "nome": "Extrato",
+      "rota": "/creditos-extrato",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Cartão",
+      "id": "cartao-painel",
+      "nome": "Painel de Controle",
+      "rota": "/cartao-painel",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Cartão",
+      "id": "cartao-transacoes",
+      "nome": "Transações",
+      "rota": "/cartao-transacoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Cartão",
+      "id": "cartao-saldo-central",
+      "nome": "Saldo da Central",
+      "rota": "/cartao-saldo-central",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Cartão",
+      "id": "cartao-saldo-motorista",
+      "nome": "Saldo do Motorista",
+      "rota": "/cartao-saldo-motorista",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Pix",
+      "id": "transacao-pix",
+      "nome": "Transações",
+      "rota": "/transacao-pix",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Contas a receber",
+      "id": "faturamento-empresa",
+      "nome": "Faturamento por empresa",
+      "rota": "/faturamento-empresa",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Contas a receber",
+      "id": "faturamento-centro-custo",
+      "nome": "Faturamento de centro de custo",
+      "rota": "/faturamento-centro-custo",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Contas a receber",
+      "id": "faturamento-periodo",
+      "nome": "Faturamento por período",
+      "rota": "/faturamento-periodo",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Contas a pagar",
+      "id": "vouchers-motoristas",
+      "nome": "Vouchers e tickets por motoristas",
+      "rota": "/vouchers-motoristas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Contas a pagar",
+      "id": "pagamentos-pendentes",
+      "nome": "Pagamentos pendentes",
+      "rota": "/pagamentos-pendentes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Relatórios",
+      "id": "visao-geral",
+      "nome": "Visão geral",
+      "rota": "/visao-geral",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Relatórios",
+      "id": "relatorio-faturamento",
+      "nome": "Faturamento",
+      "rota": "/relatorio-faturamento",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Relatórios",
+      "id": "extrato-online",
+      "nome": "Transações online",
+      "rota": "/extrato-online",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Estatísticas",
+      "id": "os-motorista",
+      "nome": "OS por motorista",
+      "rota": "/os-motorista",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Estatísticas",
+      "id": "os-empresa",
+      "nome": "OS por empresa",
+      "rota": "/os-empresa",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Estatísticas",
+      "id": "os-bairro",
+      "nome": "OS por bairro",
+      "rota": "/os-bairro",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Estatísticas",
+      "id": "os-pagamento",
+      "nome": "OS por forma de pagamento",
+      "rota": "/os-pagamento",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Estatísticas",
+      "id": "os-operador",
+      "nome": "OS por operador",
+      "rota": "/os-operador",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Estatísticas",
+      "id": "os-percentual-motorista",
+      "nome": "% de OS por motorista",
+      "rota": "/os-percentual-motorista",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "Poder público",
+      "id": "km-rodados",
+      "nome": "Km rodados por motorista",
+      "rota": "/km-rodados",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Financeiro",
+      "bloco": "",
+      "id": "indicacoes",
+      "nome": "Recompensas por indicação",
+      "rota": "/indicacoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Comunicação",
+      "bloco": "",
+      "id": "conversas",
+      "nome": "Conversas",
+      "rota": "/conversas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Comunicação",
+      "bloco": "",
+      "id": "notificacoes",
+      "nome": "Notificações app",
+      "rota": "/notificacoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Comunicação",
+      "bloco": "",
+      "id": "alertas-empresas",
+      "nome": "Alertas para empresas",
+      "rota": "/alertas-empresas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "config-gerais",
+      "nome": "Gerais",
+      "rota": "/config-gerais",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "personalizacao-app",
+      "nome": "Personalização app passageiro",
+      "rota": "/personalizacao-app",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "personalizacao-motorista",
+      "nome": "Personalização app motorista",
+      "rota": "/personalizacao-motorista",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "carteiras-credito",
+      "nome": "Carteiras de crédito",
+      "rota": "/carteiras-credito",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "taxas-central",
+      "nome": "Taxas da central",
+      "rota": "/taxas-central",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "regras-despacho",
+      "nome": "Despacho",
+      "rota": "/regras-despacho",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "transbordos",
+      "nome": "Transbordos",
+      "rota": "/transbordos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "categorias",
+      "nome": "Tarifas e categorias",
+      "rota": "/categorias",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "tarifas-dinamicas",
+      "nome": "Tarifas dinâmicas",
+      "rota": "/tarifas-dinamicas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "descontos",
+      "nome": "Descontos",
+      "rota": "/descontos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "integracoes",
+      "nome": "Integrações",
+      "rota": "/integracoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "config-nps",
+      "nome": "NPS",
+      "rota": "/config-nps",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "termos-app",
+      "nome": "Termos de uso",
+      "rota": "/termos-app",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Configurações",
+      "bloco": "",
+      "id": "regras-credito",
+      "nome": "Regras de Crédito",
+      "rota": "/regras-credito",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cobrança",
+      "bloco": "",
+      "id": "ultimo-boleto",
+      "nome": "Último boleto",
+      "rota": "/ultimo-boleto",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cobrança",
+      "bloco": "",
+      "id": "demonstrativo-mensal",
+      "nome": "Demonstrativo Mensal",
+      "rota": "/demonstrativo-mensal",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cobrança",
+      "bloco": "",
+      "id": "meus-planos",
+      "nome": "Meus planos",
+      "rota": "/meus-planos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cobrança",
+      "bloco": "",
+      "id": "extrato-central",
+      "nome": "Extrato da central",
+      "rota": "/extrato-central",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Cobrança",
+      "bloco": "",
+      "id": "controle-centrais",
+      "nome": "Controle financeiro de centrais",
+      "rota": "/controle-centrais",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Avaliações",
+      "bloco": "",
+      "id": "avaliacoes",
+      "nome": "NPS",
+      "rota": "/avaliacoes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Ajuda",
+      "bloco": "",
+      "id": "ajuda-termos",
+      "nome": "Termos de uso",
+      "rota": "/ajuda-termos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Ajuda",
+      "bloco": "",
+      "id": "juridico",
+      "nome": "Política de privacidade",
+      "rota": "/juridico",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Ajuda",
+      "bloco": "",
+      "id": "central-suporte",
+      "nome": "Central de suporte",
+      "rota": "/central-suporte",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Ajuda",
+      "bloco": "",
+      "id": "ouvidoria",
+      "nome": "Ouvidoria",
+      "rota": "/ouvidoria",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Ajuda",
+      "bloco": "",
+      "id": "central-ajuda",
+      "nome": "Central de Ajuda",
+      "rota": "/central-ajuda",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Bot & Totem",
+      "bloco": "",
+      "id": "bot",
+      "nome": "Bot de WhatsApp",
+      "rota": "/bot",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Bot & Totem",
+      "bloco": "",
+      "id": "totem",
+      "nome": "Totens & Preços",
+      "rota": "/totem",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Bot & Totem",
+      "bloco": "",
+      "id": "app-totem",
+      "nome": "App do Totem",
+      "rota": "/app-totem",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Bot & Totem",
+      "bloco": "",
+      "id": "apps",
+      "nome": "Apps e SOS",
+      "rota": "/apps",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Bot & Totem",
+      "bloco": "",
+      "id": "enderecos",
+      "nome": "Endereços",
+      "rota": "/enderecos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "CRM",
+      "bloco": "",
+      "id": "crm",
+      "nome": "CRM & Engajamento",
+      "rota": "/crm",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "CRM",
+      "bloco": "",
+      "id": "recuperacao",
+      "nome": "Recuperação de Vendas",
+      "rota": "/recuperacao",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "CRM",
+      "bloco": "",
+      "id": "funil-clientes",
+      "nome": "Funil de Clientes",
+      "rota": "/funil-clientes",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "CRM",
+      "bloco": "",
+      "id": "mapa-bairros",
+      "nome": "Mapa de Bairros e Demanda",
+      "rota": "/mapa-bairros",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Operação",
+      "id": "analise",
+      "nome": "Análise com IA",
+      "rota": "/analise",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Operação",
+      "id": "documentos",
+      "nome": "Documentos dos motoristas",
+      "rota": "/documentos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Operação",
+      "id": "destravar",
+      "nome": "Destravar Motoristas",
+      "rota": "/destravar",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Operação",
+      "id": "veiculos",
+      "nome": "Veículos",
+      "rota": "/veiculos",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Financeiro",
+      "id": "extrato",
+      "nome": "Extrato Geral",
+      "rota": "/extrato",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Financeiro",
+      "id": "saques",
+      "nome": "Saques",
+      "rota": "/saques",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Financeiro",
+      "id": "recargas",
+      "nome": "Recargas",
+      "rota": "/recargas",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Financeiro",
+      "id": "relatorios",
+      "nome": "Relatórios & Stats",
+      "rota": "/relatorios",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Conta e plataforma",
+      "id": "marca",
+      "nome": "Marca e aparência",
+      "rota": "/marca",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Conta e plataforma",
+      "id": "superadmin",
+      "nome": "Painel do dono",
+      "rota": "/superadmin",
+      "ok": false,
+      "construcao": false
+    },
+    {
+      "grupo": "Mais telas",
+      "bloco": "Conta e plataforma",
+      "id": "alterar-senha",
+      "nome": "Trocar senha",
+      "rota": "/alterar-senha",
+      "ok": false,
+      "construcao": false
+    }
+  ],
+  "erros": []
+}
