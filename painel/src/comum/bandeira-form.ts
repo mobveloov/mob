@@ -105,6 +105,11 @@ const ABA_PREMIUM: AbaForm = {
   ],
 };
 
+// Recursos Premium divididos por app: aparecem na Personalização de cada app (mesmas chaves e valores do store bandeira-campos).
+const CORTE_PREMIUM = ABA_PREMIUM.itens.findIndex((i) => !ehLinha(i) && i.secao === "Passageiro");
+export const ABA_PREMIUM_MOTORISTA: AbaForm = { ...ABA_PREMIUM, id: "premium_motorista", intro: ["", "Estes parâmetros definem a exibição de iniciativas premium no aplicativo do motorista."], itens: ABA_PREMIUM.itens.slice(1, CORTE_PREMIUM) };
+export const ABA_PREMIUM_PASSAGEIRO: AbaForm = { ...ABA_PREMIUM, id: "premium_passageiro", intro: ["", "Estes parâmetros definem a exibição de iniciativas premium no aplicativo do passageiro."], itens: ABA_PREMIUM.itens.slice(CORTE_PREMIUM + 1) };
+
 // ---- gerado das páginas da Machine: Motorista, Passageiro, Financeiro e Filtros
 const GERADAS: AbaForm[] = [{"id":"motorista","titulo":"Motorista","intro":["Alterações destes dados devem ser feitas com cuidado, pois afetarão o funcionamento da plataforma para sua central.","Estes parâmetros definem o funcionamento do aplicativo do motorista."],"itens":[
 {"rotulo":"Tempo limite para o motorista ficar offline","controles":[{"nome":"tempo_inatividade_taxista_alerta_tempo","tipo":"numero","padrao":5,"min":0,"passo":1.0},{"nome":"tempo_inatividade_taxista_alerta_periodo","tipo":"selecao","opcoes":[{"v":"segundo","t":"Segundos"},{"v":"minuto","t":"Minutos"}],"padrao":"minuto"}],"ajuda":"Tempo máximo que um motorista pode ficar sem conexão com a base antes de ficar offline (quando o tempo chegar, o motorista irá ficar com o ícone cinza no mapa de motoristas)."},

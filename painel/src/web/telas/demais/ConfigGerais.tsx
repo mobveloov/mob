@@ -8,9 +8,9 @@ import { ABAS_FORM } from "../../../comum/bandeira-form.ts";
 import { Abas, Aviso, Cab, Campo, Carregando, Interruptor, Modal, dinheiro, pedirConfig, useGestor, useCarregar, useSalvar } from "./comum";
 import { decimal } from "../../../comum/formato-br.ts";
 
-type Aba = "motorista" | "passageiro" | "despacho" | "financeiro" | "filtros" | "pagamentos" | "premium" | "geral" | "regras_motorista" | "preferencias" | "regras_passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
+type Aba = "motorista" | "passageiro" | "despacho" | "financeiro" | "filtros" | "pagamentos" | "geral" | "regras_motorista" | "preferencias" | "regras_passageiro" | "indicacoes" | "cancelamento" | "macaneta" | "banners" | "juridico";
 // As sete primeiras são as da Machine (mesma ordem); as demais são do painel de referência.
-const ABAS: Array<[Aba, string]> = [["motorista", "Motorista"], ["passageiro", "Passageiro"], ["despacho", "Despacho"], ["financeiro", "Financeiro"], ["filtros", "Filtros"], ["pagamentos", "Formas de pagamento"], ["premium", "Recursos Premium"], ["geral", "Geral"], ["regras_motorista", "Regras do motorista"], ["preferencias", "Preferências"], ["regras_passageiro", "Regras do passageiro"], ["indicacoes", "Indicações"], ["cancelamento", "Cancelamentos"], ["macaneta", "Maçaneta"], ["banners", "Banners"], ["juridico", "Jurídico"]];
+const ABAS: Array<[Aba, string]> = [["motorista", "Motorista"], ["passageiro", "Passageiro"], ["despacho", "Despacho"], ["financeiro", "Financeiro"], ["filtros", "Filtros"], ["pagamentos", "Formas de pagamento"], ["geral", "Geral"], ["regras_motorista", "Regras do motorista"], ["preferencias", "Preferências"], ["regras_passageiro", "Regras do passageiro"], ["indicacoes", "Indicações"], ["cancelamento", "Cancelamentos"], ["macaneta", "Maçaneta"], ["banners", "Banners"], ["juridico", "Jurídico"]];
 
 const dinheiroNum = (v: string) => Number(String(v).replace(/\./g, "").replace(",", ".")) || 0;
 const Num = ({ v, on, ...r }: { v: number; on: (n: number) => void } & Record<string, unknown>) => <input inputMode="decimal" value={String(v).replace(".", ",")} onChange={(e) => on(dinheiroNum(e.target.value))} {...r} />;
@@ -43,9 +43,10 @@ export function ConfigGerais() {
     <>
       <Cab titulo="Configurações" sub="Ajuste as regras de negócio e comportamento do sistema." />
       <Abas abas={ABAS} valor={aba} onChange={setAba} />
+      <p className="sub">Os Recursos Premium mudaram para Personalização app passageiro / motorista. Os valores salvos foram mantidos.</p>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
       {aba === "despacho" && <BandeiraDespacho />}
-      {ABAS_FORM.filter((a) => a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : undefined} extra={a.id === "motorista" ? (<Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
+      {ABAS_FORM.filter((a) => a.id !== "premium" && a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : undefined} extra={a.id === "motorista" ? (<Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
               <Campo rotulo="Dias sem contato para o app aparecer como OFF" dica="Define há quantos dias sem contato do app o diagnóstico mostra APP OFF"><input type="number" min={1} max={90} step={1} disabled={!admin} value={g.motorista.diasSemContatoApp} onChange={(e) => set(["motorista", "diasSemContatoApp"], Math.min(90, Math.max(1, Math.round(Number(e.target.value)) || 1)))} /></Campo>
             </Secao>) : undefined} />)}
       {aba === "motorista" && <NovoDocumento aberto={novoDoc} onFechar={() => setNovoDoc(false)} onAdd={(d) => { set(["motorista", "documentos"], [...g.motorista.documentos, d]); setNovoDoc(false); }} />}

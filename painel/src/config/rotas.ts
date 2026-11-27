@@ -35,6 +35,7 @@ import { credenciaisMp, CAMPOS_MP, pagamentos, salvarCredenciaisMp, salvarPagame
 import { texto } from "./armazem.ts";
 import { salvarConfigMapas, visaoMapas } from "./mapas.ts";
 import { ultimoErroDoProvedor } from "../servidor/mapas-tiles.ts";
+import { aberturaDoApp, ehAppAbertura, enviarAbertura, MAX_ABERTURA, removerAbertura } from "./abertura.ts";
 import { enviarImagemMarcaMotorista, personalizacaoMotorista, removerImagemMarcaMotorista, salvarPersonalizacaoMotorista } from "./personalizacao-motorista.ts";
 import { enviarImagemMarca, MAX_IMAGEM_MARCA, personalizacao, removerImagemMarca, salvarPersonalizacao } from "./personalizacao.ts";
 import { bandeira, salvarBandeira } from "./bandeira.ts";
@@ -252,6 +253,13 @@ rotasConfig.post("/personalizacao/imagem", gestor, express.raw({ type: "image/*"
   res.json(enviarImagemMarca(emp(req), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()));
 }));
 rotasConfig.delete("/personalizacao/imagem", gestor, ok((req, res) => res.json(removerImagemMarca(emp(req)))));
+// Imagem de abertura dos apps (passageiro e motorista).
+const appAbertura = (v: unknown) => { if (!ehAppAbertura(v)) throw new Error("App inválido."); return v; };
+rotasConfig.get("/abertura/:app", ok((req, res) => res.json({ abertura: aberturaDoApp(emp(req), appAbertura(req.params.app)) })));
+rotasConfig.post("/abertura/:app", gestor, express.raw({ type: "image/*", limit: MAX_ABERTURA }), ok(async (req, res) => {
+  res.json({ abertura: await enviarAbertura(emp(req), appAbertura(req.params.app), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()) });
+}));
+rotasConfig.delete("/abertura/:app", gestor, ok((req, res) => res.json({ abertura: removerAbertura(emp(req), appAbertura(req.params.app)) })));
 rotasConfig.get("/personalizacao-motorista", ok((req, res) => res.json(personalizacaoMotorista(emp(req)))));
 rotasConfig.put("/personalizacao-motorista", gestor, ok((req, res) => res.json(salvarPersonalizacaoMotorista(emp(req), req.body))));
 rotasConfig.post("/personalizacao-motorista/imagem", gestor, express.raw({ type: "image/*", limit: MAX_IMAGEM_MARCA }), ok((req, res) => {

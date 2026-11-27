@@ -21,6 +21,7 @@ const RECURSOS: Record<string, { nome: string; desc: string; fixo?: string }> = 
   iniciar: { nome: "Botão Iniciar", desc: "Liga e desliga o recebimento de viagens", fixo: "O botão Iniciar não pode ser ocultado." },
   rodape: { nome: "Rodapé Mapa e Corridas", desc: "Barra de baixo para trocar entre o mapa e as corridas", fixo: "O rodapé não pode ser ocultado." },
 };
+import { MENU_ABERTURA, SecaoAberturaPremium } from "./AberturaPremium";
 const MENU: SecaoMenu[] = [
   { titulo: "Geral", itens: [{ id: "nome", rotulo: "Nome", icone: <Type size={16} /> }, { id: "cor-principal", rotulo: "Cor principal", icone: <Palette size={16} /> }, { id: "tema", rotulo: "Tema", icone: <Contrast size={16} /> }, { id: "veiculo-no-mapa", rotulo: "Veículo no mapa", icone: <Car size={16} /> }] },
   { titulo: "Tela do mapa", itens: [{ id: "sua-marca", rotulo: "Logo no topo", icone: <Sparkles size={16} /> }, { id: "estilo-de-tela", rotulo: "Estilo da tela", icone: <LayoutGrid size={16} /> }, { id: "recursos", rotulo: "Recursos", icone: <SlidersHorizontal size={16} /> }] },
@@ -99,7 +100,7 @@ export function PersonalizacaoMotorista() {
     <>
       <Cab titulo="Personalização app motorista" />
       <Aviso erro={msg?.erro ?? d.erro} ok={msg?.ok} />
-      <PaginaPers secoes={MENU} previa={previa}>
+      <PaginaPers secoes={[...MENU, MENU_ABERTURA]} previa={previa}>
         <section className="dm-cartao" id="geral">
           <h2>Geral</h2>
           <Item id="nome" titulo="Nome" desc="Insira o nome que você deseja exibir para os seus motoristas.">
@@ -155,6 +156,7 @@ export function PersonalizacaoMotorista() {
             </ul>
           </Item>
         </section>
+        <SecaoAberturaPremium app="motorista" />
         <div className="dm-salvar">
           <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); }}>Voltar</button>
           {admin && <button className="botao primario" disabled={salvando || enviando} onClick={gravar}>Salvar alterações</button>}
