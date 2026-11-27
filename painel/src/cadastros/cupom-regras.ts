@@ -34,8 +34,10 @@ type Cupom = Pick<Registro, string>;
 const soDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 export const mesmoTelefone = (a: unknown, b: unknown) => {
   const x = soDigitos(a), y = soDigitos(b);
-  if (x.length < 8 || y.length < 8) return false;
-  return x === y || x.endsWith(y.slice(-11)) || y.endsWith(x.slice(-11));
+  const base = (v: string) => ((v.length === 12 || v.length === 13) && v.startsWith("55") ? v.slice(2) : v);
+  const a1 = base(x), b1 = base(y);
+  // Só 10 ou 11 dígitos (DDD + número) e do mesmo tamanho: sufixo curto não vale.
+  return (a1.length === 10 || a1.length === 11) && a1 === b1;
 };
 
 /** Clientes específicos do cupom (lista nova ou o telefone VIP antigo). */
@@ -87,7 +89,7 @@ export function cupomVale(c: Cupom, x: ContextoCupom): Veredito {
   if (inicioDoCupom(c) && inicioDoCupom(c) > agora) return { vale: false, motivo: "Este cupom ainda não começou." };
   if (fimDoCupom(c) && fimDoCupom(c) < agora) return { vale: false, motivo: "Este cupom já encerrou." };
   const cats = String(c.categorias ?? "").split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
-  if (cats.length && !cats.includes(String(x.categoria ?? "").trim().toLowerCase())) return { vale: false, motivo: "Este cupom não vale para a categoria escolhida." };
+  if (cats.length && x.categoria !== undefined && !cats.includes(String(x.categoria ?? "").trim().toLowerCase())) return { vale: false, motivo: "Este cupom não vale para a categoria escolhida." };
   if (Number(c.minimoCorrida) > 0 && x.valor != null && x.valor < Number(c.minimoCorrida)) return { vale: false, motivo: "O valor da corrida está abaixo do mínimo do cupom." };
 
   if (cupomEspecifico(c) && x.telefone !== undefined && (!x.telefone || !clientesDoCupom(c).some((k) => mesmoTelefone(k.telefone, x.telefone)))) return { vale: false, motivo: "Este cupom é de outros clientes." };
@@ -120,18 +122,23 @@ export function prepararCupom(entrada: Record<string, unknown>, areasIds: string
   }
   d.codigo = codigo;
   const valor = Number(d.valor);
-  if (!Number.isFinite(valor) || valor <= 0) throw new Error("Informe o valor do desconto.");
-  if (d.tipoDesconto === "Percentual" && valor > 100) throw new Error("O desconto percentual não passa de 100%.");
+  // O valor só é obrigatório com o cupom ativo (automático inativo com valor 0 pode salvar).
+  if (d.ativo === true && (!Number.isFinite(valor) || valor <= 0)) throw new Error("Informe o valor do desconto.");
+  if (!Number.isFinite(valor)) d.valor = 0;
+  if (Number.isFinite(valor) && d.tipoDesconto === "Percentual" && valor > 100) throw new Error("O desconto percentual não passa de 100%.");
   if (d.valorMaximo != null && d.valorMaximo !== "" && !(Number(d.valorMaximo) > 0)) throw new Error("Valor máximo de desconto: informe um valor maior que zero.");
   const data = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(v ?? ""));
   for (const k of ["inicio", "fim"]) if (d[k] && !data(d[k])) throw new Error("Período de validade: data inválida.");
   for (const k of ["horaInicio", "horaFim"]) if (d[k] && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(d[k]))) throw new Error("Período de validade: hora inválida (use HH:MM).");
   if (d.inicio && d.fim && `${d.fim}T${horaOu(d.horaFim, "23:59")}` <= `${d.inicio}T${horaOu(d.horaInicio, "00:00")}`) throw new Error("A data final precisa ser depois da data de início.");
 
-  d.publico = d.publico === "especificos" ? "especificos" : "todos";
+  // Cupom antigo sem "publico"/"limiteUso": deduz do que ele já tinha (não vira "todos"/"sem limite" sem querer).
+  d.publico = d.publico === "especificos" || d.publico === "todos" ? d.publico : cupomEspecifico(d as Cupom) ? "especificos" : "todos";
   const clientes = clientesDoCupom({ clientes: typeof d.clientes === "string" ? d.clientes : d.clientes == null ? "" : JSON.stringify(d.clientes), clienteTelefone: d.publico === "especificos" ? d.clienteTelefone as string : null });
   if (d.publico === "especificos") {
     if (!clientes.length) throw new Error("Escolha pelo menos um cliente para o cupom.");
+    const ruim = clientes.find((k) => { const t = k.telefone.length > 11 && k.telefone.startsWith("55") ? k.telefone.slice(2) : k.telefone; return t.length !== 10 && t.length !== 11; });
+    if (ruim) throw new Error(`Telefone "${ruim.telefone}" inválido: use DDD + número (10 ou 11 dígitos).`);
     d.clientes = JSON.stringify(clientes);
     d.clienteTelefone = clientes[0].telefone; d.clienteNome = clientes[0].nome;
   } else { d.clientes = null; d.clienteTelefone = null; d.clienteNome = null; }
@@ -141,7 +148,7 @@ export function prepararCupom(entrada: Record<string, unknown>, areasIds: string
   if (invalida) throw new Error(`Forma de pagamento "${invalida}" inválida.`);
   d.pagamentos = [...new Set(formas)].join(",") || null;
 
-  d.limiteUso = LIMITES_USO.some(([k]) => k === d.limiteUso) ? d.limiteUso : "sem_limite";
+  d.limiteUso = LIMITES_USO.some(([k]) => k === d.limiteUso) ? d.limiteUso : limiteDoCupom(d as Cupom);
   if (d.limiteUso === "por_passageiro") {
     const n = Number(d.usoPorPassageiro);
     if (!Number.isInteger(n) || n < 1) throw new Error("Limite de uso: informe quantas vezes cada passageiro pode usar.");

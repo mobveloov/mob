@@ -41,6 +41,9 @@ function protegerFinanceiro(req: Request, c: Cadastro, dados: Record<string, unk
 
 const prepararCupomDaEmpresa = (empresaId: string, corpo: Record<string, unknown>) => prepararCupom(corpo, areasDaEmpresa(empresaId).map((a) => a.id));
 
+/** Pausar/Ativar manda só {ativo}: muda só isso (o resto do cupom fica como está, sem revalidar tudo). */
+const soAtivo = (b: unknown): b is { ativo: unknown } => !!b && typeof b === "object" && Object.keys(b).length === 1 && "ativo" in b;
+
 rotasCadastros.get("/", (_req, res) => res.json({ cadastros: CADASTROS }));
 
 rotasCadastros.get("/:cadastro", ok((req, res) => {
@@ -60,7 +63,7 @@ rotasCadastros.post("/:cadastro", ok((req, res) => {
 rotasCadastros.put("/:cadastro/:id", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
   const antes = c.id === "conveniadas" ? listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null : null;
-  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, antes, false) : c.id === "cupons" ? prepararCupomDaEmpresa(ctx(req).empresaId, req.body ?? {}) : (req.body ?? {});
+  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, antes, false) : c.id === "cupons" ? (soAtivo(req.body) ? { ...(listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? {}), ativo: req.body.ativo === true } : prepararCupomDaEmpresa(ctx(req).empresaId, req.body ?? {})) : (req.body ?? {});
   const atual = listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null;
   res.json({ registro: atualizar(ctx(req).empresaId, c, String(req.params.id), protegerFinanceiro(req, c, dados, atual), quem(req)) });
 }));

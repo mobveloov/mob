@@ -6,18 +6,19 @@ import type { CorridaPropria } from "../corridas/index.ts";
 
 export const TIPO_DESAFIO_CLIENTE = "Desafio de clientes";
 
-const dig = (v: unknown) => { const d = String(v ?? "").replace(/\D/g, ""); return (d.length === 12 || d.length === 13) && d.startsWith("55") ? d.slice(2) : d; };
+export const dig = (v: unknown) => { const d = String(v ?? "").replace(/\D/g, ""); return (d.length === 12 || d.length === 13) && d.startsWith("55") ? d.slice(2) : d; };
 const inicioDe = (d: Registro) => `${d.inicio ?? "0000-01-01"}T${/^\d{2}:\d{2}$/.test(String(d.horaInicio)) ? d.horaInicio : "00:00"}`;
 const fimDe = (d: Registro) => `${d.fim ?? "9999-12-31"}T${/^\d{2}:\d{2}$/.test(String(d.horaFim)) ? d.horaFim : "23:59"}`;
 const data = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? "")) ? String(v) : "");
 
-/** Finalizadas por telefone (dentro de um intervalo de dias opcional). */
-function finalizadasPorTelefone(corridas: CorridaPropria[], de = "", ate = "") {
+/** Finalizadas por telefone. Com período (de/ate, dias) conta nele; sem período e com início do desafio, conta só as finalizadas ANTES do início (as do próprio desafio não entram no filtro mín/máx). */
+function finalizadasPorTelefone(corridas: CorridaPropria[], de = "", ate = "", antesDe = "") {
   const m = new Map<string, number>();
   for (const c of corridas) {
     if (c.status !== "finalizada") continue;
-    const dia = (c.finalizadaEm ?? c.solicitadaEm).slice(0, 10);
+    const quando = c.finalizadaEm ?? c.solicitadaEm, dia = quando.slice(0, 10);
     if ((de && dia < de) || (ate && dia > ate)) continue;
+    if (!de && !ate && antesDe && quando.slice(0, 16) >= antesDe) continue;
     m.set(dig(c.passageiro.telefone), (m.get(dig(c.passageiro.telefone)) ?? 0) + 1);
   }
   return m;
@@ -26,7 +27,7 @@ function finalizadasPorTelefone(corridas: CorridaPropria[], de = "", ate = "") {
 /** Clientes que recebem o desafio: ativos e, se houver filtro, com finalizadas entre o mínimo e o máximo no período. */
 export function clientesDesafiados(clientes: Registro[], d: Record<string, unknown>, corridas: CorridaPropria[]): Registro[] {
   const min = d.corridasMin == null || d.corridasMin === "" ? null : Number(d.corridasMin), max = d.corridasMax == null || d.corridasMax === "" ? null : Number(d.corridasMax);
-  const fin = finalizadasPorTelefone(corridas, data(d.corridasDe), data(d.corridasAte));
+  const fin = finalizadasPorTelefone(corridas, data(d.corridasDe), data(d.corridasAte), data(d.inicio) ? inicioDe(d as Registro) : "");
   return clientes.filter((c) => {
     if (String(c.status ?? "Ativo") !== "Ativo") return false;
     const n = fin.get(dig(c.telefone)) ?? 0;

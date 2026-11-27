@@ -57,10 +57,13 @@ export const DESPACHO_PADRAO: RegrasDespacho = {
 const CHAVES_ANTIGAS = ["prioritarios", "secundarios", "reserva"] as const;
 
 /** Lê a lista de etapas: a lista nova; senão a configuração antiga (3 campos); senão a atual. Sempre devolve ao menos uma etapa. */
-function etapasDe(entrada: Record<string, unknown>, atual: Etapa[]): Etapa[] {
+function etapasDe(entrada: Record<string, unknown>, atual: Etapa[], leitura = false): Etapa[] {
   let brutas: unknown[];
   if (Array.isArray(entrada.etapas)) brutas = entrada.etapas;
-  else if (CHAVES_ANTIGAS.some((k) => k in entrada)) {
+  else if (CHAVES_ANTIGAS.some((k) => k in entrada) && !leitura) {
+    // PUT antigo: só muda a quantidade das etapas correspondentes que já existem; nunca refaz a lista com o padrão.
+    brutas = atual.map((x, i) => { const k = CHAVES_ANTIGAS[i]; return k && k in entrada ? { ...x, quantidade: Math.round(numero(entrada[k], x.quantidade, 0, 500)) } : x; });
+  } else if (CHAVES_ANTIGAS.some((k) => k in entrada)) {
     const q = (k: (typeof CHAVES_ANTIGAS)[number], padrao: number) => Math.round(numero(entrada[k], padrao, 0, 500));
     brutas = etapasDoFunil(q("prioritarios", 20), q("secundarios", 15), q("reserva", 10));
   } else brutas = atual;
@@ -74,11 +77,11 @@ function etapasDe(entrada: Record<string, unknown>, atual: Etapa[]): Etapa[] {
   return l.length ? l : DESPACHO_PADRAO.etapas.map((x) => ({ ...x }));
 }
 
-export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADRAO): RegrasDespacho {
+export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADRAO, leitura = false): RegrasDespacho {
   const entrada = (e && typeof e === "object" && !Array.isArray(e) ? e : {}) as Record<string, unknown>;
   const o = { ...atual, ...entrada } as Record<string, unknown>;
   const n = (k: keyof RegrasDespacho, min: number, max: number) => Math.round(numero(o[k], DESPACHO_PADRAO[k] as number, min, max));
-  const etapas = etapasDe(entrada, atual.etapas);
+  const etapas = etapasDe(entrada, atual.etapas, leitura);
   return {
     metodo: umDe(o.metodo, ["primeiro_aceitar", "mais_proximo", "fila_virtual"] as const, "mais_proximo"),
     raioMetros: n("raioMetros", 0, 100_000), tempoTela: n("tempoTela", 5, 120), limiteMotoristas: n("limiteMotoristas", 0, 500),
@@ -126,7 +129,7 @@ function pendenciasPorFilial(v: unknown): Record<string, number> {
 /** Tempo em pendência (min) que vale para a filial; sem filial, ou filial sem valor próprio, vale o da empresa. */
 export const tempoPendenciaDaFilial = (r: RegrasDespacho, filialId?: string | null): number =>
   filialId && Object.prototype.hasOwnProperty.call(r.pendenciaFilial, filialId) ? r.pendenciaFilial[filialId] : r.tempoPendencia;
-export const regrasDespacho = (empresaId: string): RegrasDespacho => sanearDespacho(lerConfig(empresaId, "despacho", {}), DESPACHO_PADRAO);
+export const regrasDespacho = (empresaId: string): RegrasDespacho => sanearDespacho(lerConfig(empresaId, "despacho", {}), DESPACHO_PADRAO, true);
 export function salvarDespacho(empresaId: string, entrada: unknown): RegrasDespacho {
   const r = sanearDespacho(entrada, regrasDespacho(empresaId));
   // Lista de etapas enviada: as tentativas nunca ficam abaixo do número de etapas (senão as últimas nunca rodariam).

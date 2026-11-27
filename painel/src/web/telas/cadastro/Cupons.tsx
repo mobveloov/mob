@@ -96,7 +96,7 @@ export default function Cupons() {
                 <span>Cupom utilizado: <strong>{textoUsos(x.usos)}</strong></span>
                 <span className="cg-acoes">
                   <button className="cg-botao" onClick={() => setEditando(x)}>Editar</button>
-                  <button className="cg-botao" onClick={() => void tentar(async () => { await api.salvarRegistro("cupons", x.id, { ...x, ativo: x.ativo !== true }); l.recarregar(); }, x.ativo === true ? "Cupom pausado." : "Cupom ativado.")}>{x.ativo === true ? "Pausar" : "Ativar"}</button>
+                  <button className="cg-botao" onClick={() => void tentar(async () => { await api.salvarRegistro("cupons", x.id, { ativo: x.ativo !== true }); l.recarregar(); }, x.ativo === true ? "Cupom pausado." : "Cupom ativado.")}>{x.ativo === true ? "Pausar" : "Ativar"}</button>
                   <button className="cg-botao perigo" onClick={() => confirm(`Excluir o cupom ${x.codigo}?`) && void tentar(async () => { await api.apagarRegistro("cupons", x.id); l.recarregar(); }, "Cupom excluído.")}>Excluir</button>
                 </span>
               </div>

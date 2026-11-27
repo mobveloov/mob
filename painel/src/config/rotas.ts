@@ -37,6 +37,8 @@ import { salvarConfigMapas, visaoMapas } from "./mapas.ts";
 import { ultimoErroDoProvedor } from "../servidor/mapas-tiles.ts";
 import { aberturaDoApp, ehAppAbertura, enviarAbertura, MAX_ABERTURA, removerAbertura } from "./abertura.ts";
 import { enviarImagemMarcaMotorista, personalizacaoMotorista, removerImagemMarcaMotorista, salvarPersonalizacaoMotorista } from "./personalizacao-motorista.ts";
+import { preGerarFrases } from "../apps/voz.ts";
+import { vozDoApp, type AppVoz } from "./voz-app.ts";
 import { enviarImagemMarca, MAX_IMAGEM_MARCA, personalizacao, removerImagemMarca, salvarPersonalizacao } from "./personalizacao.ts";
 import { bandeira, salvarBandeira } from "./bandeira.ts";
 import { camposBandeira, salvarCamposBandeira } from "./bandeira-campos.ts";
@@ -248,7 +250,22 @@ rotasConfig.put("/bandeira-campos", gestor, ok((req, res) => res.json({ valores:
 rotasConfig.get("/transbordo-bandeiras", ok((req, res) => res.json({ parceiras: transbordoDasParceiras(emp(req)) })));
 rotasConfig.put("/transbordo-bandeiras", gestor, ok((req, res) => res.json({ parceiras: salvarTransbordo(emp(req), req.body) })));
 rotasConfig.get("/personalizacao", ok((req, res) => res.json(personalizacao(emp(req)))));
-rotasConfig.put("/personalizacao", gestor, ok((req, res) => res.json(salvarPersonalizacao(emp(req), req.body))));
+// Voz dos apps: ao mudar a voz de um app, as frases fixas são geradas no cache em segundo plano (não segura a resposta).
+const salvarComVoz = (empresaId: string, app: AppVoz, salvar: () => unknown) => {
+  const antes = JSON.stringify(vozDoApp(empresaId, app));
+  const r = salvar();
+  const depois = vozDoApp(empresaId, app);
+  if (JSON.stringify(depois) !== antes && depois.ligada) void preGerarFrases(empresaId, app).catch(() => undefined);
+  return r;
+};
+rotasConfig.put("/personalizacao", gestor, ok((req, res) => res.json(salvarComVoz(emp(req), "passageiro", () => salvarPersonalizacao(emp(req), req.body)))));
+// Gera já as frases fixas dos apps (corpo: { app?: "passageiro"|"motorista", aguardar?: true }). Sem "aguardar", responde 202 e gera em segundo plano.
+rotasConfig.post("/voz/pre-gerar", gestor, ok(async (req, res) => {
+  const app = req.body?.app === "motorista" ? "motorista" : req.body?.app === "passageiro" ? "passageiro" : undefined;
+  if (req.body?.aguardar === true) return res.json(await preGerarFrases(emp(req), app));
+  void preGerarFrases(emp(req), app).catch(() => undefined);
+  res.status(202).json({ iniciado: true });
+}));
 rotasConfig.post("/personalizacao/imagem", gestor, express.raw({ type: "image/*", limit: MAX_IMAGEM_MARCA }), ok((req, res) => {
   res.json(enviarImagemMarca(emp(req), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()));
 }));
@@ -261,7 +278,7 @@ rotasConfig.post("/abertura/:app", gestor, express.raw({ type: "image/*", limit:
 }));
 rotasConfig.delete("/abertura/:app", gestor, ok((req, res) => res.json({ abertura: removerAbertura(emp(req), appAbertura(req.params.app)) })));
 rotasConfig.get("/personalizacao-motorista", ok((req, res) => res.json(personalizacaoMotorista(emp(req)))));
-rotasConfig.put("/personalizacao-motorista", gestor, ok((req, res) => res.json(salvarPersonalizacaoMotorista(emp(req), req.body))));
+rotasConfig.put("/personalizacao-motorista", gestor, ok((req, res) => res.json(salvarComVoz(emp(req), "motorista", () => salvarPersonalizacaoMotorista(emp(req), req.body)))));
 rotasConfig.post("/personalizacao-motorista/imagem", gestor, express.raw({ type: "image/*", limit: MAX_IMAGEM_MARCA }), ok((req, res) => {
   res.json(enviarImagemMarcaMotorista(emp(req), String(req.headers["content-type"] ?? "").split(";")[0], req.body instanceof Buffer ? new Uint8Array(req.body) : new Uint8Array()));
 }));

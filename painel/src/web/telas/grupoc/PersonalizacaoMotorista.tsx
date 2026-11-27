@@ -158,7 +158,7 @@ export function PersonalizacaoMotorista() {
             </ul>
           </Item>
         </section>
-        <SecaoAberturaPremium app="motorista" premium={premium} />
+        <SecaoAberturaPremium app="motorista" premium={premium} voz={p.voz} aoMudarVoz={(v) => set("voz", v)} />
         <div className="dm-salvar">
           <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); premium.current?.desfazer(); }}>Voltar</button>
           {admin && <button className="botao primario" disabled={salvando || enviando} onClick={gravar}>Salvar alterações</button>}

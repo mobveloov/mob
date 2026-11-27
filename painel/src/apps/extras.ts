@@ -33,7 +33,8 @@ import { calcularComissao, regraDoMotorista } from "../config/comissao.ts";
 import { cobrancas, formaDaTaxa, temTaxaDoMotorista } from "../config/taxas.ts";
 import { comprarPasse, comRotulo, ofertas as ofertasDePasse, passeVigente, registrarIsencao } from "../config/passe-livre.ts";
 import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
-import { clientesDesafiados, TIPO_DESAFIO_CLIENTE } from "../gestao/desafio-cliente.ts";
+import { gravarG, lerG } from "../gestao/armazem.ts";
+import { dig, progressoClientes, TIPO_DESAFIO_CLIENTE } from "../gestao/desafio-cliente.ts";
 
 const arred = (n: number) => Math.round(n * 100) / 100;
 const hojeIso = () => agoraBr().toISOString().slice(0, 10);
@@ -503,9 +504,11 @@ export function desafios(empresaId: string, papel: PapelApp, chave: string): Pro
     if (tipo === TIPO_DESAFIO_CLIENTE) {
       // Desafio de clientes: corridas finalizadas do passageiro no período; só entra quem está na seleção do desafio.
       if (papel !== "passageiro") continue;
-      const cli = listar(empresaId, cadastroPorId("clientes")!).filter((c) => String(c.telefone) === chave);
-      if (!clientesDesafiados(cli, d, corridas).length) continue;
-      feito = corridas.filter((c) => c.passageiro.telefone === chave && c.status === "finalizada" && (c.finalizadaEm ?? "").slice(0, 10) >= ini && (c.finalizadaEm ?? "").slice(0, 10) <= fim).length;
+      // Mesma conta do painel (progressoClientes): janela com hora de início e fim, telefone normalizado.
+      const cli = listar(empresaId, cadastroPorId("clientes")!).filter((c) => dig(c.telefone) === dig(chave));
+      const meu = progressoClientes(cli, d, corridas, () => false)[0];
+      if (!meu) continue;
+      feito = meu.feito;
     } else if (TIPOS_DESAFIO_CORRIDA.includes(tipo)) {
       if (papel !== "motorista") continue;
       const cats = String(d.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
@@ -519,11 +522,14 @@ export function desafios(empresaId: string, papel: PapelApp, chave: string): Pro
     } else continue;
     const meta = Number(d.meta) || 0;
     const premio = typeof d.premio === "number" ? d.premio : null;
-    let ganho = p.premios.includes(d.id);
+    // Passageiro: o prêmio pago pela aprovação manual do painel (chave normalizada) também conta, para não pagar duas vezes.
+    const pagosDoDesafio = () => lerG<Record<string, Record<string, string>>>(empresaId, "desafios-pagos", {});
+    let ganho = p.premios.includes(d.id) || (papel === "passageiro" && !!pagosDoDesafio()[d.id]?.[dig(chave)]);
     if (!ganho && meta > 0 && feito >= meta && premio && premio > 0 && d.aprovacao !== "Manual") { // manual: a central aprova em Desafios
       lancar(empresaId, papel, chave, premio, `Prêmio: ${String(d.nome)}`, "sistema");
       p.premios = [...p.premios, d.id];
       salvarPessoa(empresaId, papel, chave, p);
+      if (papel === "passageiro") { const g = pagosDoDesafio(); g[d.id] = { ...(g[d.id] ?? {}), [dig(chave)]: new Date().toISOString() }; gravarG(empresaId, "desafios-pagos", g); }
       ganho = true;
     }
     const venceu = !!d.fim && String(d.fim) < hoje;

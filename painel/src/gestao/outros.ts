@@ -336,7 +336,7 @@ function progresso(e: string, d: Registro, corridas: CorridaPropria[]) {
   if (d.tipo !== TIPO_DESAFIO_CLIENTE) return progressoDoDesafio(e, d, corridas);
   const perfis = perfisApp(e, "passageiro");
   const pagos = lerG<Record<string, Record<string, string>>>(e, "desafios-pagos", {})[d.id] ?? {};
-  return progressoClientes(registros(e, "clientes"), d, corridas, (tel) => !!perfis.get(tel)?.premios.includes(d.id) || !!pagos[tel]);
+  return progressoClientes(registros(e, "clientes"), d, corridas, (tel) => !!perfis.get(tel)?.premios.includes(d.id) || !!pagos[telefoneBase(tel)] || !!pagos[tel] || [...perfis].some(([k, v]) => telefoneBase(k) === telefoneBase(tel) && v.premios.includes(d.id)));
 }
 
 function rotasDesafios(r: Router) {
@@ -383,9 +383,11 @@ function rotasDesafios(r: Router) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.inicio)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(b.fim))) throw new Error("Informe as datas de início e fim.");
     if (`${b.fim}T${b.horaFim ?? "23:59"}` <= `${b.inicio}T${b.horaInicio ?? "00:00"}`) throw new Error("A data final precisa ser depois do início.");
     if (!(Number(b.meta) > 0)) throw new Error("Informe a meta do desafio.");
+    if (!Number.isFinite(Number(b.meta)) || Number(b.meta) > 100_000) throw new Error("Meta inválida: use um número de corridas até 100.000.");
+    if (b.premio != null && b.premio !== "" && (!Number.isFinite(Number(b.premio)) || Number(b.premio) < 0 || Number(b.premio) > 100_000)) throw new Error("Prêmio inválido: use um valor de 0 a 100.000.");
     if (b.tipoRecompensa === "Personalizada" && !texto(b.premioDescricao, 100)) throw new Error("Descreva a recompensa.");
     const d = criar(emp(req), cad("desafios"), {
-      nome, tipo: b.publico === "Clientes" ? TIPO_DESAFIO_CLIENTE : TIPOS_DESAFIO_CORRIDA.includes(String(b.tipo)) ? b.tipo : "Desafio de corridas", meta: b.meta, premio: b.premio, inicio: b.inicio, fim: b.fim,
+      nome, tipo: b.publico === "Clientes" ? TIPO_DESAFIO_CLIENTE : TIPOS_DESAFIO_CORRIDA.includes(String(b.tipo)) ? b.tipo : "Desafio de corridas", meta: Number(b.meta), premio: b.premio == null || b.premio === "" ? b.premio : Number(b.premio), inicio: b.inicio, fim: b.fim,
       horaInicio: texto(b.horaInicio, 5) || "00:00", horaFim: texto(b.horaFim, 5) || "23:59", categorias: texto(b.categorias, 200), aprovacao: b.aprovacao === "Manual" ? "Manual" : "Automático",
       tipoRecompensa: b.tipoRecompensa === "Personalizada" ? "Personalizada" : "Em créditos", premioDescricao: b.tipoRecompensa === "Personalizada" ? texto(b.premioDescricao, 100) : "",
       corridasMin: b.corridasMin ?? null, corridasMax: b.corridasMax ?? null, corridasDe: texto(b.corridasDe, 10), corridasAte: texto(b.corridasAte, 10), ativo: true, cancelado: false, regras: texto(b.regras, 1000),
@@ -406,16 +408,19 @@ function rotasDesafios(r: Router) {
     const e = emp(req);
     const d = registros(e, "desafios").find((x) => x.id === req.params.id);
     if (!d) throw new Error("Desafio não encontrado.");
+    if (d.aprovacao !== "Manual") throw new Error("Este desafio é de aprovação automática: o prêmio entra sozinho.");
     const papel = d.tipo === TIPO_DESAFIO_CLIENTE ? "passageiro" : "motorista";
     const p = progresso(e, d, listarProprias(e)).find((x) => x.id === req.params.motoristaId);
     if (!p || p.situacao !== "Concluído") throw new Error(`${papel === "passageiro" ? "O cliente" : "O motorista"} ainda não completou o desafio.`);
     if (p.pago) throw new Error("A recompensa já foi paga.");
+    // Carteira do passageiro: a chave do cliente com o telefone normalizado (a mesma chave que o app usa, se já existir).
+    const chave = papel === "passageiro" ? ([...perfisApp(e, "passageiro").keys()].find((k) => telefoneBase(k) === telefoneBase(p.id)) ?? telefoneBase(p.id)) : p.id;
     const premio = Number(d.premio) || 0;
-    if (premio > 0) lancar(e, papel, p.id, premio, `Prêmio: ${String(d.nome)}`, quem(req));
-    const perf = pessoa(e, papel, p.id);
-    salvarPessoa(e, papel, p.id, { ...perf, premios: [...perf.premios, d.id] });
+    if (premio > 0) lancar(e, papel, chave, premio, `Prêmio: ${String(d.nome)}`, quem(req));
+    const perf = pessoa(e, papel, chave);
+    salvarPessoa(e, papel, chave, { ...perf, premios: [...perf.premios, d.id] });
     const pagos = lerG<Record<string, Record<string, string>>>(e, "desafios-pagos", {});
-    pagos[d.id] = { ...(pagos[d.id] ?? {}), [p.id]: new Date().toISOString() };
+    pagos[d.id] = { ...(pagos[d.id] ?? {}), [papel === "passageiro" ? telefoneBase(p.id) : p.id]: new Date().toISOString() };
     gravarG(e, "desafios-pagos", pagos);
     res.json({ ok: true });
   }));

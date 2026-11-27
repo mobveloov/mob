@@ -93,6 +93,8 @@ const PUBLICAS: Array<[string, string, string]> = [
   ["POST", "/api/apps/:empresa/entrar", "app: entra com o código"],
   ["GET", "/api/apps/:empresa/marca", "app: marca"],
   ["GET", "/api/apps/:empresa/abertura/:app", "app: url e versão da imagem de abertura (tela que aparece antes do login; só um endereço público de imagem)"],
+  ["GET", "/api/apps/:empresa/voz", "app: mp3 da frase curta (até 200 caracteres), com limite por IP e cache em disco; sem dado de ninguém"],
+  ["POST", "/api/apps/:empresa/voz", "app: igual ao GET, com o texto no corpo"],
   ["GET", "/api/apps/:empresa/personalizacao/icone/:veiculo/:estado.svg", "app: desenho do carro do mapa (só um SVG fixo, sem dado da empresa)"],
   ["GET", "/api/apps/:empresa/cidades", "app: cidades atendidas"],
   ["GET", "/api/apps/:empresa/regras-cadastro", "app: se o CPF é obrigatório ao criar conta"],
