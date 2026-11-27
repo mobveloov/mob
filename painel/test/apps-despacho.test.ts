@@ -151,13 +151,25 @@ test("passageiro cancela com chamadas tocando: todos os toques param", async () 
 });
 
 // 5 --------------------------------------------------------------------------------------------------
-test("ninguém aceita: depois do máximo de tentativas, sem pendência, a corrida vira não atendida", async () => {
+test("ninguém aceita: depois do máximo de tentativas a corrida cai em pendência (continua procurando, sem chamar o terceiro)", async () => {
   const t = await montar({ metodo: "mais_proximo", maxTentativas: 2, tempoPendencia: 0 }, [{ nome: "Ana", lat: -23.551 }, { nome: "Beto", lat: -23.552 }, { nome: "Caio", lat: -23.553 }]);
   const id = await t.pedir();
   for (const nome of ["Ana", "Beto"]) { const o = await t.oferta(nome); assert.ok(o, nome); await chamar("POST", `${t.API}/ofertas/${o.id}/recusar`, {}, t.tokens[nome]); }
   await esperar(2300);
-  assert.equal(C.listarProprias(t.E.id).find((c) => c.id === id)!.status, "nao_atendida");
+  const c = C.listarProprias(t.E.id).find((x) => x.id === id)!;
+  assert.equal(c.status, "procurando", "não cancela na hora: fica pendente");
+  assert.ok(c.pendenciaDesde, "marcada como pendente");
+  assert.equal(C.corridaPropriaParaPainel(c).statusTexto, "Pendente");
   assert.equal(await t.oferta("Caio", 500), null, "o terceiro não foi chamado: o máximo era 2 tentativas");
+  const abertas = await chamar("GET", `${t.API}/corridas-abertas`, undefined, t.tokens.Caio);
+  const lista = (abertas.corpo as any)?.pendentes ?? [];
+  assert.ok(lista.some((x: any) => x.id === id && x.emPendencia), "aparece na aba Pendentes do motorista");
+  // cancelamento automático por tempo configurável: dentro do prazo não cancela, passado o prazo cancela com o texto do passageiro
+  assert.equal(await C.encerrarSemMotorista(t.E.id, 10), 0);
+  assert.equal(await C.encerrarSemMotorista(t.E.id, 0), 0, "0 = nunca cancela");
+  await esperar(1100);
+  assert.equal(await C.encerrarSemMotorista(t.E.id, 1 / 60), 1);
+  assert.equal(C.listarProprias(t.E.id).find((x) => x.id === id)!.status, "nao_atendida");
 });
 
 test("tempo em pendência: depois das tentativas a corrida espera, sem chamar ninguém", async () => {

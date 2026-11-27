@@ -359,12 +359,13 @@ test("opcionais e forma de pagamento: só vê e só recebe quem oferece; corrida
   assert.equal((await chamar("GET", `${API}/corridas-abertas`, undefined, tokBeto)).corpo.disponiveis.length, 0, "aceita só Pix e a corrida é em dinheiro");
   await chamar("POST", `${API}/preferencias`, { categorias: [], filtros: ["e0"], pagamentos: ["Dinheiro", "Pix"] }, tokBeto);
   const ab = (await chamar("GET", `${API}/corridas-abertas`, undefined, tokBeto)).corpo;
-  assert.equal(ab.disponiveis.length, 1);
-  const d = ab.disponiveis[0];
+  // Ninguém tinha as opções pedidas: a corrida está pendente (sem aceite) e aparece na aba Pendentes de quem pode pegá-la.
+  assert.equal(ab.disponiveis.length + ab.pendentes.length, 1);
+  const d = ab.disponiveis[0] ?? ab.pendentes[0];
   assert.equal(d.id, ped.corpo.corrida.id); assert.deepEqual(d.opcionais, ["Porta-malas grande"]);
   assert.equal(d.valorBruto, d.valorLiquido, "Beto é isento"); assert.equal(d.taxaCentral, 0);
   assert.equal(d.passageiro, "Carla Opcionais Souza"); assert.ok(d.distanciaKm < 2);
-  assert.deepEqual(ab.pendentes, []); assert.deepEqual(ab.programadas, []);
+  assert.deepEqual(ab.programadas, []);
   // Quem está em análise ou offline não pega.
   assert.match((await chamar("POST", `${API}/corridas/${d.id}/pegar`, {}, tokNovo)).corpo.erro, /online/);
   const pg = await chamar("POST", `${API}/corridas/${d.id}/pegar`, {}, tokBeto);

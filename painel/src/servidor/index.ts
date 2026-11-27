@@ -35,6 +35,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar as listarCadastro } from "../cadastros/armazem.ts";
 import { normal } from "./util.ts";
 import { rotasConfig } from "../config/rotas.ts";
+import { regrasDespacho } from "../config/despacho.ts";
 import { rotasRelatorios } from "../relatorios/rotas.ts";
 import { rotasAreas } from "../areas/rotas.ts";
 import { rotasCentrais } from "../centrais/rotas.ts";
@@ -528,7 +529,7 @@ if (process.env.NODE_ENV !== "test") {
   servidor.keepAliveTimeout = 65_000;
   servidor.headersTimeout = 66_000;
   // A cada minuto: corrida sem motorista há mais de 20 min vira "não atendida".
-  setInterval(() => { for (const e of D.listarEmpresas()) encerrarSemMotorista(e.id).catch(() => undefined); }, 60_000).unref();
+  setInterval(() => { for (const e of D.listarEmpresas()) encerrarSemMotorista(e.id, regrasDespacho(e.id).cancelarSemAceite).catch(() => undefined); }, 20_000).unref();
   // Despacho dos apps: oferta ao motorista mais perto, vence ofertas e avisa mudanças (a cada 2 s).
   iniciarApps();
 }

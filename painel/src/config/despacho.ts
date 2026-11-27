@@ -12,14 +12,14 @@ export interface RegrasDespacho {
   metodo: "primeiro_aceitar" | "mais_proximo" | "fila_virtual";
   raioMetros: number; tempoTela: number; limiteMotoristas: number;
   prioritarios: number; secundarios: number; reserva: number;
-  maxTentativas: number; tempoPendencia: number; notificarGrupo: "prioritario" | "todos";
+  maxTentativas: number; tempoPendencia: number; /** Minutos sem aceite até cancelar sozinha (0 = nunca). */ cancelarSemAceite: number; notificarGrupo: "prioritario" | "todos";
   distanciaProxima: number; permitirProxima: boolean;
   /** Transbordo: motorista de outra cidade pode atender corridas desta cidade. */
   permitirTransbordo: boolean;
 }
 export const DESPACHO_PADRAO: RegrasDespacho = {
   metodo: "mais_proximo", raioMetros: 20_000, tempoTela: 20, limiteMotoristas: 20, prioritarios: 20, secundarios: 15, reserva: 10,
-  maxTentativas: 4, tempoPendencia: 1, notificarGrupo: "prioritario", distanciaProxima: 500, permitirProxima: false, permitirTransbordo: true,
+  maxTentativas: 4, tempoPendencia: 1, cancelarSemAceite: 10, notificarGrupo: "prioritario", distanciaProxima: 500, permitirProxima: false, permitirTransbordo: true,
 };
 
 export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADRAO): RegrasDespacho {
@@ -29,7 +29,7 @@ export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADR
     metodo: umDe(o.metodo, ["primeiro_aceitar", "mais_proximo", "fila_virtual"] as const, "mais_proximo"),
     raioMetros: n("raioMetros", 100, 100_000), tempoTela: n("tempoTela", 5, 120), limiteMotoristas: n("limiteMotoristas", 1, 500),
     prioritarios: n("prioritarios", 0, 500), secundarios: n("secundarios", 0, 500), reserva: n("reserva", 0, 500),
-    maxTentativas: n("maxTentativas", 1, 50), tempoPendencia: n("tempoPendencia", 0, 1440), notificarGrupo: umDe(o.notificarGrupo, ["prioritario", "todos"] as const, "prioritario"),
+    maxTentativas: n("maxTentativas", 1, 50), tempoPendencia: n("tempoPendencia", 0, 1440), cancelarSemAceite: n("cancelarSemAceite", 0, 1440), notificarGrupo: umDe(o.notificarGrupo, ["prioritario", "todos"] as const, "prioritario"),
     distanciaProxima: n("distanciaProxima", 0, 500_000), permitirProxima: sim(o.permitirProxima), permitirTransbordo: sim(o.permitirTransbordo, true),
   };
 }

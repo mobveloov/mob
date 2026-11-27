@@ -10,7 +10,7 @@
 import crypto from "node:crypto";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
-import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, taxasDoPassageiroDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
+import { aindaAgendada, alterarCorrida, atribuirMotorista, criarCorridaPropria, descontoDoCupom, estimarPreco, horaDaCorrida, listarProprias, marcarPendencia, mudarStatus, STATUS_TEXTO, taxaServicoDaCorrida, taxasDoPassageiroDaCorrida, type CorridaPropria, type Ponto } from "../corridas/index.ts";
 import { observacaoDaEmpresa } from "../corridas/empresa-conveniada.ts";
 import { banco } from "../servidor/banco.ts";
 import { registrarEvento, registrarPonto } from "../corridas/registro.ts";
@@ -160,7 +160,8 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
   const culpa = papel === "passageiro" ? mensagemDeCancelamento(c) : "";
   const m = c.motoristaId ? motorista(empresaId, c.motoristaId) : undefined;
   return {
-    id: c.id, os: c.os, status: c.status, statusTexto: STATUS_TEXTO[c.status], aberta,
+    id: c.id, os: c.os, status: c.status, statusTexto: papel === "passageiro" && c.status === "nao_atendida" ? "Não há nenhum motorista disponível" : STATUS_TEXTO[c.status], aberta,
+    emPendencia: c.status === "procurando" && !!c.pendenciaDesde,
     ...(papel === "motorista" && aberta ? (({ taxaCentral, valorLiquido }) => ({ taxaCentral, valorLiquido }))(valoresDaCorrida(empresaId, c, c.motoristaId ?? undefined)) : {}),
     embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
     estimativa: c.estimativa, valor: c.valor, cupom: c.cupom, desconto: c.desconto, avaliacao: c.avaliacao,
@@ -364,7 +365,11 @@ const semMotoristaAvisado = new Set<string>();
 
 export function despachar(empresaId: string) {
   const e = estado(empresaId);
-  if (!e.online.size) return 0;
+  if (!e.online.size) {
+    // Ninguém online: a corrida já fica pendente (visível no painel e para quem entrar) até o cancelamento automático.
+    for (const c of listarProprias(empresaId)) if (c.status === "procurando" && !c.pendenciaDesde && !aindaAgendada(c)) void marcarPendencia(empresaId, c.id).catch(() => undefined);
+    return 0;
+  }
   const lista = listarProprias(empresaId);
   const busy = ocupados(lista);
   const cadastro = new Map(motoristas(empresaId).map((m) => [m.id, m]));
@@ -427,6 +432,7 @@ export function despachar(empresaId: string) {
       candidatos.push(cand);
     }
     if (!candidatos.length) {
+      if (!c.pendenciaDesde) void marcarPendencia(empresaId, c.id).catch(() => undefined); // ninguém para chamar agora: fica pendente
       // Histórico da OS: avisa uma vez só que não havia motorista disponível (a verificação roda a cada 2 s).
       if (!semMotoristaAvisado.has(c.id)) { semMotoristaAvisado.add(c.id); if (semMotoristaAvisado.size > 5000) semMotoristaAvisado.clear(); registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: "Nenhum motorista disponível por perto no momento", usuario: "sistema", canal: "Despacho automático" }); }
       continue;
@@ -436,11 +442,14 @@ export function despachar(empresaId: string) {
     // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
     // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
     const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras) : candidatos.slice(0, Math.max(1, carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0))); // corrida marcada "enviar mais de um carro" completa as ofertas abertas
-    // Tentativas: depois de "máx. tentativas" rodadas sem aceite a corrida fica em pendência por "tempo em pendência" minutos; passada a pendência, tenta de novo uma vez; sem aceite, não atendida.
+    // Tentativas: depois de "máx. tentativas" rodadas sem aceite a corrida cai em PENDÊNCIA (continua procurando, aparece como pendente no painel e
+    // na aba Pendentes do motorista, que ainda pode pegá-la). Passados "tempo em pendência" minutos tenta de novo uma vez. Sem aceite, o cancelamento
+    // automático (Config › Regras de Despacho › cancelar sem aceite) a encerra como não atendida e o passageiro é avisado.
     const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
     if (rod.pausaAte > agora) continue;
     if (rod.n >= regras.maxTentativas) {
-      if (rod.pendencias >= 1 || regras.tempoPendencia <= 0) { void mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined); e.rodadas.delete(c.id); continue; }
+      void marcarPendencia(empresaId, c.id).catch(() => undefined);
+      if (rod.pendencias >= 1 || regras.tempoPendencia <= 0) continue; // fica pendente até aceitarem ou o tempo de cancelamento vencer
       e.rodadas.set(c.id, { n: 0, pausaAte: agora + regras.tempoPendencia * 60_000, pendencias: rod.pendencias + 1 });
       void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
       continue;
@@ -547,7 +556,7 @@ export async function desistir(empresaId: string, motoristaId: string, corridaId
 const assinatura = (c: CorridaPropria) => `${c.status}|${c.motoristaId ?? ""}|${c.historico.length}|${c.avaliacao ?? ""}`;
 const TEXTO_PUSH: Partial<Record<CorridaPropria["status"], string>> = {
   a_caminho: "Seu motorista está a caminho.", no_local: "Seu motorista está no local.", em_andamento: "Boa viagem!",
-  finalizada: "Corrida finalizada. Avalie o motorista.", cancelada: "A corrida foi cancelada.", nao_atendida: "Não achamos motorista agora. Tente de novo.",
+  finalizada: "Corrida finalizada. Avalie o motorista.", cancelada: "A corrida foi cancelada.", nao_atendida: "Não há nenhum motorista disponível.",
 };
 
 /** Compara as corridas com o último estado avisado e manda o evento "corrida" para quem está nela. */
@@ -652,7 +661,7 @@ function dadosDaLista(empresaId: string, c: CorridaPropria, motoristaId: string,
   return {
     id: c.id, os: c.os, embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
     infoAntes: c.infoAntes ?? "", estimativa: c.estimativa, passageiro: c.passageiro.nome, paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null,
-    status: c.status, statusTexto: STATUS_TEXTO[c.status], solicitadaEm: c.solicitadaEm, distanciaKm: km, ...extrasDaChamada(empresaId, c, motoristaId, km),
+    status: c.status, statusTexto: STATUS_TEXTO[c.status], solicitadaEm: c.solicitadaEm, distanciaKm: km, emPendencia: c.status === "procurando" && !!c.pendenciaDesde, ...extrasDaChamada(empresaId, c, motoristaId, km),
   };
 }
 
@@ -668,8 +677,12 @@ export function corridasAbertas(empresaId: string, motoristaId: string) {
   const porDistancia = (a: CorridaPropria, b: CorridaPropria) => (kmAteEmbarque(e, motoristaId, a) ?? Infinity) - (kmAteEmbarque(e, motoristaId, b) ?? Infinity);
   const item = (c: CorridaPropria) => dadosDaLista(empresaId, c, motoristaId, kmAteEmbarque(e, motoristaId, c));
   return {
-    disponiveis: procurando.filter((c) => !aindaAgendada(c)).sort(porDistancia).slice(0, 30).map(item),
-    pendentes: lista.filter((c) => c.motoristaId === motoristaId && (c.status === "a_caminho" || c.status === "no_local")).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b))).map(item),
+    disponiveis: procurando.filter((c) => !aindaAgendada(c) && !c.pendenciaDesde).sort(porDistancia).slice(0, 30).map(item),
+    // Pendentes: as que este motorista já aceitou e não começou + as que ninguém aceitou (em pendência) e ele ainda pode pegar (igual à Machine).
+    pendentes: [
+      ...lista.filter((c) => c.motoristaId === motoristaId && (c.status === "a_caminho" || c.status === "no_local")),
+      ...procurando.filter((c) => !aindaAgendada(c) && !!c.pendenciaDesde).sort(porDistancia),
+    ].map(item),
     programadas: procurando.filter((c) => aindaAgendada(c)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b))).slice(0, 30).map(item),
   };
 }
