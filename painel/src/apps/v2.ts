@@ -14,7 +14,7 @@ import { alterarCampos, listar } from "../cadastros/armazem.ts";
 import { alterarCorrida, estimarPreco, listarProprias, type Ponto } from "../corridas/index.ts";
 import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/index.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
-import { abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
+import { abrirCompleta, abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
 import { agoraBr, arred } from "../servidor/util.ts";
 import { extraDaCategoria } from "../config/categorias.ts";
 import { arquivoDoBanner, gerais as geraisDoPainel, termos as termosDoPainel } from "../config/gerais.ts";
@@ -495,7 +495,24 @@ rotasV2Central.get("/pessoas/:telefone", ok((req, res) => {
 }));
 
 // Gravações das corridas: só cargo alto (admin); cada vez que alguém abre uma gravação fica registrado.
-rotasV2Central.get("/gravacoes", exigirPapel("admin"), ok((req, res) => res.json({ gravacoes: listarGravacoes(emC(req), req.query.corrida ? String(req.query.corrida) : undefined), config: configGravacao(emC(req)) })));
+rotasV2Central.get("/gravacoes", exigirPapel("admin"), ok((req, res) => {
+  const e = emC(req), nomes = new Map(listar(e, cadastroPorId("motoristas")!).map((m) => [m.id, String(m.nome ?? "")]));
+  const corridas = new Map(listarProprias(e).map((c) => [c.id, c]));
+  const gravacoes = listarGravacoes(e, req.query.corrida ? String(req.query.corrida) : undefined).map((g) => {
+    const c = corridas.get(g.corridaId);
+    return { ...g, motorista: nomes.get(g.motoristaId) ?? c?.motorista ?? "", passageiro: c?.passageiro.nome ?? "", embarque: c?.embarque.texto ?? "", solicitadaEm: c?.solicitadaEm ?? "", segundos: g.partes.reduce((t, p) => t + p.segundos, 0), bytes: g.partes.reduce((t, p) => t + p.bytes, 0) };
+  });
+  res.json({ gravacoes, config: configGravacao(e) });
+}));
+rotasV2Central.get("/gravacoes/:corrida/completa", exigirPapel("admin"), ok((req, res) => {
+  const a = abrirCompleta(emC(req), req.params.corrida, req.ctx!.usuario.email);
+  if (!a) return res.status(404).json({ erro: "Gravação não encontrada." });
+  res.setHeader("Content-Type", a.mime);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Disposition", `${req.query.baixar ? "attachment" : "inline"}; filename="gravacao-${req.params.corrida.slice(0, 8)}.${a.extensao}"`);
+  res.end(a.dados);
+}));
 rotasV2Central.get("/gravacoes/:corrida/:parte", exigirPapel("admin"), ok((req, res) => {
   const a = abrirParte(emC(req), req.params.corrida, Number(req.params.parte), req.ctx!.usuario.email);
   return enviarArquivo(res, a ? { caminho: a.caminho, mime: a.mime } : null, false);

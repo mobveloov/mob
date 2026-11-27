@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Ban, ChevronDown, FileText, Gavel, Info, Loader2, MapPin, MessageCircle, Navigation, Phone, Radar, RefreshCw, Share2, ArrowLeft } from "lucide-react";
 import { Aviso, Dado, GRUPO_CLASSE, Janela, L, dh, dhAno, fone, km, msgErro, op, pino, reais, Selo, useDados, useMapa, zap } from "./comum";
+import { JanelaGravacoes } from "./Gravacoes";
+import { useAdmin } from "./pagamentos-comum";
 import { BlocosDaCorrida, Conversa, EnviarRecibo, JanelaLog, JanelaTrajeto, type DadosMachine } from "./DetalheCorrida";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 
@@ -15,7 +17,7 @@ export interface Detalhe {
 const STATUS_EDITAR: Array<[string, string]> = [["procurando", "Aguardando"], ["a_caminho", "A Caminho"], ["no_local", "Chegou"], ["em_andamento", "Em Viagem"], ["finalizada", "Finalizada"], ["cancelada", "Cancelada"], ["nao_atendida", "Não Atendida"]];
 const PAGAMENTOS_EDITAR = ["Dinheiro", "Pix", "Cartão na Maquininha", "Saldo da Carteira", "Cartão no App"];
 
-type Sub = "" | "raiox" | "rastreio" | "editar" | "conversa" | "cancelar" | "legenda" | "lances" | "trajeto" | "log" | "enviar";
+type Sub = "" | "raiox" | "rastreio" | "editar" | "conversa" | "cancelar" | "legenda" | "lances" | "trajeto" | "log" | "enviar" | "gravacao";
 
 export function JanelaCorrida({ id, onFechar, onMudou, editarDireto, embutida, onTrajeto, onLog, onCopia }: {
   id: string; onFechar: () => void; onMudou?: () => void; editarDireto?: boolean; embutida?: boolean;
@@ -23,6 +25,7 @@ export function JanelaCorrida({ id, onFechar, onMudou, editarDireto, embutida, o
   onTrajeto?: (id: string) => void; onLog?: (id: string) => void; onCopia?: (id: string) => void;
 }) {
   const { dados: d, erro, carregando, recarregar } = useDados<Detalhe>(() => op(`/corridas/${encodeURIComponent(id)}`), [id]);
+  const admin = useAdmin();
   const [sub, setSub] = useState<Sub>(editarDireto ? "editar" : "");
   const [msg, setMsg] = useState<{ t: string; erro?: boolean } | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -67,6 +70,7 @@ export function JanelaCorrida({ id, onFechar, onMudou, editarDireto, embutida, o
       <div className="oc-det-botoes">
         <button className="oc-btn ok" onClick={() => (onTrajeto ? onTrajeto(c.id) : setSub("trajeto"))}>Trajeto</button>
         <button className="oc-btn info" onClick={() => (onLog ? onLog(c.id) : setSub("log"))}>Histórico</button>
+        {admin && <button className="oc-btn" onClick={() => setSub("gravacao")}>Gravações</button>}
         <button className="oc-btn" onClick={() => copiar(c.id)}>Criar cópia</button>
         <button className="oc-btn" onClick={() => (d.podeRecibo ? setSub("enviar") : semRecibo())}>Enviar recibo</button>
         <button className="oc-btn" onClick={() => (d.podeRecibo ? recibo() : semRecibo())}>Exportar recibo</button>
@@ -106,6 +110,7 @@ export function JanelaCorrida({ id, onFechar, onMudou, editarDireto, embutida, o
       {d && sub === "conversa" && <Conversa id={c.id} onFechar={() => { setSub(""); mudou(); }} />}
       {d && sub === "enviar" && <EnviarRecibo d={d} onFechar={() => setSub("")} />}
       {d && sub === "trajeto" && <JanelaTrajeto id={c.id} os={c.os} onFechar={() => setSub("")} />}
+      {d && sub === "gravacao" && <JanelaGravacoes corridaId={c.id} os={c.os} onFechar={() => setSub("")} />}
       {d && sub === "log" && <JanelaLog id={c.id} os={c.os} onFechar={() => setSub("")} />}
       {d && sub === "editar" && <EditarOS d={d} onFechar={() => setSub("")} onSalvou={() => { setSub(""); setMsg({ t: "Alterações salvas." }); mudou(); }} />}
       {d && sub === "lances" && <Janela onFechar={() => setSub("")} titulo="Lances da corrida" tamanho="estreita" nivel="alto"><p className="oc-vazio">Esta corrida não recebeu lances de motoristas.</p></Janela>}

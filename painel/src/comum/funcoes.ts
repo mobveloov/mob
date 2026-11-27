@@ -47,6 +47,7 @@ export const FUNCOES: Funcao[] = [
   { id: "solicitar", grupo: "Corridas", nome: "Solicitar nova corrida", rota: "/solicitar" },
   { id: "monitoramento", grupo: "Corridas", nome: "Acompanhamento", rota: "/monitoramento", antigas: ["/acompanhamento"] },
   { id: "ocorrencias", grupo: "Corridas", nome: "Retorno e Ocorrências", rota: "/ocorrencias" },
+  { id: "gravacoes", grupo: "Corridas", nome: "Gravações", rota: "/gravacoes", minimo: "admin" },
   { id: "alertas-seguranca", grupo: "Corridas", nome: "Alertas de segurança", rota: "/alertas-seguranca", minimo: "operador" },
   { id: "historico", grupo: "Corridas", nome: "Consultar corridas", rota: "/historico", antigas: ["/corridas", "/raiox"] },
   { id: "mapa", grupo: "Corridas", nome: "Mapa de motoristas", rota: "/mapa" },
