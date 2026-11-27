@@ -310,11 +310,11 @@ test("webhook: a assinatura Signature-V2 é o HMAC-SHA-512 do corpo exato, confe
     assert.ok(env.event_id && env.source_event_id && env.occurred_at);
     assert.ok(W.entregasRecentes(t.E).every((x) => x.estado === "entregue"));
     // Teste manual do botão "Testar".
-    assert.equal((await W.testarWebhook(t.E, webhook.id)).ok, true);
+    assert.equal((await W.testarWebhook(t.E, webhook.id, 100_000)).ok, true);
     // Segredo novo: o antigo deixa de conferir.
     const novo = W.girarSegredo(t.E, webhook.id).segredo;
     assert.notEqual(novo, segredo);
-    await W.testarWebhook(t.E, webhook.id);
+    await W.testarWebhook(t.E, webhook.id, 200_000);
     const ult = recebidos.at(-1)!;
     assert.equal(ult.assinatura, crypto.createHmac("sha512", novo).update(ult.corpo).digest("hex"));
   } finally { srv.closeAllConnections(); srv.close(); }
@@ -383,4 +383,77 @@ test("webhook desligado ou de outro tipo não recebe; rotas listam, criam, giram
     assert.equal((await chamar("DELETE", `/${a.corpo.webhook.id}`)).status, 400);
   } finally { srv.closeAllConnections(); srv.close(); W.definirEnvio(); }
   assert.deepEqual(envios, []);
+});
+
+// ------------------------------------------------------------------ endurecimento (revisão)
+
+test("webhook: IPs internos, NAT64, 6to4, multicast, 'localhost.', portas e tamanho do endereço", () => {
+  for (const ip of ["10.0.0.1", "127.0.0.1", "192.0.0.5", "198.18.0.1", "198.19.255.1", "224.0.0.1", "255.255.255.255", "169.254.1.1", "100.64.0.1", "::1", "64:ff9b::7f00:1", "2002:7f00:1::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1"]) assert.ok(W.ipInterno(ip), ip);
+  for (const ip of ["8.8.8.8", "198.20.0.1", "2606:4700::1111"]) assert.equal(W.ipInterno(ip), false, ip);
+  const antes = process.env.WEBHOOK_PERMITIR_LOCAL;
+  process.env.WEBHOOK_PERMITIR_LOCAL = "0";
+  try {
+    for (const u of ["https://localhost./x", "https://224.0.0.1/x", "https://[64:ff9b::7f00:1]/x", "https://[2002:7f00:1::1]/x", "https://exemplo.com.br:8080/x", "https://exemplo.com.br/" + "a".repeat(500)]) assert.throws(() => W.validarUrl(u), /./, u);
+    assert.equal(W.validarUrl("https://exemplo.com.br:8443/x"), "https://exemplo.com.br:8443/x");
+    assert.equal(W.validarUrl("https://exemplo.com.br:443/x"), "https://exemplo.com.br/x");
+  } finally { if (antes === undefined) delete process.env.WEBHOOK_PERMITIR_LOCAL; else process.env.WEBHOOK_PERMITIR_LOCAL = antes; }
+});
+
+test("webhook: a conexão resolve o nome de novo e recusa IP interno (rebinding)", async () => {
+  const antes = process.env.WEBHOOK_PERMITIR_LOCAL;
+  process.env.WEBHOOK_PERMITIR_LOCAL = "0";
+  try {
+    await assert.rejects(() => W.verificarDns("https://localhost/x"), /interna|encontrar/);
+    const r = await new Promise<Error | null>((ok) => W.lookupSeguro("localhost", {}, (e) => ok(e)));
+    assert.match(String(r?.message), /interno/);
+  } finally { if (antes === undefined) delete process.env.WEBHOOK_PERMITIR_LOCAL; else process.env.WEBHOOK_PERMITIR_LOCAL = antes; }
+});
+
+test("webhook: sem segredo não envia e marca falhou; teste manual 1 a cada 10 s com erro genérico", async () => {
+  const t = cenario();
+  let chamadas = 0;
+  W.definirEnvio(async () => { chamadas++; return { status: 200 }; });
+  const { webhook } = W.criarWebhook(t.E, { tipo: "Status", url: "https://exemplo.com.br/h" });
+  const c = await t.pedir();
+  const seg = D.segredos(t.E); delete seg.integracoes[`webhook-${webhook.id}`]; D.salvarSegredos(t.E, seg);
+  await C.cancelarCorrida(t.E, c.id, "Central", "teste");
+  await W.processarEntregas();
+  assert.equal(chamadas, 0);
+  assert.equal(W.entregasRecentes(t.E)[0].estado, "falhou");
+  assert.match(W.entregasRecentes(t.E)[0].ultimoErro, /segredo/);
+  const u = cenario();
+  const w2 = W.criarWebhook(u.E, { tipo: "Status", url: "https://exemplo.com.br/h" }).webhook;
+  W.definirEnvio(async () => { throw new Error("connect ECONNREFUSED 10.0.0.5:80"); });
+  const r = await W.testarWebhook(u.E, w2.id, 100_000);
+  assert.equal(r.ok, false);
+  assert.doesNotMatch(r.erro, /10\.0\.0\.5|ECONN/);
+  await assert.rejects(() => W.testarWebhook(u.E, w2.id, 109_000), /10 segundos/);
+  assert.equal((await W.testarWebhook(u.E, w2.id, 116_000)).ok, false);
+  W.definirEnvio();
+});
+
+test("webhook: uma empresa não passa de 20 entregas por volta e as entregas andam em paralelo", async () => {
+  const a = cenario(), b = cenario();
+  let emVoo = 0, pico = 0;
+  W.definirEnvio(async () => { emVoo++; pico = Math.max(pico, emVoo); await new Promise((r) => setTimeout(r, 15)); emVoo--; return { status: 200 }; });
+  W.criarWebhook(a.E, { tipo: "Status", url: "https://exemplo.com.br/a" });
+  W.criarWebhook(b.E, { tipo: "Status", url: "https://exemplo.com.br/b" });
+  for (let i = 0; i < 25; i++) W.enfileirar(a.E, "Status", "A", { i });
+  W.enfileirar(b.E, "Status", "A", { i: 0 });
+  const feitas = await W.processarEntregas(Date.now() + 1000);
+  assert.equal(feitas, 21, "20 da empresa A e 1 da B");
+  assert.ok(pico > 1 && pico <= 10, `paralelo com limite (pico ${pico})`);
+  assert.equal(W.entregasRecentes(b.E)[0].estado, "entregue");
+  await W.processarEntregas(Date.now() + 2000);
+  W.definirEnvio();
+});
+
+test("will_reopen só sai se o motorista de fato cancelou; motivoId inválido da central dá erro", async () => {
+  const t = cenario();
+  const { c } = await t.aceitarCorrida();
+  const antes = t.de(c.id);
+  const sem = await C.alterarCorrida(t.E, c.id, (x) => { x.status = "procurando"; x.motoristaId = null; });
+  assert.equal(M.eventosDaMudanca(antes, sem).some((e) => e.codigo === "C"), false, "voltou à fila sem cancelamento do motorista: nada de C");
+  const d = await t.pedir({ passageiro: { nome: "Outro", telefone: "11977770055" } });
+  await assert.rejects(() => C.cancelarCorrida(t.E, d.id, "Central", "x", "painel", 999), /Motivo de cancelamento inválido/);
 });

@@ -695,7 +695,7 @@ export function cancelarCorrida(empresaId: string, id: string, quem: "Passageiro
     if (GRUPO[c.status] !== "aberta") throw new ErroCorrida(151, "Esta corrida já terminou.");
     // Motivo escolhido pelo id da lista da Machine: o texto vem da lista quando não foi informado.
     const m = motivoId != null ? motivoPorId(motivoId) : undefined;
-    if (motivoId != null && !m && quem === "Passageiro") throw new Error("Motivo de cancelamento inválido.");
+    if (motivoId != null && !m) throw new Error("Motivo de cancelamento inválido.");
     if (m) { c.motivoId = m.id; if (!String(motivo ?? "").trim()) motivo = m.texto; }
     // Taxa: passageiro que cancela depois que o motorista aceitou e já passou a tolerância da categoria.
     if (quem === "Passageiro" && c.motoristaId && (c.status === "a_caminho" || c.status === "no_local")) {

@@ -407,6 +407,7 @@ app.put("/api/integracoes/:id", admin, ok((req, res) => {
 
 app.delete("/api/integracoes/:id", admin, ok((req, res) => {
   const id = ctx(req).empresaId;
+  if (String(req.params.id).startsWith("webhook-")) throw new Error("Este item não é uma integração. Webhooks se removem na própria lista.");
   D.salvarIntegracoes(id, D.integracoes(id).filter((x) => x.id !== req.params.id));
   const seg = D.segredos(id);
   delete seg.integracoes[req.params.id];

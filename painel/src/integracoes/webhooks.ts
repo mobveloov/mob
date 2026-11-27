@@ -8,6 +8,10 @@
 // Tipos "Posição" e "Mensagens" da Machine não existem aqui (ver docs/CONFERENCIA_MACHINE.md).
 
 import crypto from "node:crypto";
+import dns from "node:dns/promises";
+import dnsCb from "node:dns";
+import http from "node:http";
+import https from "node:https";
 import net from "node:net";
 import { gravarConfig, lerConfig } from "../config/armazem.ts";
 import { banco, arquivoDoBanco } from "../servidor/banco.ts";
@@ -19,7 +23,9 @@ export type TipoWebhook = typeof TIPOS_WEBHOOK[number];
 export const MAX_POR_TIPO = 5;
 /** Espera (ms) antes de cada nova tentativa; passou do fim da lista, a entrega fica como "falhou". */
 export const ESPERAS_MS = [10_000, 60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
-const TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = 5000;
+/** Entregas ao mesmo tempo e máximo por empresa em cada volta (uma empresa com endereço lento não trava as outras). */
+const PARALELAS = 10, POR_EMPRESA = 20;
 const GUARDAR_DIAS = 14;
 
 export interface Webhook { id: string; tipo: TipoWebhook; url: string; ativo: boolean; criadoEm: string }
@@ -44,24 +50,55 @@ export const assinar = (corpo: string, segredo: string) => crypto.createHmac("sh
 // ------------------------------------------------------------------ endereço
 
 const permitirLocal = () => process.env.WEBHOOK_PERMITIR_LOCAL === "1" || (process.env.NODE_ENV === "test" && process.env.WEBHOOK_PERMITIR_LOCAL !== "0");
-/** Endereço de rede interna (o servidor não pode ser usado para bater em serviços de dentro da casa). */
-function enderecoInterno(host: string): boolean {
-  const h = host.replace(/^\[|\]$/g, "").toLowerCase();
-  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+/** Endereço IP de rede interna, reservado ou que não é de internet pública (inclui NAT64 e 6to4, que escondem IPv4 interno). */
+export function ipInterno(ip: string): boolean {
+  const h = ip.replace(/^\[|\]$/g, "").toLowerCase();
   if (net.isIPv4(h)) {
-    const [a, b] = h.split(".").map(Number);
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    const [a, b, c] = h.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168) || (a === 192 && b === 0 && c === 0) || (a === 198 && (b === 18 || b === 19));
   }
-  if (net.isIPv6(h)) return h === "::1" || h === "::" || /^f[cd]/.test(h) || /^fe[89ab]/.test(h) || h.startsWith("::ffff:");
+  if (net.isIPv6(h)) return h === "::1" || h === "::" || /^f[cd]/.test(h) || /^fe[89ab]/.test(h) || h.startsWith("::ffff:") || h.startsWith("64:ff9b:") || h.startsWith("2002:");
   return false;
 }
+/** Nome ou IP de rede interna (o ponto final de "localhost." conta). */
+function enderecoInterno(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, "").toLowerCase().replace(/\.+$/, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  return ipInterno(h);
+}
 export function validarUrl(entrada: unknown): string {
+  const bruto = String(entrada ?? "").trim();
+  if (bruto.length > 500) throw new Error("O endereço é longo demais (máximo 500 caracteres).");
   let u: URL;
-  try { u = new URL(String(entrada ?? "").trim()); } catch { throw new Error("Informe o endereço completo, por exemplo https://sua-empresa.com.br/webhook."); }
+  try { u = new URL(bruto); } catch { throw new Error("Informe o endereço completo, por exemplo https://sua-empresa.com.br/webhook."); }
   if (u.username || u.password) throw new Error("O endereço não pode ter usuário e senha.");
   if (u.protocol !== "https:" && !(u.protocol === "http:" && permitirLocal())) throw new Error("O endereço precisa começar com https://.");
+  if (!permitirLocal() && u.port && u.port !== "443" && u.port !== "8443") throw new Error("Use a porta 443 ou 8443.");
   if (enderecoInterno(u.hostname) && !permitirLocal()) throw new Error("Este endereço é de rede interna e não pode receber webhooks.");
-  return u.toString().slice(0, 500);
+  const fim = u.toString();
+  if (fim.length > 500) throw new Error("O endereço é longo demais (máximo 500 caracteres).");
+  return fim;
+}
+
+/** Resolve o nome e recusa se QUALQUER endereço for interno (o cadastro chama; a conexão confere de novo em `lookupSeguro`). */
+export async function verificarDns(url: string): Promise<void> {
+  if (permitirLocal()) return;
+  const host = new URL(url).hostname.replace(/^\[|\]$/g, "");
+  if (net.isIP(host)) return; // IP literal já foi checado em validarUrl
+  let r: Array<{ address: string }>;
+  try { r = await dns.lookup(host, { all: true }); } catch { throw new Error("Não foi possível encontrar este endereço na internet."); }
+  if (!r.length || r.some((x) => ipInterno(x.address))) throw new Error("Este endereço aponta para a rede interna e não pode receber webhooks.");
+}
+/** `lookup` da conexão: resolve de novo na hora de conectar e recusa IP interno (fecha o "DNS rebinding" entre o cadastro e o envio). */
+export function lookupSeguro(host: string, opcoes: dnsCb.LookupOptions, cb: (err: Error | null, a?: string | dnsCb.LookupAddress[], f?: number) => void) {
+  dnsCb.lookup(host, { ...opcoes, all: true }, (err, lista) => {
+    if (err) return cb(err);
+    const l = lista as dnsCb.LookupAddress[];
+    if (!permitirLocal() && (!l.length || l.some((x) => ipInterno(x.address)))) return cb(new Error("Endereço interno recusado."));
+    if (opcoes.all) return cb(null, l);
+    cb(null, l[0].address, l[0].family);
+  });
 }
 
 // ------------------------------------------------------------------ cadastro
@@ -143,10 +180,16 @@ export function enfileirar(empresaId: string, tipo: TipoWebhook, codigo: string,
 }
 
 export type Envio = (url: string, corpo: string, cabecalhos: Record<string, string>) => Promise<{ status: number }>;
-const envioPadrao: Envio = async (url, corpo, cabecalhos) => {
-  const r = await fetch(url, { method: "POST", headers: cabecalhos, body: corpo, redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
-  return { status: r.status };
-};
+const envioPadrao: Envio = (url, corpo, cabecalhos) => new Promise((ok, falha) => {
+  const u = new URL(url);
+  const req = (u.protocol === "https:" ? https : http).request(u, { method: "POST", headers: { ...cabecalhos, "content-length": Buffer.byteLength(corpo) }, lookup: lookupSeguro as never, timeout: TIMEOUT_MS }, (res) => {
+    res.destroy(); // não lê o corpo da resposta: só o status importa (e uma resposta enorme não ocupa o servidor)
+    ok({ status: res.statusCode ?? 0 });
+  });
+  req.on("timeout", () => req.destroy(new Error("Tempo esgotado.")));
+  req.on("error", falha);
+  req.end(corpo);
+}); // sem seguir redirecionamento: 3xx conta como falha
 let envio: Envio = envioPadrao;
 /** Só para os testes: troca (ou volta, com undefined) a função que faz o POST. */
 export const definirEnvio = (f?: Envio) => { envio = f ?? envioPadrao; };
@@ -165,21 +208,27 @@ export async function processarEntregas(agora = Date.now()): Promise<number> {
       ultimaLimpeza = agora;
       db.prepare("DELETE FROM webhook_entregas WHERE estado <> 'pendente' AND criado_em < ?").run(new Date(agoraBr().getTime() - GUARDAR_DIAS * 86_400_000).toISOString());
     }
-    const devidas = db.prepare("SELECT seq, empresa, webhook_id, source_event_id, tipo, corpo, tentativas FROM webhook_entregas WHERE estado = 'pendente' AND proxima_em <= ? ORDER BY seq LIMIT 50").all(agora) as unknown as Linha[];
-    for (const l of devidas) {
+    const todas = db.prepare("SELECT seq, empresa, webhook_id, source_event_id, tipo, corpo, tentativas FROM webhook_entregas WHERE estado = 'pendente' AND proxima_em <= ? ORDER BY seq LIMIT 500").all(agora) as unknown as Linha[];
+    const porEmpresa = new Map<string, number>();
+    const devidas = todas.filter((l) => { const n = (porEmpresa.get(l.empresa) ?? 0) + 1; porEmpresa.set(l.empresa, n); return n <= POR_EMPRESA; });
+    const um = async (l: Linha) => {
       const w = lista(l.empresa).find((x) => x.id === l.webhook_id);
-      if (!w || !w.ativo) { db.prepare("UPDATE webhook_entregas SET estado = 'falhou', ultimo_erro = ? WHERE seq = ?").run("Webhook removido ou desligado.", l.seq); continue; }
+      if (!w || !w.ativo) { db.prepare("UPDATE webhook_entregas SET estado = 'falhou', ultimo_erro = ? WHERE seq = ?").run("Webhook removido ou desligado.", l.seq); return; }
+      const segredo = segredoDe(l.empresa, w.id);
+      if (!segredo) { db.prepare("UPDATE webhook_entregas SET estado = 'falhou', ultimo_erro = ? WHERE seq = ?").run("Webhook sem segredo: gere um novo segredo.", l.seq); return; }
       const corpo = JSON.stringify({ event_id: crypto.randomUUID(), ...(JSON.parse(l.corpo) as object) });
       let status = 0, erro = "";
       try {
-        status = (await envio(w.url, corpo, { "content-type": "application/json", "Signature-V2": assinar(corpo, segredoDe(l.empresa, w.id)), "user-agent": "mob-webhooks/1" })).status;
+        status = (await envio(w.url, corpo, { "content-type": "application/json", "Signature-V2": assinar(corpo, segredo), "user-agent": "mob-webhooks/1" })).status;
         if (status < 200 || status >= 300) erro = `O endereço respondeu ${status}.`;
-      } catch (e) { erro = e instanceof Error ? e.message.slice(0, 200) : "Falha de rede."; }
+      } catch { erro = "Falha de conexão com o endereço."; }
       const n = l.tentativas + 1;
       if (!erro) db.prepare("UPDATE webhook_entregas SET estado = 'entregue', tentativas = ?, ultimo_status = ?, ultimo_erro = '', entregue_em = ? WHERE seq = ?").run(n, status, agoraBr().toISOString(), l.seq);
       else if (n > ESPERAS_MS.length) db.prepare("UPDATE webhook_entregas SET estado = 'falhou', tentativas = ?, ultimo_status = ?, ultimo_erro = ? WHERE seq = ?").run(n, status || null, erro, l.seq);
       else db.prepare("UPDATE webhook_entregas SET tentativas = ?, ultimo_status = ?, ultimo_erro = ?, proxima_em = ? WHERE seq = ?").run(n, status || null, erro, agora + ESPERAS_MS[n - 1], l.seq);
-    }
+    };
+    let proximo = 0;
+    await Promise.all(Array.from({ length: Math.min(PARALELAS, devidas.length) }, async () => { while (proximo < devidas.length) await um(devidas[proximo++]); }));
     return devidas.length;
   } finally { processando = false; }
 }
@@ -190,15 +239,21 @@ export function entregasRecentes(empresaId: string, limite = 30) {
     .map((r) => ({ id: r.seq as number, webhookId: r.webhook_id as string, sourceEventId: r.source_event_id as string, tipo: r.tipo as string, evento: String((JSON.parse(String(r.corpo)) as { evento?: string }).evento ?? ""), tentativas: r.tentativas as number, estado: r.estado as string, ultimoStatus: (r.ultimo_status as number | null) ?? null, ultimoErro: r.ultimo_erro as string, criadoEm: r.criado_em as string, entregueEm: (r.entregue_em as string | null) ?? null }));
 }
 
-/** Manda um evento de teste na hora para o endereço (sem fila). Devolve o que o endereço respondeu. */
-export async function testarWebhook(empresaId: string, id: string): Promise<{ ok: boolean; status: number; erro: string }> {
+const ultimoTeste = new Map<string, number>();
+/** Manda um evento de teste na hora (sem fila). No máximo um a cada 10 s por empresa; o erro devolvido é genérico (não revela a rede interna). */
+export async function testarWebhook(empresaId: string, id: string, agora = Date.now()): Promise<{ ok: boolean; status: number; erro: string }> {
   const w = lista(empresaId).find((x) => x.id === id);
   if (!w) throw new Error("Webhook não encontrado.");
+  if (agora - (ultimoTeste.get(empresaId) ?? 0) < 10_000) throw new Error("Aguarde 10 segundos entre um teste e outro.");
+  ultimoTeste.set(empresaId, agora);
+  const segredo = segredoDe(empresaId, w.id);
+  if (!segredo) return { ok: false, status: 0, erro: "Webhook sem segredo: gere um novo segredo." };
   const corpo = JSON.stringify({ event_id: crypto.randomUUID(), source_event_id: crypto.randomUUID(), tipo: w.tipo, evento: "TESTE", occurred_at: new Date().toISOString(), data: { teste: true } });
   try {
-    const { status } = await envio(w.url, corpo, { "content-type": "application/json", "Signature-V2": assinar(corpo, segredoDe(empresaId, w.id)), "user-agent": "mob-webhooks/1" });
-    return { ok: status >= 200 && status < 300, status, erro: status >= 200 && status < 300 ? "" : `O endereço respondeu ${status}.` };
-  } catch (e) { return { ok: false, status: 0, erro: e instanceof Error ? e.message.slice(0, 200) : "Falha de rede." }; }
+    const { status } = await envio(w.url, corpo, { "content-type": "application/json", "Signature-V2": assinar(corpo, segredo), "user-agent": "mob-webhooks/1" });
+    const bom = status >= 200 && status < 300;
+    return { ok: bom, status, erro: bom ? "" : `O endereço respondeu ${status}.` };
+  } catch { return { ok: false, status: 0, erro: "Não foi possível entregar o teste." }; }
 }
 
 let relogio: NodeJS.Timeout | null = null;

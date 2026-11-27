@@ -105,7 +105,7 @@ const brl = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleStr
 export function eventosDaMudanca(antes: CorridaPropria, c: CorridaPropria): EventoDaMudanca[] {
   const base = { corrida_id: c.id, os: c.os };
   const l: EventoDaMudanca[] = [];
-  const motoristaVoltou = (antes.status === "a_caminho" || antes.status === "no_local") && c.status === "procurando";
+  const motoristaVoltou = (antes.status === "a_caminho" || antes.status === "no_local") && c.status === "procurando" && (c.cancelamentos?.length ?? 0) > (antes.cancelamentos?.length ?? 0);
   if (motoristaVoltou) {
     // O motorista cancelou antes de começar e a mesma corrida volta a procurar: a Machine avisa C com will_reopen verdadeiro.
     const ultimo = c.cancelamentos?.at(-1);
