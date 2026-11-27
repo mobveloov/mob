@@ -3,19 +3,24 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Download, Filter, Info, Search } from "lucide-react";
+import { useAvisoRelatorio } from "../../componentes/AvisoRelatorio";
+import { buscarCsvCentrais, pedirCentrais, type CentralResumo } from "../centrais/comum";
 import { Aviso, Campo, Carregando, FiltroPeriodo, Modal, PERIODO_MES, PERIODOS_MACHINE, dataBr, dataHoraBr, dinheiro, pedirConfig, queryPeriodo, textoPeriodo, useAdmin, useCarregar, useSalvar, type PeriodoSel } from "./comum";
 
 const ULTIMOS_7: PeriodoSel = { chave: "ultimos_7", inicio: "", fim: "" };
 const diaCurto = (d: string) => d.slice(8, 10) + "/" + d.slice(5, 7);
 const dataExtenso = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
 
-/** Baixa um CSV do servidor (a proteção contra fórmula é feita lá). */
-export async function baixarCsv(url: string, nome: string) {
+/** Busca um CSV do servidor (a proteção contra fórmula é feita lá). */
+export async function buscarCsv(url: string): Promise<Blob> {
   let emp = "";
   try { emp = localStorage.getItem("empresa") ?? ""; } catch { /* sem armazenamento */ }
   const r = await fetch(`/api/config${url}`, { credentials: "same-origin", headers: emp ? { "X-Empresa": emp } : {} });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erro?: string }).erro || `Erro ${r.status}`);
-  const blob = await r.blob();
+  return r.blob();
+}
+export async function baixarCsv(url: string, nome: string) {
+  const blob = await buscarCsv(url);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -88,6 +93,7 @@ export function VisaoGeral() {
   const [detalhe, setDetalhe] = useState<null | "recargas" | "corridas" | "saques">(null);
   return (
     <>
+      <div className="aviso" role="note">Atenção: Os dados de faturamento nesta tela vêm dos registros deste painel e não contemplam transações feitas fora dele.</div>
       <div className="dm-cab">
         <div><h1>Visão geral do financeiro</h1><p>Período: {textoPeriodo(per)}{x ? ` (${dataBr(x.periodo.inicio)} a ${dataBr(x.periodo.fim)})` : ""}</p></div>
         <div className="dm-cab-acoes">
@@ -168,6 +174,9 @@ export function ExtratoCentral() {
   const admin = useAdmin();
   const nomeCentral = useNomeCentral();
   const { msg, salvar } = useSalvar();
+  const { gerar, aviso } = useAvisoRelatorio();
+  const rede = useCarregar(() => pedirCentrais<{ atual: string; centrais: CentralResumo[] }>("/seletor").catch(() => ({ atual: "", centrais: [] as CentralResumo[] })), []);
+  const [central, setCentral] = useState(""); // "" = a própria central
   const [acoes, setAcoes] = useState(false);
   const [modo, setModo] = useState<Modo>("mensal");
   const [mes, setMes] = useState(mesAtual());
@@ -177,7 +186,8 @@ export function ExtratoCentral() {
   const [fechados, setFechados] = useState<Set<string> | "todos">(new Set());
   const [recarregar, setRecarregar] = useState(false), [pedidos, setPedidos] = useState(false);
   const per = modo === "hoje" ? ({ chave: "hoje", inicio: "", fim: "" } as PeriodoSel) : modo === "mensal" ? limitesDoMes(mes) : perPeriodo;
-  const d = useCarregar(() => pedirConfig(`/extrato-central?${queryPeriodo(per)}`), [modo, mes, perPeriodo]);
+  // A principal vê o extrato de uma associada só se ela permitiu (e sem nomes de pessoas): quem confere é o servidor.
+  const d = useCarregar(() => (central ? pedirCentrais(`/extrato/${encodeURIComponent(central)}?${queryPeriodo(per)}`) : pedirConfig(`/extrato-central?${queryPeriodo(per)}`)), [modo, mes, perPeriodo, central]);
   const x = d.dados;
   const dias = useMemo(() => {
     if (!x) return [];
@@ -190,8 +200,13 @@ export function ExtratoCentral() {
     <>
       <div className="dm-cab">
         <div><h1>Extrato da central</h1><p>{nomeCentral || "Entradas e saídas do caixa da central, dia a dia."}</p></div>
-        <div className="dm-cab-acoes">{admin && <button className="botao primario" onClick={() => setRecarregar(true)}>Recarregar saldo</button>}</div>
+        <div className="dm-cab-acoes">{admin && !central && <button className="botao primario" onClick={() => setRecarregar(true)}>Recarregar saldo</button>}</div>
       </div>
+      {(rede.dados?.centrais?.length ?? 0) > 1 && (
+        <div className="dm-pilulas" role="tablist" aria-label="Central">
+          {rede.dados!.centrais.map((c) => { const propria = c.id === rede.dados!.centrais[0].id; return <button key={c.id} role="tab" aria-selected={(central || rede.dados!.centrais[0].id) === c.id} className={(central || rede.dados!.centrais[0].id) === c.id ? "ativo" : ""} onClick={() => setCentral(propria ? "" : c.id)}>{c.nome}</button>; })}
+        </div>
+      )}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-kpis">
         <div className="dm-kpi destaque"><small>Saldo atual</small><strong>{x ? dinheiro(x.saldoAtual) : "—"}</strong><small>Comissões e recargas menos saques pagos</small></div>
@@ -203,7 +218,7 @@ export function ExtratoCentral() {
         {modo === "periodo" && <FiltroPeriodo valor={perPeriodo} onChange={setPerPeriodo} atalhos={PERIODOS_MACHINE} />}
         <div className="dm-dropdown">
           <button type="button" className="botao" aria-haspopup="menu" aria-expanded={acoes} onClick={() => setAcoes(!acoes)}>Mais ações ▾</button>
-          {acoes && <div className="dm-dropdown-menu" role="menu"><button role="menuitem" onClick={() => { setAcoes(false); void salvar(() => baixarCsv(`/extrato-central/csv?${queryPeriodo(per)}`, "extrato-da-central.csv"), "CSV exportado."); }}>Exportar CSV</button></div>}
+          {acoes && <div className="dm-dropdown-menu" role="menu"><button role="menuitem" onClick={() => { setAcoes(false); void salvar(() => gerar(() => (central ? buscarCsvCentrais(`/extrato/${encodeURIComponent(central)}/csv?${queryPeriodo(per)}`) : buscarCsv(`/extrato-central/csv?${queryPeriodo(per)}`)), "extrato-da-central.csv"), ""); }}>Exportar</button></div>}
         </div>
         <select value={mostrar} onChange={(e) => setMostrar(e.target.value as typeof mostrar)} aria-label="Mostrar"><option value="todos">Entradas e saídas</option><option value="entrada">Só entradas</option><option value="saida">Só saídas</option></select>
         <label className="dm-inline">Ordenar por <select value={ordem} onChange={(e) => setOrdem(e.target.value as typeof ordem)} aria-label="Ordenar por"><option value="recentes">Dias mais recentes</option><option value="antigos">Dias mais antigos</option><option value="maior">Maior valor</option></select></label>
@@ -231,6 +246,7 @@ export function ExtratoCentral() {
           )}
         </div>
       ))}
+      {aviso}
       <ModalRecarga aberto={recarregar} onFechar={() => setRecarregar(false)} onFeito={() => { setRecarregar(false); d.recarregar(); setPedidos(true); }} />
       <ModalPedidos aberto={pedidos} onFechar={() => setPedidos(false)} pedidos={x?.pedidos ?? []} admin={admin} onMudou={d.recarregar} />
     </>
@@ -274,34 +290,57 @@ function ModalPedidos({ aberto, onFechar, pedidos, admin, onMudou }: { aberto: b
 
 // ------------------------------------------------------------------ Extrato de transações online
 
-const PADRAO_FILTRO = { tipo: "todos", status: "todos", repasse: "", busca: "" };
+// Como na Machine: "Tipo de transação" e "Repasse" (situação) são caixas de marcar, todas marcadas ao abrir; "Todos" marca ou desmarca as demais.
+const TIPOS_TRANSACAO = ["Saque", "Pagamento", "Recarga empresa", "Recarga passageiro", "Recarga motorista", "Repasse"];
+const SITUACOES_TRANSACAO = ["Pago", "Pendente", "Chargeback", "Estornado", "Cancelado"];
+const PADRAO_FILTRO = { tipo: TIPOS_TRANSACAO, status: SITUACOES_TRANSACAO, repasse: "", busca: "" };
+const valorMarcadas = (marcadas: string[], todas: string[]) => (marcadas.length === todas.length || !marcadas.length ? "todos" : marcadas.join("|"));
+
+function GrupoMarcar({ rotulo, opcoes, marcadas, onChange }: { rotulo: string; opcoes: string[]; marcadas: string[]; onChange: (m: string[]) => void }) {
+  const todas = marcadas.length === opcoes.length;
+  return (
+    <fieldset className="dm-campo" style={{ flexBasis: "100%", border: 0, padding: 0 }}>
+      <span>{rotulo}</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        <label><input type="checkbox" checked={todas} onChange={() => onChange(todas ? [] : opcoes)} /> Todos</label>
+        {opcoes.map((o) => <label key={o}><input type="checkbox" checked={marcadas.includes(o)} onChange={() => onChange(opcoes.filter((x) => (x === o ? !marcadas.includes(o) : marcadas.includes(x))))} /> {o}</label>)}
+      </div>
+    </fieldset>
+  );
+}
 
 export function ExtratoOnline() {
   const admin = useAdmin();
   const [per, setPer] = useState<PeriodoSel>({ chave: "hoje", inicio: "", fim: "" });
   const [maisFiltros, setMais] = useState(false), [repasses, setRepasses] = useState(false);
   const [f, setF] = useState(PADRAO_FILTRO), [aplicado, setAplicado] = useState(PADRAO_FILTRO);
+  const [pagina, setPagina] = useState(1);
   const [marcar, setMarcar] = useState<any>(null);
-  const qs = `${queryPeriodo(per)}&tipo=${encodeURIComponent(aplicado.tipo)}&status=${encodeURIComponent(aplicado.status)}&repasse=${aplicado.repasse}&busca=${encodeURIComponent(aplicado.busca)}`;
-  const d = useCarregar(() => pedirConfig(`/transacoes-online?${qs}`), [qs]);
+  const qs = `${queryPeriodo(per)}&tipo=${encodeURIComponent(valorMarcadas(aplicado.tipo, TIPOS_TRANSACAO))}&status=${encodeURIComponent(valorMarcadas(aplicado.status, SITUACOES_TRANSACAO))}&repasse=${aplicado.repasse}&busca=${encodeURIComponent(aplicado.busca)}`;
+  const d = useCarregar(() => pedirConfig(`/transacoes-online?${qs}&pagina=${pagina}`), [qs, pagina]);
   const { msg, salvar } = useSalvar();
   const x = d.dados;
+  const de = x ? (x.total ? (x.pagina - 1) * x.porPagina + 1 : 0) : 0, ate = x ? Math.min(x.total, x.pagina * x.porPagina) : 0;
+  const numeros: number[] = x ? Array.from({ length: x.paginas }, (_, i) => i + 1).filter((p) => p === 1 || p === x.paginas || Math.abs(p - x.pagina) <= 2) : [];
   return (
     <>
+      <div className="aviso" role="note">Atenção: Os dados de faturamento nesta tela vêm dos registros deste painel e não contemplam transações feitas fora dele.</div>
       <div className="dm-cab">
         <div><h1>Extrato de transações online</h1><p>Período: {textoPeriodo(per)}</p></div>
         <div className="dm-cab-acoes">
           <button className="botao" aria-expanded={maisFiltros} onClick={() => setMais(!maisFiltros)}><Filter size={14} /> Mais filtros</button>
-          <FiltroPeriodo valor={per} onChange={setPer} atalhos={PERIODOS_MACHINE} />
+          <FiltroPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} atalhos={PERIODOS_MACHINE} />
           <button className="botao" onClick={() => salvar(() => baixarCsv(`/transacoes-online/csv?${qs}`, "extrato-transacoes-online.csv"), "CSV exportado.")}><Download size={14} /> Exportar CSV</button>
         </div>
       </div>
-      {maisFiltros && <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setAplicado(f); }}>
-        <label>Tipo de transação<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}><option value="todos">Todos</option>{(x?.tipos ?? []).map((t: string) => <option key={t}>{t}</option>)}</select></label>
-        <label>Status<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="todos">Todos</option>{(x?.status ?? []).map((t: string) => <option key={t}>{t}</option>)}</select></label>
+      {maisFiltros && <form className="dm-cartao dm-filtros" aria-label="Filtro de pesquisa" onSubmit={(e) => { e.preventDefault(); setPagina(1); setAplicado(f); setMais(false); }}>
+        <div style={{ flexBasis: "100%" }}><h3 className="dm-secao">Filtro de pesquisa</h3><small>Você pode filtrar um ou mais campos</small></div>
+        <GrupoMarcar rotulo="Tipo de transação" opcoes={TIPOS_TRANSACAO} marcadas={f.tipo} onChange={(m) => setF({ ...f, tipo: m })} />
+        <GrupoMarcar rotulo="Repasse" opcoes={SITUACOES_TRANSACAO} marcadas={f.status} onChange={(m) => setF({ ...f, status: m })} />
         <label>Data de repasse<input type="date" value={f.repasse} onChange={(e) => setF({ ...f, repasse: e.target.value })} /></label>
         <button className="botao primario">Filtrar</button>
-        <button type="button" className="botao" onClick={() => { setF({ ...PADRAO_FILTRO, busca: f.busca }); setAplicado({ ...PADRAO_FILTRO, busca: aplicado.busca }); }}>Limpar filtros</button>
+        <button type="button" className="botao" onClick={() => { setF({ ...PADRAO_FILTRO, busca: f.busca }); setAplicado({ ...PADRAO_FILTRO, busca: aplicado.busca }); setPagina(1); }}>Limpar filtros</button>
+        <button type="button" className="botao" onClick={() => { setF(aplicado); setMais(false); }}>Cancelar</button>
       </form>}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
       <div className="dm-kpis">
@@ -310,15 +349,16 @@ export function ExtratoOnline() {
         <Indicador titulo="Repasses agendados" dica="Soma de todas as transações com status Pendente (saques e recargas aguardando a central)." valor={x?.repassesAgendados} />
       </div>
       <div className="dm-cartao tabela-rola">
-        <div className="dm-busca"><Search size={14} aria-hidden /><input type="search" value={f.busca} onChange={(e) => { setF({ ...f, busca: e.target.value }); setAplicado({ ...aplicado, busca: e.target.value }); }} placeholder="Buscar por ID da transação" aria-label="Buscar por ID da transação" /></div>
+        <div className="dm-busca"><Search size={14} aria-hidden /><input type="search" value={f.busca} onChange={(e) => { setF({ ...f, busca: e.target.value }); setAplicado({ ...aplicado, busca: e.target.value }); setPagina(1); }} placeholder="Buscar por ID da transação" aria-label="Buscar por ID da transação" /></div>
+        {x && x.total > 0 && <p><small>Exibindo {de}-{ate} de {x.total} resultados</small></p>}
         <table>
-          <thead><tr><th>Data e Hora</th><th>Data de repasse</th><th>ID da transação</th><th>Tipo de transação</th><th>Forma de pagamento</th><th>Repasse</th><th>Status</th><th>Valor líquido</th>{admin && <th />}</tr></thead>
+          <thead><tr><th>Data e Hora</th><th>Data de repasse</th><th>ID da transação</th><th>Tipo de transação</th><th>Forma de pagamento</th><th>Repasse</th><th>Valor líquido</th>{admin && <th />}</tr></thead>
           <tbody>
-            {!x ? <tr><td colSpan={9}><Carregando /></td></tr> : !x.itens.length ? <tr><td colSpan={9} className="vazio"><strong>Nenhuma transação encontrada para os filtros selecionados</strong><br />Quando houver lançamentos de transações, eles aparecerão aqui.</td></tr> : x.itens.map((i: any) => (
+            {!x ? <tr><td colSpan={8}><Carregando /></td></tr> : !x.itens.length ? <tr><td colSpan={8} className="vazio"><strong>Nenhuma transação encontrada para os filtros selecionados</strong><br />Quando houver lançamentos de transações, eles aparecerão aqui.</td></tr> : x.itens.map((i: any) => (
               <tr key={`${i.tipo}${i.id}`}>
                 <td>{dataHoraBr(i.em)}</td><td>{i.dataRepasse ? dataBr(i.dataRepasse) : "—"}</td>
                 <td title={i.id}><code>{i.codigo}</code><small className="bloco">{i.pessoa}{i.detalhe ? ` · ${i.detalhe}` : ""}</small></td>
-                <td>{i.tipo}</td><td>{i.forma}</td><td>{i.repasse}</td>
+                <td>{i.tipo}</td><td title={`Repasse para: ${i.repasse}`}>{i.forma}</td>
                 <td><span className={`selo ${i.status === "Pago" ? "ok" : i.status === "Pendente" ? "alerta" : "ruim"}`}>{i.status}</span>{i.marcadoPor && <small className="bloco">por {i.marcadoPor}</small>}</td>
                 <td className={`num ${i.valor < 0 ? "txt-ruim" : ""}`}>{dinheiro(i.valor)}</td>
                 {admin && <td>{["Pagamento", "Repasse", "Recarga motorista", "Recarga passageiro", "Recarga empresa"].includes(i.tipo) && ["Pago", "Chargeback", "Estornado"].includes(i.status) && <button className="botao" onClick={() => setMarcar(i)}>Marcar</button>}</td>}
@@ -326,7 +366,15 @@ export function ExtratoOnline() {
             ))}
           </tbody>
         </table>
-        {x && x.total > x.itens.length && <p className="vazio">Mostrando {x.itens.length} de {x.total}. Refine os filtros ou exporte o CSV.</p>}
+        {x && x.paginas > 1 && (
+          <div className="dm-cab-acoes" style={{ marginTop: 10 }} role="navigation" aria-label="Páginas">
+            <button className="botao" disabled={x.pagina <= 1} onClick={() => setPagina(1)}>Primeira</button>
+            <button className="botao" disabled={x.pagina <= 1} onClick={() => setPagina(x.pagina - 1)}>←</button>
+            {numeros.map((p) => <button key={p} className={`botao ${p === x.pagina ? "primario" : ""}`} onClick={() => setPagina(p)}>{p}</button>)}
+            <button className="botao" disabled={x.pagina >= x.paginas} onClick={() => setPagina(x.pagina + 1)}>→</button>
+            <button className="botao" disabled={x.pagina >= x.paginas} onClick={() => setPagina(x.paginas)}>Última</button>
+          </div>
+        )}
       </div>
       <Modal aberto={repasses} onFechar={() => setRepasses(false)} titulo="Repasses de hoje" sub="Pagamentos e repasses pagos com data de repasse de hoje." larga>
         {(() => {

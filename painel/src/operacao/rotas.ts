@@ -22,10 +22,11 @@ import fs from "node:fs";
 import { Router, type Request, type Response } from "express";
 import { arquivoDaMidia, arquivoDoAudio } from "../apps/chat.ts";
 import { aposCancelar, aposFinalizar } from "../apps/extras.ts";
-import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
+import { atribuirMotorista, cancelarCorrida, criarCorridaPropria, editarCorridaPropria, exigirOsAlteravel, pagamentosAceitosValidos, type EdicaoCorrida, type StatusProprio } from "../corridas/index.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { alterarCampos, listar } from "../cadastros/armazem.ts";
 import { sosPendentes } from "../apps/sos.ts";
+import { ajustes as ajustesApps } from "../apps/ajustes.ts";
 import * as D from "../servidor/dados.ts";
 import { consultarProprias, csvDeCorridas, empresasPorTelefone, paraLinha, PAGAMENTOS_LISTA, URGENCIAS, VIAS } from "./consulta.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
@@ -204,6 +205,11 @@ rotasOperacao.get("/ocorrencias", ok(async (req, res) => {
   const status = q(req, "status", 20).split(",").filter((x) => x in S.OCORRENCIAS_TIPOS);
   res.json(await S.ocorrencias(emp(req), { horas: h > 0 && h <= 72 ? h : 24, empresa: q(req, "empresa", 80), categoria: q(req, "categoria", 60), nomeEmpresa: q(req, "nomeEmpresa", 80), status }, pag(req), empresasPorTelefone(emp(req))));
 }));
+// Registrar ciência: a ocorrência deixa de contar no aviso fixo do painel ("Há corridas que podem requerer atenção do operador").
+rotasOperacao.post("/ocorrencias/:id/ciencia", central, ok(async (req, res) => {
+  const c = await S.registrarCiencia(emp(req), String(req.params.id).slice(0, 80), quem(req), req.body?.desfazer === true, empresasPorTelefone(emp(req)));
+  res.json({ ok: true, ciencia: c });
+}));
 
 const filtroProg = (req: Request): S.FiltroProgramadas => ({
   centralChamada: q(req, "centralChamada", 60), empresa: q(req, "empresa", 80), os: q(req, "os", 30), categoria: q(req, "categoria", 60),
@@ -264,7 +270,7 @@ const filtroTaxas = (req: Request): FiltroTaxas => ({ ...faixa(req), aba: ABAS_T
 rotasOperacao.get("/taxas-cancelamento", ok((req, res) => res.json({ ...listarTaxas(emp(req), filtroTaxas(req), pag(req)), periodo: faixa(req) })));
 rotasOperacao.get("/taxas-cancelamento/exportar", ok((req, res) => baixarCsv(res, "taxas-de-cancelamento", csvTaxas(emp(req), filtroTaxas(req)))));
 
-const filtroPix = (req: Request): FiltroPix => ({ ...faixa(req), os: q(req, "os", 30) || q(req, "busca", 30), motorista: q(req, "motorista", 80), situacao: q(req, "situacao") });
+const filtroPix = (req: Request): FiltroPix => ({ ...faixa(req), os: q(req, "os", 30) || q(req, "busca", 30), motorista: q(req, "motorista", 80), situacao: q(req, "situacao"), bandeira: q(req, "bandeira", 60), bandeiraCorrida: q(req, "bandeiraCorrida", 60) });
 rotasOperacao.get("/pix", ok((req, res) => res.json(listarPix(emp(req), filtroPix(req), pag(req)))));
 rotasOperacao.get("/pix/exportar", ok((req, res) => baixarCsv(res, "transacoes-pix", csvPix(emp(req), filtroPix(req)))));
 rotasOperacao.post("/pix/:id/situacao", exigirPapel("admin"), ok((req, res) => res.json({ pix: marcarPix(emp(req), req.params.id, String(req.body?.situacao ?? ""), String(req.body?.motivo ?? ""), quem(req)) })));
@@ -288,6 +294,8 @@ rotasOperacao.post("/recuperacao/contato", central, ok((req, res) => res.json({ 
 // ------------------------------------------------------------------ nova solicitação
 
 rotasOperacao.get("/passageiro", ok((req, res) => res.json(S.buscarPassageiro(emp(req), { telefone: q(req, "telefone", 20), cpf: q(req, "cpf", 20) }))));
+/** Exigências da solicitação: os opcionais configurados em Config › Gerais do App (só recebem a corrida motoristas que oferecem todos). */
+rotasOperacao.get("/opcionais", ok((req, res) => res.json({ opcionais: ajustesApps(emp(req)).opcionais })));
 rotasOperacao.get("/motoristas", ok((req, res) => res.json({ motoristas: S.opcoesMotoristas(emp(req)) })));
 
 
@@ -324,12 +332,17 @@ function dadosCorporativos(empresaId: string, b: Record<string, unknown>) {
 rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   const pass = (b.passageiro ?? {}) as Record<string, unknown>;
+  const validos = new Set(ajustesApps(emp(req)).opcionais.map((o) => o.id));
+  const opcionais = (Array.isArray(b.opcionais) ? b.opcionais.map(String) : []).filter((x, i, a) => validos.has(x) && a.indexOf(x) === i).slice(0, 8);
   const exig = Array.isArray(b.exigencias) ? b.exigencias.map((x) => String(x).replace(/[<>]/g, "").slice(0, 60)).slice(0, 10) : [];
   const observacao = [
     String(b.observacao ?? ""), b.complemento ? `Complemento: ${String(b.complemento).slice(0, 80)}` : "", b.referencia ? `Referência: ${String(b.referencia).slice(0, 120)}` : "",
     exig.length ? `Exigências: ${exig.join(", ")}` : "",
   ].filter((x) => x.trim()).join(" · ");
+  // Formas de pagamento marcadas: a primeira vira a principal da corrida; cada uma precisa valer para a empresa conveniada.
+  const marcadas = pagamentosAceitosValidos(b.pagamentosAceitos, String(b.pagamento ?? ""));
   const corporativo = dadosCorporativos(emp(req), b);
+  for (const p of marcadas.slice(1)) dadosCorporativos(emp(req), { ...b, pagamento: p });
   const modoFinal = String(b.valorFinalModo ?? "livre") === "prefixado" ? "prefixado" : "livre";
   const prefixado = num(b.valorPrefixado);
   if (modoFinal === "prefixado" && !(prefixado != null && prefixado > 0)) throw new Error("Informe o valor prefixado da corrida.");
@@ -339,7 +352,7 @@ rotasOperacao.post("/solicitar", central, ok(async (req, res) => {
   const c = await criarCorridaPropria(emp(req), {
     passageiro: { nome: String(pass.nome ?? ""), telefone: String(pass.telefone ?? "") }, embarque: ponto(b.embarque),
     destino: b.destino ? ponto(b.destino) : undefined, paradas: Array.isArray(b.paradas) ? b.paradas.map(ponto) : [],
-    categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), canal: "painel", observacao,
+    categoria: String(b.categoria ?? ""), pagamento: String(b.pagamento ?? ""), pagamentosAceitos: marcadas, opcionais, canal: "painel", observacao,
     cupom: b.cupom ? String(b.cupom).slice(0, 30) : undefined, agendadaPara: b.agendadaPara ? String(b.agendadaPara) : undefined,
     osExterna: b.osExterna ? String(b.osExterna) : undefined,
     filialId: filialDe(emp(req), "operador", req.ctx!.usuario.id) ?? undefined,

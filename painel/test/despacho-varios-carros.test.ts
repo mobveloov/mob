@@ -1,4 +1,4 @@
-// "Enviar mais de um carro": a corrida marcada recebe a oferta de vários motoristas ao mesmo tempo (até CARROS_SIMULTANEOS),
+// "Enviar mais de um carro": a corrida marcada recebe a oferta de vários motoristas ao mesmo tempo (até o limite de motoristas do Despacho),
 // vale o primeiro que aceitar e os outros perdem a chamada na hora. Sem a marcação, continua uma oferta por vez.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -47,11 +47,13 @@ test("sem a marcação: uma oferta por vez, só para o mais perto", async () => 
   todosOffline();
 });
 
-test("com a marcação: vai para os mais perto ao mesmo tempo, no máximo CARROS_SIMULTANEOS", async () => {
+test("com a marcação: vai para os mais perto ao mesmo tempo, no máximo o limite do Despacho (3)", async () => {
+  const { salvarDespacho } = await import("../src/config/despacho.ts");
+  salvarDespacho(E, { limiteMotoristas: 3 });
   todosOnline();
   const c = await pedir("11920000002", true);
   P.despachar(E);
-  assert.equal(P.CARROS_SIMULTANEOS, 3);
+  assert.equal((P as Record<string, unknown>).CARROS_SIMULTANEOS, undefined, "não há mais número fixo no código");
   assert.deepEqual(comOferta(), [m[0].id, m[1].id, m[2].id], "os três mais perto");
   P.despachar(E);
   assert.equal(comOferta().length, 3, "não passa do limite em outra volta");

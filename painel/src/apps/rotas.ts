@@ -37,6 +37,7 @@ import { dadosParaOApp } from "../config/personalizacao.ts";
 import { dadosParaOAppMotorista } from "../config/personalizacao-motorista.ts";
 import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { euCompleto } from "./perfil.ts";
+import { rotasPublicasVoz } from "./voz.ts";
 import { rotasPublicasV2, rotasV2, rotasV2Central } from "./v2.ts";
 import { aguardar, emitir, ouvir, type Alvo } from "./eventos.ts";
 import { avisar, pushLigado, registrarToken } from "./push.ts";
@@ -137,6 +138,9 @@ r.use(rotasPublicasV2);
 
 // Link público de acompanhar a viagem (sem token).
 r.use(rotasPublicasExtras);
+
+// Voz gerada no servidor (mp3): pública, com limite por IP e cache em disco.
+r.use(rotasPublicasVoz);
 
 // Imagem de abertura (tela que aparece assim que o app abre, antes do login): pública, com versão para o cache.
 r.get("/abertura/:app", ok((req, res) => {

@@ -17,7 +17,7 @@ import { agoraBr, normal } from "../servidor/util.ts";
 import { contem, emp, hojeBr, ok, paginar, registros, soAdmin, soGestor, texto } from "./comum.ts";
 
 /** Telefone só com DDD e número (sem o 55 do país). */
-const telefoneBase = (v: unknown) => { const d = String(v ?? "").replace(/D/g, ""); return (d.length === 12 || d.length === 13) && d.startsWith("55") ? d.slice(2) : d; };
+export const telefoneBase = (v: unknown) => { const d = String(v ?? "").replace(/\D/g, ""); return (d.length === 12 || d.length === 13) && d.startsWith("55") ? d.slice(2) : d; };
 
 const naoAchou = (msg: string) => Object.assign(new Error(msg), { status: 404 });
 
@@ -87,7 +87,7 @@ export function registrarCartaoTokenizado(empresaId: string, c: { telefone: stri
   return linha;
 }
 
-function cartoesDaEmpresa(empresaId: string): CartaoTokenizado[] {
+export function cartoesDaEmpresa(empresaId: string): CartaoTokenizado[] {
   const nomes = new Map<string, string>(registros(empresaId, "clientes").map((c) => [telefoneBase(c.telefone), String(c.nome ?? "")]));
   return (tabelaCartoes().prepare("SELECT id, telefone, nome, bandeira, final, validade, validado, gateway, criado_em AS criadoEm FROM cartoes_tokenizados WHERE empresa = ? ORDER BY criado_em DESC, id").all(empresaId) as Array<Omit<CartaoTokenizado, "validado"> & { validado: number }>)
     .map((c) => ({ ...c, validado: c.validado === 1, nome: c.nome || nomes.get(c.telefone) || "" }));

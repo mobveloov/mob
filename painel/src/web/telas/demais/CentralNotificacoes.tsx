@@ -87,10 +87,12 @@ export function FaixaAlerta() {
     let vivo = true;
     const ler = () => {
       pedirConfig<{ alertas: any[] }>("/alertas/ativos").then((r) => vivo && setAlertas(r.alertas ?? [])).catch(() => undefined);
-      fetch("/api/operacao/ocorrencias?horas=1", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((r) => vivo && setOcorrencias(r?.total ?? 0)).catch(() => undefined);
+      fetch("/api/operacao/ocorrencias?horas=1", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then((r) => vivo && setOcorrencias(r?.semCiencia ?? r?.total ?? 0)).catch(() => undefined);
     };
     ler(); const t = setInterval(ler, 300_000);
-    return () => { vivo = false; clearInterval(t); };
+    // A tela de ocorrências avisa quando a central registra ciência: o aviso some na hora.
+    window.addEventListener("ocorrencias-mudou", ler);
+    return () => { vivo = false; clearInterval(t); window.removeEventListener("ocorrencias-mudou", ler); };
   }, []);
   const itens: ItemBanner[] = [
     ...(sos.abertos + sos.atendidos > 0 ? [{

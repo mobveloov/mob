@@ -90,7 +90,7 @@ export function EntregaVoucher() {
         <table>
           <thead><tr><th><input type="checkbox" aria-label="Selecionar todas" checked={todas} onChange={() => setMarcadas(todas ? [] : itens.map((i) => i.id))} /></th><th>Nº OS</th><th>Voucher</th><th>Motorista</th><th>Passageiro</th><th>Origem</th><th>Destino</th><th>Valor</th></tr></thead>
           <tbody>
-            {!pedido ? <tr><td colSpan={8} className="vazio">Clique em Obter OS Pendentes.</td></tr> : !d.dados ? <tr><td colSpan={8}><Carregando /></td></tr> : !itens.length ? <tr><td colSpan={8} className="vazio">Nenhum resultado encontrado.</td></tr> : itens.map((i) => (
+            {!pedido ? <tr><td colSpan={8} className="vazio">Nenhum resultado encontrado.</td></tr> : !d.dados ? <tr><td colSpan={8}><Carregando /></td></tr> : !itens.length ? <tr><td colSpan={8} className="vazio">Nenhum resultado encontrado.</td></tr> : itens.map((i) => (
               <tr key={i.id}>
                 <td><input type="checkbox" aria-label={`Selecionar OS ${i.os}`} checked={marcadas.includes(i.id)} onChange={() => setMarcadas(marcadas.includes(i.id) ? marcadas.filter((m) => m !== i.id) : [...marcadas, i.id])} /></td>
                 <td>{i.os}</td><td>{i.voucher}</td><td>{i.motorista}</td><td>{i.passageiro}</td><td>{i.origem}</td><td>{i.destino}</td><td className="num">{i.valor == null ? "" : dinheiro(i.valor)}</td>

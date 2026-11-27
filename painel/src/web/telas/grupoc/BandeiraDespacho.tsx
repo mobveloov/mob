@@ -82,21 +82,21 @@ export function BandeiraDespacho() {
         {b.tipoDespacho === "proximidade" && (
           <>
             <SimNao rotulo="Fazer eleição de motoristas" valor={b.eleicao} onChange={(v) => set("eleicao", v)} desabilitado={dis} ajuda="Proximidade com eleição: a corrida toca para os motoristas mais próximos e eles têm pouco menos de 10 segundos para aceitá-la. Dentre os motoristas que a aceitarem, o sistema vai identificar o que estiver a menos tempo ou na menor distância do passageiro ou do local de coleta. Proximidade sem eleição: toca em um determinado número de motoristas dentro de uma distância específica; o primeiro motorista que aceitar, não necessariamente o mais próximo, efetua a corrida." />
-            <label className="dm-campo"><span>Quantidade de tentativas de despacho por Proximidade</span>
-              <select disabled={dis} value={b.tentativas} onChange={(e) => set("tentativas", Number(e.target.value))}>{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-            <small className="bloco">Define o número de tentativas (ciclos) de despacho antes que uma solicitação fique pendente. A quantidade escolhida determina o limite de motoristas acionados e o raio de alcance por disparo: máximo de 20 motoristas em um raio de até 50 km; máximo de 6 motoristas em um raio de até 20 km.</small>
-            {b.disparos.slice(0, b.tentativas).map((x: any, i: number) => (
+            <p className="sub">Define as etapas (disparos) de despacho antes que uma solicitação fique pendente. Não há limite de etapas: use "+ Adicionar disparo" para cidades grandes. Em motoristas e distância, 0 = sem limite (distância 0 = o raio inicial do Despacho).</p>
+            {b.disparos.map((x: any, i: number) => (
               <div key={i} className="dm-cartao dm-disparo">
                 <h4>{i + 1}°</h4>
                 <div className="dm-duplo">
-                  <label className="dm-campo"><span>Motoristas simultâneos no {i + 1}º despacho</span><input type="number" min={1} max={20} disabled={dis} value={x.motoristas} onChange={(e) => setDisparo(i, "motoristas", Number(e.target.value))} /></label>
+                  <label className="dm-campo"><span>Motoristas simultâneos no {i + 1}º despacho</span><input type="number" min={0} disabled={dis} placeholder="Ilimitado" value={x.motoristas} onChange={(e) => setDisparo(i, "motoristas", Math.max(0, Number(e.target.value) || 0))} /></label>
                   <label className="dm-campo"><span>Distância até o local de solicitação (Km)</span><input inputMode="decimal" disabled={dis} value={txt(x.km)} onChange={(e) => setDisparo(i, "km", num(e.target.value))} /></label>
                 </div>
                 <label className="dm-check"><input type="checkbox" disabled={dis} checked={x.secundarios} onChange={(e) => setDisparo(i, "secundarios", e.target.checked)} /> Inclui motoristas secundários</label>
                 <label className="dm-check"><input type="checkbox" disabled={dis} checked={x.transbordo} onChange={(e) => setDisparo(i, "transbordo", e.target.checked)} /> Inclui motoristas de transbordo</label>
+                {!dis && <button type="button" className="botao" aria-label={`Remover ${i + 1}º disparo`} disabled={b.disparos.length <= 1} onClick={() => set("disparos", b.disparos.filter((_: unknown, j: number) => j !== i))}>Remover</button>}
                 {i === 0 && <small className="bloco">Motoristas simultâneos nos despachos: quantidade de motoristas que receberão a chamada simultaneamente na primeira tentativa. Distância até o local da solicitação em Km: distância máxima em Km para um motorista ser chamado na primeira tentativa.</small>}
               </div>
             ))}
+            {!dis && <button type="button" className="botao" aria-label="Adicionar disparo" onClick={() => set("disparos", [...b.disparos, { ...(b.disparos[b.disparos.length - 1] ?? { motoristas: 0, km: 0, secundarios: true, transbordo: true, tempo: 0 }) }])}>+ Adicionar disparo</button>}
           </>
         )}
       </section>

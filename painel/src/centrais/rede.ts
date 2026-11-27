@@ -14,7 +14,8 @@ import { criarEmpresa, criarUsuario, empresa, listarEmpresas, listarUsuarios, ra
 import { gravarJson, lerJson } from "../servidor/jsoncache.ts";
 
 export const OPCOES_EXTRATO = ["Não permitir", "Permitir"] as const;
-export const OPCOES_DEBITO = ["Usar conta desta central", "Usar conta da central principal"] as const;
+// "Não permitir" desliga o débito automático (a cobrança não é capturada sozinha), como na Machine.
+export const OPCOES_DEBITO = ["Usar conta desta central", "Usar conta da central principal", "Não permitir"] as const;
 export const OPCOES_CONTA = ["Conta própria", "Conta da central principal"] as const;
 export interface ControleCentral { exibirExtrato: typeof OPCOES_EXTRATO[number]; debitoAutomatico: typeof OPCOES_DEBITO[number]; contaOnline: typeof OPCOES_CONTA[number] }
 export const CONTROLE_PADRAO: ControleCentral = { exibirExtrato: "Não permitir", debitoAutomatico: "Usar conta desta central", contaOnline: "Conta própria" };
@@ -152,10 +153,12 @@ export function linhasDeControle(visorId: string, plataforma: boolean): LinhaCon
   return centraisVisiveis(visorId).map((c) => {
     const propria = c.id === visorId, ehAssociada = c.tipo === "associada";
     return {
-      ...c, controle: controleDe(c.id),
+      // na principal o extrato fica sempre ativo (ela vê o próprio)
+      ...c, controle: c.tipo === "principal" ? { ...controleDe(c.id), exibirExtrato: "Permitir" as const } : controleDe(c.id),
       pode: {
         exibirExtrato: ehAssociada && (plataforma || propria),
-        debitoAutomatico: ehAssociada && (plataforma || !propria),
+        // a principal também escolhe o próprio débito (Não permitir ou a conta dela)
+        debitoAutomatico: ehAssociada ? plataforma || !propria : plataforma || propria,
         contaOnline: ehAssociada && (plataforma || !propria),
       },
     };
@@ -165,13 +168,18 @@ export function linhasDeControle(visorId: string, plataforma: boolean): LinhaCon
 export function salvarControle(visorId: string, alvoId: unknown, mudanca: Record<string, unknown>, plataforma: boolean): ControleCentral {
   const alvo = exigirVisivel(visorId, alvoId);
   const linha = linhasDeControle(visorId, plataforma).find((l) => l.id === alvo);
-  if (!linha || linha.tipo !== "associada") throw new ErroCentral("A central principal não tem controle financeiro por aqui.");
-  const novo = { ...linha.controle };
+  if (!linha) throw naoEncontrada();
+  // na principal só o débito automático muda (Não permitir ou a conta dela); extrato e conta online não se aplicam
+  if (linha.tipo === "principal") {
+    if (Object.keys(mudanca).some((k) => k !== "debitoAutomatico")) throw new ErroCentral("A central principal só muda o débito automático por aqui.");
+    if (mudanca.debitoAutomatico === "Usar conta da central principal") throw new ErroCentral("A central principal não usa a conta de outra central.");
+  }
+  const novo = { ...controleDe(alvo) };
   const aplicar = <K extends keyof ControleCentral>(campo: K, opcoes: readonly ControleCentral[K][]) => {
     if (mudanca[campo] === undefined) return;
     const v = opcoes.find((o) => o === mudanca[campo]);
     if (!v) throw new ErroCentral("Opção inválida.");
-    if (v !== linha.controle[campo] && !linha.pode[campo as keyof LinhaControle["pode"]]) throw new ErroCentral("Seu usuário não pode mudar esta opção para esta central.", 403);
+    if (v !== controleDe(alvo)[campo] && !linha.pode[campo as keyof LinhaControle["pode"]]) throw new ErroCentral("Seu usuário não pode mudar esta opção para esta central.", 403);
     novo[campo] = v;
   };
   aplicar("exibirExtrato", OPCOES_EXTRATO); aplicar("debitoAutomatico", OPCOES_DEBITO); aplicar("contaOnline", OPCOES_CONTA);

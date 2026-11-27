@@ -250,24 +250,42 @@ export function transacoesOnline(empresaId: string, p: Per): Transacao[] {
 }
 
 export interface FiltroTransacoes { tipo?: string; status?: string; repasse?: string; busca?: string }
-export function extratoOnline(empresaId: string, p: Per, f: FiltroTransacoes = {}) {
+export const POR_PAGINA_TRANSACOES = 10;
+
+/** Valor de filtro com várias opções ("Saque|Pagamento"): só as conhecidas. Vazio ou "todos" = sem filtro. */
+export function opcoesDoFiltro<T extends string>(v: string | undefined, validas: readonly T[]): T[] | null {
+  const t = String(v ?? "").trim();
+  if (!t || t === "todos") return null;
+  return t.split("|").map((x) => x.trim()).filter((x): x is T => (validas as readonly string[]).includes(x));
+}
+
+/** Todas as transações do período que passam pelos filtros (sem paginar). */
+export function transacoesFiltradas(empresaId: string, p: Per, f: FiltroTransacoes = {}) {
   const q = normal(f.busca ?? "").replace(/-/g, "");
   const todas = transacoesOnline(empresaId, p);
-  const itens = todas.filter((x) => (!f.tipo || f.tipo === "todos" || x.tipo === f.tipo) && (!f.status || f.status === "todos" || x.status === f.status)
+  const tipos = opcoesDoFiltro(f.tipo, TIPOS_TRANSACAO), status = opcoesDoFiltro(f.status, STATUS_TRANSACAO);
+  const itens = todas.filter((x) => (!tipos || tipos.includes(x.tipo)) && (!status || status.includes(x.status))
     && (!f.repasse || x.dataRepasse === f.repasse) && (!q || normal(`${x.id} ${x.codigo} ${x.pessoa} ${x.detalhe}`).replace(/-/g, "").includes(q)));
+  return { todas, itens };
+}
+
+export function extratoOnline(empresaId: string, p: Per, f: FiltroTransacoes = {}, pagina = 1) {
+  const { todas, itens } = transacoesFiltradas(empresaId, p, f);
   const hoje = hojeBr();
   const soma = (l: Transacao[]) => cent(l.reduce((s, x) => s + x.valor, 0));
   const entradas = todas.filter((x) => x.status === "Pago" && ["Pagamento", "Recarga motorista", "Recarga passageiro", "Recarga empresa"].includes(x.tipo));
   const repHoje = todas.filter((x) => x.status === "Pago" && x.dataRepasse === hoje && ["Pagamento", "Repasse"].includes(x.tipo));
+  // Páginas de 10 em 10, como na Machine ("Exibindo 1-10 de N resultados").
+  const paginas = Math.max(1, Math.ceil(itens.length / POR_PAGINA_TRANSACOES)), pg = Math.min(paginas, Math.max(1, Math.floor(pagina) || 1));
   return {
-    periodo: p, tipos: TIPOS_TRANSACAO, status: STATUS_TRANSACAO, total: itens.length,
+    periodo: p, tipos: TIPOS_TRANSACAO, status: STATUS_TRANSACAO, total: itens.length, pagina: pg, paginas, porPagina: POR_PAGINA_TRANSACOES,
     totalCorridasRecargas: soma(entradas), repassesHoje: soma(repHoje), repassesAgendados: soma(todas.filter((x) => x.status === "Pendente")),
-    itens: itens.slice(0, 1000),
+    itens: itens.slice((pg - 1) * POR_PAGINA_TRANSACOES, pg * POR_PAGINA_TRANSACOES),
   };
 }
 
 export function csvExtratoOnline(empresaId: string, p: Per, f: FiltroTransacoes = {}): string {
-  const x = extratoOnline(empresaId, p, f);
+  const x = { itens: transacoesFiltradas(empresaId, p, f).itens.slice(0, 50_000) };
   const br = (s: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : "");
   return montarCsv(["Data e hora", "Data de repasse", "ID da transação", "Tipo de transação", "Forma de pagamento", "Repasse", "Status", "Pessoa", "Detalhe", "Valor líquido"],
     x.itens.map((i) => [`${br(i.em)} ${i.em.slice(11, 16)}`, br(i.dataRepasse), i.id, i.tipo, i.forma, i.repasse, i.status, i.pessoa, i.detalhe, i.valor]));
@@ -306,10 +324,27 @@ function linhasFaturamento(empresaId: string, p: Per): LinhaFaturamento[] {
   return l.sort((a, b) => b.em.localeCompare(a.em));
 }
 
-function filtrarFaturamento(todas: LinhaFaturamento[], f: FiltroFaturamento) {
-  const busca = (f.busca ?? "").replace(/\D/g, ""), forma = normal(f.pagamento ?? "");
-  return todas.filter((x) => (!f.status || f.status === "todos" || x.status === f.status) && (!busca || x.os.includes(busca))
-    && (!forma || normal(x.pagamento) === forma || normal(x.pagamento).includes(forma) || (forma.includes("debito") && normal(x.pagamento).includes("debito")) || (forma.includes("credito") && normal(x.pagamento).includes("credito"))));
+/** Formas de pagamento do filtro "Mais filtros" do Relatório de faturamento, com os nomes da Machine. */
+export const FORMAS_FATURAMENTO = ["Dinheiro", "Maquininha de débito", "Maquininha de crédito", "eTicket", "Voucher", "Cartão no app", "Pix", "Picpay", "Whatsapp", "Pix no app"] as const;
+const CASA_FORMA: Record<(typeof FORMAS_FATURAMENTO)[number], (n: string) => boolean> = {
+  "Dinheiro": (n) => n === "dinheiro",
+  "Maquininha de débito": (n) => n.includes("debito"),
+  "Maquininha de crédito": (n) => n.includes("credito"),
+  "eTicket": (n) => n.includes("eticket") || n === "ticket",
+  "Voucher": (n) => n === "voucher",
+  "Cartão no app": (n) => n.includes("cartao") && n.includes("app"),
+  "Pix": (n) => n === "pix",
+  "Picpay": (n) => n.includes("picpay"),
+  "Whatsapp": (n) => n.includes("whatsapp"),
+  "Pix no app": (n) => n.includes("pix") && n.includes("app"),
+};
+export const casaFormaFaturamento = (pagamento: string, forma: (typeof FORMAS_FATURAMENTO)[number]) => CASA_FORMA[forma](normal(pagamento));
+
+/** Status e formas aceitam várias opções separadas por "|" (caixas de marcar da Machine); "todos" ou vazio = sem filtro. */
+export function filtrarFaturamento(todas: LinhaFaturamento[], f: FiltroFaturamento) {
+  const busca = (f.busca ?? "").replace(/\D/g, "");
+  const status = opcoesDoFiltro(f.status, STATUS_FATURAMENTO), formas = opcoesDoFiltro(f.pagamento, FORMAS_FATURAMENTO);
+  return todas.filter((x) => (!status || status.includes(x.status)) && (!busca || x.os.includes(busca)) && (!formas || formas.some((m) => casaFormaFaturamento(x.pagamento, m))));
 }
 
 export function relatorioFaturamento(empresaId: string, p: Per, f: FiltroFaturamento = {}, pagina = 1) {
@@ -318,7 +353,7 @@ export function relatorioFaturamento(empresaId: string, p: Per, f: FiltroFaturam
   const soma = (l: LinhaFaturamento[], k: "valor" | "taxa") => cent(l.reduce((s, x) => s + x[k], 0));
   const por = 10, paginas = Math.max(1, Math.ceil(itens.length / por)), pg = Math.min(paginas, Math.max(1, Math.floor(pagina) || 1));
   return {
-    periodo: p, status: STATUS_FATURAMENTO,
+    periodo: p, status: STATUS_FATURAMENTO, formas: FORMAS_FATURAMENTO,
     brutoTotal: soma(fin, "valor"), taxaCentral: soma(fin, "taxa"), ticketMedio: fin.length ? cent(soma(fin, "valor") / fin.length) : 0,
     naoAtendidas: soma(itens.filter((x) => x.status === "Não atendida"), "valor"), canceladas: soma(itens.filter((x) => x.status === "Cancelada"), "valor"),
     total: itens.length, pagina: pg, paginas, porPagina: por, itens: itens.slice((pg - 1) * por, pg * por),

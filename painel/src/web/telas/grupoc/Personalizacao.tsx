@@ -18,6 +18,7 @@ const MARCAS: Array<[string, string]> = [["texto", "Apenas nome"], ["imagem", "A
 const DIMENSOES: Record<string, [number, number]> = { imagem: [52, 52], texto_imagem: [52, 52], imagem_alongada: [184, 52] };
 const ESTILOS: Array<[string, string, string]> = [["flutuante", "Flutuante", "Conteúdo flutuante sobre o mapa"], ["neutro", "Neutro", "Conteúdo sobre o fundo branco"], ["marcante", "Marcante", "Conteúdo sobre fundo branco e com destaque da cor principal"]];
 import { MENU_ABERTURA, SecaoAberturaPremium } from "./AberturaPremium";
+import type { ComandosAba } from "./BandeiraAbas";
 const MENU: SecaoMenu[] = [
   { titulo: "Geral", itens: [{ id: "nome", rotulo: "Nome", icone: <Type size={16} /> }, { id: "cor-principal", rotulo: "Cor principal", icone: <Palette size={16} /> }, { id: "veiculo-no-mapa", rotulo: "Veículo no mapa", icone: <Car size={16} /> }] },
   { titulo: "Tela inicial", itens: [{ id: "sua-marca", rotulo: "Sua marca", icone: <Sparkles size={16} /> }, { id: "estilo-de-tela", rotulo: "Estilo da tela", icone: <LayoutGrid size={16} /> }, { id: "recursos", rotulo: "Recursos", icone: <ReceiptText size={16} /> }] },
@@ -30,6 +31,7 @@ export function Personalizacao() {
   const [erroNome, setErroNome] = useState(false), [enviando, setEnviando] = useState(false);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setSalvo(d.dados); setP(structuredClone(d.dados)); }
   const { msg, salvando, salvar, setMsg } = useSalvar();
+  const premium = useRef<ComandosAba | null>(null); // Recursos Premium: gravam e voltam junto com a personalização
   const arrastando = useRef<string | null>(null);
   if (!p) return <>{d.erro ? <Aviso erro={d.erro} /> : <Carregando />}</>;
   const set = (k: string, v: unknown) => setP((x: any) => ({ ...x, [k]: v }));
@@ -57,7 +59,7 @@ export function Personalizacao() {
     if (!p.nome.trim()) { setErroNome(true); document.getElementById("nome")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     if (p.marca !== "texto" && !p.imagemMarcaUrl) { setMsg({ erro: "Envie uma imagem para salvar as alterações." }); return; }
     setErroNome(false);
-    void salvar(async () => { const r = await pedirConfig("/personalizacao", "PUT", p); setSalvo(r); setP(structuredClone(r)); }, "Alterações salvas.");
+    void salvar(async () => { const r = await pedirConfig("/personalizacao", "PUT", p); setSalvo(r); setP(structuredClone(r)); await premium.current?.gravar(); }, "Alterações salvas.");
   };
   const visiveis = p.recursos.filter((r: any) => r.visivel);
   const dim = DIMENSOES[p.marca];
@@ -168,9 +170,9 @@ export function Personalizacao() {
             </ul>
           </Item>
         </section>
-        <SecaoAberturaPremium app="passageiro" />
+        <SecaoAberturaPremium app="passageiro" premium={premium} voz={p.voz} aoMudarVoz={(v) => set("voz", v)} />
         <div className="dm-salvar">
-          <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); }}>Voltar</button>
+          <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); premium.current?.desfazer(); }}>Voltar</button>
           {admin && <button className="botao primario" disabled={salvando || enviando} onClick={gravar}>Salvar alterações</button>}
         </div>
         {!admin && <p className="sub">Só o administrador altera a personalização.</p>}

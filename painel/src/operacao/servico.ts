@@ -2,6 +2,7 @@
 // (repasses, financeiro, auditoria), rastreio, recibo, monitoramento, mapa em tempo real, ocorrências, programadas,
 // pendências de pagamento e objetos perdidos. Tudo por empresa (a empresa vem do login).
 
+import { regrasDespacho } from "../config/despacho.ts";
 import { cadastroPorId } from "../comum/cadastros.ts";
 import { GRUPO_TEXTO, type CorridaPainel, type Filtro } from "../comum/corrida.ts";
 import { sanearMarca } from "../comum/marca.ts";
@@ -186,7 +187,8 @@ export const trajetoDaCorrida = (empresaId: string, id: string) => trajetoDaOs(e
 
 // ====================================================================== auditoria (raio-x)
 
-const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
+/** Raio do Despacho da empresa (km; 0 = sem limite). */
+const RAIO_KM = (empresaId: string) => { const m = regrasDespacho(empresaId).raioMetros; return m > 0 ? m / 1000 : Infinity; };
 const FIM_TEXTO: Record<Onda["fim"], string> = { oferecida: "Sem resposta", aceitou: "Aceitou", recusou: "Recusou", expirou: "Deixou passar", saiu: "Ficou offline", perdeu: "Outro motorista aceitou" };
 
 export function raioX(empresaId: string, id: string) {
@@ -211,7 +213,7 @@ export function raioX(empresaId: string, id: string) {
     else if (!p) motivo = "Offline";
     else if (ocupados.has(m.id)) motivo = "Ocupado em outra corrida";
     else if (cats.length && !cats.includes(normal(c.categoria))) motivo = "Categoria não habilitada";
-    else if (km != null && km > RAIO_KM()) motivo = `Fora do raio (${RAIO_KM()} km)`;
+    else if (km != null && km > RAIO_KM(empresaId)) motivo = `Fora do raio (${RAIO_KM(empresaId)} km)`;
     return { motoristaId: m.id, nome: String(m.nome ?? ""), placa: String(m.placa ?? ""), distanciaKm: km, motivo, online: !!p };
   }).filter((m) => m.online || m.motivo === "Offline").sort((a, b) => Number(b.online) - Number(a.online) || (a.distanciaKm ?? 1e9) - (b.distanciaKm ?? 1e9)).slice(0, 100);
   return { ondas: ondas.map((o) => ({ ...o, resultado: FIM_TEXTO[o.fim] })), timeline, regiao };
@@ -350,7 +352,19 @@ export const OCORRENCIAS_TIPOS: Record<string, string> = { C: "Cancelada", N: "N
 export const PENDENTE_APOS_MIN = 3;
 export const ATRASADA_APOS_MIN = 10;
 
-export async function ocorrencias(empresaId: string, f: FiltroOcorrencias, pagina: number, empresas = new Map<string, string>()) {
+/** Ciência registrada pelo operador numa ocorrência (guardada em operacao/ciencias.json, por id da corrida). */
+export interface CienciaOcorrencia { por: string; em: string }
+/** Registra (ou desfaz, com desfazer) a ciência de uma ocorrência. Só vale para ocorrência que existe hoje na lista da empresa. */
+export async function registrarCiencia(empresaId: string, id: string, por: string, desfazer = false, empresas = new Map<string, string>()): Promise<CienciaOcorrencia | null> {
+  const todas = (await ocorrencias(empresaId, { horas: 72 }, 1, empresas, 100_000)).itens;
+  if (!todas.some((i) => i.id === id)) throw new Error("Ocorrência não encontrada.");
+  const atual = { ...lerOperacao<Record<string, CienciaOcorrencia>>(empresaId, "ciencias.json", {}) };
+  if (desfazer) delete atual[id]; else atual[id] = { por: String(por).slice(0, 120), em: new Date().toISOString() };
+  gravarOperacao(empresaId, "ciencias.json", atual);
+  return atual[id] ?? null;
+}
+
+export async function ocorrencias(empresaId: string, f: FiltroOcorrencias, pagina: number, empresas = new Map<string, string>(), porPagina = 20) {
   const r = await buscarCorridas(empresaId, { ultimasHoras: f.horas ?? 24 });
   const agora = agoraBr().getTime();
   const minutos = (c: CorridaPainel) => (c.solicitadaEm ? Math.max(0, Math.round((agora - Date.parse(c.solicitadaEm)) / 60_000)) : 0);
@@ -363,6 +377,7 @@ export async function ocorrencias(empresaId: string, f: FiltroOcorrencias, pagin
   };
   const marcados = new Set(f.status?.length ? f.status : Object.keys(OCORRENCIAS_TIPOS));
   const emp = (c: CorridaPainel) => empresas.get(soDigitos(c.telefonePassageiro)) ?? "";
+  const ciencias = lerOperacao<Record<string, CienciaOcorrencia>>(empresaId, "ciencias.json", {});
   const l = r.corridas
     .map((c) => ({ c, tipo: tipoDe(c) }))
     .filter(({ tipo }) => tipo && marcados.has(tipo))
@@ -378,9 +393,11 @@ export async function ocorrencias(empresaId: string, f: FiltroOcorrencias, pagin
       previsaoMin: c.distanciaMotoristaKm != null ? Math.max(1, Math.round(c.distanciaMotoristaKm * 3)) : null,
       avisoMotorista: /^pix/i.test(c.pagamento) ? "Pgto por Pix" : /cart|cr[eé]dito|d[eé]bito/i.test(c.pagamento) ? `Pgto por ${c.pagamento}` : "",
       valorPerdido: c.valor ?? c.valorEstimado,
+      // Quem registrou ciência (some do aviso fixo do painel); null enquanto ninguém registrou.
+      ciencia: ciencias[c.id] ?? null,
     }));
-  const p = paginar(l, pagina, 20);
-  return { avisos: r.avisos, ...p, opcoes: { categorias: [...new Set(listar(empresaId, cadastroPorId("categorias")!).map((x) => String(x.nome ?? "")).filter(Boolean))].sort(), empresas: [...new Set(empresas.values())].sort(), tipos: Object.entries(OCORRENCIAS_TIPOS).map(([id, nome]) => ({ id, nome })) } };
+  const p = paginar(l, pagina, porPagina);
+  return { avisos: r.avisos, ...p, semCiencia: l.filter((i) => !i.ciencia).length, opcoes: { categorias: [...new Set(listar(empresaId, cadastroPorId("categorias")!).map((x) => String(x.nome ?? "")).filter(Boolean))].sort(), empresas: [...new Set(empresas.values())].sort(), tipos: Object.entries(OCORRENCIAS_TIPOS).map(([id, nome]) => ({ id, nome })) } };
 }
 
 // ====================================================================== programadas
