@@ -623,3 +623,30 @@ test("pendência: sem aceite nas tentativas a corrida vira PENDÊNCIA (aba Pend.
   await chamar("POST", `${API}/corridas/${c1}/cancelar`, { motivo: "Teste" }, tokM);
   await chamar("POST", `${API}/offline`, {}, tokM);
 });
+
+test("recusar pela lista de corridas: some da lista de quem recusou, continua para os outros e a oferta aberta passa adiante", async () => {
+  const { controlarPendencias, OFERTA_MS } = await import("../src/apps/despacho.ts");
+  const { regrasDespacho } = await import("../src/config/despacho.ts");
+  const { listarProprias } = await import("../src/corridas/index.ts");
+  const regras = regrasDespacho(E.id);
+  const LONGE = { lat: -11.0, lng: -41.0 };
+  const tokP = await entrar("passageiro", "11988887401");
+  const ped = await chamar("POST", `${API}/corridas`, { embarque: { texto: "Rua da Recusa, 1", ...LONGE }, destino: { texto: "Av. Fim, 9", lat: -11.03, lng: -41.03 }, categoria: "Econômico", pagamento: "Dinheiro", pedidoId: "recusa-lista-1" }, tokP);
+  assert.equal(ped.status, 200, JSON.stringify(ped.corpo));
+  const id = ped.corpo.corrida.id as string;
+  await controlarPendencias(E.id, Date.now() + regras.maxTentativas * OFERTA_MS() + 31_000); // entra em pendência: aparece na lista de todos, sem chamada
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Rita Recusa", telefone: "11900000401", status: "Ativo", veiculo: "Hatch", placa: "RIT1A23" }, "teste");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Beto Fica", telefone: "11900000402", status: "Ativo", veiculo: "Hatch", placa: "BET1A23" }, "teste");
+  const tokA = await entrar("motorista", "11900000401"), tokB = await entrar("motorista", "11900000402");
+  for (const t of [tokA, tokB]) await chamar("POST", `${API}/online`, LONGE, t);
+  const vejo = async (t: string) => { const l = (await chamar("GET", `${API}/corridas-abertas`, undefined, t)).corpo; return [...l.disponiveis, ...l.pendentes].some((c: any) => c.id === id); };
+  assert.ok(await vejo(tokA) && await vejo(tokB), "as duas veem a corrida");
+  const r = await chamar("POST", `${API}/corridas/${id}/recusar`, {}, tokA);
+  assert.equal(r.status, 200, JSON.stringify(r.corpo));
+  assert.ok(!(await vejo(tokA)), "quem recusou não vê mais a corrida");
+  assert.ok(await vejo(tokB), "o outro motorista continua vendo");
+  assert.equal(listarProprias(E.id).find((c) => c.id === id)!.status, "procurando", "a corrida segue procurando");
+  assert.equal((await chamar("POST", `${API}/corridas/${id}/recusar`, {}, tokA)).status, 200, "recusar de novo não dá erro");
+  await chamar("POST", `${API}/corridas/${id}/cancelar`, { motivo: "Teste" }, tokP);
+  for (const t of [tokA, tokB]) await chamar("POST", `${API}/offline`, {}, t);
+});

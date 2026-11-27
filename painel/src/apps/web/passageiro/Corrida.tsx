@@ -85,7 +85,7 @@ export function Procurando({ corrida: c, mudou, recarregar }: { corrida: Corrida
     <div className="tela-mapa">
       <Mapa pontos={pontosDaRota(c)} perto={temCoord(c.embarque) ? c.embarque as Posicao : null} controles folga={360} />
       <div className="topo-flutuante">
-        <button className="pilula-branca vermelho" onClick={() => setCancelar(true)}>Cancelar</button>
+        <button className="pilula-branca vermelho" onClick={() => setCancelar(true)}>Cancelar corrida</button>
       </div>
       <FolhaBaixo fixa className="folha-procurando">
         <div className="barra-progresso" aria-hidden="true"><span /></div>
@@ -171,7 +171,7 @@ export function Cancelar({ corrida: c, fechar, mudou }: { corrida: Corrida; fech
         {(motivos ?? []).map((m) => <button key={m} className={motivo === m ? "marcado" : ""} onClick={() => setMotivo(m)}>{m}<span className={`radio ${motivo === m ? "marcado" : ""}`} /></button>)}
       </div>
       <Aviso texto={erro} />
-      <button className="botao largo" disabled={!motivo || ocupado} onClick={() => void confirmar()}>{ocupado ? "CANCELANDO…" : "CONFIRMAR"}</button>
+      <button className="botao largo" disabled={!motivo || ocupado} onClick={() => void confirmar()}>{ocupado ? "CANCELANDO…" : "CANCELAR CORRIDA"}</button>
     </FolhaModal>
   );
 }

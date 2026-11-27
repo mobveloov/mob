@@ -109,7 +109,7 @@ export function Dialogo({ icone, titulo, texto, acao, aoConfirmar, fechar, perig
         {texto && <p>{texto}</p>}
         {children}
         <div className="dialogo-botoes">
-          <button className="botao contorno" onClick={fechar}>Cancelar</button>
+          <button className="botao contorno" onClick={fechar}>Voltar</button>
           <button className={`botao ${perigo ? "vermelho" : ""}`} disabled={ocupado} onClick={aoConfirmar}>{acao}</button>
         </div>
       </div>

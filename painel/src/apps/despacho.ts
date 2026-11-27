@@ -122,6 +122,8 @@ interface Estado {
   rodadas: Map<string, { n: number; pausaAte: number; pendencias: number }>;
   /** corridaId → quando foi a última rodada de chamada (o vigia de pendência usa para saber se a busca parou) */
   movimento: Map<string, number>;
+  /** corridaId → motoristas que recusaram a corrida pela lista (some da lista deles e não recebem chamada dela) */
+  recusadas: Map<string, Set<string>>;
   /** corridaId → assinatura do último estado avisado */
   vistos: Map<string, string>;
   /** Já passou a primeira volta do vigia (a primeira só anota, não avisa). */
@@ -132,7 +134,7 @@ interface Estado {
 const estados = new Map<string, Estado>();
 function estado(empresaId: string): Estado {
   let e = estados.get(empresaId);
-  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), rodadas: new Map(), movimento: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
+  if (!e) estados.set(empresaId, (e = { online: new Map(), ofertas: new Map(), tentados: new Map(), rodadas: new Map(), movimento: new Map(), recusadas: new Map(), vistos: new Map(), vigiado: false, contraofertas: new Map() }));
   return e;
 }
 /** Só para os testes. */
@@ -495,6 +497,25 @@ function passarOferta(empresaId: string, o: Oferta, fim: FimOferta = "expirou") 
   emitir(empresaId, motoristaAlvo(o.motoristaId), "oferta_encerrada", { id: o.id });
 }
 
+/**
+ * "Recusar" numa corrida aberta pela lista (Disp./Pend.): se há chamada aberta dela para este motorista, recusa a chamada (passa adiante);
+ * em qualquer caso a corrida some da lista dele e ele não recebe chamada dela de novo. Fica no histórico da OS.
+ */
+export function recusarCorrida(empresaId: string, motoristaId: string, corridaId: string) {
+  const e = estado(empresaId);
+  const c = listarProprias(empresaId).find((x) => x.id === corridaId);
+  if (!c || c.status !== "procurando") return; // já foi pega ou cancelada: nada a recusar
+  const aberta = [...e.ofertas.values()].find((o) => o.corridaId === corridaId && o.motoristaId === motoristaId);
+  if (aberta) passarOferta(empresaId, aberta, "recusou");
+  else registrarEvento(empresaId, corridaId, { tipo: "oferta_recusada", descricao: `${String(motorista(empresaId, motoristaId)?.nome ?? "Motorista")} recusou a corrida pela lista`, usuario: String(motorista(empresaId, motoristaId)?.nome ?? "motorista"), canal: "App do motorista", dados: { motoristaId } });
+  const quem = e.recusadas.get(corridaId) ?? new Set<string>();
+  quem.add(motoristaId); e.recusadas.set(corridaId, quem);
+  const t = e.tentados.get(corridaId) ?? new Map<string, number>();
+  t.set(motoristaId, Date.now() + 365 * 24 * 3600_000); // nunca mais para ele
+  e.tentados.set(corridaId, t);
+  despachar(empresaId);
+}
+
 export function recusar(empresaId: string, motoristaId: string, ofertaId: string) {
   const o = estado(empresaId).ofertas.get(ofertaId);
   if (!o || o.motoristaId !== motoristaId) throw new Error("Esta chamada já passou.");
@@ -604,6 +625,7 @@ function limparMemoria(empresaId: string, e: Estado, agora: number) {
   const limite = agoraBr().getTime() - 24 * 3600_000;
   for (const id of e.tentados.keys()) if (porId.get(id)?.status !== "procurando") e.tentados.delete(id);
   for (const id of e.movimento.keys()) if (porId.get(id)?.status !== "procurando") e.movimento.delete(id);
+  for (const id of e.recusadas.keys()) if (porId.get(id)?.status !== "procurando") e.recusadas.delete(id);
   for (const id of e.rodadas.keys()) if (porId.get(id)?.status !== "procurando") e.rodadas.delete(id);
   for (const id of e.vistos.keys()) {
     const c = porId.get(id);
@@ -720,7 +742,7 @@ export function corridasAbertas(empresaId: string, motoristaId: string) {
   const filtros = filtrosDoDespacho(empresaId);
   const pode = (c: CorridaPropria) => !!cad && cad.status === "Ativo" && filtros.podeAtender(c, motoristaId) && habilitado(cad, c.categoria);
   const noRaio = (c: CorridaPropria) => { const km = kmAteEmbarque(e, motoristaId, c); return km == null || km <= RAIO_KM(); };
-  const procurando = lista.filter((c) => c.status === "procurando" && pode(c) && noRaio(c));
+  const procurando = lista.filter((c) => c.status === "procurando" && pode(c) && noRaio(c) && !e.recusadas.get(c.id)?.has(motoristaId));
   const porDistancia = (a: CorridaPropria, b: CorridaPropria) => (kmAteEmbarque(e, motoristaId, a) ?? Infinity) - (kmAteEmbarque(e, motoristaId, b) ?? Infinity);
   const item = (c: CorridaPropria) => dadosDaLista(empresaId, c, motoristaId, kmAteEmbarque(e, motoristaId, c));
   return {

@@ -357,6 +357,13 @@ rotasV2.post("/corridas/:id/pegar", so("motorista"), ok(async (req, res) => {
   res.json({ corrida: P.corridaParaApp(empresaId, c, "motorista") });
 }));
 
+/** "Recusar" numa corrida da lista (Disp./Pend.): sai da lista dele e passa adiante. */
+rotasV2.post("/corridas/:id/recusar", so("motorista"), ok((req, res) => {
+  const { empresaId, sessao } = ctx(req);
+  P.recusarCorrida(empresaId, sessao.chave, req.params.id);
+  res.json({ ok: true });
+}));
+
 rotasV2.post("/corridas/:id/contraoferta", so("motorista"), ok((req, res) => {
   const { empresaId, sessao } = ctx(req);
   const o = P.registrarContraoferta(empresaId, sessao.chave, req.params.id, req.body?.valor);
