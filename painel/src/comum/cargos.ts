@@ -80,7 +80,7 @@ export const REGRAS_API: RegraApi[] = [
   { caminho: /^\/crm(\/|$)/, minimo: "gestor" },
 
   // Filiais: a lista curta serve de filtro para todos; o cadastro e os vínculos são do Gestor para cima.
-  { caminho: /^\/filiais\/opcoes$/, minimo: "operador" },
+  { caminho: /^\/filiais\/(opcoes|centro)$/, minimo: "operador" },
   { caminho: /^\/filiais(\/|$)/, minimo: "gestor" },
 ];
 

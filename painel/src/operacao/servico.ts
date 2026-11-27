@@ -9,6 +9,8 @@ import { listar, atualizar, remover } from "../cadastros/armazem.ts";
 import { corridaDaFilial, pessoasDaFilial } from "../filiais/filiais.ts";
 import { estaOnline, motoristasOnline, posicaoDoMotorista } from "../apps/despacho.ts";
 import { sosPendentes } from "../apps/sos.ts";
+import { ultimasPosicoes } from "../apps/ultima-posicao.ts";
+import { ultimosContatos } from "../apps/sessoes.ts";
 import { mensagens } from "../apps/chat.ts";
 import { CANAL_TEXTO, corridaPropriaParaPainel, listarProprias, STATUS_TEXTO, taxaServicoDaCorrida, type CorridaPropria, type StatusProprio } from "../corridas/index.ts";
 import { linhaReta } from "../enderecos/index.ts";
@@ -306,15 +308,23 @@ export function mapa(empresaId: string, filial?: string) {
   const lista = listarProprias(empresaId);
   const online = new Map(motoristasOnline(empresaId).map((m) => [m.id, m]));
   const corridaDe = new Map(lista.filter((c) => c.motoristaId && COM_MOTORISTA.has(c.status)).map((c) => [c.motoristaId!, c]));
+  const ultimas = ultimasPosicoes(empresaId), contatos = ultimosContatos(empresaId, "motorista");
+  /** Último sinal do app do motorista que está desconectado: o mais recente entre o contato e a última posição. */
+  const contatoEm = (id: string, posicaoEm?: number): string | null => { const t = Math.max(posicaoEm ?? 0, contatos.get(id) ?? 0); return t ? new Date(t).toISOString() : null; };
   const cad = motoristasCad(empresaId);
   const ativos = cad.filter((m) => m.status === "Ativo" && (!daFilial || daFilial.has(m.id)));
   const motoristas = [...ativos, ...cad.filter((m) => m.status !== "Ativo" && online.has(m.id) && (!daFilial || daFilial.has(m.id)))].map((m) => {
     const o = online.get(m.id);
+    const ultima = ultimas.get(m.id);
     const c = corridaDe.get(m.id);
     const situacao = !o ? "offline" : c ? c.status : o.situacao === "recebendo chamada" ? "chamada" : "livre";
     return {
       id: m.id, nome: String(m.nome ?? ""), telefone: String(m.telefone ?? ""), veiculo: String(m.veiculo ?? ""), placa: String(m.placa ?? ""),
-      categorias: String(m.categorias ?? ""), cidade: String(m.cidade ?? ""), lat: o?.lat ?? null, lng: o?.lng ?? null, atualizadoEm: o?.atualizadoEm ?? null,
+      categorias: String(m.categorias ?? ""), cidade: String(m.cidade ?? ""),
+      // Online: posição de agora. Desconectado: última posição conhecida (pin cinza) e quando foi o último contato.
+      lat: o?.lat ?? ultima?.lat ?? null, lng: o?.lng ?? ultima?.lng ?? null,
+      atualizadoEm: o?.atualizadoEm ?? (ultima ? new Date(ultima.em).toISOString() : null),
+      ultimoContatoEm: o ? o.atualizadoEm : contatoEm(m.id, ultima?.em),
       situacao, corrida: c ? { id: c.id, os: c.os, passageiro: c.passageiro.nome } : null,
     };
   });

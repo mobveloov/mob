@@ -6,6 +6,8 @@ import "leaflet/dist/leaflet.css";
 import "./corridas.css";
 import { baseDoMapa } from "../../../comum/mapa-base.ts";
 import { invalidarDepois } from "../../../comum/mapa-seguro.ts";
+import { aplicarVista, CENTRO_BRASIL, desenharCobertura, mapaNaoMexido, type CentroDoMapa } from "../../../comum/mapa-centro.ts";
+import { buscarCentro } from "../../centro-mapa";
 
 export class ErroOp extends Error { constructor(msg: string, public status: number) { super(msg); } }
 
@@ -107,7 +109,8 @@ export const Dado = ({ r, v }: { r: string; v: ReactNode }) => <div className="o
 export const Vazio = ({ children }: { children: ReactNode }) => <div className="oc-vazio">{children}</div>;
 
 // ------------------------------------------------------------------ mapa
-export const CENTRO_PADRAO: [number, number] = [-15.78, -47.93];
+/** Só até o servidor dizer onde a empresa atua: o Brasil inteiro, nunca um ponto fixo. */
+export const CENTRO_PADRAO: [number, number] = CENTRO_BRASIL;
 
 export function pino(cor: string, texto = "", forma: "redondo" | "ponto" = "redondo") {
   return L.divIcon({
@@ -116,19 +119,43 @@ export function pino(cor: string, texto = "", forma: "redondo" | "ponto" = "redo
   });
 }
 
-/** Mapa OpenStreetMap. Devolve a referência do div e o mapa (só depois de montar). */
-export function useMapa(centro: [number, number] = CENTRO_PADRAO, zoom = 12, ativo = true) {
+/**
+ * Mapa OpenStreetMap. Devolve a referência do div e o mapa (só depois de montar).
+ * Sem `centro`, o mapa abre na cidade da filial escolhida (`filial`; vazio = todas) com a área de cobertura desenhada,
+ * e recentra ao trocar a filial. Com `centro`, a tela manda na vista (`areas: false` não desenha a cobertura).
+ */
+export function useMapa(centro?: [number, number], zoom = 12, ativo = true, opcoes: { filial?: string; areas?: boolean } = {}) {
   const ref = useRef<HTMLDivElement>(null);
   const [mapa, setMapa] = useState<L.Map | null>(null);
+  const [vista, setVista] = useState<CentroDoMapa | null>(null);
+  const inicial = centro ?? CENTRO_PADRAO;
   useEffect(() => {
     if (!ativo || !ref.current) return;
-    const m = L.map(ref.current, { zoomControl: true }).setView(centro, zoom);
+    const m = L.map(ref.current, { zoomControl: true }).setView(inicial, centro ? zoom : 4);
     baseDoMapa(L, m);
     setMapa(m);
     const cancela = invalidarDepois(m, 150);
     return () => { cancela(); m.remove(); setMapa(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ativo]);
-  return { ref, mapa };
+  const filial = opcoes.filial ?? "";
+  const desenhar = opcoes.areas !== false;
+  const aplicada = useRef<string | null>(null);
+  const cobertura = useRef<L.LayerGroup | null>(null);
+  useEffect(() => {
+    if (!mapa || (centro && !desenhar)) return;
+    let vivo = true;
+    void buscarCentro(filial).then((c) => {
+      if (!vivo || !c) return;
+      setVista(c);
+      if (desenhar) cobertura.current = desenharCobertura(L, mapa, c.areas, cobertura.current);
+      // Sem centro dado pela tela: a vista vem do servidor (na primeira vez só se ninguém mexeu; ao trocar a filial, sempre).
+      if (!centro && (aplicada.current === null ? mapaNaoMexido(mapa, inicial) : aplicada.current !== filial)) aplicarVista(L, mapa, c);
+      aplicada.current = filial;
+    });
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapa, filial, desenhar]);
+  return { ref, mapa, vista };
 }
 export { L };

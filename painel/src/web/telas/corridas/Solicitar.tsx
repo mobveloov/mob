@@ -104,7 +104,7 @@ export default function Solicitar() {
   const valor = manual != null ? (manual.trim() ? Number(manual.replace(",", ".")) : null) : est?.valor ?? null;
 
   // Mapa com os carros online e os pontos da rota.
-  const { ref, mapa: m } = useMapa([-15.78, -47.93], 12);
+  const { ref, mapa: m } = useMapa(undefined, 12);
   const camada = useRef<L.LayerGroup | null>(null);
   const ajustado = useRef("");
   useEffect(() => {

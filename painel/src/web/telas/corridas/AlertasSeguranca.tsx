@@ -24,7 +24,7 @@ const SELO: Record<string, [string, string]> = { aberto: ["ruim", "Aberto"], ate
 const PAPEL = (p: string) => (p === "motorista" ? "Motorista" : "Passageiro");
 
 function MapaDoAlerta({ a }: { a: Alerta }) {
-  const { ref, mapa } = useMapa([a.lat ?? -15.78, a.lng ?? -47.93], 16, a.lat != null);
+  const { ref, mapa } = useMapa(a.lat != null ? [a.lat, a.lng!] : undefined, 16, a.lat != null, { areas: false });
   const camada = useRef<L.LayerGroup | null>(null);
   useEffect(() => {
     if (!mapa || a.lat == null || a.lng == null) return;
