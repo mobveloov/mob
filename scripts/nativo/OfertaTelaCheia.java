@@ -31,13 +31,18 @@ public final class OfertaTelaCheia {
             abrir.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
             PendingIntent pi = PendingIntent.getActivity(c, 7, abrir, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel("oferta") == null) {
-                NotificationChannel canal = new NotificationChannel("oferta", "Chamada de corrida", NotificationManager.IMPORTANCE_HIGH);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel("oferta2") == null) {
+                // Canal "oferta2": o Android não deixa trocar o som de um canal já criado ("oferta" ficou com o som padrão). Toque de corrida do app, tipo ligação.
+                NotificationChannel canal = new NotificationChannel("oferta2", "Chamada de corrida", NotificationManager.IMPORTANCE_HIGH);
                 canal.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
                 canal.enableVibration(true);
+                canal.setVibrationPattern(new long[] {0, 600, 300, 600, 300, 600});
+                int som = c.getResources().getIdentifier("toque_corrida", "raw", c.getPackageName());
+                if (som != 0) canal.setSound(android.net.Uri.parse("android.resource://" + c.getPackageName() + "/" + som),
+                    new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
                 nm.createNotificationChannel(canal);
             }
-            Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(c, "oferta") : new Notification.Builder(c);
+            Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(c, "oferta2") : new Notification.Builder(c);
             b.setContentTitle(titulo).setContentText(texto).setSmallIcon(c.getApplicationInfo().icon)
                 .setCategory(Notification.CATEGORY_CALL).setPriority(Notification.PRIORITY_MAX)
                 .setAutoCancel(true).setContentIntent(pi).setFullScreenIntent(pi, true).setVisibility(Notification.VISIBILITY_PUBLIC);

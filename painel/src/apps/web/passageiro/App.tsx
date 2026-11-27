@@ -71,7 +71,10 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   const carregar = useCallback(async () => {
     const [e, s] = await Promise.all([api<{ eu: Eu }>("/eu"), api<{ corrida: Corrida | null; posicaoMotorista: Posicao | null }>("/estado")]);
-    setEu(e.eu); setCorrida(s.corrida); setPosMotorista(s.posicaoMotorista);
+    // Voltou do segundo plano (ou a conexão em tempo real caiu) e a corrida mudou de etapa: avisa com som, como no tempo real.
+    const c = s.corrida;
+    if (c) { const visto = statusVisto.current[c.id]; if (visto && visto !== c.status) avisoDoMarco(c.status); statusVisto.current[c.id] = c.status; }
+    setEu(e.eu); setCorrida(c); setPosMotorista(s.posicaoMotorista);
   }, []);
   const carregarLugares = useCallback(() => { void lerLugares().then(setLugares).catch(() => undefined); }, []);
   useEffect(() => { void carregar().catch(() => undefined); carregarLugares(); void posicaoAgora().then(setAqui).catch(() => undefined); }, [carregar, carregarLugares]);
@@ -83,6 +86,8 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     return () => document.removeEventListener("visibilitychange", f);
   }, [carregar]);
   useEffect(() => { void ligarPush(marca.push, () => void carregar()); }, [marca.push, carregar]);
+  // Corrida criada neste aparelho (resposta do pedido): já conta como "vista", senão o primeiro aviso de etapa (motorista aceitou) passava mudo.
+  useEffect(() => { if (corrida) statusVisto.current[corrida.id] ??= corrida.status; }, [corrida]);
 
   useEffect(() => {
     atualRef.current = corrida?.aberta ? corrida.id : null;
