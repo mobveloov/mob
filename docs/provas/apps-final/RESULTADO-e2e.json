@@ -1,5 +1,5 @@
 {
-  "quando": "2026-11-27T20:14:24.412Z",
+  "quando": "2026-11-27T20:46:09.853Z",
   "resultados": [
     {
       "item": "toque Xperia em laço na oferta (padrão)",
@@ -19,7 +19,7 @@
     {
       "item": "passageiro ouve som quando o motorista aceita (app aberto)",
       "passou": true,
-      "detalhe": "[{\"via\":\"ctx\",\"loop\":false,\"dur\":1},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/72ff9167-5510-4190-bba2-2ad387952c2b\",\"loop\":false},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/33116381-6b32-41d3-8759-2da286c528ff\",\"loop\":false}] marcos=[\"cancelada\",\"a_caminho\"]"
+      "detalhe": "[{\"via\":\"ctx\",\"loop\":false,\"dur\":1},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/d10741e3-6ad0-4dd4-b635-d78a35f8a9db\",\"loop\":false},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/b57f444d-64b3-47d2-9c1f-819e12259136\",\"loop\":false}] marcos=[\"cancelada\",\"a_caminho\"]"
     },
     {
       "item": "tela sempre ligada (wake lock pedido) nos dois apps",
@@ -109,7 +109,7 @@
     {
       "item": "SOS aberto (central notificada)",
       "passou": true,
-      "detalhe": "{\"alerta\":{\"id\":\"38e8e6ae-3ace-4f71-853e-626d1be3f054\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T17:13:53"
+      "detalhe": "{\"alerta\":{\"id\":\"b4a4151d-aa1e-47dd-b169-74d3e2aa55cd\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T17:45:40"
     },
     {
       "item": "rua sem número: o app pede o número da casa",

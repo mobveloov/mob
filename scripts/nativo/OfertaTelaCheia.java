@@ -43,10 +43,11 @@ public final class OfertaTelaCheia {
                     new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
                 nm.createNotificationChannel(canal);
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { try { nm.deleteNotificationChannel("oferta2"); } catch (Exception e) { /* canal antigo já foi */ } }
             Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(c, "oferta3") : new Notification.Builder(c);
             b.setContentTitle(titulo).setContentText(texto).setSmallIcon(c.getApplicationInfo().icon)
                 .setCategory(Notification.CATEGORY_CALL).setPriority(Notification.PRIORITY_MAX)
-                .setAutoCancel(true).setContentIntent(pi).setFullScreenIntent(pi, true).setVisibility(Notification.VISIBILITY_PUBLIC);
+                .setAutoCancel(true).setTimeoutAfter(60000).setContentIntent(pi).setFullScreenIntent(pi, true).setVisibility(Notification.VISIBILITY_PUBLIC);
             Notification n = b.build();
             n.flags |= Notification.FLAG_INSISTENT; // toca em laço até aceitar, recusar ou vencer (o app cancela a notificação)
             nm.notify(4712, n);

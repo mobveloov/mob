@@ -104,7 +104,11 @@ try {
   const j = r.ok ? await r.json() : null;
   if (j?.url) {
     const img = await fetch(new URL(j.url, urlApi + "/"), { signal: AbortSignal.timeout(30000) });
-    if (img.ok) { aberturaPainel = path.join(saida, "assets", "abertura-painel.webp"); fs.writeFileSync(aberturaPainel, Buffer.from(await img.arrayBuffer())); passo(`Imagem de abertura do painel baixada (versão ${j.versao})`); }
+    if (img.ok) {
+      const bytes = Buffer.from(await img.arrayBuffer());
+      if (bytes.length > 8_000_000) throw new Error("imagem grande demais");
+      await sharp(bytes).metadata(); // confere que é imagem de verdade (senão cai na arte da empresa)
+      aberturaPainel = path.join(saida, "assets", "abertura-painel.webp"); fs.writeFileSync(aberturaPainel, bytes); passo(`Imagem de abertura do painel baixada (versão ${j.versao})`); }
   }
 } catch { passo("Sem imagem de abertura no painel (ou painel fora do ar): usando a arte da pasta da empresa."); }
 const abertura = aberturaPainel ?? asset("abertura") ?? icone;

@@ -67,14 +67,14 @@ export function vozDoPainel(): VozDoPainel {
 let painelOff = 0; // até quando não tentar o servidor (sem motor, limite ou sem rede)
 const emMemoria = new Map<string, string>(); // chave -> blob URL
 const pedindo = new Map<string, Promise<string | null>>();
-const hash = (t: string) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 const chaveDe = (t: string, v: VozDoPainel) => `${t}|${v.genero}|${v.velocidade}`;
-const chaveCache = (t: string, v: VozDoPainel) => `/voz-cache/${config().empresaId}/${hash(chaveDe(t, v))}`;
+const chaveCache = (t: string, v: VozDoPainel) => `/voz-cache/${config().empresaId}/${v.genero}/${v.velocidade}/${encodeURIComponent(t)}`;
 const abrirCache = () => (typeof caches !== "undefined" ? caches.open("voz-v2") : Promise.reject(new Error("sem cache")));
 export interface RegistroVoz { texto: string; bytes: number; origem: "cache" | "servidor" }
 /** Registro do que foi baixado/tocado (prova em teste e diagnóstico). */
-export const registroVoz: RegistroVoz[] = [];
-if (typeof window !== "undefined") (window as unknown as { __vozRegistro: RegistroVoz[] }).__vozRegistro = registroVoz;
+export const registroVoz: RegistroVoz[] = []; // só cresce em teste (DEV)
+const anota = (r: RegistroVoz) => { if (import.meta.env?.DEV) registroVoz.push(r); };
+if (typeof window !== "undefined" && import.meta.env?.DEV) (window as unknown as { __vozRegistro: RegistroVoz[] }).__vozRegistro = registroVoz;
 
 async function doCache(texto: string, v: VozDoPainel): Promise<string | null> {
   const k = chaveDe(texto, v);
@@ -86,13 +86,13 @@ async function doCache(texto: string, v: VozDoPainel): Promise<string | null> {
     const b = await r.blob();
     const u = URL.createObjectURL(b);
     emMemoria.set(k, u);
-    registroVoz.push({ texto, bytes: b.size, origem: "cache" });
+    anota({ texto, bytes: b.size, origem: "cache" });
     return u;
   } catch { return null; }
 }
 
 /** Baixa o mp3 do servidor e guarda no aparelho. Devolve o endereço para tocar (ou null: só o toque). */
-export async function baixarVoz(texto: string): Promise<string | null> {
+export async function baixarVoz(texto: string, fixa = true): Promise<string | null> {
   const v = vozDoPainel();
   if (!v.ligada || !config().empresaId) return null;
   const guardada = await doCache(texto, v);
@@ -103,8 +103,10 @@ export async function baixarVoz(texto: string): Promise<string | null> {
   if (andando) return andando;
   const p = (async () => {
     try {
-      const q = new URLSearchParams({ texto, voz: v.genero, velocidade: String(v.velocidade), app: v.app });
-      const r = await fetch(`${config().api}${v.url}?${q}`);
+      const dados = { texto, voz: v.genero, velocidade: v.velocidade, app: v.app };
+      // frases fixas: GET (cacheável); instruções com nome de rua: POST (o trajeto não vai no endereço/logs)
+      const r = fixa ? await fetch(`${config().api}${v.url}?${new URLSearchParams({ ...dados, velocidade: String(v.velocidade) })}`)
+        : await fetch(`${config().api}${v.url}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(dados) });
       if (r.status === 204) return null; // desligada no painel
       if (!r.ok) { painelOff = Date.now() + (r.status === 429 ? 120_000 : 60_000); return null; }
       const bytes = await r.arrayBuffer();
@@ -112,7 +114,7 @@ export async function baixarVoz(texto: string): Promise<string | null> {
       try { await (await abrirCache()).put(chaveCache(texto, v), new Response(bytes, { headers: { "content-type": "audio/mpeg" } })); } catch { /* sem cache: toca só desta vez */ }
       const u = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
       emMemoria.set(k, u);
-      registroVoz.push({ texto, bytes: bytes.byteLength, origem: "servidor" });
+      anota({ texto, bytes: bytes.byteLength, origem: "servidor" });
       return u;
     } catch { painelOff = Date.now() + 30_000; return null; } finally { pedindo.delete(k); }
   })();
@@ -146,7 +148,9 @@ export async function vozDe(texto: string): Promise<{ origem: "painel" | "aparel
 }
 
 /** Fala `texto`. Painel desligou a voz = só o toque. Sem áudio do servidor = só o toque (não cai na voz robótica). */
-export async function falarTexto(texto: string, _o: { fixa?: boolean } = {}): Promise<void> {
+let geracao = 0;
+export async function falarTexto(texto: string, o: { fixa?: boolean } = {}): Promise<void> {
+  const minha = ++geracao;
   try {
     pararVoz();
     const v = vozDoPainel();
@@ -158,8 +162,13 @@ export async function falarTexto(texto: string, _o: { fixa?: boolean } = {}): Pr
       if (s && voz) { const f = new SpeechSynthesisUtterance(texto); f.voice = voz; f.lang = voz.lang; f.rate = cfg.velocidade; s.speak(f); }
       return;
     }
-    const url = await baixarVoz(texto);
-    if (!url) return;
+    const url = await baixarVoz(texto, o.fixa !== false);
+    if (minha !== geracao) return; // chegou outra fala enquanto baixava
+    if (!url) { // instrução de navegação (frase nova) sem rede/servidor: a voz do aparelho avisa, para a curva não ficar muda
+      const s = window.speechSynthesis, voz = s && o.fixa === false ? vozEscolhida() : null;
+      if (s && voz) { const f = new SpeechSynthesisUtterance(texto); f.voice = voz; f.lang = voz.lang; f.rate = cfg.velocidade; s.speak(f); }
+      return;
+    }
     const a = new Audio(url);
     tocando = a;
     await a.play();
