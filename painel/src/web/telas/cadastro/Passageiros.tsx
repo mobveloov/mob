@@ -97,6 +97,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
   const novo = id === "novo";
   const [f, setF] = useState<Record<string, string>>({ nome: "", genero: "", telefone: "", email: "", nascimento: "", cidade: "", cpf: "", status: "Ativo", origemCadastro: estabelecimento ? "Estabelecimento" : "Painel", observacao: "", avaliouApp: "Pendente", notaApp: "0", senha: "" });
   const [nota, setNota] = useState<number | null>(null);
+  const [foto, setFoto] = useState<string | null>(null);
   const [casa, setCasa] = useState<PontoEscolhido>({ texto: "" });
   const [trabalho, setTrabalho] = useState<PontoEscolhido>({ texto: "" });
   const { aviso, tentar } = useAviso();
@@ -104,7 +105,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
     if (novo) return null;
     const r = await chamar<{ passageiro: Record<string, unknown>; nota: number | null }>("GET", `/passageiros/${id}`);
     setF((a) => ({ ...a, ...Object.fromEntries(["nome", "genero", "telefone", "email", "nascimento", "cidade", "cpf", "status", "origemCadastro", "observacao", "avaliouApp"].map((k) => [k, String(r.passageiro[k] ?? a[k])])), notaApp: String(r.passageiro.notaApp ?? 0) }));
-    setNota(r.nota);
+    setNota(r.nota); setFoto((r.passageiro.foto as string | null) ?? null);
     const ponto = (t: unknown, pos: unknown): PontoEscolhido => { const m = /^(-?[\d.]+),(-?[\d.]+)$/.exec(String(pos ?? "")); return { texto: String(t ?? ""), ...(m ? { lat: Number(m[1]), lng: Number(m[2]) } : {}) }; };
     setCasa(ponto(r.passageiro.enderecoCasa, r.passageiro.enderecoCasaPos)); setTrabalho(ponto(r.passageiro.enderecoTrabalho, r.passageiro.enderecoTrabalhoPos));
     return r;
@@ -126,17 +127,14 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
       </div>
       <h4 className="cg-secao">Dados pessoais</h4>
       <div className="cg-grade">
-        {!novo && <Campo rotulo="Foto de perfil" className="larga"><input readOnly disabled value="(Sem foto)" /></Campo>}
+        {!novo && <Campo rotulo="Foto de perfil" className="larga">{foto ? <a href={foto} target="_blank" rel="noopener noreferrer"><img src={foto} alt="Foto do passageiro" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} /></a> : <input readOnly disabled value="(Sem foto)" />}</Campo>}
         <Campo rotulo="Nome *" className="larga"><input value={f.nome} onChange={(e) => set("nome", e.target.value)} /></Campo>
         <Campo rotulo="Telefone *"><input value={f.telefone} placeholder="11 96123-4567" maxLength={30} onChange={(e) => set("telefone", e.target.value)} /></Campo>
         <Campo rotulo="CPF"><input value={f.cpf} inputMode="numeric" maxLength={14} onChange={(e) => set("cpf", e.target.value)} /></Campo>
-        {!novo && <Campo rotulo="CPF validado"><input readOnly disabled value="Não" /></Campo>}
         {!novo && <>
           <Campo rotulo="E-mail"><input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Campo>
           <Campo rotulo="Data de nascimento"><input type="date" value={f.nascimento} onChange={(e) => set("nascimento", e.target.value)} /></Campo>
           <Campo rotulo="Gênero"><select value={f.genero} onChange={(e) => set("genero", e.target.value)}><option value="">Não informado</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select></Campo>
-          <Campo rotulo="E-mail validado?" dica="Não enviamos link de validação de e-mail."><input readOnly disabled value="Não" /></Campo>
-          <Campo rotulo="Recebimento de e-mails bloqueado?"><select disabled value="false"><option value="true">Sim</option><option value="false">Não</option></select></Campo>
           <Campo rotulo="Senha do app" dica="Deixe vazio para manter."><input type="text" autoComplete="off" value={f.senha} onChange={(e) => set("senha", e.target.value)} /></Campo>
         </>}
       </div>

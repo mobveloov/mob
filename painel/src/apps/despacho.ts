@@ -363,13 +363,15 @@ function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: { li
 /** Corridas que já avisaram "nenhum motorista disponível" (some quando aparece alguém). */
 const semMotoristaAvisado = new Set<string>();
 
+/** Ninguém online: a corrida já fica pendente (visível no painel e para quem entrar) até o cancelamento automático. Roda também sem nenhum app conectado. */
+export function marcarPendentesSemMotorista(empresaId: string) {
+  if (estado(empresaId).online.size) return; // com motoristas online quem marca é o próprio despacho
+  for (const c of listarProprias(empresaId)) if (c.status === "procurando" && !c.pendenciaDesde && !aindaAgendada(c)) void marcarPendencia(empresaId, c.id).catch(() => undefined);
+}
+
 export function despachar(empresaId: string) {
   const e = estado(empresaId);
-  if (!e.online.size) {
-    // Ninguém online: a corrida já fica pendente (visível no painel e para quem entrar) até o cancelamento automático.
-    for (const c of listarProprias(empresaId)) if (c.status === "procurando" && !c.pendenciaDesde && !aindaAgendada(c)) void marcarPendencia(empresaId, c.id).catch(() => undefined);
-    return 0;
-  }
+  if (!e.online.size) { marcarPendentesSemMotorista(empresaId); return 0; }
   const lista = listarProprias(empresaId);
   const busy = ocupados(lista);
   const cadastro = new Map(motoristas(empresaId).map((m) => [m.id, m]));

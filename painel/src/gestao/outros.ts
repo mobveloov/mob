@@ -93,7 +93,7 @@ function rotasPassageiros(r: Router) {
   r.get("/passageiros/:id", ok((req, res) => {
     const c = registros(emp(req), "clientes").find((x) => x.id === req.params.id);
     if (!c) throw new Error("Passageiro não encontrado.");
-    res.json({ passageiro: c, nota: notasDosPassageiros(listarProprias(emp(req))).get(String(c.telefone)) ?? null });
+    res.json({ passageiro: { ...c, foto: pessoa(emp(req), "passageiro", String(c.telefone)).foto ? `/api/apps-central/foto/passageiro/${encodeURIComponent(String(c.telefone))}` : null }, nota: notasDosPassageiros(listarProprias(emp(req))).get(String(c.telefone)) ?? null });
   }));
 
   const CAMPOS = ["nome", "genero", "telefone", "email", "nascimento", "avaliouApp", "notaApp", "origemCadastro", "motoristaOrigem", "cidade", "status", "dispositivo", "cpf", "observacao"];
