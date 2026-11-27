@@ -72,6 +72,12 @@ async function tokenDeAcesso(conta: ContaServico): Promise<string> {
 
 // ------------------------------------------------------------------ envio
 
+/**
+ * Sufixo do canal de notificação no Android. O Android não deixa mudar o som de um canal que já existe no aparelho; quem instalou um APK antigo
+ * ficou com canais sem som próprio. O app cria os canais "<nome>2" (com som) e o servidor manda para eles (mesmo valor em comum/api.ts).
+ */
+const VERSAO_CANAL = "2";
+
 export interface Aviso {
   titulo: string; texto: string; dados?: Record<string, string>; canal?: "corridas" | "chat" | "geral" | "chegada" | "emergencia";
   /**
@@ -105,7 +111,7 @@ export async function avisarDetalhado(empresaId: string, alvo: Alvo, aviso: Avis
             : {
               notification: { title: aviso.titulo.slice(0, 80), body: aviso.texto.slice(0, 200) },
               data: aviso.dados ?? {},
-              android: { priority: "high", notification: { channel_id: aviso.canal ?? "geral", sound: "default" } },
+              android: { priority: "high", notification: { channel_id: `${aviso.canal ?? "geral"}${VERSAO_CANAL}`, sound: "default" } },
             }),
         } }),
       });

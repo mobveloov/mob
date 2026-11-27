@@ -304,6 +304,9 @@ interface PluginPush {
 }
 const Push = registerPlugin<PluginPush>("PushNotifications");
 
+/** Sufixo dos canais de notificação do Android (o som de um canal criado não muda; ver painel/src/apps/push.ts). */
+const VERSAO_CANAL = "2";
+
 /** Liga o push no APK (só se a empresa tiver Firebase configurado). Abre a tela certa ao tocar na notificação. */
 export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, string>) => void) {
   if (!ativo || !nativo() || !Capacitor.isPluginAvailable("PushNotifications")) return;
@@ -311,7 +314,7 @@ export async function ligarPush(ativo: boolean, aoTocar: (dados: Record<string, 
     const p = await Push.requestPermissions();
     if (p.receive !== "granted") return;
     for (const [id, nome] of [["corridas", "Corridas"], ["chegada", "Motorista no local"], ["chat", "Mensagens"], ["geral", "Avisos"]]) {
-      await Push.createChannel({ id, name: nome, importance: id === "corridas" || id === "chegada" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: config().papel === "passageiro" ? "aceite" : "chamada" } : id === "chegada" ? { sound: "buzina" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
+      await Push.createChannel({ id: id + VERSAO_CANAL, name: nome, importance: id === "corridas" || id === "chegada" ? 5 : 4, visibility: 1, vibration: true, ...(id === "corridas" ? { sound: config().papel === "passageiro" ? "aceite" : "toque_corrida" } : id === "chegada" ? { sound: "buzina" } : id === "chat" ? { sound: "mensagem" } : {}) }).catch(() => undefined);
     }
     await Push.addListener("registration", (t: { value: string }) => { void api("/push", { corpo: { token: t.value } }).catch(() => undefined); });
     await Push.addListener("pushNotificationActionPerformed", (a: { notification?: { data?: Record<string, string> } }) => aoTocar(a.notification?.data ?? {}));
@@ -390,7 +393,7 @@ export const vibrar = (ms: number | number[]) => { try { navigator.vibrate?.(ms)
 /** Toque curto (chamada de corrida), sem arquivo de som. */
 export type Som = "chamada" | "mensagem" | "aceite" | "alerta" | "cancelado" | "buzina" | "iniciada" | "finalizada";
 /** Toques da chamada do motorista (3 à escolha em Ajustes). */
-export type Toque = "xperia" | "pulso" | "campanario" | "radar";
+export type Toque = "corrida" | "xperia" | "pulso" | "campanario" | "radar";
 const ARQUIVOS: Record<Som, string> = {
   chamada: new URL("./sons/chamada.wav", import.meta.url).href,
   mensagem: new URL("./sons/mensagem.wav", import.meta.url).href,
@@ -402,7 +405,8 @@ const ARQUIVOS: Record<Som, string> = {
   finalizada: new URL("./sons/finalizada.wav", import.meta.url).href,
 };
 const TOQUES: Record<Toque, string> = {
-  xperia: new URL("./sons/toque_xperia.mp3", import.meta.url).href, // toque escolhido pelo dono: padrão da chamada do motorista
+  corrida: new URL("./sons/toque_corrida.wav", import.meta.url).href, // estilo Uber/99/Machine: padrão da chamada do motorista
+  xperia: new URL("./sons/toque_xperia.mp3", import.meta.url).href, // toque escolhido pelo dono (opção nos Ajustes)
   pulso: new URL("./sons/toque_pulso.wav", import.meta.url).href,
   campanario: new URL("./sons/toque_campanario.wav", import.meta.url).href,
   radar: new URL("./sons/toque_radar.wav", import.meta.url).href,
@@ -411,7 +415,7 @@ const TOQUES: Record<Toque, string> = {
 export function tocarToque(toque: Toque, laco: boolean) {
   pararSons();
   const minha = geracaoDeSom;
-  const url = TOQUES[toque] ?? TOQUES.xperia;
+  const url = TOQUES[toque] ?? TOQUES.corrida;
   const comAudio = () => {
     try {
       const a = new Audio(url);

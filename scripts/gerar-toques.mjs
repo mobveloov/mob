@@ -4,7 +4,7 @@
 //   node scripts/gerar-toques.mjs
 //
 // Saída em painel/src/apps/web/comum/sons/*.wav (mono, 16 bits, 22,05 kHz):
-//   toque_pulso, toque_campanario, toque_radar   toques da chamada do motorista: altos, brilhantes, feitos para tocar em laço dentro do carro
+//   toque_corrida, toque_pulso, toque_campanario, toque_radar   toques da chamada do motorista: altos, brilhantes, feitos para tocar em laço dentro do carro
 //   aceite, buzina, iniciada, finalizada, mensagem, cancelado   sons do passageiro: curtos, suaves, tipo app de mobilidade
 //
 // Os toques do motorista seguem a "vibe" de um toque de celular clássico (arpejo rápido subindo + sino brilhante + pausa), mas a melodia,
@@ -19,7 +19,7 @@ const SAIDA = path.join(RAIZ, "painel", "src", "apps", "web", "comum", "sons");
 const TAXA = 22050;
 
 // Notas (Hz)
-const N = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, B4: 493.88, Gs5: 830.61, B5: 987.77, Cs6: 1108.7, E6: 1318.5, Fs6: 1480, Gs6: 1661.2, B6: 1975.5, A4: 440, E4: 329.63, G4: 392, C6: 1046.5 };
+const N = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, B4: 493.88, Gs5: 830.61, B5: 987.77, Cs6: 1108.7, E6: 1318.5, Fs6: 1480, Gs6: 1661.2, B6: 1975.5, A4: 440, E4: 329.63, G4: 392, C6: 1046.5, G6: 1568, C7: 2093 };
 
 const TIMBRES = {
   // Sino brilhante: parciais inarmônicos com queda rápida nos agudos (som de campainha cristalina).
@@ -73,6 +73,15 @@ const repetir = (notas, inicios) => inicios.flatMap((t0) => notas.map((n) => ({ 
 
 const SONS = {
   // ---------------------------------------------------------------- motorista (3 toques, altos, para laço)
+  // Corrida (padrão): estilo dos apps de corrida (Uber, 99, Machine): arpejo agudo e urgente subindo duas vezes seguidas, depois dois pings de "atenda!".
+  // Agudos e rápidos cortam o barulho do carro; pausa final de 0,5 s antes de repetir em laço.
+  "toque_corrida": { total: 2.7, drive: 2.6, alvo: 0.99, notas: [
+    ...[0, 0.78].flatMap((t) => [
+      nota(N.C6, t + 0.00, 0.22, 0.85, "sinoForte"), nota(N.E6, t + 0.10, 0.22, 0.85, "sinoForte"), nota(N.G6, t + 0.20, 0.22, 0.9, "sinoForte"),
+      nota(N.C7, t + 0.30, 0.42, 1.0, "sinoForte"), nota(N.C6, t + 0.30, 0.42, 0.45, "sinoForte"),
+    ]),
+    nota(N.G6, 1.62, 0.2, 0.9, "sinoForte"), nota(N.C7, 1.78, 0.62, 1.0, "sinoForte"), nota(N.E6, 1.78, 0.62, 0.5, "sinoForte"),
+  ] },
   // Pulso: arpejo rápido subindo (Mi–Sol#–Si–Mi), sino longo e dois pings agudos. Pausa final de 0,6 s antes de repetir.
   "toque_pulso": { total: 3.2, drive: 2.4, alvo: 0.98, notas: [
     nota(N.E5, 0.00, 0.30, 0.8, "sinoForte"), nota(N.Gs5, 0.09, 0.30, 0.8, "sinoForte"), nota(N.B5, 0.18, 0.30, 0.8, "sinoForte"), nota(N.E6, 0.27, 1.0, 0.95, "sinoForte"),
@@ -94,8 +103,6 @@ const SONS = {
   // ---------------------------------------------------------------- passageiro (curtos e suaves)
   // Motorista aceitou: duas notas subindo, leves.
   aceite: { total: 1.0, drive: 1, alvo: 0.6, notas: [nota(N.G5, 0, 0.5, 0.7, "suave"), nota(N.C6, 0.16, 0.8, 0.8, "suave")] },
-  // Motorista chegou: sino claro duas vezes (sem buzina).
-  buzina: { total: 1.5, drive: 1, alvo: 0.7, notas: [nota(N.E6, 0, 0.7, 0.8, "sino"), nota(N.B5, 0.04, 0.7, 0.4, "sino"), nota(N.E6, 0.6, 0.9, 0.8, "sino"), nota(N.B5, 0.64, 0.9, 0.4, "sino")] },
   // Corrida iniciada: três notas subindo devagar.
   iniciada: { total: 1.2, drive: 1, alvo: 0.6, notas: [nota(N.C5, 0, 0.4, 0.7, "suave"), nota(N.E5, 0.14, 0.4, 0.7, "suave"), nota(N.G5, 0.28, 0.9, 0.8, "suave")] },
   // Corrida finalizada: acorde de Dó maior que desce em paz.
@@ -112,3 +119,25 @@ for (const [nome, { total, drive, alvo, notas }] of Object.entries(SONS)) {
   fs.writeFileSync(path.join(SAIDA, `${nome}.wav`), buf);
   console.log(`✔ ${nome}.wav  ${(buf.length / 1024).toFixed(0)} KB`);
 }
+
+// BUZINA DE CARRO DE VERDADE (motorista chegou): dois tons de buzina (~415 e ~523 Hz, a terça menor das buzinas de carro), cada um uma onda
+// "serra" (harmônicos 1/h, o timbre áspero da membrana) com um leve ronco de 110 Hz. Toca "bi-biiiip": curta e longa.
+function buzinaDeCarro() {
+  const total = 1.45, n = Math.ceil(total * TAXA), a = new Float32Array(n);
+  const buzinadas = [[0.0, 0.24], [0.36, 1.05]]; // [início, fim] em segundos
+  for (const [t0, t1] of buzinadas) {
+    const i0 = Math.floor(t0 * TAXA), i1 = Math.min(n, Math.floor(t1 * TAXA));
+    for (let i = i0; i < i1; i++) {
+      const t = (i - i0) / TAXA, resto = (i1 - i) / TAXA;
+      const env = Math.min(1, t / 0.012) * Math.min(1, resto / 0.045);
+      let s = 0;
+      for (const f of [415, 523]) for (let h = 1; h <= 12; h++) s += Math.sin(2 * Math.PI * f * h * (i / TAXA) + h * 0.7) / h;
+      s *= 1 - 0.18 + 0.18 * Math.sin(2 * Math.PI * 110 * (i / TAXA)); // ronco da membrana
+      a[i] += s * env * 0.5;
+    }
+  }
+  for (let i = 0; i < n; i++) a[i] = Math.tanh(a[i] * 1.6);
+  return a;
+}
+fs.writeFileSync(path.join(SAIDA, "buzina.wav"), wav(buzinaDeCarro(), 0.95));
+console.log("✔ buzina.wav  (buzina de carro)");
