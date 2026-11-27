@@ -1,5 +1,5 @@
 {
-  "quando": "2026-11-27T17:14:50.826Z",
+  "quando": "2026-11-27T17:18:42.182Z",
   "resultados": [
     {
       "item": "toque Xperia em laço na oferta (padrão)",
@@ -89,7 +89,17 @@
     {
       "item": "SOS aberto (central notificada)",
       "passou": true,
-      "detalhe": "{\"alerta\":{\"id\":\"24b55f10-d351-4f07-aaea-50b4e3c5a8d0\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T14:14:34"
+      "detalhe": "{\"alerta\":{\"id\":\"ec06b4c1-b9fa-4d71-a179-4000469a5f73\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T14:18:10"
+    },
+    {
+      "item": "rua sem número: o app pede o número da casa",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "endereço fica como 'Rua das Flores, 123'",
+      "passou": true,
+      "detalhe": "Seu Local de Partida|Minha localização|Destino|Rua das Flores, 123|© OpenStreetMap|Agora|Agendar|Opções para você|Opcion"
     },
     {
       "item": "pop-up do aviso aparece no MEIO da tela",

@@ -186,6 +186,26 @@ await passo("SOS do passageiro chega à central e ao motorista", async () => {
   await limpar(tp, tm);
 });
 
+// ---------------------------------------------------------------- número da casa (rua sem número -> pede o número -> "Rua X, 123")
+await passo("número da casa", async () => {
+  await limpar(tp, tm);
+  const rua = { texto: "Rua das Flores, Centro, Pitangueiras/SP", rua: "Rua das Flores", bairro: "Centro", cidade: "Pitangueiras", uf: "SP", lat: -21.0106, lng: -48.2196 };
+  const C = await abrir("passageiro", tp);
+  await C.p.route("**/enderecos/casas*", (r) => r.fulfill({ json: { casas: [100, 123, 150, 200].map((n) => ({ numero: n, rua: "Rua das Flores", lat: rua.lat, lng: rua.lng })) } }));
+  await C.p.route(/\/enderecos\?q=/, (r) => { const q = decodeURIComponent(new URL(r.request().url()).searchParams.get("q") ?? ""); r.fulfill({ json: { enderecos: /, 123,/.test(q) ? [{ ...rua, numero: "123", exato: true, texto: "Rua das Flores, 123 - Centro, Pitangueiras/SP" }] : [rua], aviso: null } }); });
+  await C.p.getByText("Para onde você vai?").first().click(); await esperar(800);
+  await C.p.locator("input").last().fill("Rua das Flores"); await esperar(1500);
+  await C.p.locator(".sugestoes button").first().click(); await esperar(1000);
+  ok("rua sem número: o app pede o número da casa", await C.p.getByText("Número da casa").isVisible());
+  await foto(C.p, SAIDA, "e2e-passageiro-numero-da-casa");
+  await C.p.getByRole("button", { name: "123" }).click();
+  await C.p.getByRole("button", { name: /usar este número/i }).click(); await esperar(2500);
+  const t = await C.p.locator("body").innerText();
+  ok("endereço fica como 'Rua das Flores, 123'", /Rua das Flores, 123/.test(t), t.slice(0, 120).replace(/\n/g, "|"));
+  await foto(C.p, SAIDA, "e2e-passageiro-endereco-com-numero");
+  await C.ctx.close();
+});
+
 // ---------------------------------------------------------------- pop-up de notificação (CRM/painel) no meio da tela + sininho; SOS
 await passo("pop-up de notificação no meio da tela", async () => {
   const { execFileSync } = await import("node:child_process");
