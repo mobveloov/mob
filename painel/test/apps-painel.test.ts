@@ -381,7 +381,7 @@ test("recarga de saldo do motorista: o pedido chega à central, o depósito conf
   assert.equal(Math.round((depois.saldo - antes.saldo) * 100), 5000, "o depósito entra no saldo");
   assert.ok(depois.extrato.some((l: any) => l.valor === 50 && /Depósito confirmado/.test(l.descricao)), "aparece no extrato do app");
   const { listaRecargas } = await import("../src/config/financeiro.ts");
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10); // dia de Brasília (UTC-3), como o app
   const rec = listaRecargas(E.id, "motorista", { inicio: hoje, fim: hoje });
   assert.ok(rec.itens.some((i: any) => i.valor === 50), "o painel enxerga a recarga em Recargas");
 });
@@ -543,4 +543,36 @@ test("painel → app (onda 1): Carteiras de crédito mudam os botões e o aviso 
   } finally {
     salvarCarteirasCredito(E.id, original);
   }
+});
+
+test("desafios: criado no painel aparece no app com progresso; cumprido (automático) paga o prêmio na carteira; manual fica em análise; vencido vai para expirados", async () => {
+  const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10), ontem = new Date(Date.now() - 3 * 3_600_000 - 2 * 86_400_000).toISOString().slice(0, 10), amanha = new Date(Date.now() - 3 * 3_600_000 + 5 * 86_400_000).toISOString().slice(0, 10);
+  criar(E.id, cadastroPorId("desafios")!, { nome: "Primeira corrida do dia", tipo: "Desafio de corridas", meta: 1, premio: 10, inicio: hoje, fim: amanha, aprovacao: "Automático", tipoRecompensa: "Em créditos", ativo: true, regras: "Faça 1 corrida finalizada." }, "teste");
+  criar(E.id, cadastroPorId("desafios")!, { nome: "Meta com análise", tipo: "Desafio de corridas", meta: 1, premio: 7, inicio: hoje, fim: amanha, aprovacao: "Manual", tipoRecompensa: "Em créditos", ativo: true }, "teste");
+  criar(E.id, cadastroPorId("desafios")!, { nome: "Desafio vencido", tipo: "Desafio de corridas", meta: 50, premio: 5, inicio: ontem, fim: ontem, aprovacao: "Automático", tipoRecompensa: "Em créditos", ativo: true }, "teste");
+  criar(E.id, cadastroPorId("motoristas")!, { nome: "Zed Desafio", telefone: "11900000141", status: "Ativo", veiculo: "Hatch", placa: "ZED1A23" }, "teste");
+  const tokM = await entrar("motorista", "11900000141");
+  const antes = (await chamar("GET", `${API}/desafios`, undefined, tokM)).corpo;
+  const por = (l: any[], n: string) => l.find((d: any) => d.nome === n);
+  assert.equal(por(antes.desafios, "Primeira corrida do dia")?.situacao, "ativo", "aparece como ativo");
+  assert.equal(por(antes.desafios, "Primeira corrida do dia")?.feito, 0);
+  assert.equal(por(antes.desafios, "Desafio vencido")?.situacao, "expirado", "vencido sem cumprir: expirado");
+  const saldoAntes = (await chamar("GET", `${API}/carteira`, undefined, tokM)).corpo.saldo;
+  // Cumpre: uma corrida finalizada.
+  const POS = { lat: -25.4, lng: -49.2 };
+  await chamar("POST", `${API}/online`, POS, tokM);
+  const tokP = await entrar("passageiro", "11988887004");
+  const ped = await chamar("POST", `${API}/corridas`, { embarque: { texto: "Rua do Desafio, 1", ...POS }, destino: { texto: "Av. Fim, 9", lat: -25.43, lng: -49.23 }, categoria: "Econômico", pagamento: "Dinheiro", pedidoId: "ponta-desafio" }, tokP);
+  let of = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta;
+  for (let i = 0; i < 12 && !of; i++) { await new Promise((r) => setTimeout(r, 300)); of = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta; }
+  assert.ok(of, "oferta chegou");
+  await chamar("POST", `${API}/ofertas/${of.id}/aceitar`, {}, tokM);
+  for (const s of ["no_local", "em_andamento", "finalizada"]) await chamar("POST", `${API}/corridas/${ped.corpo.corrida.id}/status`, { status: s }, tokM);
+  const depois = (await chamar("GET", `${API}/desafios`, undefined, tokM)).corpo;
+  assert.equal(por(depois.desafios, "Primeira corrida do dia")?.situacao, "concluido", "meta batida: concluído");
+  assert.equal(por(depois.desafios, "Meta com análise")?.situacao, "em_analise", "manual: em análise até a central aprovar");
+  const cart = (await chamar("GET", `${API}/carteira`, undefined, tokM)).corpo;
+  assert.ok(cart.extrato.some((l: any) => /Prêmio: Primeira corrida do dia/.test(l.descricao) && l.valor === 10), "prêmio no extrato");
+  assert.ok(cart.saldo > saldoAntes, "o prêmio entrou no saldo");
+  assert.ok(!cart.extrato.some((l: any) => /Meta com análise/.test(l.descricao)), "manual ainda não pagou");
 });

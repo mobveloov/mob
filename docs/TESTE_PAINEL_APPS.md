@@ -21,7 +21,7 @@ Legenda do resultado: **ok** = testado; **pendente** = tem efeito no app e ainda
 | Cadastro > Clientes > Clientes | Cadastro do passageiro (nome, telefone) e bloqueio; o app lê e grava | apps-painel.test.ts (cadastro nos dois papéis); bloqueio em apps.test.ts | ok |
 | Cadastro > Clientes > Consulta de cartões | Sem efeito direto no app (cartão é do financeiro) | - | sem efeito |
 | Cadastro > Ruas | Ruas/trechos: correção de nome de via na busca de endereço do app | enderecos-correcoes.test.ts (painel); busca no app: provas em docs/evidencias | ok |
-| Cadastro > Desafios | Tela "Indique e ganhe/Desafios" do motorista lê os desafios ativos e o progresso | apps-extras.test.ts (desafios) | ok |
+| Cadastro > Desafios | Desafio criado no painel aparece no menu **Desafios** do motorista (selo) e na **Conta do passageiro** (indicação), com abas Ativos/Concluídos/Expirados e progresso; meta batida paga o prêmio (automático) ou fica em análise (manual); vencido vai para Expirados; filtra por categoria do motorista | apps-painel.test.ts (desafios: ativo, concluído, em análise, expirado); prova visual 412x915: docs/evidencias/desafios-motorista-1 e 2, desafios-passageiro-1 a 3. Falta: "participar" (não existe campo de adesão) e aviso ao criar o desafio | ok |
 | Corridas > Solicitar nova corrida | Corrida criada pelo painel chega ao motorista (despacho) e ao passageiro | apps-painel.test.ts: "painel → app: cancelar e mudar status" e corrida do app no painel | ok |
 | Corridas > Acompanhamento | Mostra corridas do app (status em tempo real) | apps-painel.test.ts (corrida do app aparece no painel) | ok |
 | Corridas > Retorno e Ocorrências | Sem rota própria no app (retorno e ocorrência são do painel) | - | sem efeito |
