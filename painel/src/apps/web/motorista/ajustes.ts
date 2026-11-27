@@ -14,7 +14,7 @@ export interface Ajustes {
   tema: Tema; navegador: Navegador; prioritarias: boolean; flutuante: boolean; vibrar: boolean; insistente: boolean; voz: boolean; sons: Sons; volume: boolean; esconderGanhos: boolean; manterTela: boolean; gravar: boolean; gravarVideo: boolean; gravarSoWifi: boolean;
 }
 
-const PADRAO: Ajustes = { tema: "sistema", navegador: "nativo", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "corrida", volume: true, esconderGanhos: false, manterTela: true, gravar: true, gravarVideo: false, gravarSoWifi: true };
+const PADRAO: Ajustes = { tema: "sistema", navegador: "nativo", prioritarias: true, flutuante: true, vibrar: true, insistente: true, voz: true, sons: "xperia", volume: true, esconderGanhos: false, manterTela: true, gravar: true, gravarVideo: false, gravarSoWifi: true };
 const CHAVE = "motorista-ajustes";
 
 function carregar(): Ajustes {
@@ -59,7 +59,7 @@ if (typeof matchMedia !== "undefined") matchMedia("(prefers-color-scheme: dark)"
 
 export const NOMES_TEMA: Record<Tema, string> = { sistema: "Automático", claro: "Claro", escuro: "Escuro" };
 export const NOMES_NAVEGADOR: Record<Navegador, string> = { nativo: "GPS do app (passo a passo)", google: "Google Maps", waze: "Waze" };
-export const NOMES_SONS: Record<Sons, string> = { corrida: "Corrida (padrão)", xperia: "Xperia", pulso: "Pulso", campanario: "Campanário", radar: "Radar" };
+export const NOMES_SONS: Record<Sons, string> = { corrida: "Corrida", xperia: "Sony Xperia (padrão)", pulso: "Pulso", campanario: "Campanário", radar: "Radar" };
 
 /** Link para navegar até o ponto no navegador escolhido. */
 export function linkNavegar(p: Ponto) {

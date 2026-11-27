@@ -508,6 +508,7 @@ export function pararSons() {
 export function falarAviso(texto: string) { void falarTexto(texto, { fixa: true }); }
 /** Avisos de cada marco da corrida para o passageiro: som forte e voz. `no_local` toca a buzina e depois fala. */
 export function avisoDoMarco(status: string) {
+  try { ((window as unknown as { __marcos?: string[] }).__marcos ??= []).push(status); } catch { /* só observação dos testes */ }
   switch (status) {
     case "a_caminho": tocarAlerta(1, "aceite"); setTimeout(() => falarAviso("Seu motorista está a caminho."), 900); break;
     case "no_local": tocarAlerta(1, "buzina"); setTimeout(() => falarAviso("Seu motorista está no local."), 1500); vibrar([500, 200, 500, 200, 500]); break;

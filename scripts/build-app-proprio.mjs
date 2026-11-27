@@ -175,7 +175,7 @@ if (cleartext && !xml.includes("usesCleartextTraffic")) xml = xml.replace("<appl
 const raw = path.join(saida, "android", "app", "src", "main", "res", "raw");
 fs.mkdirSync(raw, { recursive: true });
 const sonsDir = path.join(RAIZ, "painel", "src", "apps", "web", "comum", "sons");
-if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsWith(".wav")) fs.copyFileSync(path.join(sonsDir, f), path.join(raw, f));
+if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsWith(".wav") || f.endsWith(".mp3")) fs.copyFileSync(path.join(sonsDir, f), path.join(raw, f));
 
 // Ícone da bolha flutuante: a arte inteira (a mesma do ícone do app), quadrada, sem recorte do ícone adaptativo.
 {

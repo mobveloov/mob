@@ -75,12 +75,16 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const avisarSemMotorista = (c: Corrida) => { if (c.status === "nao_atendida") { setSemMotorista(c.mensagemCancelamento || c.statusTexto || "Não há nenhum motorista disponível no momento."); setFluxo({ tela: "" }); setAba("inicio"); } };
   const atualRef = useRef<string | null>(null);
   const statusVisto = useRef<Record<string, string>>({});
+  const jaCarregou = useRef(false);
 
   const carregar = useCallback(async () => {
     const [e, s] = await Promise.all([api<{ eu: Eu }>("/eu"), api<{ corrida: Corrida | null; posicaoMotorista: Posicao | null }>("/estado")]);
     // Voltou do segundo plano (ou a conexão em tempo real caiu) e a corrida mudou de etapa: avisa com som, como no tempo real.
     const c = s.corrida;
-    if (c) { const visto = statusVisto.current[c.id]; if (visto && visto !== c.status) avisoDoMarco(c.status); statusVisto.current[c.id] = c.status; }
+    // Corrida que o app ainda não conhecia (o tempo real ficou fora do ar, ou o app estava em segundo plano quando o motorista aceitou):
+    // depois da primeira leitura, qualquer etapa nova também avisa com som. Antes ficava mudo (o app só avisava quem já "tinha visto" a corrida).
+    if (c) { const visto = statusVisto.current[c.id]; if ((visto && visto !== c.status) || (!visto && jaCarregou.current && c.status !== "procurando")) avisoDoMarco(c.status); statusVisto.current[c.id] = c.status; }
+    jaCarregou.current = true;
     setEu(e.eu); setCorrida(c); setPosMotorista(s.posicaoMotorista);
   }, []);
   const carregarLugares = useCallback(() => { void lerLugares().then(setLugares).catch(() => undefined); }, []);
@@ -111,7 +115,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
       const c = d as Corrida;
       if (esperandoHorario(c)) return; // agendada: aparece na aba Agendadas até chegar a hora
       const visto = statusVisto.current[c.id];
-      if (visto && visto !== c.status) avisoDoMarco(c.status); // som forte e voz em cada marco (só quando o status muda de verdade)
+      if ((visto && visto !== c.status) || (!visto && jaCarregou.current && c.status !== "procurando")) avisoDoMarco(c.status); // som forte e voz em cada marco (só quando o status muda de verdade)
       statusVisto.current[c.id] = c.status;
       setCorrida((antes) => {
         if (antes && antes.id === c.id && antes.status !== c.status) vibrar([200, 100, 200]);
