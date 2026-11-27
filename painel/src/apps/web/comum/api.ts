@@ -2,6 +2,7 @@
 // Roda no navegador (teste) e dentro do APK (Capacitor). No APK, o build grava config.json com a empresa e o
 // endereço da API. No navegador: ?empresa=<id> na URL (e ?api=<url> se a API estiver em outro endereço).
 
+import { falarTexto } from "./voz";
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 
 export type Papel = "passageiro" | "motorista";
@@ -503,17 +504,8 @@ export function pararSons() {
   tocando.clear();
   try { navigator.vibrate?.(0); } catch { /* sem vibração */ }
 }
-/** Fala um aviso em português (voz do aparelho). Sem voz disponível, não faz nada. */
-export function falarAviso(texto: string) {
-  try {
-    const s = window.speechSynthesis;
-    if (!s) return;
-    const f = new SpeechSynthesisUtterance(texto);
-    f.lang = "pt-BR"; f.rate = 1; f.volume = 1;
-    f.voice = s.getVoices().find((v) => v.lang.replace("_", "-").toLowerCase() === "pt-br") ?? null;
-    s.cancel(); s.speak(f);
-  } catch { /* sem voz */ }
-}
+/** Fala um aviso em português (voz do painel se já guardada; senão a melhor voz do aparelho). Frases fixas e curtas. */
+export function falarAviso(texto: string) { void falarTexto(texto, { fixa: true }); }
 /** Avisos de cada marco da corrida para o passageiro: som forte e voz. `no_local` toca a buzina e depois fala. */
 export function avisoDoMarco(status: string) {
   switch (status) {

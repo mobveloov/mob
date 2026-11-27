@@ -45,10 +45,15 @@ public class FlutuanteService extends Service {
         // O ícone adaptativo do Android é um quadro de 108 dp em que só os 72 dp do meio aparecem; desenhar o quadro inteiro deixava
         // uma borda de fundo (preto) sobrando. Aqui desenha o quadro e recorta só a parte visível.
         try {
-            Drawable icone = getPackageManager().getApplicationIcon(getPackageName());
-            img.setImageBitmap(recortarIcone(icone));
+            // Arte COMPLETA do ícone (sem o recorte do ícone adaptativo, que cortava o "UP" e o boneco): imagem própria do build.
+            int idArte = getResources().getIdentifier("icone_flutuante", "drawable", getPackageName());
+            if (idArte != 0) img.setImageResource(idArte);
+            else {
+                Drawable icone = getPackageManager().getApplicationIcon(getPackageName());
+                img.setImageBitmap(recortarIcone(icone));
+            }
         } catch (Exception e) { /* sem ícone: a bolha fica vazia */ }
-        img.setScaleType(ImageView.ScaleType.FIT_XY);
+        img.setScaleType(ImageView.ScaleType.FIT_CENTER);
         img.setElevation(dp(4));
         img.setClipToOutline(true);
         final float raio = dp(TAMANHO) * 0.22f;

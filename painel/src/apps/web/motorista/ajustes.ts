@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { Ponto } from "./tipos";
 import { tocarToque, type Toque } from "../comum/api";
+import { falarTexto } from "../comum/voz";
 
 export const VERSAO = "2.0";
 
@@ -79,14 +80,7 @@ export function tremer(ms: number | number[]) {
 
 // ------------------------------------------------------------------ voz (co-piloto)
 
-export function falar(texto: string) {
+export function falar(texto: string, fixa = false) {
   if (!atual.voz) return;
-  try {
-    const s = window.speechSynthesis;
-    if (!s) return;
-    const f = new SpeechSynthesisUtterance(texto);
-    f.lang = "pt-BR";
-    f.voice = s.getVoices().find((v) => v.lang.replace("_", "-").toLowerCase() === "pt-br") ?? null;
-    s.cancel(); s.speak(f);
-  } catch { /* sem voz */ }
+  void falarTexto(texto, { fixa });
 }

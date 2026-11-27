@@ -97,8 +97,18 @@ await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", backgr
 const desenho = await sharp(icone, { density: 384 }).resize(arteSangrada ? 940 : 660, arteSangrada ? 940 : 660, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: desenho, gravity: "center" }]).png().toFile(path.join(saida, "assets", "icon-foreground.png"));
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: fundoIcone } }).png().toFile(path.join(saida, "assets", "icon-background.png"));
-const abertura = asset("abertura") ?? icone;
-const meio = await sharp(abertura, { density: 384 }).resize(asset("abertura") ? 2732 : 900, asset("abertura") ? 2732 : 900, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+// Imagem de abertura do PAINEL (Personalização do app): baixada na hora do build para a tela nativa de abertura (sem piscar). Sem ela, vale a arte da pasta da empresa, ou o ícone.
+let aberturaPainel = null;
+try {
+  const r = await fetch(`${urlApi}/api/apps/${empresaId}/abertura/${papel}`, { signal: AbortSignal.timeout(15000) });
+  const j = r.ok ? await r.json() : null;
+  if (j?.url) {
+    const img = await fetch(new URL(j.url, urlApi + "/"), { signal: AbortSignal.timeout(30000) });
+    if (img.ok) { aberturaPainel = path.join(saida, "assets", "abertura-painel.webp"); fs.writeFileSync(aberturaPainel, Buffer.from(await img.arrayBuffer())); passo(`Imagem de abertura do painel baixada (versão ${j.versao})`); }
+  }
+} catch { passo("Sem imagem de abertura no painel (ou painel fora do ar): usando a arte da pasta da empresa."); }
+const abertura = aberturaPainel ?? asset("abertura") ?? icone;
+const meio = await sharp(abertura, { density: 384 }).resize(aberturaPainel || asset("abertura") ? 2732 : 900, aberturaPainel || asset("abertura") ? 2732 : 900, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 await sharp({ create: { width: 2732, height: 2732, channels: 4, background: fundo } }).composite([{ input: meio, gravity: "center" }]).png().toFile(path.join(saida, "assets", "splash.png"));
 fs.copyFileSync(path.join(saida, "assets", "splash.png"), path.join(saida, "assets", "splash-dark.png"));
 
@@ -129,6 +139,22 @@ rodar(npm, ["install", "--no-audit", "--no-fund"]);
 if (!fs.existsSync(path.join(saida, "android"))) { passo("Criando projeto Android"); rodar(npx, ["cap", "add", "android"]); }
 passo("Gerando ícones e telas de abertura do Android");
 rodar(npx, ["capacitor-assets", "generate", "--android", "--iconBackgroundColor", fundoIcone, "--splashBackgroundColor", fundo]);
+// Abertura nativa em TELA CHEIA com a imagem do painel: cada splash.png gerado (retrato/paisagem, claro/escuro) é refeito em "cobrir" no tamanho dele.
+let fundoAbertura = fundo;
+if (aberturaPainel) {
+  const res = path.join(saida, "android", "app", "src", "main", "res");
+  const dom = (await sharp(aberturaPainel).stats()).dominant;
+  fundoAbertura = `#${[dom.r, dom.g, dom.b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+  let n = 0;
+  for (const d of fs.readdirSync(res).filter((x) => /^drawable(-(port|land))?(-night)?(-[a-z]*dpi)?$/.test(x))) {
+    const arq = path.join(res, d, "splash.png");
+    if (!fs.existsSync(arq)) continue;
+    const { width, height } = await sharp(arq).metadata();
+    fs.writeFileSync(arq, await sharp(aberturaPainel).resize(width, height, { fit: "cover", position: "centre" }).png().toBuffer());
+    n++;
+  }
+  passo(`Abertura nativa: ${n} telas refeitas com a imagem do painel (fundo ${fundoAbertura})`);
+}
 rodar(npx, ["cap", "sync", "android"]);
 
 // Permissões, conforme o que cada app faz (cada uma tem uso no código):
@@ -151,6 +177,13 @@ fs.mkdirSync(raw, { recursive: true });
 const sonsDir = path.join(RAIZ, "painel", "src", "apps", "web", "comum", "sons");
 if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsWith(".wav")) fs.copyFileSync(path.join(sonsDir, f), path.join(raw, f));
 
+// Ícone da bolha flutuante: a arte inteira (a mesma do ícone do app), quadrada, sem recorte do ícone adaptativo.
+{
+  const nodpi = path.join(saida, "android", "app", "src", "main", "res", "drawable-nodpi");
+  fs.mkdirSync(nodpi, { recursive: true });
+  const arte = await sharp(icone, { density: 384 }).resize(288, 288, { fit: "contain", background: fundoIcone }).png().toBuffer();
+  fs.writeFileSync(path.join(nodpi, "icone_flutuante.png"), arte);
+}
 // Motorista: plugin do ícone flutuante, serviço e abrir por cima da tela bloqueada quando chega uma corrida.
 if (papel === "motorista") {
   const pastaJava = path.join(saida, "android", "app", "src", "main", "java", ...pacote.split("."));
@@ -178,7 +211,20 @@ if (papel === "passageiro") {
 fs.writeFileSync(manifesto, xml);
 
 const cores = path.join(saida, "android", "app", "src", "main", "res", "values", "colors.xml");
-fs.writeFileSync(cores, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="colorPrimary">${primaria}</color>\n  <color name="colorPrimaryDark">${primaria}</color>\n  <color name="colorAccent">${primaria}</color>\n</resources>\n`);
+fs.writeFileSync(cores, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="aberturaFundo">${fundoAbertura}</color>\n  <color name="colorPrimary">${primaria}</color>\n  <color name="colorPrimaryDark">${primaria}</color>\n  <color name="colorAccent">${primaria}</color>\n</resources>\n`);
+
+// Tema de abertura: Android 12+ pinta a janela de abertura com a cor da imagem (sem ícone no meio); a imagem em tela cheia fica de fundo da janela até o app desenhar.
+const estilos = path.join(saida, "android", "app", "src", "main", "res", "values", "styles.xml");
+let st = fs.readFileSync(estilos, "utf8");
+if (!st.includes("windowSplashScreenBackground")) {
+  st = st.replace(/(<style name="AppTheme.NoActionBarLaunch"[^>]*>)/, `$1
+        <item name="windowSplashScreenBackground">@color/aberturaFundo</item>
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>`);
+  st = st.replace(/(<style name="AppTheme.NoActionBar"[^>]*>)/, `$1
+        <item name="android:windowBackground">@drawable/splash</item>`);
+  fs.writeFileSync(estilos, st);
+}
 
 const destinoGs = path.join(saida, "android", "app", "google-services.json");
 if (googleServices) { passo("Firebase da empresa (push) ligado"); fs.copyFileSync(googleServices, destinoGs); }

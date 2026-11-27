@@ -19,6 +19,8 @@ import { Opcoes } from "./Opcoes";
 import { ParaOnde, type ModoParaOnde } from "./ParaOnde";
 import { Avaliar, OpcoesDaCorrida } from "./PosCorrida";
 import { avisarNovoAviso, PopupDeAvisos } from "../comum/Avisos";
+import { aquecerFrasesFixas } from "../comum/voz";
+import { Abertura, useAberturaMinima } from "../comum/Abertura";
 import "./passageiro.css";
 import "./passageiro-m.css";
 
@@ -27,6 +29,7 @@ type Fluxo = { tela: "" } | { tela: "paraonde"; modo: ModoParaOnde } | { tela: "
 
 export default function App() {
   const { marca: marcaBase, erro } = useMarca();
+  const abrindo = useAberturaMinima();
   const pers = usePersonalizacao();
   // O nome escolhido em Configurações > Personalização vale no app inteiro.
   const marca = marcaBase && pers?.empresa.nome ? { ...marcaBase, nome: pers.empresa.nome } : marcaBase;
@@ -36,7 +39,7 @@ export default function App() {
   useEffect(() => (logado ? acompanharPersonalizacao() : undefined), [logado]);
   useEffect(() => { const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
-  if (!marca) return <Carregando />;
+  if (!marca || abrindo) return <Abertura marca={marca} />;
   if (!logado) return <Entrar marca={marca} aoEntrar={() => setLogado(true)} />;
   return <><Logado marca={marca} sair={() => setLogado(false)} /><CartaoMeuSos /><PopupDeAvisos /></>;
 }
@@ -54,6 +57,7 @@ async function partidaAgora(aqui: Posicao | null): Promise<Ponto> {
 }
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
+  useEffect(() => { const t = setTimeout(() => void aquecerFrasesFixas(), 5000); return () => clearTimeout(t); }, []);
   const [eu, setEu] = useState<Eu | null>(null);
   const [corrida, setCorrida] = useState<Corrida | null>(null);
   const [posMotorista, setPosMotorista] = useState<Posicao | null>(null);
@@ -124,7 +128,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     }
   }, (ligado) => { setConectado(ligado); if (ligado) void carregar().catch(() => undefined); }), [carregar]);
 
-  if (!eu) return <Carregando />;
+  if (!eu) return <Abertura marca={marca} />;
   if (chat && corrida) return <Chat corridaId={corrida.id} papel="passageiro" mensagens={mensagens} titulo={corrida.motorista?.nome} avatar={corrida.motorista ? <Avatar foto={corrida.motorista.foto} nome={corrida.motorista.nome} tamanho={40} /> : undefined} telefone={corrida.motorista?.telefone} aberto={!!corrida.motorista && corrida.aberta} fechar={() => { setChat(false); void api(`/corridas/${corrida.id}/chat/lida`, { corpo: {} }).catch(() => undefined); }} />;
   if (avaliar) return <Avaliar corrida={avaliar} fechar={() => setAvaliar(null)} />;
 

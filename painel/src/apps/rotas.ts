@@ -33,6 +33,7 @@ import { gerais } from "../config/gerais.ts";
 import { extraDaCategoria } from "../config/categorias.ts";
 import { ajustes, formasDePagamento } from "./ajustes.ts";
 import { aberturaDoApp, ehAppAbertura } from "../config/abertura.ts";
+import { textoDeVoz, vozDisponivel, vozDoApp } from "./voz.ts";
 import { dadosParaOApp } from "../config/personalizacao.ts";
 import { dadosParaOAppMotorista } from "../config/personalizacao-motorista.ts";
 import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
@@ -150,6 +151,19 @@ r.use(exigirApp);
 // Personalização do app do passageiro (Configurações do painel): cores, design, veículo no mapa, tela inicial e recursos. Aplique ao abrir, sem gerar APK.
 r.get("/personalizacao", ok((req, res) => res.json(dadosParaOApp(ctx(req).empresaId))));
 r.get("/personalizacao-motorista", so("motorista"), ok((req, res) => res.json(dadosParaOAppMotorista(ctx(req).empresaId))));
+// Voz neural do painel para os avisos falados (frases curtas). 404 = a empresa não tem voz configurada: o app usa a voz do aparelho.
+r.post("/voz", ok(async (req, res) => {
+  const c = ctx(req);
+  if (!vozDisponivel(c.empresaId)) return res.status(404).json({ erro: "Sem voz do painel." });
+  const texto = textoDeVoz(req.body?.texto);
+  if (!texto) return res.status(400).json({ erro: "Texto inválido (até 140 letras, sem links)." });
+  const r = await vozDoApp(c.empresaId, c.sessao.chave, texto, req.body?.voz);
+  if (r === "limite") return res.status(429).json({ erro: "Muitos pedidos de voz. Tente em instantes." });
+  if (!r) return res.status(404).json({ erro: "Voz indisponível agora." });
+  res.setHeader("Content-Type", r.audio.mimetype);
+  res.setHeader("Cache-Control", "private, max-age=86400");
+  res.send(r.audio.bytes);
+}));
 r.use(rotasExtras);
 r.use(rotasV2);
 

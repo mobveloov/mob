@@ -2,7 +2,7 @@
 // Também a lista de corridas agendadas.
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Trophy, ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, FileText, ShieldCheck, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Wallet } from "lucide-react";
+import { Trophy, ArrowLeft, Bell, CalendarDays, Camera, ChevronRight, CreditCard, FileText, ShieldCheck, Tag, Headphones, History, Lock, LogOut, Mail, Megaphone, Pencil, Phone, Star, UserRound, Users, Volume2, Wallet } from "lucide-react";
 import { api, reais, telefoneBonito } from "../comum/api";
 import { Aviso, Carregando, Cartao, mensagemDeErro, type MarcaApp } from "../comum/ui";
 import { ListaDeAvisos, useNaoLidos } from "../comum/Avisos";
@@ -12,7 +12,7 @@ import { useConfigDoPainel } from "../comum/ui";
 import { Avatar, Campo, TextoDoPainel } from "./pecas";
 import { NOMES_TEMA_APP, useTemaApp, type TemaApp } from "../comum/tema";
 
-type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "desafios" | "avisos" | "ajuda";
+type Tela = "" | "perfil" | "cupons" | "cartoes" | "favoritos" | "carteira" | "indique" | "desafios" | "avisos" | "ajuda" | "voz";
 
 function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => void; children: ReactNode }) {
   return (
@@ -24,6 +24,7 @@ function Voltar({ titulo, voltar, children }: { titulo: string; voltar: () => vo
   );
 }
 
+import { AjustesDeVoz } from "../comum/AjustesDeVoz";
 import { ListaDeDesafios, useDesafiosAtivos } from "../comum/Desafios";
 export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: MarcaApp; sair: () => void; irPara: (a: "historico" | "carteira" | "agendadas") => void; mudouEu?: () => void }) {
   const [tela, setTela] = useState<Tela>("");
@@ -45,6 +46,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
   if (tela === "cartoes") return <Voltar titulo="Meus Cartões" voltar={voltar}><Cartoes /></Voltar>;
   if (tela === "favoritos") return <Voltar titulo="Motoristas favoritos e bloqueados" voltar={voltar}><Favoritos /></Voltar>;
   if (tela === "carteira") return <Voltar titulo="Carteira" voltar={voltar}><Carteira /></Voltar>;
+  if (tela === "voz") return <Voltar titulo="Voz dos avisos" voltar={voltar}><Cartao><AjustesDeVoz /></Cartao></Voltar>;
   if (tela === "desafios") return <Voltar titulo="Desafios" voltar={voltar}><ListaDeDesafios classeCartao="cartao" /></Voltar>;
   if (tela === "indique" && perfil) return <Voltar titulo="Indique e ganhe" voltar={voltar}><Indique perfil={perfil} marca={marca} mudou={setPerfil} /></Voltar>;
   if (tela === "avisos") return <Voltar titulo="Notificações" voltar={voltar}><Avisos /></Voltar>;
@@ -83,6 +85,7 @@ export function Conta({ eu, marca, sair, irPara, mudouEu }: { eu: Eu; marca: Mar
         <ItemConta icone={<FileText size={22} />} cor="azul" titulo="Termos de uso" sub="Regras de uso do aplicativo" ir={() => setTexto("passageiro")} />
         <ItemConta icone={<ShieldCheck size={22} />} cor="verde" titulo="Política de privacidade" sub="Como seus dados são usados" ir={() => setTexto("privacidade")} />
         <SeletorDeTema />
+        <ItemConta icone={<Volume2 size={22} />} cor="azul" titulo="Voz dos avisos" sub="Voz, velocidade e exemplo" ir={() => setTela("voz")} />
         {temAjuda && <ItemConta icone={<Headphones size={22} />} cor="verde" titulo="Central de Ajuda" sub="Suporte e dúvidas frequentes" ir={() => setTela("ajuda")} />}
         <ItemConta icone={<LogOut size={22} />} cor="vermelho" titulo="Sair da conta" sub="Encerrar sessão" ir={sair} />
       </div>
