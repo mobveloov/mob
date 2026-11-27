@@ -198,3 +198,23 @@ Pendente: nada além de validar no Docker de produção (não rodei aqui) e do a
 ## Segunda rodada pendente
 
 Comparar com a documentação oficial da Machine (docs.machine.global) campo a campo.
+
+## Conferência com a documentação da Machine
+
+Comparação com a API pública v2 (detalhes e tabela em `docs/CONFERENCIA_MACHINE.md`). Testes: `painel/test/conferencia-machine.test.ts` (16).
+
+| Tema | O que faltava | O que foi feito |
+|---|---|---|
+| Fases da corrida aceita | Só havia a caminho e no local | Fases próximo (menos de 500 m) e espera prolongada (5 min), código de status em letra, no app (campo `fase`) e no detalhe |
+| Cancelamento | Sem id de motivo, sem código de erro | 15 motivos com id, `motivoId` no app e no painel, quem cancelou P/T/C, erro 151 |
+| Reabertura | Motorista que desiste não deixava rastro | `cancelamentos[]` e aviso C com `will_reopen` verdadeiro, seguido de T |
+| Pendência | Sem hora de entrada | `pendenteEm` (pending_at) e status P |
+| Sem aceite em 60 s | Não existia | Ocorrência NA, uma vez por corrida, fora programadas |
+| Motorista atrasado | Não existia | Ocorrência DL (estimativa gravada no aceite mais 3 min) |
+| Nota baixa do motorista | Sem aviso | Sino da central, linha do tempo e ocorrência LR |
+| Taxa de cancelamento e tarifa recalculada | Só no extrato | Linha do tempo e ocorrências CF e FR |
+| Formas de pagamento | Catálogo de 5 | As 12 formas com código no detalhe (catálogo selecionável inalterado) |
+| Webhooks de saída | Não existiam | Integrações › Webhooks de saída, com Signature-V2, event_id e source_event_id, limite de 5 por tipo e reenvio |
+| Detalhe da corrida | Sem os campos da Machine | `GET /api/corridas-proprias/:id/detalhe` |
+
+Pendente: Posição e Mensagens em webhook, estados S e R, rota recalculada (RR), e o que está em "Precisa do app" no outro documento.

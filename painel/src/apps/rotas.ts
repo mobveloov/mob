@@ -54,7 +54,8 @@ type Fn = (req: Request, res: Response) => unknown;
 const ok = (fn: Fn) => async (req: Request, res: Response) => {
   try { await fn(req, res); } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (!res.headersSent) res.status((e as { status?: number }).status ?? 400).json({ erro: msg });
+    const codigo = (e as { codigo?: number }).codigo; // erros de cancelamento da Machine: 151 e 152
+    if (!res.headersSent) res.status((e as { status?: number }).status ?? 400).json(codigo ? { erro: msg, codigo } : { erro: msg });
   }
 };
 
@@ -379,10 +380,11 @@ r.post("/corridas/:id/cancelar", ok(async (req, res) => {
   const { empresaId, sessao } = ctx(req);
   const c = P.corridaDoApp(empresaId, req.params.id, sessao.papel, sessao.chave);
   const motivo = txt(req.body?.motivo, 200);
+  const motivoId = req.body?.motivoId ?? req.body?.motivo_id; // id da lista de motivos do passageiro (GET /motivos-cancelamento)
   let feita: CorridaPropria;
   if (sessao.papel === "passageiro") {
     if (!ANTES_DE_COMECAR.has(c.status)) throw new Error("Não dá para cancelar uma viagem em andamento. Fale com o motorista.");
-    feita = await cancelarCorrida(empresaId, c.id, "Passageiro", motivo || "Cancelada pelo app", "app do passageiro");
+    feita = await cancelarCorrida(empresaId, c.id, "Passageiro", motivo || (motivoId != null ? "" : "Cancelada pelo app"), "app do passageiro", motivoId == null || motivoId === "" ? undefined : Number(motivoId));
   } else if (c.status === "a_caminho" && !P.culpaDoPassageiro(motivo)) {
     // Só desistência do motorista volta para a fila. Se o motivo é culpa do passageiro (não apareceu...), cai no cancelamento abaixo.
     feita = await P.desistir(empresaId, sessao.chave, c.id, motivo);

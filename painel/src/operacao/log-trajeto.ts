@@ -50,6 +50,7 @@ export const ROTULO_TIPO: Record<string, string> = {
   oferta_recusada: "Chamada recusada", oferta_expirada: "Chamada sem resposta", oferta_perdida: "Chamada encerrada", oferta_saiu: "Motorista offline", atribuida: "Motorista atribuído",
   a_caminho: "A caminho", chegou: "Chegou ao embarque", iniciou: "Corrida iniciada", finalizou: "Finalizada", cancelou: "Cancelada", voltou_a_procurar: "Voltou a procurar",
   nao_atendida: "Não atendida", mudanca_valor: "Mudança de valor", mudanca_pagamento: "Mudança de pagamento", alteracao: "Alteração da OS", avaliacao: "Avaliação", avaliacao_passageiro: "Avaliação do passageiro", outro: "Outro",
+  sem_aceite_60s: "Sem aceite em 60 s", motorista_atrasado: "Motorista atrasado", nota_baixa: "Nota baixa ao passageiro", taxa_cancelamento: "Taxa de cancelamento", tarifa_recalculada: "Tarifa recalculada", proximo: "Motorista próximo", espera_prolongada: "Espera prolongada",
 };
 
 /** Histórico da OS: linhas do tempo (hora, tipo, descrição, usuário, canal) e, a cada rodada do despacho, a tabela de motoristas consultados. */

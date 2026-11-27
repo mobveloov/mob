@@ -8,6 +8,7 @@ import { agoraBr, arred } from "../servidor/util.ts";
 export type TipoEvento =
   | "criada" | "despacho_consulta" | "despacho_encontrados" | "sem_motorista" | "oferta_enviada" | "oferta_aceita" | "oferta_recusada" | "oferta_expirada" | "oferta_perdida" | "oferta_saiu"
   | "atribuida" | "a_caminho" | "chegou" | "iniciou" | "finalizou" | "cancelou" | "voltou_a_procurar" | "nao_atendida"
+  | "sem_aceite_60s" | "motorista_atrasado" | "nota_baixa" | "taxa_cancelamento" | "tarifa_recalculada" | "proximo" | "espera_prolongada"
   | "mudanca_valor" | "mudanca_pagamento" | "alteracao" | "avaliacao" | "avaliacao_passageiro" | "outro";
 
 export interface EventoCorrida {

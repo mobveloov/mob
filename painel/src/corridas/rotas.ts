@@ -4,6 +4,7 @@
 import { Router, type Request, type Response } from "express";
 import { rota } from "../enderecos/index.ts";
 import { aposFinalizar } from "../apps/extras.ts";
+import { detalheDaCorrida } from "../comum/machine.ts";
 import { atribuirMotorista, avaliar, cancelarCorrida, criarCorridaPropria, estimarPreco, distanciaEstimada, listarProprias, mudarStatus, STATUS_TEXTO, type StatusProprio } from "./index.ts";
 
 export const rotasCorridasProprias = Router();
@@ -51,7 +52,15 @@ rotasCorridasProprias.post("/:id/status", ok(async (req, res) => {
 
 rotasCorridasProprias.post("/:id/cancelar", ok(async (req, res) => {
   const q = ["Passageiro", "Motorista", "Central"].includes(req.body?.quem) ? req.body.quem : "Central";
-  res.json({ corrida: await cancelarCorrida(emp(req), String(req.params.id), q, String(req.body?.motivo ?? ""), quem(req)) });
+  const mid = req.body?.motivoId ?? req.body?.motivo_id;
+  res.json({ corrida: await cancelarCorrida(emp(req), String(req.params.id), q, String(req.body?.motivo ?? ""), quem(req), mid == null || mid === "" ? undefined : Number(mid)) });
+}));
+
+/** Detalhe da corrida com os nomes de campo da API de detalhes da Machine (status em letra, fase, progress, finished, cancellation). */
+rotasCorridasProprias.get("/:id/detalhe", ok((req, res) => {
+  const c = listarProprias(emp(req)).find((x) => x.id === req.params.id || x.os === req.params.id);
+  if (!c) throw new Error("Corrida não encontrada.");
+  res.json(detalheDaCorrida(c));
 }));
 
 rotasCorridasProprias.post("/:id/avaliar", ok(async (req, res) => {

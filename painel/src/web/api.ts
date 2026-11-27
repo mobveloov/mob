@@ -29,6 +29,10 @@ export interface Integracoes {
   ia: { situacao: Array<{ caso: string; rotas: Array<{ provedor: string; modelo: string; temChave: boolean }> }>; preenchidas: Record<string, boolean> };
 }
 
+export interface WebhookSaida { id: string; tipo: "Status" | "Ocorrencia"; url: string; ativo: boolean; criadoEm: string; segredoFim: string }
+export interface EntregaWebhook { id: number; webhookId: string; sourceEventId: string; tipo: string; evento: string; tentativas: number; estado: string; ultimoStatus: number | null; ultimoErro: string; criadoEm: string; entregueEm: string | null }
+export interface WebhooksSaida { webhooks: WebhookSaida[]; entregas: EntregaWebhook[]; tipos: string[]; maximoPorTipo: number }
+
 export type Registro = { id: string; criadoEm: string; atualizadoEm: string; atualizadoPor: string } & Record<string, string | number | boolean | null>;
 export interface CorridaPropria {
   id: string; os: string; status: string; motoristaId: string | null; motorista: string; valor: number | null;
@@ -100,6 +104,12 @@ export const api = {
   novaIntegracao: (tipo: string) => pedir("/api/integracoes", json("POST", { tipo })),
   salvarIntegracao: (id: string, d: { nome?: string; ativa?: boolean; credenciais?: Record<string, string> }) => pedir(`/api/integracoes/${id}`, json("PUT", d)),
   apagarIntegracao: (id: string) => pedir(`/api/integracoes/${id}`, { method: "DELETE" }),
+  webhooksSaida: () => pedir<WebhooksSaida>("/api/integracoes/webhooks"),
+  criarWebhook: (d: { tipo: string; url: string }) => pedir<{ webhook: WebhookSaida; segredo: string }>("/api/integracoes/webhooks", json("POST", d)),
+  salvarWebhook: (id: string, d: { url?: string; ativo?: boolean }) => pedir(`/api/integracoes/webhooks/${id}`, json("PUT", d)),
+  apagarWebhook: (id: string) => pedir(`/api/integracoes/webhooks/${id}`, { method: "DELETE" }),
+  girarSegredoWebhook: (id: string) => pedir<{ segredo: string }>(`/api/integracoes/webhooks/${id}/segredo`, json("POST", {})),
+  testarWebhook: (id: string) => pedir<{ ok: boolean; status: number; erro: string }>(`/api/integracoes/webhooks/${id}/testar`, json("POST", {})),
   salvarChavesIa: (d: Record<string, string>) => pedir("/api/ia/chaves", json("PUT", d)),
   importarPlanilha: (arq: File) => pedir<{ total: number }>(`/api/planilhas?nome=${encodeURIComponent(arq.name)}`, { method: "POST", headers: { "Content-Type": "text/csv" }, body: arq }),
   usuarios: () => pedir<{ usuarios: Array<{ id: string; nome: string; email: string; papel: string }> }>("/api/usuarios"),
