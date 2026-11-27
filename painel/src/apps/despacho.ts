@@ -34,6 +34,7 @@ import { emitir, empresasComOuvintes, temOuvinte, type Alvo, conectado } from ".
 import { avisar } from "./push.ts";
 import { configGravacao, limparGravacoes } from "./gravacoes.ts";
 import type { PapelApp } from "./sessoes.ts";
+import { gravarUltimaPosicao } from "./ultima-posicao.ts";
 
 /** Quanto tempo o motorista tem para aceitar. */
 export const OFERTA_MS = () => Math.max(5, Number(process.env.APPS_OFERTA_SEGUNDOS) || 20) * 1000;
@@ -230,12 +231,15 @@ export function ficarOnline(empresaId: string, motoristaId: string, lat: number,
   const agora = Date.now();
   const o: Online = { lat, lng, em: agora, desde: antes?.desde ?? agora, visto: agora, contado: antes?.contado ?? agora };
   e.online.set(motoristaId, o);
+  gravarUltimaPosicao(empresaId, motoristaId, lat, lng, agora, !antes);
   contarOnline(empresaId, motoristaId, o);
   if (!antes) despachar(empresaId);
 }
 
 export function ficarOffline(empresaId: string, motoristaId: string) {
   const e = estado(empresaId);
+  const ultimo = e.online.get(motoristaId);
+  if (ultimo) gravarUltimaPosicao(empresaId, motoristaId, ultimo.lat, ultimo.lng, ultimo.em, true);
   e.online.delete(motoristaId);
   for (const o of [...e.ofertas.values()]) if (o.motoristaId === motoristaId) passarOferta(empresaId, o, "saiu");
 }
