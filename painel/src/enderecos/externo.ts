@@ -215,3 +215,32 @@ export async function pontoFora(lat: number, lng: number): Promise<Endereco | nu
     return guardar(pontos, k, e ? { ...e, lat, lng } : null);
   } catch { return null; }
 }
+
+const cidadesBuscadas = new Map<string, { em: number; v: CidadeAchada | null }>();
+export interface CidadeAchada { lat: number; lng: number; uf: string; /** [sul, oeste, norte, leste] */ caixa: [number, number, number, number] | null }
+
+/** Centro de uma cidade pelo OpenStreetMap (sem chave): coordenada, UF e a caixa que envolve a cidade. */
+export async function buscarCidade(cidade: string, uf = ""): Promise<CidadeAchada | null> {
+  const url = servidorNominatim();
+  const nome = cidade.replace(/[<>]/g, "").trim().slice(0, 80);
+  if (!url || nome.length < 2) return null;
+  const k = `${nome.toLowerCase()}|${uf.toUpperCase()}`;
+  const ja = valido(cidadesBuscadas.get(k), 24 * 3600_000);
+  if (ja) return ja.v;
+  const p = new URLSearchParams({ city: nome, country: "Brasil", format: "jsonv2", addressdetails: "1", limit: "1", "accept-language": "pt-BR" });
+  if (uf) p.set("state", uf.toUpperCase());
+  try {
+    const a = await naFila(async () => {
+      const r = await fetch(`${url}/search?${p}`, { headers: { "user-agent": AGENTE }, signal: AbortSignal.timeout(7000) });
+      return r.ok ? ((await r.json()) as Array<Achado & { boundingbox?: string[] }>)[0] ?? null : null;
+    });
+    const lat = Number(a?.lat), lng = Number(a?.lon);
+    if (!a || !Number.isFinite(lat) || !Number.isFinite(lng)) return guardar(cidadesBuscadas, k, null);
+    const bb = a.boundingbox?.map(Number);
+    const achada: CidadeAchada = {
+      lat, lng, uf: ((a.address?.["ISO3166-2-lvl4"] ?? "").replace("BR-", "") || UF[a.address?.state ?? ""] || uf).toUpperCase(),
+      caixa: bb && bb.length === 4 && bb.every(Number.isFinite) ? [bb[0], bb[2], bb[1], bb[3]] : null,
+    };
+    return guardar(cidadesBuscadas, k, achada);
+  } catch { return null; }
+}

@@ -14,6 +14,7 @@ import { cadastroPorId } from "../comum/cadastros.ts";
 import { listar } from "../cadastros/armazem.ts";
 import { listarUsuarios } from "../servidor/dados.ts";
 import { centroDoMapa } from "./centro.ts";
+import { geoDaCidade } from "./geocidade.ts";
 import { atualizarFilial, criarFilial, desvincular, ErroFilial, filial, filialForcada, listarFiliais, pessoasDaFilial, removerFilial, vincular } from "./filiais.ts";
 
 export const rotasFiliais = express.Router();
@@ -25,6 +26,11 @@ const ok = (fn: (req: Request, res: Response) => unknown) => async (req: Request
 const emp = (req: Request) => req.ctx!.empresaId;
 
 rotasFiliais.get("/opcoes", ok((req, res) => res.json({ filiais: listarFiliais(emp(req)).map((f) => ({ id: f.id, nome: f.nome, ativa: f.ativa })) })));
+rotasFiliais.get("/geocidade", ok(async (req, res) => {
+  const g = await geoDaCidade(emp(req), String(req.query.cidade ?? "").slice(0, 80), String(req.query.uf ?? "").slice(0, 2));
+  if (!g) throw new ErroFilial("Não achei essa cidade. Confira o nome ou preencha a latitude e a longitude.", 404);
+  res.json(g);
+}));
 rotasFiliais.get("/centro", ok((req, res) => {
   const presa = filialForcada(emp(req), req.ctx!.usuario);
   res.json(centroDoMapa(emp(req), presa ?? String(req.query.filial ?? "").slice(0, 80)));

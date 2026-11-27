@@ -69,7 +69,7 @@ function dentroDoPoligono(lat: number, lng: number, pol: Ponto[]): boolean {
 }
 
 /** Primeira coordenada achada na base de endereços para "cidade UF" (a base só cobre as cidades atendidas pela empresa). */
-function geocodificar(empresaId: string, cidade: string, uf: string): { lat: number; lng: number } | null {
+export function geocodificar(empresaId: string, cidade: string, uf: string): { lat: number; lng: number } | null {
   if (!cidade.trim()) return null;
   try {
     const r = buscarEndereco(empresaId, `${cidade} ${uf}`.trim(), 8).enderecos.find((e) => noBrasil(e.lat, e.lng));
