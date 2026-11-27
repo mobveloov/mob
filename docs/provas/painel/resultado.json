@@ -1,5 +1,5 @@
 {
-  "quando": "2026-11-27T17:28:43.584Z",
+  "quando": "2026-11-27T20:35:06.494Z",
   "res": [
     {
       "grupo": "Painel",
@@ -7,7 +7,7 @@
       "id": "painel",
       "nome": "Painel",
       "rota": "/",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -16,7 +16,7 @@
       "id": "equipe",
       "nome": "Minha equipe",
       "rota": "/equipe",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -25,7 +25,7 @@
       "id": "cupons",
       "nome": "Cupons",
       "rota": "/cupons",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -34,7 +34,7 @@
       "id": "passe-livre",
       "nome": "Passe Livre",
       "rota": "/passe-livre",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -43,7 +43,7 @@
       "id": "empresas",
       "nome": "Empresas",
       "rota": "/empresas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -52,7 +52,7 @@
       "id": "filiais",
       "nome": "Filiais",
       "rota": "/filiais",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -61,7 +61,7 @@
       "id": "faixas-vouchers",
       "nome": "Faixa de Vouchers",
       "rota": "/faixas-vouchers",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -70,7 +70,7 @@
       "id": "areas",
       "nome": "Áreas",
       "rota": "/areas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -79,7 +79,7 @@
       "id": "plantao",
       "nome": "Plantão",
       "rota": "/plantao",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -88,7 +88,7 @@
       "id": "motoristas",
       "nome": "Motoristas",
       "rota": "/motoristas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -97,7 +97,7 @@
       "id": "punicoes",
       "nome": "Punições",
       "rota": "/punicoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -106,7 +106,7 @@
       "id": "passageiros",
       "nome": "Clientes",
       "rota": "/passageiros",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -115,7 +115,7 @@
       "id": "consulta-cartoes",
       "nome": "Consulta de cartões",
       "rota": "/consulta-cartoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -124,7 +124,7 @@
       "id": "ruas",
       "nome": "Ruas",
       "rota": "/ruas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -133,7 +133,7 @@
       "id": "desafios",
       "nome": "Desafios",
       "rota": "/desafios",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -142,7 +142,7 @@
       "id": "solicitar",
       "nome": "Solicitar nova corrida",
       "rota": "/solicitar",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -151,7 +151,7 @@
       "id": "monitoramento",
       "nome": "Acompanhamento",
       "rota": "/monitoramento",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -160,7 +160,7 @@
       "id": "ocorrencias",
       "nome": "Retorno e Ocorrências",
       "rota": "/ocorrencias",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -169,7 +169,7 @@
       "id": "alertas-seguranca",
       "nome": "Alertas de segurança",
       "rota": "/alertas-seguranca",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -178,7 +178,7 @@
       "id": "gravacoes",
       "nome": "Gravações",
       "rota": "/gravacoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -187,7 +187,7 @@
       "id": "historico",
       "nome": "Consultar corridas",
       "rota": "/historico",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -196,7 +196,7 @@
       "id": "mapa",
       "nome": "Mapa de motoristas",
       "rota": "/mapa",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -205,7 +205,7 @@
       "id": "programadas",
       "nome": "Consultar programadas",
       "rota": "/programadas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -214,7 +214,7 @@
       "id": "taxas-cancelamento",
       "nome": "Taxas de cancelamento",
       "rota": "/taxas-cancelamento",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -223,7 +223,7 @@
       "id": "indice-relatorios",
       "nome": "Relatórios",
       "rota": "/indice-relatorios",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -232,7 +232,7 @@
       "id": "alterar-os",
       "nome": "Alteração de dados da OS",
       "rota": "/alterar-os",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -241,7 +241,7 @@
       "id": "entrega-voucher",
       "nome": "Entrega de voucher",
       "rota": "/entrega-voucher",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -250,7 +250,7 @@
       "id": "objetos",
       "nome": "Objetos perdidos",
       "rota": "/objetos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -259,7 +259,7 @@
       "id": "engajamento",
       "nome": "Mapa de engajamento",
       "rota": "/engajamento",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -268,7 +268,7 @@
       "id": "carteiras",
       "nome": "Carteiras de crédito",
       "rota": "/carteiras",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -277,7 +277,7 @@
       "id": "creditos-recargas-saques",
       "nome": "Recargas e Saques",
       "rota": "/creditos-recargas-saques",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -286,7 +286,7 @@
       "id": "creditos-extrato",
       "nome": "Extrato",
       "rota": "/creditos-extrato",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -295,7 +295,7 @@
       "id": "cartao-painel",
       "nome": "Painel de Controle",
       "rota": "/cartao-painel",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -304,7 +304,7 @@
       "id": "cartao-transacoes",
       "nome": "Transações",
       "rota": "/cartao-transacoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -313,7 +313,7 @@
       "id": "cartao-saldo-central",
       "nome": "Saldo da Central",
       "rota": "/cartao-saldo-central",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -322,7 +322,7 @@
       "id": "cartao-saldo-motorista",
       "nome": "Saldo do Motorista",
       "rota": "/cartao-saldo-motorista",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -331,7 +331,7 @@
       "id": "transacao-pix",
       "nome": "Transações",
       "rota": "/transacao-pix",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -340,7 +340,7 @@
       "id": "faturamento-empresa",
       "nome": "Faturamento por empresa",
       "rota": "/faturamento-empresa",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -349,7 +349,7 @@
       "id": "faturamento-centro-custo",
       "nome": "Faturamento de centro de custo",
       "rota": "/faturamento-centro-custo",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -358,7 +358,7 @@
       "id": "faturamento-periodo",
       "nome": "Faturamento por período",
       "rota": "/faturamento-periodo",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -367,7 +367,7 @@
       "id": "vouchers-motoristas",
       "nome": "Vouchers e tickets por motoristas",
       "rota": "/vouchers-motoristas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -376,7 +376,7 @@
       "id": "pagamentos-pendentes",
       "nome": "Pagamentos pendentes",
       "rota": "/pagamentos-pendentes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -385,7 +385,7 @@
       "id": "visao-geral",
       "nome": "Visão geral",
       "rota": "/visao-geral",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -394,7 +394,7 @@
       "id": "relatorio-faturamento",
       "nome": "Faturamento",
       "rota": "/relatorio-faturamento",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -403,7 +403,7 @@
       "id": "extrato-online",
       "nome": "Transações online",
       "rota": "/extrato-online",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -412,7 +412,7 @@
       "id": "os-motorista",
       "nome": "OS por motorista",
       "rota": "/os-motorista",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -421,7 +421,7 @@
       "id": "os-empresa",
       "nome": "OS por empresa",
       "rota": "/os-empresa",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -430,7 +430,7 @@
       "id": "os-bairro",
       "nome": "OS por bairro",
       "rota": "/os-bairro",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -439,7 +439,7 @@
       "id": "os-pagamento",
       "nome": "OS por forma de pagamento",
       "rota": "/os-pagamento",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -448,7 +448,7 @@
       "id": "os-operador",
       "nome": "OS por operador",
       "rota": "/os-operador",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -457,7 +457,7 @@
       "id": "os-percentual-motorista",
       "nome": "% de OS por motorista",
       "rota": "/os-percentual-motorista",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -466,7 +466,7 @@
       "id": "km-rodados",
       "nome": "Km rodados por motorista",
       "rota": "/km-rodados",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -475,7 +475,7 @@
       "id": "indicacoes",
       "nome": "Recompensas por indicação",
       "rota": "/indicacoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -484,7 +484,7 @@
       "id": "conversas",
       "nome": "Conversas",
       "rota": "/conversas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -493,7 +493,7 @@
       "id": "notificacoes",
       "nome": "Notificações app",
       "rota": "/notificacoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -502,7 +502,7 @@
       "id": "alertas-empresas",
       "nome": "Alertas para empresas",
       "rota": "/alertas-empresas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -511,7 +511,7 @@
       "id": "config-gerais",
       "nome": "Gerais",
       "rota": "/config-gerais",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -520,7 +520,7 @@
       "id": "personalizacao-app",
       "nome": "Personalização app passageiro",
       "rota": "/personalizacao-app",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -529,7 +529,7 @@
       "id": "personalizacao-motorista",
       "nome": "Personalização app motorista",
       "rota": "/personalizacao-motorista",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -538,7 +538,7 @@
       "id": "carteiras-credito",
       "nome": "Carteiras de crédito",
       "rota": "/carteiras-credito",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -547,7 +547,7 @@
       "id": "taxas-central",
       "nome": "Taxas da central",
       "rota": "/taxas-central",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -556,7 +556,7 @@
       "id": "regras-despacho",
       "nome": "Despacho",
       "rota": "/regras-despacho",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -565,7 +565,7 @@
       "id": "transbordos",
       "nome": "Transbordos",
       "rota": "/transbordos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -574,7 +574,7 @@
       "id": "categorias",
       "nome": "Tarifas e categorias",
       "rota": "/categorias",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -583,7 +583,7 @@
       "id": "tarifas-dinamicas",
       "nome": "Tarifas dinâmicas",
       "rota": "/tarifas-dinamicas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -592,7 +592,7 @@
       "id": "descontos",
       "nome": "Descontos",
       "rota": "/descontos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -601,7 +601,7 @@
       "id": "integracoes",
       "nome": "Integrações",
       "rota": "/integracoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -610,7 +610,7 @@
       "id": "config-nps",
       "nome": "NPS",
       "rota": "/config-nps",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -619,7 +619,7 @@
       "id": "termos-app",
       "nome": "Termos de uso",
       "rota": "/termos-app",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -628,7 +628,7 @@
       "id": "regras-credito",
       "nome": "Regras de Crédito",
       "rota": "/regras-credito",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -637,7 +637,7 @@
       "id": "ultimo-boleto",
       "nome": "Último boleto",
       "rota": "/ultimo-boleto",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -646,7 +646,7 @@
       "id": "demonstrativo-mensal",
       "nome": "Demonstrativo Mensal",
       "rota": "/demonstrativo-mensal",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -655,7 +655,7 @@
       "id": "meus-planos",
       "nome": "Meus planos",
       "rota": "/meus-planos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -664,7 +664,7 @@
       "id": "extrato-central",
       "nome": "Extrato da central",
       "rota": "/extrato-central",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -673,7 +673,7 @@
       "id": "controle-centrais",
       "nome": "Controle financeiro de centrais",
       "rota": "/controle-centrais",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -682,7 +682,7 @@
       "id": "avaliacoes",
       "nome": "NPS",
       "rota": "/avaliacoes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -691,7 +691,7 @@
       "id": "ajuda-termos",
       "nome": "Termos de uso",
       "rota": "/ajuda-termos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -700,7 +700,7 @@
       "id": "juridico",
       "nome": "Política de privacidade",
       "rota": "/juridico",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -709,7 +709,7 @@
       "id": "central-suporte",
       "nome": "Central de suporte",
       "rota": "/central-suporte",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -718,7 +718,7 @@
       "id": "ouvidoria",
       "nome": "Ouvidoria",
       "rota": "/ouvidoria",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -727,7 +727,7 @@
       "id": "central-ajuda",
       "nome": "Central de Ajuda",
       "rota": "/central-ajuda",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -736,7 +736,7 @@
       "id": "bot",
       "nome": "Bot de WhatsApp",
       "rota": "/bot",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -745,7 +745,7 @@
       "id": "totem",
       "nome": "Totens & Preços",
       "rota": "/totem",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -754,7 +754,7 @@
       "id": "app-totem",
       "nome": "App do Totem",
       "rota": "/app-totem",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -763,7 +763,7 @@
       "id": "apps",
       "nome": "Apps e SOS",
       "rota": "/apps",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -772,7 +772,7 @@
       "id": "enderecos",
       "nome": "Endereços",
       "rota": "/enderecos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -781,7 +781,7 @@
       "id": "crm",
       "nome": "CRM & Engajamento",
       "rota": "/crm",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -790,7 +790,7 @@
       "id": "recuperacao",
       "nome": "Recuperação de Vendas",
       "rota": "/recuperacao",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -799,7 +799,7 @@
       "id": "funil-clientes",
       "nome": "Funil de Clientes",
       "rota": "/funil-clientes",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -808,7 +808,7 @@
       "id": "mapa-bairros",
       "nome": "Mapa de Bairros e Demanda",
       "rota": "/mapa-bairros",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -817,7 +817,7 @@
       "id": "analise",
       "nome": "Análise com IA",
       "rota": "/analise",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -826,7 +826,7 @@
       "id": "documentos",
       "nome": "Documentos dos motoristas",
       "rota": "/documentos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -835,7 +835,7 @@
       "id": "destravar",
       "nome": "Destravar Motoristas",
       "rota": "/destravar",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -844,7 +844,7 @@
       "id": "veiculos",
       "nome": "Veículos",
       "rota": "/veiculos",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -853,7 +853,7 @@
       "id": "extrato",
       "nome": "Extrato Geral",
       "rota": "/extrato",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -862,7 +862,7 @@
       "id": "saques",
       "nome": "Saques",
       "rota": "/saques",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -871,7 +871,7 @@
       "id": "recargas",
       "nome": "Recargas",
       "rota": "/recargas",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -880,7 +880,7 @@
       "id": "relatorios",
       "nome": "Relatórios & Stats",
       "rota": "/relatorios",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -889,7 +889,7 @@
       "id": "marca",
       "nome": "Marca e aparência",
       "rota": "/marca",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -898,7 +898,7 @@
       "id": "superadmin",
       "nome": "Painel do dono",
       "rota": "/superadmin",
-      "ok": false,
+      "ok": true,
       "construcao": false
     },
     {
@@ -907,7 +907,7 @@
       "id": "alterar-senha",
       "nome": "Trocar senha",
       "rota": "/alterar-senha",
-      "ok": false,
+      "ok": true,
       "construcao": false
     }
   ],
