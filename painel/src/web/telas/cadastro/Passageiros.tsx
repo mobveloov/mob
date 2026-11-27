@@ -6,15 +6,16 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEndereco";
-import { Cabecalho, Campo, chamar, ComFiltros, consulta, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
+import { Cabecalho, Campo, chamar, ComFiltros, consulta, dataBr, Janela, MenuAcoes, Paginacao, Selo, useAviso, Vazio } from "./base";
 import { decimal } from "../../../comum/formato-br.ts";
 
 interface Linha { id: string; nome: string; telefone: string; email: string; cidade: string; genero: string; dispositivo: string; origem: string; tipoCurto: string; nota: number | null; status: string; bloqueado: boolean }
 interface Resposta { passageiros: Linha[]; paginacao: { atual: number; totalPaginas: number; totalItens: number }; contadores: Record<string, number> }
+interface Resumo { corridas: number; cadastradoEm: string | null; diasSemLogin: number | null; ultimaEstimativa: string | null; versaoApp: string | null; ativoDesde: string | null; cpfValidado: boolean; emailValidado: boolean; emailBloqueado: boolean }
 interface Restrito { id: string; nome: string; placa: string }
 
 // Tela "Clientes" da Machine: filtros, Criar Estabelecimento, Criar Cliente e Exportar.
-const VAZIO = { nome: "", telefone: "", cpf: "", email: "", nascIni: "", nascFim: "", cadIni: "", cadFim: "", avaliacao: "", status: [] as string[], tipo: "" };
+const VAZIO = { nome: "", telefone: "", cpf: "", email: "", nascIni: "", nascFim: "", cadIni: "", cadFim: "", avaliacao: "", status: [] as string[], tipo: "", cartaoAtivo: "", cartaoNaoValidado: "" };
 const STATUS = ["Ativo", "Inativo", "Suspenso", "Aguardando Ativação", "Aguardando Deleção", "Deletado", "Suspenso por nota", "Bloqueado"];
 const TIPOS: Array<[string, string]> = [["Estabelecimento", "Estabelecimento"], ["App", "Passageiro App"], ["Painel", "Passageiro Call-Center"], ["Motorista", "Passageiro Maçaneta"]];
 
@@ -59,6 +60,8 @@ export default function Passageiros() {
           <Campo rotulo="Avaliação"><input value={form.avaliacao} maxLength={3} inputMode="decimal" onChange={(e) => setForm({ ...form, avaliacao: e.target.value.replace(",", ".").replace(/[^0-9.]/g, "") })} /></Campo>
           <Campo rotulo="Status"><div>{STATUS.map((st) => <label key={st} style={{ display: "block" }}><input type="checkbox" checked={form.status.includes(st)} onChange={() => marcar(st)} /> {st}</label>)}</div></Campo>
           <Campo rotulo="Tipo"><select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option value="">Selecione</option>{TIPOS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></Campo>
+          <label style={{ display: "block" }}><input type="checkbox" checked={form.cartaoAtivo === "1"} onChange={(e) => setForm({ ...form, cartaoAtivo: e.target.checked ? "1" : "" })} /> Cartões ativos</label>
+          <label style={{ display: "block" }}><input type="checkbox" checked={form.cartaoNaoValidado === "1"} onChange={(e) => setForm({ ...form, cartaoNaoValidado: e.target.checked ? "1" : "" })} /> Cartões não validados</label>
           <button className="cg-botao primario cheio">Filtrar</button>
           <button type="button" className="cg-botao cheio" onClick={() => { setForm(VAZIO); setFiltro(VAZIO); setPagina(1); }}>Limpar filtros</button>
         </form>
@@ -95,16 +98,18 @@ export default function Passageiros() {
 
 function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: string | "novo"; estabelecimento?: boolean; cidades: string[]; onFechar: () => void; onSalvo: () => void }) {
   const novo = id === "novo";
-  const [f, setF] = useState<Record<string, string>>({ nome: "", genero: "", telefone: "", email: "", nascimento: "", cidade: "", cpf: "", status: "Ativo", origemCadastro: estabelecimento ? "Estabelecimento" : "Painel", observacao: "", avaliouApp: "Pendente", notaApp: "0", senha: "" });
+  const [f, setF] = useState<Record<string, string>>({ emailValidado: "", emailBloqueado: "", nome: "", genero: "", telefone: "", email: "", nascimento: "", cidade: "", cpf: "", status: "Ativo", origemCadastro: estabelecimento ? "Estabelecimento" : "Painel", observacao: "", avaliouApp: "Pendente", notaApp: "0", senha: "" });
   const [nota, setNota] = useState<number | null>(null);
+  const [resumo, setResumo] = useState<Resumo | null>(null);
   const [foto, setFoto] = useState<string | null>(null);
   const [casa, setCasa] = useState<PontoEscolhido>({ texto: "" });
   const [trabalho, setTrabalho] = useState<PontoEscolhido>({ texto: "" });
   const { aviso, tentar } = useAviso();
   useCarregar(async () => {
     if (novo) return null;
-    const r = await chamar<{ passageiro: Record<string, unknown>; nota: number | null }>("GET", `/passageiros/${id}`);
-    setF((a) => ({ ...a, ...Object.fromEntries(["nome", "genero", "telefone", "email", "nascimento", "cidade", "cpf", "status", "origemCadastro", "observacao", "avaliouApp"].map((k) => [k, String(r.passageiro[k] ?? a[k])])), notaApp: String(r.passageiro.notaApp ?? 0) }));
+    const r = await chamar<{ passageiro: Record<string, unknown>; nota: number | null; resumo: Resumo }>("GET", `/passageiros/${id}`);
+    setResumo(r.resumo);
+    setF((a) => ({ ...a, emailValidado: r.passageiro.emailValidado === true ? "1" : "", emailBloqueado: r.passageiro.emailBloqueado === true ? "1" : "", ...Object.fromEntries(["nome", "genero", "telefone", "email", "nascimento", "cidade", "cpf", "status", "origemCadastro", "observacao", "avaliouApp"].map((k) => [k, String(r.passageiro[k] ?? a[k])])), notaApp: String(r.passageiro.notaApp ?? 0) }));
     setNota(r.nota); setFoto((r.passageiro.foto as string | null) ?? null);
     const ponto = (t: unknown, pos: unknown): PontoEscolhido => { const m = /^(-?[\d.]+),(-?[\d.]+)$/.exec(String(pos ?? "")); return { texto: String(t ?? ""), ...(m ? { lat: Number(m[1]), lng: Number(m[2]) } : {}) }; };
     setCasa(ponto(r.passageiro.enderecoCasa, r.passageiro.enderecoCasaPos)); setTrabalho(ponto(r.passageiro.enderecoTrabalho, r.passageiro.enderecoTrabalhoPos));
@@ -113,12 +118,20 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
   const set = (k: string, v: string) => setF({ ...f, [k]: v });
   const salvar = async () => {
     const pos = (p: PontoEscolhido) => (p.lat != null && p.lng != null ? `${p.lat},${p.lng}` : "");
-    const corpo = { ...f, notaApp: Number(f.notaApp) || 0, senha: f.senha || undefined, ...(novo ? {} : { enderecoCasa: casa.texto, enderecoCasaPos: pos(casa), enderecoTrabalho: trabalho.texto, enderecoTrabalhoPos: pos(trabalho) }) };
+    const corpo = { ...f, emailValidado: f.emailValidado === "1", emailBloqueado: f.emailBloqueado === "1", notaApp: Number(f.notaApp) || 0, senha: f.senha || undefined, ...(novo ? {} : { enderecoCasa: casa.texto, enderecoCasaPos: pos(casa), enderecoTrabalho: trabalho.texto, enderecoTrabalhoPos: pos(trabalho) }) };
     if (await tentar(() => (novo ? chamar("POST", "/passageiros", corpo) : chamar("PUT", `/passageiros/${id}`, corpo)), "Cliente salvo.")) { onSalvo(); onFechar(); }
   };
   return (
     <Janela cheia aberta titulo="Cadastro de passageiro" onFechar={onFechar} rodape={<><button className="cg-botao" onClick={onFechar}>Voltar</button><button className="cg-botao primario" onClick={() => void salvar()}>Gravar</button></>}>
       {aviso}
+      {resumo && <div className="cg-kpis">
+        <div className="cg-kpi"><span>Quantidade de corridas</span><strong>{resumo.corridas}</strong></div>
+        <div className="cg-kpi"><span>Cadastrado em</span><strong>{resumo.cadastradoEm ? dataBr(resumo.cadastradoEm) : "-"}</strong></div>
+        <div className="cg-kpi"><span>Dias sem realizar login</span><strong>{resumo.diasSemLogin ?? "-"}</strong></div>
+        <div className="cg-kpi"><span>Última estimativa realizada</span><strong>{resumo.ultimaEstimativa ? dataBr(resumo.ultimaEstimativa) : "-"}</strong></div>
+        <div className="cg-kpi"><span>Versão do aplicativo</span><strong>{resumo.versaoApp ?? "-"}</strong></div>
+        <div className="cg-kpi"><span>Ativo desde</span><strong>{resumo.ativoDesde ? dataBr(resumo.ativoDesde) : "-"}</strong></div>
+      </div>}
       <h4 className="cg-secao">Informações gerais</h4>
       <div className="cg-grade">
         <Campo rotulo="Bandeira *"><select value={f.cidade || cidades[0] || ""} disabled={novo && cidades.length === 1} onChange={(e) => set("cidade", e.target.value)}>{cidades.length !== 1 && <option value="">Selecione</option>}{cidades.map((c) => <option key={c}>{c}</option>)}</select></Campo>
@@ -133,6 +146,8 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
         <Campo rotulo="CPF"><input value={f.cpf} inputMode="numeric" maxLength={14} onChange={(e) => set("cpf", e.target.value)} /></Campo>
         {!novo && <>
           <Campo rotulo="E-mail"><input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} /></Campo>
+          <Campo rotulo="CPF validado"><input readOnly disabled value={resumo?.cpfValidado ? "Sim" : "Não"} /></Campo>
+          <Campo rotulo="E-mail validado?" dica="Não há serviço de e-mail ligado: a central confirma aqui à mão."><div className="cg-duplo"><input readOnly disabled value={f.emailValidado === "1" ? "Sim" : "Não"} /><button type="button" className="cg-botao" onClick={() => set("emailValidado", f.emailValidado === "1" ? "" : "1")}>{f.emailValidado === "1" ? "Remover validação" : "Validar email"}</button></div></Campo>
           <Campo rotulo="Data de nascimento"><input type="date" value={f.nascimento} onChange={(e) => set("nascimento", e.target.value)} /></Campo>
           <Campo rotulo="Gênero"><select value={f.genero} onChange={(e) => set("genero", e.target.value)}><option value="">Não informado</option><option>Masculino</option><option>Feminino</option><option>Outro</option></select></Campo>
           <Campo rotulo="Senha do app" dica="Deixe vazio para manter."><input type="text" autoComplete="off" value={f.senha} onChange={(e) => set("senha", e.target.value)} /></Campo>
@@ -148,6 +163,7 @@ function Formulario({ id, estabelecimento, cidades, onFechar, onSalvo }: { id: s
         </div>
       </>}
       <h4 className="cg-secao">Dados internos</h4>
+      {!novo && <Campo rotulo="Recebimento de e-mails bloqueado?" dica="Indica que e-mails como recuperação de senha e recibos não serão mais recebidos pelo cliente, porque ele fez o bloqueio."><select value={f.emailBloqueado === "1" ? "1" : "0"} onChange={(e) => set("emailBloqueado", e.target.value === "1" ? "1" : "")}><option value="1">Sim</option><option value="0">Não</option></select></Campo>}
       <Campo rotulo="Observação" dica={`${f.observacao.length}/5000. Só a central vê.`}><textarea value={f.observacao} maxLength={5000} rows={3} onChange={(e) => set("observacao", e.target.value)} /></Campo>
       {!novo && <>
         <h4 className="cg-secao">Avaliações</h4>

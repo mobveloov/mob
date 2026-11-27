@@ -65,10 +65,11 @@ export default function Empresas() {
         </div>
         <div className="cg-tabela-caixa">
           <div className="cg-rolagem"><table className="cg-tabela">
-            <thead><tr><th>Nome fantasia</th><th>CPF/CNPJ</th><th>Status da empresa</th><th>Responsável</th><th>Cidade</th><th>Última solicitação</th><th>Funcionários</th><th>Fatura Mês</th><th className="direita" /></tr></thead>
+            <thead><tr><th>Nome fantasia</th><th>Tipo de operação</th><th>CPF/CNPJ</th><th>Status da empresa</th><th>Responsável</th><th>Cidade</th><th>Última solicitação</th><th>Funcionários</th><th>Fatura Mês</th><th className="direita" /></tr></thead>
             <tbody>{d?.empresas.map((e) => (
               <tr key={e.id}>
                 <td><strong>{String(e.nome)}</strong>{e.numeroContrato ? <><br /><small className="cg-mono">Contrato {String(e.numeroContrato)}</small></> : null}</td>
+                <td>{String(e.tipoOperacao || "Corporativo")}</td>
                 <td className="cg-mono">{documentoBonito(e.cnpj)}</td>
                 <td><Selo tom={TOM[String(e.status)] ?? "neutro"}>{ROTULO[String(e.status)] ?? String(e.status)}</Selo></td>
                 <td>{String(e.contato ?? "")}<br /><small className="cg-mono">{String(e.telefone ?? "")}</small></td>
@@ -101,7 +102,7 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
   const t = (k: string) => (e?.[k] == null ? "" : String(e[k]));
   const docInicial = t("cnpj");
   const [f, setF] = useState({
-    bandeira: t("bandeira") || opcoes.bandeiras[0] || "", tipoDocumento: t("tipoDocumento") || (soDigitos(docInicial).length === 11 ? "CPF" : "CNPJ"), cnpj: documentoBonito(docInicial), numeroContrato: t("numeroContrato"),
+    bandeira: t("bandeira") || opcoes.bandeiras[0] || "", tipoOperacao: t("tipoOperacao") || "Corporativo", tipoDocumento: t("tipoDocumento") || (soDigitos(docInicial).length === 11 ? "CPF" : "CNPJ"), cnpj: documentoBonito(docInicial), numeroContrato: t("numeroContrato"),
     razaoSocial: t("razaoSocial"), nome: t("nome"), endereco: t("endereco"), enderecoNumero: t("enderecoNumero"), complemento: t("complemento"), uf: t("uf"), cidade: t("cidade"), bairro: t("bairro"), cep: mascaraCep(t("cep")),
     contato: t("contato"), email: t("email"), telefone: t("telefone"), status: t("status") || "Ativa",
     permiteEspecificarMotorista: t("permiteEspecificarMotorista") || "Sim", obsMotorista: t("obsMotorista"),
@@ -134,6 +135,7 @@ function Formulario({ e, opcoes, cidades, onFechar, onSalvo }: { e: Empresa | nu
       <h4 className="cg-secao">Dados da empresa</h4>
       <div className="cg-grade">
         <Campo rotulo="Bandeira *"><select value={f.bandeira} onChange={(x) => set("bandeira", x.target.value)}><option value="">Selecione</option>{[...new Set([...opcoes.bandeiras, f.bandeira].filter(Boolean))].map((b) => <option key={b}>{b}</option>)}</select></Campo>
+        <Campo rotulo="Tipo de operação"><select value={f.tipoOperacao} onChange={(x) => set("tipoOperacao", x.target.value)}><option>Corporativo</option><option>Voucher</option></select></Campo>
         <Campo rotulo={`${f.tipoDocumento} *`} dica={e ? undefined : undefined}>
           <div className="cg-duplo"><input value={f.cnpj} inputMode="numeric" onChange={(x) => set("cnpj", mascara(x.target.value))} />
             <button type="button" className="cg-botao" onClick={() => setF({ ...f, tipoDocumento: f.tipoDocumento === "CPF" ? "CNPJ" : "CPF", cnpj: "" })}>Alterar para {f.tipoDocumento === "CPF" ? "CNPJ" : "CPF"}</button></div>

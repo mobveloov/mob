@@ -1,16 +1,18 @@
 // Config › Gerais › aba Despacho ("Alterando Bandeira" da Machine): parâmetros da central para pendências, reenvio, alertas,
 // cerca eletrônica, corrida em espera, estimativa, tela de solicitação, área de operação controlada e os disparos por proximidade.
-// Fica em config/bandeira.json. Quem já vale no sistema: área de operação controlada (bloqueia pedido fora dela). O resto fica
-// gravado e aparece nas telas; o despacho ainda usa as Regras de Despacho (config/despacho.ts) para montar as rodadas.
+// Fica em config/bandeira.json. Quem já vale no sistema: área de operação controlada (bloqueia pedido fora dela) e os disparos.
+// Os disparos (e a quantidade de tentativas) são as ETAPAS das Regras de Despacho (config/despacho.ts): uma só lista, gravada lá,
+// que o despacho percorre na ordem. Aqui eles aparecem (e são gravados) no formato da Machine. Sem limite de etapas; 0 = sem limite.
 
-import { gravarConfig, lerConfig, lista, numero, sim, umDe } from "./armazem.ts";
+import { gravarConfig, lerConfig, numero, sim, umDe } from "./armazem.ts";
+import { regrasDespacho, salvarDespacho, type Etapa } from "./despacho.ts";
 
 export const TIPOS_DESPACHO = ["proximidade", "apoio_proximidade", "area_proximidade"] as const;
 export const UNIDADES_AUTORIZACAO = ["minutos", "horas", "dias"] as const;
 export const ESTIMATIVAS = ["menor_tempo", "menor_trajeto"] as const;
-export const MAX_DISPAROS = 6;
 
-export interface Disparo { motoristas: number; km: number; secundarios: boolean; transbordo: boolean }
+/** Um disparo = uma etapa do despacho. motoristas 0 = sem limite; km 0 = o raio inicial; tempo 0 = o tempo na tela da empresa. */
+export interface Disparo { motoristas: number; km: number; secundarios: boolean; transbordo: boolean; tempo: number }
 export interface Bandeira {
   expiracaoPendenciaMin: number; distanciaListarKm: number; distanciaPendenciaKm: number;
   reenvioAutomatico: boolean; redistribuirAgendada: boolean; alertasOperadores: boolean; enviarNumeroPartida: boolean;
@@ -23,28 +25,17 @@ export interface Bandeira {
   tipoDespacho: (typeof TIPOS_DESPACHO)[number]; eleicao: boolean; tentativas: number; disparos: Disparo[];
 }
 
-const DISPAROS_PADRAO: Disparo[] = [
-  { motoristas: 2, km: 1, secundarios: true, transbordo: true }, { motoristas: 3, km: 3, secundarios: true, transbordo: true },
-  { motoristas: 6, km: 5, secundarios: true, transbordo: true }, { motoristas: 6, km: 6, secundarios: true, transbordo: true },
-  { motoristas: 6, km: 7, secundarios: true, transbordo: true }, { motoristas: 6, km: 8, secundarios: true, transbordo: true },
-];
+const deEtapa = (e: Etapa): Disparo => ({ motoristas: e.quantidade, km: e.raioKm, secundarios: e.secundarios, transbordo: e.transbordo, tempo: e.tempo });
 export const BANDEIRA_PADRAO: Bandeira = {
   expiracaoPendenciaMin: 20, distanciaListarKm: 5, distanciaPendenciaKm: 5, reenvioAutomatico: true, redistribuirAgendada: true, alertasOperadores: true, enviarNumeroPartida: true,
   autorizacaoCorporativa: { valor: 10, unidade: "minutos" }, obrigarProximidadeApp: false, cercaEletronica: false, corridaEmEspera: false, distanciaEsperaKm: 1,
   tipoEstimativa: "menor_tempo", observacaoObrigatoria: false, obrigaEnderecoDesejado: false, calcularEstimativa: true, areaControlada: "",
-  tipoDespacho: "proximidade", eleicao: true, tentativas: 3, disparos: DISPAROS_PADRAO,
+  tipoDespacho: "proximidade", eleicao: true, tentativas: 3, disparos: [],
 };
 
 export function sanearBandeira(e: unknown, atual: Bandeira = BANDEIRA_PADRAO): Bandeira {
   const o = { ...atual, ...((e ?? {}) as object) } as Record<string, any>;
   const n = (v: unknown, padrao: number, min: number, max: number) => Math.round(numero(v, padrao, min, max) * 100) / 100;
-  const tentativas = Math.round(n(o.tentativas, 3, 1, MAX_DISPAROS));
-  const brutos = lista(o.disparos).map((d) => (d ?? {}) as Record<string, unknown>);
-  // Sempre 6 linhas guardadas (as que passam da quantidade de tentativas só não aparecem). Máximos da Machine: 20 motoristas e 50 km.
-  const disparos = DISPAROS_PADRAO.map((p, i) => {
-    const d = brutos[i] ?? {};
-    return { motoristas: Math.round(n(d.motoristas, p.motoristas, 1, 20)), km: n(d.km, p.km, 0.1, 50), secundarios: sim(d.secundarios, p.secundarios), transbordo: sim(d.transbordo, p.transbordo) };
-  });
   const aut = (o.autorizacaoCorporativa ?? {}) as Record<string, unknown>;
   return {
     expiracaoPendenciaMin: Math.round(n(o.expiracaoPendenciaMin, 20, 1, 1440)), distanciaListarKm: n(o.distanciaListarKm, 5, 0, 500), distanciaPendenciaKm: n(o.distanciaPendenciaKm, 5, 0, 500),
@@ -53,13 +44,21 @@ export function sanearBandeira(e: unknown, atual: Bandeira = BANDEIRA_PADRAO): B
     obrigarProximidadeApp: sim(o.obrigarProximidadeApp), cercaEletronica: sim(o.cercaEletronica), corridaEmEspera: sim(o.corridaEmEspera), distanciaEsperaKm: n(o.distanciaEsperaKm, 1, 0, 500),
     tipoEstimativa: umDe(o.tipoEstimativa, ESTIMATIVAS, "menor_tempo"), observacaoObrigatoria: sim(o.observacaoObrigatoria), obrigaEnderecoDesejado: sim(o.obrigaEnderecoDesejado), calcularEstimativa: sim(o.calcularEstimativa, true),
     areaControlada: typeof o.areaControlada === "string" ? o.areaControlada.slice(0, 80) : "",
-    tipoDespacho: umDe(o.tipoDespacho, TIPOS_DESPACHO, "proximidade"), eleicao: sim(o.eleicao, true), tentativas, disparos,
+    tipoDespacho: umDe(o.tipoDespacho, TIPOS_DESPACHO, "proximidade"), eleicao: sim(o.eleicao, true), tentativas: 0, disparos: [],
   };
 }
-export const bandeira = (empresaId: string): Bandeira => sanearBandeira(lerConfig(empresaId, "bandeira", {}), BANDEIRA_PADRAO);
+/** Os disparos e a quantidade de tentativas vêm das etapas do despacho (não ficam repetidos em bandeira.json). */
+const comDisparos = (b: Bandeira, empresaId: string): Bandeira => { const e = regrasDespacho(empresaId).etapas; return { ...b, tentativas: e.length, disparos: e.map(deEtapa) }; };
+export const bandeira = (empresaId: string): Bandeira => comDisparos(sanearBandeira(lerConfig(empresaId, "bandeira", {}), BANDEIRA_PADRAO), empresaId);
 export function salvarBandeira(empresaId: string, entrada: unknown, areasValidas: string[]): Bandeira {
   const b = sanearBandeira(entrada, bandeira(empresaId));
   if (b.areaControlada && !areasValidas.includes(b.areaControlada)) throw new Error("Escolha uma área que exista em Cadastro › Áreas.");
-  gravarConfig(empresaId, "bandeira", b);
-  return b;
+  // Lista de disparos enviada: vira a lista de etapas do despacho (sem limite de quantidade).
+  const d = (entrada as { disparos?: unknown } | null)?.disparos;
+  if (Array.isArray(d)) {
+    const atuais = regrasDespacho(empresaId).etapas;
+    salvarDespacho(empresaId, { etapas: d.map((x, i) => { const r = (x ?? {}) as Record<string, unknown>; return { ...(atuais[i] ?? {}), quantidade: r.motoristas, raioKm: r.km, tempo: r.tempo ?? atuais[i]?.tempo ?? 0, secundarios: r.secundarios, transbordo: r.transbordo }; }) });
+  }
+  gravarConfig(empresaId, "bandeira", { ...b, tentativas: 0, disparos: [] });
+  return bandeira(empresaId);
 }

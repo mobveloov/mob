@@ -93,7 +93,7 @@ rotasConfig.post("/extrato-central/recargas/:id/:acao", admin, ok((req, res) => 
   res.json({ pedido: resolverPedidoRecarga(emp(req), req.params.id, req.params.acao === "confirmar", quem(req)) });
 }));
 const filtroTransacoes = (req: Request) => ({ tipo: q(req, "tipo"), status: q(req, "status"), repasse: /^\d{4}-\d{2}-\d{2}$/.test(q(req, "repasse")) ? q(req, "repasse") : "", busca: q(req, "busca").slice(0, 80) });
-rotasConfig.get("/transacoes-online", ok((req, res) => res.json(extratoOnline(emp(req), per(req), filtroTransacoes(req)))));
+rotasConfig.get("/transacoes-online", ok((req, res) => res.json(extratoOnline(emp(req), per(req), filtroTransacoes(req), Number(q(req, "pagina")) || 1))));
 rotasConfig.get("/transacoes-online/csv", ok((req, res) => baixarCsv(res, "extrato-transacoes-online", csvExtratoOnline(emp(req), per(req), filtroTransacoes(req)))));
 const filtroFaturamento = (req: Request) => ({ status: q(req, "status"), pagamento: q(req, "pagamento"), busca: q(req, "busca").slice(0, 40) });
 rotasConfig.get("/relatorio-faturamento", ok((req, res) => res.json(relatorioFaturamento(emp(req), per(req), filtroFaturamento(req), Number(q(req, "pagina")) || 1))));

@@ -37,6 +37,14 @@ export function TarifasDinamicas() {
   const [edit, setEdit] = useState<any>(null);
   const [auto, setAuto] = useState<any>(null);
   const [mostraAutomacoes, setMostraAutomacoes] = useState(false);
+  // Apresentação da dinâmica automática: aparece na primeira vez que a pessoa abre Automações (como na Machine).
+  const [intro, setIntro] = useState(false);
+  const abrirAutomacoes = () => {
+    let visto = false;
+    try { visto = localStorage.getItem("dinamica-intro-vista") === "1"; } catch { /* sem armazenamento: mostra sempre */ }
+    if (visto) setMostraAutomacoes(true); else setIntro(true);
+  };
+  const explorar = () => { try { localStorage.setItem("dinamica-intro-vista", "1"); } catch { /* ok */ } setIntro(false); setMostraAutomacoes(true); };
   const [lado, setLado] = useState<"embarque" | "destino">("embarque");
   const [busca, setBusca] = useState(""), [ordem, setOrdem] = useState<"nome" | "valor">("nome"), [cheia, setCheia] = useState(false);
   const [globalEdit, setGlobalEdit] = useState<any>(null);
@@ -54,7 +62,7 @@ export function TarifasDinamicas() {
   return (
     <>
       <Cab titulo="Tarifas dinâmicas" sub="Multiplicadores de preço por área, horário e demanda">
-        <button className="botao" onClick={() => setMostraAutomacoes(true)}><Zap size={14} /> Automações</button>
+        <button className="botao" onClick={abrirAutomacoes}><Zap size={14} /> Automações</button>
         <button className="botao" aria-pressed={legenda} onClick={() => setLegenda(!legenda)}>Legenda</button>
         {admin && <button className="botao primario" onClick={() => nova(aba === "sem_area" ? "horario" : "mapa")}><Plus size={14} /> Nova regra</button>}
       </Cab>
@@ -125,6 +133,15 @@ export function TarifasDinamicas() {
         </Modal>
       )}
       {edit && <JanelaDinamica inicial={edit} onFechar={() => setEdit(null)} onSalvo={() => { setEdit(null); d.recarregar(); }} />}
+      <Modal aberto={intro} onFechar={() => setIntro(false)} titulo="Dinâmica automática" sub="Beta">
+        <h4>Uma ferramenta que entende sua demanda</h4>
+        <p>Em poucos passos, aplique tarifas dinâmicas de forma simples e automática. O sistema irá ajustar as tarifas em regiões de alta demanda, conforme suas configurações.</p>
+        <h4>Dinâmica Automática vs. Áreas de Dinâmica Manual</h4>
+        <p>A dinâmica automática e as áreas de dinâmica manual podem funcionar em conjunto. Se sua intenção é aumentar os valores das corridas em horários de pico ou ajustar os preços conforme a demanda de passageiros e a oferta de motoristas em um local, desative as áreas manuais, configure a dinâmica automática e deixe-a agir sozinha. Continue a usar a dinâmica manual se quiser aumentar os preços de solicitações vindas de áreas mais afastadas do centro.</p>
+        <h4>Funcionalidade em fase experimental</h4>
+        <p>A dinâmica automática é um recurso em fase experimental e pode evoluir muito com sua colaboração.</p>
+        <div className="dm-rodape-modal"><button className="botao primario" onClick={explorar}>Explorar</button></div>
+      </Modal>
       <Modal aberto={mostraAutomacoes} onFechar={() => setMostraAutomacoes(false)} titulo="Automações" sub="Áreas automáticas por demanda (beta)" larga>
         <p className="sub">Quando uma região do mapa recebe pedidos demais num período curto, o painel abre uma área com preço extra ali, e a fecha quando a procura cai. Ligue cada automação nas categorias, na aba Dinâmica.</p>
         {admin && <button className="botao primario" onClick={() => setAuto({ nome: "", cidade: "", ativa: true, janelaMin: 15, minPedidos: 5, celulaKm: 1, cobranca: "multiplicador", valor: 1.3, minimo: 0 })}><Plus size={14} /> Nova automação</button>}

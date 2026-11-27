@@ -156,6 +156,9 @@ export function RegrasDespacho() {
   const salvarTudo = () => salvar(async () => setR(await pedirConfig("/despacho", "PUT", r)), "Regras de despacho salvas.");
   const filiais: Array<{ id: string; nome: string; ativa: boolean }> = fil.dados?.filiais ?? [];
   const pend: Record<string, number> = r.pendenciaFilial ?? {};
+  const etapas: Array<{ quantidade: number; raioKm: number; tempo: number; secundarios: boolean; transbordo: boolean }> = r.etapas ?? [];
+  const setEtapa = (i: number, v: object) => set("etapas", etapas.map((x, j) => (j === i ? { ...x, ...v } : x)));
+  const moverEtapa = (i: number, d: number) => { const l = [...etapas]; [l[i], l[i + d]] = [l[i + d], l[i]]; set("etapas", l); };
   // Campo vazio = a filial herda o tempo da empresa (some da lista); número = valor próprio daquela filial.
   const setPend = (id: string, v: string) => {
     const novo = { ...pend };
@@ -172,9 +175,9 @@ export function RegrasDespacho() {
         ))}</div></section>
       <section className="dm-cartao"><h3>Parâmetros de Busca</h3><p className="sub">Alcance, Tempo e Motor de Disparo</p>
         <div className="dm-grade3">
-          {n("raioMetros", "Raio Inicial (Metros)", "m", "É a distância máxima ao redor do passageiro. Recomendado: 5000 (5km).")}
+          {n("raioMetros", "Raio Inicial (Metros)", "m", "É a distância máxima ao redor do passageiro. Recomendado: 5000 (5km). 0 = sem limite de distância.")}
           {n("tempoTela", "Tempo na Tela (Seg)", "s", "Tempo que a corrida toca para o motorista decidir. Recomendado: 15 a 20 segundos.")}
-          {n("limiteMotoristas", "Limite Motoristas (A Mágica)", undefined, "Define como a corrida será distribuída (veja o guia abaixo).")}
+          {n("limiteMotoristas", "Limite Motoristas (A Mágica)", undefined, "Define como a corrida será distribuída (veja o guia abaixo). 0 = ilimitado: toca para todos que estiverem disponíveis.")}
         </div>
         <h4>Entenda o impacto do "Limite Motoristas"</h4>
         <div className="dm-duplo">
@@ -182,15 +185,31 @@ export function RegrasDespacho() {
           <div className="dm-guia"><strong>Limite: 10 a 30 · TOCAR PRA TODOS (Geral)</strong><p>O sistema notifica dezenas de motoristas ao mesmo tempo, ignorando quem está mais perto. É a lei do "dedo mais rápido". <em>Desvantagem:</em> pode gerar muita frustração na base, pois a maioria recebe o aviso de que outro motorista já aceitou.</p></div>
         </div>
       </section>
-      <section className="dm-cartao"><h3>Funil de Prioridade (Ciclos)</h3>
-        <div className="dm-grade3">
-          <div><small>Ciclo 1</small><h4>Motoristas Prioritários</h4><p className="sub">Primeiro grupo a receber o chamado (Ex: Melhores avaliados).</p>{n("prioritarios", "Quantidade")}</div>
-          <div><small>Ciclo 2</small><h4>Motoristas Secundários</h4><p className="sub">Segundo grupo, caso ninguém do primeiro aceite a corrida.</p>{n("secundarios", "Quantidade")}</div>
-          <div><small>Ciclo 3</small><h4>Reserva (Todos)</h4><p className="sub">Última tentativa, expandindo para todos os motoristas disponíveis.</p>{n("reserva", "Quantidade")}</div>
-        </div></section>
+      <section className="dm-cartao"><h3>Etapas do Despacho (Ciclos)</h3>
+        <p className="sub">Cada rodada de chamada usa a etapa seguinte, na ordem. Passadas todas, a última se repete até acabarem as tentativas. Cidades grandes podem adicionar quantas etapas precisarem. Em quantidade, raio e tempo, 0 = sem limite / o valor geral acima.</p>
+        <div className="tabela-rola"><table className="dm-etapas">
+          <thead><tr><th>Etapa</th><th>Motoristas ao mesmo tempo</th><th>Raio (km)</th><th>Tempo na tela (s)</th><th>Secundários</th><th>Transbordo</th><th></th></tr></thead>
+          <tbody>{etapas.map((x, i) => (
+            <tr key={i}>
+              <td><strong>{i + 1}ª</strong></td>
+              <td><input type="number" min={0} aria-label={`Motoristas da etapa ${i + 1}`} disabled={!admin} placeholder="Ilimitado" value={x.quantidade} onChange={(e) => setEtapa(i, { quantidade: Math.max(0, Number(e.target.value) || 0) })} /></td>
+              <td><input type="number" min={0} step="0.1" aria-label={`Raio da etapa ${i + 1}`} disabled={!admin} placeholder="Raio inicial" value={x.raioKm} onChange={(e) => setEtapa(i, { raioKm: Math.max(0, Number(e.target.value) || 0) })} /></td>
+              <td><input type="number" min={0} aria-label={`Tempo na tela da etapa ${i + 1}`} disabled={!admin} placeholder="Geral" value={x.tempo} onChange={(e) => setEtapa(i, { tempo: Math.max(0, Number(e.target.value) || 0) })} /></td>
+              <td><input type="checkbox" aria-label={`Secundários na etapa ${i + 1}`} disabled={!admin} checked={x.secundarios} onChange={(e) => setEtapa(i, { secundarios: e.target.checked })} /></td>
+              <td><input type="checkbox" aria-label={`Transbordo na etapa ${i + 1}`} disabled={!admin} checked={x.transbordo} onChange={(e) => setEtapa(i, { transbordo: e.target.checked })} /></td>
+              <td>{admin && <span className="dm-linha">
+                <button type="button" className="botao" aria-label={`Subir etapa ${i + 1}`} disabled={i === 0} onClick={() => moverEtapa(i, -1)}>↑</button>
+                <button type="button" className="botao" aria-label={`Descer etapa ${i + 1}`} disabled={i === etapas.length - 1} onClick={() => moverEtapa(i, 1)}>↓</button>
+                <button type="button" className="botao" aria-label={`Remover etapa ${i + 1}`} disabled={etapas.length <= 1} onClick={() => set("etapas", etapas.filter((_, j) => j !== i))}>Remover</button></span>}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+        {admin && <button type="button" className="botao" aria-label="Adicionar etapa" onClick={() => set("etapas", [...etapas, { ...(etapas[etapas.length - 1] ?? { quantidade: 0, raioKm: 0, tempo: 0, secundarios: true, transbordo: true }) }])}>+ Adicionar etapa</button>}
+        <small className="bloco">{etapas.length} {etapas.length === 1 ? "etapa" : "etapas"}. Ao salvar, "Máx. Tentativas" sobe até o número de etapas se for menor, para todas serem percorridas.</small>
+      </section>
       <section className="dm-cartao"><h3>Regras de Fila e Pendência</h3>
         <div className="dm-grade4">
-          {n("maxTentativas", "Máx. Tentativas", undefined, "Antes de ir para pendência.")}
+          {n("maxTentativas", "Máx. Tentativas", undefined, "Antes de ir para pendência (cada tentativa usa uma etapa).")}
           {n("tempoPendencia", "Tempo em Pendência (Min)")}
           <Campo rotulo="Notificar Grupo"><select disabled={!admin} value={r.notificarGrupo} onChange={(e) => set("notificarGrupo", e.target.value)}><option value="prioritario">Apenas Prioritários</option><option value="todos">Todos os Motoristas</option></select></Campo>
           {n("distanciaProxima", "Dist. Aceitar Próxima (m)", undefined, "Para pegar corrida em viagem.")}

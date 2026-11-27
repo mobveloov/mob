@@ -1,8 +1,8 @@
 // Mapa Real-Time: motoristas dos apps no mapa (Leaflet + OpenStreetMap), com indicadores e filtros.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, MoreVertical } from "lucide-react";
-import { Aviso, L, Selo, hora, op, pino, qs, useDados, useMapa } from "./comum";
+import { Eye, EyeOff, MessageCircle, MessageSquare, MoreVertical } from "lucide-react";
+import { Aviso, L, Selo, hora, op, pino, qs, useDados, useMapa, zap } from "./comum";
 import "./corridas.css";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
 import { dentroDaCobertura } from "../../../comum/mapa-centro.ts";
@@ -113,11 +113,15 @@ export default function MapaReal() {
               <td><Selo tom={s2.tom}>{s2.rotulo}</Selo>{m.situacao === "offline" && <><br /><small className="suave">Último contato {tempoDesde(m.ultimoContatoEm)}</small></>}{m.corrida && <><br /><small className="suave">OS {m.corrida.os} · {m.corrida.passageiro}</small></>}</td>
               <td>{cats.slice(0, 2).join(", ") || "—"}{cats.length > 2 && ` +${cats.length - 2}`}</td>
               <td style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                <button className="oc-btn peq" aria-label={`Ações de ${m.nome}`} onClick={() => setMenu(menu === m.id ? null : m.id)}><MoreVertical size={14} /></button>
+                <span className="oc-fila" style={{ flexWrap: "nowrap", gap: 4 }}>
+                  <Link className="oc-btn peq" style={{ textDecoration: "none" }} to="/conversas" title="Mensagens" aria-label={`Mensagens para ${m.nome}`}><MessageSquare size={14} /></Link>
+                  {zap(m.telefone) && <a className="oc-btn peq" style={{ textDecoration: "none" }} href={zap(m.telefone)} target="_blank" rel="noopener noreferrer" title="WhatsApp" aria-label={`WhatsApp de ${m.nome}`}><MessageCircle size={14} /></a>}
+                  <button className="oc-btn peq" aria-label={`Ações de ${m.nome}`} onClick={() => setMenu(menu === m.id ? null : m.id)}><MoreVertical size={14} /></button>
+                </span>
                 {menu === m.id && <div className="oc-card" style={{ position: "absolute", right: 0, zIndex: 5, minWidth: 190, padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
                   <Link className="oc-btn peq" style={{ textDecoration: "none" }} to={`/historico?motorista=${encodeURIComponent(m.nome)}`}>Ver Histórico</Link>
                   <Link className="oc-btn peq" style={{ textDecoration: "none" }} to={`/historico?motorista=${encodeURIComponent(m.nome)}`}>Consultar corridas</Link>
-                  <Link className="oc-btn peq" style={{ textDecoration: "none" }} to={`/motoristas?editar=${m.id}`}>Adicionar créditos</Link>
+                  <Link className="oc-btn peq" style={{ textDecoration: "none" }} to="/carteiras">Adicionar créditos</Link>
                   <Link className="oc-btn peq" style={{ textDecoration: "none" }} to={`/motoristas?editar=${m.id}`}>Editar cadastro</Link>
                 </div>}
               </td></tr>); })}</tbody></table></div>}

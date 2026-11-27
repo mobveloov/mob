@@ -10,6 +10,7 @@ import { listarProprias } from "../corridas/index.ts";
 import { calcularComissao } from "../config/comissao.ts";
 import { montarCsv } from "../config/financeiro-visao.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
+import * as D from "../servidor/dados.ts";
 import { gravarOperacao, lerOperacao } from "./armazem.ts";
 
 export const SITUACOES_PIX = ["Paga", "Estornada", "Processando", "Em disputa", "Chargeback"] as const;
@@ -20,14 +21,14 @@ const marcas = (empresaId: string) => lerOperacao<Record<string, Marca>>(empresa
 
 export interface LinhaPix {
   id: string; os: string; data: string; passageiro: string; telefone: string; motorista: string; motoristaId: string | null;
-  valor: number; liquidoBandeira: number; liquidoMotorista: number; situacao: SituacaoPix; automatica: boolean; motivo: string; marcadaEm: string | null; marcadaPor: string;
+  centralChamada: string; centralCorrida: string; valor: number; liquidoBandeira: number; liquidoMotorista: number; situacao: SituacaoPix; automatica: boolean; motivo: string; marcadaEm: string | null; marcadaPor: string;
 }
 
 const ehPix = (p: string) => normal(p).includes("pix");
 
 /** Todas as corridas da empresa pagas com Pix, com a situação já calculada. */
 export function pixDasCorridas(empresaId: string): LinhaPix[] {
-  const mk = marcas(empresaId);
+  const mk = marcas(empresaId), nomeCentral = D.empresa(empresaId)?.nome ?? "";
   const l: LinhaPix[] = [];
   for (const c of listarProprias(empresaId)) {
     if (!ehPix(c.pagamento)) continue;
@@ -37,14 +38,15 @@ export function pixDasCorridas(empresaId: string): LinhaPix[] {
     const taxa = c.motoristaId && valor > 0 ? calcularComissao(empresaId, c.categoria, valor, c.motoristaId, c.pagamento).taxaCentral : 0;
     l.push({
       id: c.id, os: c.os, data: c.finalizadaEm ?? c.solicitadaEm, passageiro: c.passageiro.nome, telefone: c.passageiro.telefone, motorista: c.motorista, motoristaId: c.motoristaId,
-      valor, liquidoBandeira: arred(taxa), liquidoMotorista: arred(valor - taxa),
+      centralChamada: c.centralChamada || nomeCentral, centralCorrida: c.centralCorrida || nomeCentral, valor, liquidoBandeira: arred(taxa), liquidoMotorista: arred(valor - taxa),
       situacao: m?.situacao ?? (c.status === "finalizada" ? "Paga" : "Processando"), automatica: !m, motivo: m?.motivo ?? "", marcadaEm: m?.em ?? null, marcadaPor: m?.por ?? "",
     });
   }
   return l.sort((a, b) => b.data.localeCompare(a.data));
 }
 
-export interface FiltroPix { inicio?: string; fim?: string; os?: string; motorista?: string; situacao?: string }
+/** "Bandeira" = central da chamada; "Bandeira da corrida" = central que atendeu (a própria central quando a corrida não registra outra). */
+export interface FiltroPix { inicio?: string; fim?: string; os?: string; motorista?: string; situacao?: string; bandeira?: string; bandeiraCorrida?: string }
 const diaDe = (s: string) => s.slice(0, 10);
 
 function filtrar(empresaId: string, f: FiltroPix) {
@@ -55,7 +57,8 @@ function filtrar(empresaId: string, f: FiltroPix) {
   const vtr = new Map<string, string>();
   if (mot) for (const m of listar(empresaId, cadastroPorId("motoristas")!)) vtr.set(m.id, normal(String(m.viatura ?? "")));
   return pixDasCorridas(empresaId).filter((x) => (!f.inicio || diaDe(x.data) >= f.inicio) && (!f.fim || diaDe(x.data) <= f.fim)
-    && (!os || x.os.includes(os)) && (!mot || normal(x.motorista).includes(mot) || (x.motoristaId != null && (vtr.get(x.motoristaId) ?? "") === mot)) && (!sits.length || sits.includes(x.situacao)));
+    && (!os || x.os.includes(os)) && (!mot || normal(x.motorista).includes(mot) || (x.motoristaId != null && (vtr.get(x.motoristaId) ?? "") === mot)) && (!sits.length || sits.includes(x.situacao))
+    && (!f.bandeira || normal(x.centralChamada) === normal(f.bandeira)) && (!f.bandeiraCorrida || normal(x.centralCorrida) === normal(f.bandeiraCorrida)));
 }
 
 export function listarPix(empresaId: string, f: FiltroPix, pagina: number) {
@@ -64,7 +67,7 @@ export function listarPix(empresaId: string, f: FiltroPix, pagina: number) {
   const resumo = Object.fromEntries(SITUACOES_PIX.map((s) => { const g = l.filter((x) => x.situacao === s); return [s, { qtd: g.length, valor: arred(g.reduce((t, x) => t + x.valor, 0)) }]; }));
   const pagas = l.filter((x) => x.situacao === "Paga");
   return {
-    situacoes: SITUACOES_PIX, resumo,
+    situacoes: SITUACOES_PIX, resumo, bandeiras: [D.empresa(empresaId)?.nome ?? ""].filter(Boolean),
     totalPago: arred(pagas.reduce((t, x) => t + x.valor, 0)), liquidoBandeira: arred(pagas.reduce((t, x) => t + x.liquidoBandeira, 0)), liquidoMotoristas: arred(pagas.reduce((t, x) => t + x.liquidoMotorista, 0)),
     total: l.length, pagina: p, paginas, itens: l.slice((p - 1) * por, p * por),
   };

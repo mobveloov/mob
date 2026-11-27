@@ -63,6 +63,8 @@ export function periodo(nome: string, inicio?: unknown, fim?: unknown): [string,
     case "ontem": return [dia(1), dia(1)];
     case "esta_semana": return [dia(semana), hoje];
     case "semana_passada": return [dia(semana + 7), dia(semana + 1)];
+    case "ultimos_7": return [dia(6), hoje];
+    case "ultimos_30": return [dia(29), hoje];
     case "este_mes": return [`${hoje.slice(0, 7)}-01`, hoje];
     case "mes_passado": { const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)); const f = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 0)); return [m.toISOString().slice(0, 10), f.toISOString().slice(0, 10)]; }
     case "este_ano": return [`${hoje.slice(0, 4)}-01-01`, hoje];

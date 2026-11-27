@@ -25,8 +25,8 @@ export function DespachoResumo() {
           <div className="tabela-rola"><table>
             <thead><tr><th>Disparo *</th><th>Tipo de despacho</th><th>Onde Toca</th></tr></thead>
             <tbody>
-              {b.disparos.slice(0, b.tentativas).map((x: any, i: number) => (
-                <tr key={i}><td>{i + 1}º Disparo</td><td>Proximidade</td><td>Toca em {x.motoristas} motoristas a menos de {km(x.km)} km{incluindo(x)}</td></tr>
+              {b.disparos.map((x: any, i: number) => (
+                <tr key={i}><td>{i + 1}º Disparo</td><td>Proximidade</td><td>Toca em {x.motoristas > 0 ? `${x.motoristas} motoristas` : "todos os motoristas disponíveis"} {x.km > 0 ? `a menos de ${km(x.km)} km` : "dentro do raio inicial"}{incluindo(x)}</td></tr>
               ))}
               <tr><td>{b.tentativas + 1}º Disparo</td><td>Pendência **</td><td>A corrida fica disponível para os motoristas a menos de {km(b.distanciaPendenciaKm)} km{incluindo({ secundarios: true, transbordo: true })}, durante mais {b.expiracaoPendenciaMin} minutos antes de se tornar não atendida</td></tr>
             </tbody>

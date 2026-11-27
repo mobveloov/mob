@@ -16,6 +16,7 @@ export function BandeiraAbas({ aba, especiais, aoGravar, extra, comandos }: { ab
   const navegar = useNavigate();
   const d = useCarregar(() => pedirConfig("/bandeira-campos"), []);
   const [v, setV] = useState<ValoresForm | null>(null);
+  const [abertas, setAbertas] = useState<Record<string, number>>({});
   const { msg, salvando, salvar } = useSalvar();
   useEffect(() => { if (d.dados) setV(structuredClone(d.dados.valores)); }, [d.dados]);
   if (!v) return <>{d.erro ? <Aviso erro={d.erro} /> : <Carregando />}</>;
@@ -41,7 +42,7 @@ export function BandeiraAbas({ aba, especiais, aoGravar, extra, comandos }: { ab
         <label key={o.v} className="dm-check"><input type="radio" name={nome} disabled={!on || o.desab} checked={String(v[c.nome]) === o.v} onChange={() => set(c.nome, o.v)} /> {o.t}</label>
       ))}</div>;
     }
-    if (c.tipo === "caixa") return <label key={c.nome} className="dm-check"><input type="checkbox" disabled={!on} checked={!!v[c.nome]} onChange={(e) => set(c.nome, e.target.checked)} /> {c.rotulo ?? linha.rotulo}</label>;
+    if (c.tipo === "caixa") return <label key={c.nome} className="dm-check">{c.dica && <small className="bloco">{c.dica}</small>}<input type="checkbox" disabled={!on} checked={!!v[c.nome]} onChange={(e) => set(c.nome, e.target.checked)} /> {c.rotulo ?? linha.rotulo}</label>;
     const cx = c.tipo === "selecao" ? (
       <select value={String(v[c.nome] ?? "")} disabled={!on} onChange={(e) => set(c.nome, e.target.value)} aria-label={c.rotulo ?? linha.rotulo}>
         {c.fonte === "categorias" ? <>{!v[c.nome] && <option value="">Selecione</option>}{categorias.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}</> : (c.opcoes ?? []).map((o) => <option key={o.v} value={o.v}>{o.t}</option>)}
@@ -55,6 +56,28 @@ export function BandeiraAbas({ aba, especiais, aoGravar, extra, comandos }: { ab
     return <label key={c.nome} className="dm-campo"><span>{c.rotulo && c.rotulo !== linha.rotulo ? c.rotulo : ""}{dica && <small> {dica}</small>}</span><span className="dm-linha">{cx}{c.unidade && <small>{c.unidade}</small>}</span></label>;
   };
 
+  /** Lista com "Adicionar nova mensagem" e "×" (como na Machine): mostra os espaços preenchidos e os que a pessoa abriu. */
+  const mensagens = (linha: LinhaForm) => {
+    const nomes = linha.controles.map((c) => c.nome);
+    const cheios = nomes.reduce((ate, n, k) => (String(v[n] ?? "").trim() !== "" ? k + 1 : ate), 0);
+    const visiveis = Math.min(nomes.length, Math.max(cheios, abertas[nomes[0]] ?? 0));
+    // Os preenchidos ficam juntos no começo: apagar um puxa os de baixo para cima.
+    const lista = nomes.map((n) => String(v[n] ?? ""));
+    const gravarLista = (nova: string[]) => setV({ ...v, ...Object.fromEntries(nomes.map((n, k) => [n, nova[k] ?? ""])) });
+    return (
+      <div className="dm-lista-edit">
+        <small>* Até 50 caracteres</small>
+        {nomes.slice(0, visiveis).map((n, k) => (
+          <div key={n} className="dm-linha">
+            <input value={lista[k]} maxLength={50} placeholder="Escreva aqui" disabled={!gestor} aria-label={`Mensagem ${k + 1}`} onChange={(e) => set(n, e.target.value)} />
+            {gestor && <button type="button" className="icone" aria-label={`Remover mensagem ${k + 1}`} onClick={() => { gravarLista(lista.filter((_, j) => j !== k)); setAbertas({ ...abertas, [nomes[0]]: Math.max(0, visiveis - 1) }); }}>×</button>}
+          </div>
+        ))}
+        {gestor && visiveis < nomes.length && <button type="button" className="botao" onClick={() => setAbertas({ ...abertas, [nomes[0]]: visiveis + 1 })}>+ Adicionar nova mensagem</button>}
+      </div>
+    );
+  };
+
   return (
     <>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
@@ -64,7 +87,7 @@ export function BandeiraAbas({ aba, especiais, aoGravar, extra, comandos }: { ab
         {aba.itens.map((i, k) => !ehLinha(i) ? <h3 key={k} className="dm-sep">{i.secao}</h3> : (
           <div key={k} className="dm-opcao">
             <h4>{i.rotulo}</h4>
-            {i.especial === "documentos" ? especiais?.documentos : i.controles.map((c) => controle(c, i))}
+            {i.especial === "documentos" ? especiais?.documentos : i.especial === "mensagens" ? mensagens(i) : i.controles.map((c) => controle(c, i))}
             {i.ajuda && <small className="bloco" style={{ whiteSpace: "pre-line" }}>{i.ajuda}</small>}
           </div>
         ))}

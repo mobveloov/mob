@@ -68,7 +68,7 @@ export default function Engajamento() {
 
   return (
     <div className="mapa-engajamento">
-      <Titulo titulo="Mapa de engajamento" sub="Como motoristas e passageiros se comportam" />
+      <Titulo titulo="Mapa de engajamento" />
       <div className="me-tabs" role="tablist">
         {([["motoristas", "Motoristas"], ["passageiros", "Passageiros"], ["historico", "Histórico"]] as Array<[Aba, string]>).map(([id, nome]) => (
           <button key={id} type="button" role="tab" aria-selected={aba === id} className={`me-tabs__item ${aba === id ? "me-tabs__item--ativo" : ""}`} onClick={() => setAba(id)}>{nome}</button>

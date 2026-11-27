@@ -33,6 +33,7 @@ import { calcularComissao, regraDoMotorista } from "../config/comissao.ts";
 import { cobrancas, formaDaTaxa, temTaxaDoMotorista } from "../config/taxas.ts";
 import { comprarPasse, comRotulo, ofertas as ofertasDePasse, passeVigente, registrarIsencao } from "../config/passe-livre.ts";
 import { contaParaDesafio, TIPOS_DESAFIO_CORRIDA } from "../gestao/desafio-regra.ts";
+import { clientesDesafiados, TIPO_DESAFIO_CLIENTE } from "../gestao/desafio-cliente.ts";
 
 const arred = (n: number) => Math.round(n * 100) / 100;
 const hojeIso = () => agoraBr().toISOString().slice(0, 10);
@@ -499,7 +500,13 @@ export function desafios(empresaId: string, papel: PapelApp, chave: string): Pro
     const tipo = String(d.tipo ?? "");
     const ini = String(d.inicio ?? "0000"), fim = d.fim ? String(d.fim) : "9999";
     let feito = 0;
-    if (TIPOS_DESAFIO_CORRIDA.includes(tipo)) {
+    if (tipo === TIPO_DESAFIO_CLIENTE) {
+      // Desafio de clientes: corridas finalizadas do passageiro no período; só entra quem está na seleção do desafio.
+      if (papel !== "passageiro") continue;
+      const cli = listar(empresaId, cadastroPorId("clientes")!).filter((c) => String(c.telefone) === chave);
+      if (!clientesDesafiados(cli, d, corridas).length) continue;
+      feito = corridas.filter((c) => c.passageiro.telefone === chave && c.status === "finalizada" && (c.finalizadaEm ?? "").slice(0, 10) >= ini && (c.finalizadaEm ?? "").slice(0, 10) <= fim).length;
+    } else if (TIPOS_DESAFIO_CORRIDA.includes(tipo)) {
       if (papel !== "motorista") continue;
       const cats = String(d.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
       feito = corridas.filter((c) => c.motoristaId === chave && contaParaDesafio(tipo, c) && (c.finalizadaEm ?? "").slice(0, 10) >= ini && (c.finalizadaEm ?? "").slice(0, 10) <= fim

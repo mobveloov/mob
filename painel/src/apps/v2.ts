@@ -5,6 +5,7 @@
 //   rotasV2Central   no painel (login do painel): aprovar motoristas, conversas de suporte e fotos.
 // Tudo por empresa: a empresa vem da URL e o token só vale na empresa em que foi criado.
 
+import { cupomVale } from "../cadastros/cupom-regras.ts";
 import { ENVIO_MAXIMO } from "./extras.ts";
 import { otimizarImagem } from "../comum/imagem.ts";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -243,9 +244,11 @@ rotasV2.get("/foto/:papel/:chave", ok((req, res) => {
 
 /** Cupons ativos e dentro da validade, para a tela "Meus Cupons" do passageiro. */
 rotasV2.get("/cupons", so("passageiro"), ok((req, res) => {
-  const hoje = agoraBr().toISOString().slice(0, 10);
+  const agora = agoraBr().toISOString();
+  // Só entra o cupom que o cadastro deixa aparecer na lista do app (Exibir na lista de cupons disponíveis) e que vale para este passageiro
+  // (cupom de cliente específico não aparece para os outros).
   const lista = listar(ctx(req).empresaId, cadastroPorId("cupons")!)
-    .filter((c) => c.ativo === true && c.automatico !== true && !(c.inicio && String(c.inicio) > hoje) && !(c.fim && String(c.fim) < hoje))
+    .filter((c) => c.automatico !== true && c.exibirApp !== false && cupomVale(c, { hoje: agora.slice(0, 10), hora: agora.slice(11, 16), telefone: ctx(req).sessao.chave }).vale)
     .map((c) => ({
       codigo: String(c.codigo ?? ""), tipo: c.tipoDesconto === "Valor fixo" ? "valor" : "percentual", valor: Number(c.valor) || 0,
       maximo: typeof c.valorMaximo === "number" && c.valorMaximo > 0 ? c.valorMaximo : null,

@@ -10,6 +10,8 @@ import { categoriasDoMotor, motoristasDoMotor, type TipoMotor } from "../servido
 import { normal } from "../servidor/util.ts";
 import { atualizar, criar, listar, mesclar, remover, type Valor } from "./armazem.ts";
 import { prepararEmpresa } from "../gestao/empresas.ts";
+import { areasDaEmpresa } from "../areas/areas.ts";
+import { prepararCupom } from "./cupom-regras.ts";
 
 export const rotasCadastros = Router();
 
@@ -37,6 +39,8 @@ function protegerFinanceiro(req: Request, c: Cadastro, dados: Record<string, unk
   return out;
 }
 
+const prepararCupomDaEmpresa = (empresaId: string, corpo: Record<string, unknown>) => prepararCupom(corpo, areasDaEmpresa(empresaId).map((a) => a.id));
+
 rotasCadastros.get("/", (_req, res) => res.json({ cadastros: CADASTROS }));
 
 rotasCadastros.get("/:cadastro", ok((req, res) => {
@@ -49,14 +53,14 @@ rotasCadastros.get("/:cadastro", ok((req, res) => {
 
 rotasCadastros.post("/:cadastro", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
-  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, null, false) : (req.body ?? {});
+  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, null, false) : c.id === "cupons" ? prepararCupomDaEmpresa(ctx(req).empresaId, req.body ?? {}) : (req.body ?? {});
   res.json({ registro: criar(ctx(req).empresaId, c, protegerFinanceiro(req, c, dados, null), quem(req)) });
 }));
 
 rotasCadastros.put("/:cadastro/:id", ok((req, res) => {
   const c = cad(req); podeEditar(req, c);
   const antes = c.id === "conveniadas" ? listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null : null;
-  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, antes, false) : (req.body ?? {});
+  const dados = c.id === "conveniadas" ? prepararEmpresa(ctx(req).empresaId, { ...(req.body ?? {}) }, antes, false) : c.id === "cupons" ? prepararCupomDaEmpresa(ctx(req).empresaId, req.body ?? {}) : (req.body ?? {});
   const atual = listar(ctx(req).empresaId, c).find((r) => r.id === String(req.params.id)) ?? null;
   res.json({ registro: atualizar(ctx(req).empresaId, c, String(req.params.id), protegerFinanceiro(req, c, dados, atual), quem(req)) });
 }));

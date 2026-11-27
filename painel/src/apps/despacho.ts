@@ -25,7 +25,8 @@ import { filtrosDoDespacho } from "./extras.ts";
 import { fantasmas, regrasDoDespacho } from "../gestao/regras.ts";
 import { fotoDeAreas } from "../areas/areas.ts";
 import { motoristasEmPlantao } from "../areas/plantao.ts";
-import { regrasDespacho, tempoPendenciaDaFilial, transbordoPermitido } from "../config/despacho.ts";
+import { carrosSimultaneos, DESPACHO_PADRAO, duracaoDasTentativasMs, ehTransbordo, etapaDaRodada, quantidadeDaEtapa, raioDaEtapaKm, regrasDespacho, tempoDaEtapa, tempoPendenciaDaFilial, tentativasDoDespacho, transbordoPermitido, type Etapa, type RegrasDespacho } from "../config/despacho.ts";
+import { bandeira } from "../config/bandeira.ts";
 import { enderecoDoPonto, linhaReta } from "../enderecos/index.ts";
 import { listarEmpresas } from "../servidor/dados.ts";
 import { agoraBr, arred, normal } from "../servidor/util.ts";
@@ -36,20 +37,17 @@ import { configGravacao, limparGravacoes, temGravacao } from "./gravacoes.ts";
 import type { PapelApp } from "./sessoes.ts";
 import { gravarUltimaPosicao } from "./ultima-posicao.ts";
 
-/** Quanto tempo o motorista tem para aceitar. */
-export const OFERTA_MS = () => Math.max(5, Number(process.env.APPS_OFERTA_SEGUNDOS) || 20) * 1000;
-/** Raio máximo da oferta (km). */
-const RAIO_KM = () => Number(process.env.APPS_RAIO_KM) || 20;
+/** Quanto tempo o motorista tem para aceitar: o "Tempo na Tela" do painel (Despacho) da empresa; sem empresa, o padrão do painel. */
+export const OFERTA_MS = (empresaId?: string) => (empresaId ? regrasDespacho(empresaId).tempoTela : DESPACHO_PADRAO.tempoTela) * 1000;
+/** Raio (km) das listas do app do motorista: o "Raio Inicial" do painel (0 = sem limite). */
+const raioDaListaKm = (empresaId: string) => { const m = regrasDespacho(empresaId).raioMetros; return m > 0 ? m / 1000 : Infinity; };
+/** Distância máxima (km) para listar pendentes/programadas e para aceitar uma pendência: Despacho (Alterando Bandeira). 0 = sem limite. */
+const distanciaPendenciaKm = (empresaId: string) => { const k = bandeira(empresaId).distanciaPendenciaKm; return k > 0 ? k : Infinity; };
+const distanciaListarKm = (empresaId: string) => { const k = bandeira(empresaId).distanciaListarKm; return k > 0 ? k : Infinity; };
 /** Posição mais velha que isso não conta (motorista sumiu). */
 const POSICAO_MS = 10 * 60_000; // o app reenvia a cada 30 s; em segundo plano o Android pode atrasar
 /** Depois de recusar ou deixar passar, o motorista só recebe de novo a mesma corrida depois disso. */
 const reofertaMs = (empresaId: string) => { try { return gerais(empresaId).motorista.reofertaMinutos * 60_000; } catch { return 120_000; } };
-
-/**
- * "Enviar mais de um carro" (marcação da corrida na tela Solicitar): a oferta vai a vários motoristas ao mesmo tempo e vale o
- * primeiro que aceitar. Quantos ao mesmo tempo: este número, limitado pelo "limite de motoristas" do Despacho.
- */
-export const CARROS_SIMULTANEOS = 3;
 
 const ABERTA_COM_MOTORISTA = new Set(["a_caminho", "no_local", "em_andamento"]);
 const ABERTA = new Set(["procurando", "a_caminho", "no_local", "em_andamento"]);
@@ -357,13 +355,15 @@ export function ofertaParaApp(empresaId: string, o: Oferta) {
   };
 }
 
-/** Oferece cada corrida "procurando" (sem oferta pendente) ao motorista livre mais perto. */
-/** Grupo que recebe a chamada junto no modo "primeiro a aceitar": até o limite de motoristas; com "só prioritários", apenas o primeiro nível. */
-function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: { limiteMotoristas: number; prioritarios: number; secundarios: number; reserva: number; notificarGrupo: "prioritario" | "todos" }): T[] {
-  const limite = Math.max(1, regras.limiteMotoristas);
-  if (regras.notificarGrupo === "todos") return ordenados.slice(0, limite);
-  const prioritarios = ordenados.filter((c) => c.nivel === 0);
-  return (prioritarios.length ? prioritarios : ordenados).slice(0, Math.min(limite, Math.max(1, regras.prioritarios)));
+/**
+ * Grupo que recebe a chamada junto na rodada do modo "primeiro a aceitar". Quantos: o da etapa, limitado pelo "limite de motoristas"
+ * do Despacho (0 nos dois = todos). "Notificar grupo": com "só prioritários", se houver prioritário disponível só eles tocam.
+ */
+export function grupoDaRodada<T extends { nivel: number }>(ordenados: T[], regras: RegrasDespacho, et: Etapa): T[] {
+  const prio = ordenados.filter((c) => c.nivel === 0);
+  const lista = regras.notificarGrupo === "todos" || !prio.length ? ordenados : prio;
+  const q = quantidadeDaEtapa(regras, et);
+  return q === Infinity ? lista : lista.slice(0, q);
 }
 
 /** Corridas que já avisaram "nenhum motorista disponível" (some quando aparece alguém). */
@@ -379,8 +379,10 @@ export function despachar(empresaId: string) {
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.motoristaId));
   const ofertasDaCorrida = new Map<string, number>();
   for (const o of e.ofertas.values()) ofertasDaCorrida.set(o.corridaId, (ofertasDaCorrida.get(o.corridaId) ?? 0) + 1);
-  const carrosDaCorrida = (c: CorridaPropria) => (c.enviarVariosCarros ? Math.max(1, Math.min(CARROS_SIMULTANEOS, regrasDespacho(empresaId).limiteMotoristas)) : 1);
   const regras = regrasDespacho(empresaId); // Config › Regras de Despacho
+  // "Enviar mais de um carro": vários motoristas juntos, até o limite de motoristas do Despacho (0 = todos).
+  const carrosDaCorrida = (c: CorridaPropria) => (c.enviarVariosCarros ? carrosSimultaneos(regras) : 1);
+  const tentativas = tentativasDoDespacho(regras);
   // "Aceitar próxima": motorista em viagem a menos de "distância" metros do destino final também recebe chamada.
   const emViagemPorMotorista = new Map(lista.filter((x) => x.status === "em_andamento" && x.motoristaId).map((x) => [x.motoristaId!, x]));
   const pertoDoDestino = (id: string, p: { lat: number; lng: number }) => {
@@ -400,11 +402,11 @@ export function despachar(empresaId: string) {
   const areasEmpresa = fotoDeAreas(empresaId); // Cadastro › Áreas: bloqueio e prioridade
   const emPlantao = motoristasEmPlantao(empresaId); // Cadastro › Plantão: escalados têm prioridade nas filas
   let n = 0;
-  for (const c of lista.filter((x) => x.status === "procurando" && (ofertasDaCorrida.get(x.id) ?? 0) < carrosDaCorrida(x) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
+  for (const c of lista.filter((x) => x.status === "procurando" && (ofertasDaCorrida.get(x.id) ?? 0) < carrosDaCorrida(x) && !(carrosDaCorrida(x) === Infinity && (ofertasDaCorrida.get(x.id) ?? 0) > 0) && !aindaAgendada(x)).sort((a, b) => horaDaCorrida(a).localeCompare(horaDaCorrida(b)))) {
     if (areasEmpresa.bloqueando(c.embarque.lat, c.embarque.lng)) continue; // embarque em área de risco/bloqueio: ninguém é chamado
     const areaDaCorrida = areasEmpresa.principal(c.embarque.lat, c.embarque.lng);
     const tentados = e.tentados.get(c.id) ?? new Map<string, number>();
-    type Candidato = { id: string; km: number | null; fav: boolean; plantao: boolean; nivel: number; naArea: boolean; desde: number };
+    type Candidato = { id: string; km: number | null; fav: boolean; plantao: boolean; nivel: number; naArea: boolean; desde: number; transb: boolean };
     const candidatos: Candidato[] = [];
     // Ordem: favorito do passageiro, plantão, nível (prioritário, secundário, reserva), mesma área do embarque; depois, com a fila
     // virtual ligada (Config › Regras de Despacho), quem está online há mais tempo; senão, o mais perto.
@@ -425,14 +427,21 @@ export function despachar(empresaId: string) {
       if (!cad || cad.status !== "Ativo" || !habilitado(cad, c.categoria)) continue;
       if (!gestao.pode(id, c, p)) continue; // punido, fora da cerca ou sem saldo mínimo
       const km = c.embarque.lat != null && c.embarque.lng != null ? linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) : null;
-      if (km != null && km > (process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000)) continue;
-      if (!transbordoOk(cad.cidade, c.categoria)) continue; // Config › Transbordos
+      if (!transbordoOk(cad.cidade, c.categoria)) continue; // Config › Transbordos (liga/desliga geral)
       const cand: Candidato = {
         id, km, fav: filtros.ehFavorito(c.passageiro.telefone, id), plantao: emPlantao.has(id), nivel: gestao.nivel(id),
-        naArea: !!areaDaCorrida && areasEmpresa.principal(p.lat, p.lng)?.id === areaDaCorrida.id, desde: p.desde,
+        naArea: !!areaDaCorrida && areasEmpresa.principal(p.lat, p.lng)?.id === areaDaCorrida.id, desde: p.desde, transb: ehTransbordo(empresaId, cad.cidade, c.categoria),
       };
       candidatos.push(cand);
     }
+    // Etapas: cada rodada usa a etapa seguinte (raio, secundários e transbordo dela). Etapa sem ninguém no alcance conta como tentada e passa para a próxima.
+    const todos = candidatos.splice(0);
+    const daEtapa = (et: Etapa) => { const raio = raioDaEtapaKm(regras, et); return todos.filter((x) => (x.km == null || x.km <= raio) && (et.secundarios || x.nivel === 0) && (et.transbordo || !x.transb)); };
+    const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
+    let idx = rod.n;
+    if (rod.n >= tentativas) candidatos.push(...daEtapa(etapaDaRodada(regras, rod.n)));
+    else for (; idx < tentativas; idx++) { candidatos.push(...daEtapa(etapaDaRodada(regras, idx))); if (candidatos.length) break; }
+    const et = etapaDaRodada(regras, idx);
     if (!candidatos.length) {
       // Histórico da OS: avisa uma vez só que não havia motorista disponível (a verificação roda a cada 2 s).
       if (!semMotoristaAvisado.has(c.id)) { semMotoristaAvisado.add(c.id); if (semMotoristaAvisado.size > 5000) semMotoristaAvisado.clear(); registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: "Nenhum motorista disponível por perto no momento", usuario: "sistema", canal: "Despacho automático" }); }
@@ -442,29 +451,28 @@ export function despachar(empresaId: string) {
     candidatos.sort((a, b) => (vence(a, b) ? -1 : vence(b, a) ? 1 : 0));
     // Modos: mais próximo e fila virtual chamam UM por vez; "primeiro a aceitar" chama o grupo todo ao mesmo tempo (limite de motoristas,
     // níveis prioritário/secundário/reserva e "notificar grupo") e vale o primeiro que aceitar.
-    const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras) : candidatos.slice(0, Math.max(1, carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0))); // corrida marcada "enviar mais de um carro" completa as ofertas abertas
+    const escolhidos = regras.metodo === "primeiro_aceitar" ? grupoDaRodada(candidatos, regras, et) : candidatos.slice(0, Math.max(1, carrosDaCorrida(c) - (ofertasDaCorrida.get(c.id) ?? 0))); // corrida marcada "enviar mais de um carro" completa as ofertas abertas
     // Tentativas: depois de "máx. tentativas" rodadas sem aceite a corrida fica em pendência por "tempo em pendência" minutos; passada a pendência, tenta de novo uma vez; sem aceite, não atendida.
-    const rod = e.rodadas.get(c.id) ?? { n: 0, pausaAte: 0, pendencias: 0 };
     if (rod.pausaAte > agora) continue;
-    if (rod.n >= regras.maxTentativas) {
+    if (rod.n >= tentativas) {
       const tpend = tempoPendenciaDaFilial(regras, c.filialId);
       if (rod.pendencias >= 1 || tpend <= 0) { void mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined); e.rodadas.delete(c.id); continue; }
       e.rodadas.set(c.id, { n: 0, pausaAte: agora + tpend * 60_000, pendencias: rod.pendencias + 1 });
       void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
       continue;
     }
-    e.rodadas.set(c.id, { ...rod, n: rod.n + 1 });
+    e.rodadas.set(c.id, { ...rod, n: idx + 1 });
     e.movimento.set(c.id, agora);
     // Histórico da OS: quem foi consultado nesta rodada, a que distância (linha reta) e quem recebeu a chamada.
     {
-      const raioKm = process.env.APPS_RAIO_KM ? RAIO_KM() : regras.raioMetros / 1000;
+      const raioKm = raioDaEtapaKm(regras, et), raioTexto = raioKm === Infinity ? "sem limite de distância" : `até ${String(arred(raioKm, 1)).replace(".", ",")} km`;
       const metodoTexto = regras.metodo === "fila_virtual" ? "fila virtual" : regras.metodo === "primeiro_aceitar" ? "grupo (primeiro a aceitar)" : "proximidade";
       registrarEvento(empresaId, c.id, { tipo: "despacho_consulta", descricao: `Consultando motoristas por ${metodoTexto}`, usuario: "sistema", canal: "Despacho automático" });
       registrarEvento(empresaId, c.id, {
         tipo: "despacho_encontrados", usuario: "sistema", canal: "Despacho automático",
-        descricao: `Foram encontrados ${candidatos.length} ${candidatos.length === 1 ? "motorista" : "motoristas"} em até ${String(arred(raioKm, 1)).replace(".", ",")} km (${regras.metodo === "primeiro_aceitar" ? "Disputa sem eleição" : regras.metodo === "fila_virtual" ? "Fila virtual" : "Mais próximo"})`,
+        descricao: `Etapa ${idx + 1}: foram encontrados ${candidatos.length} ${candidatos.length === 1 ? "motorista" : "motoristas"} em ${raioTexto} (${regras.metodo === "primeiro_aceitar" ? "Disputa sem eleição" : regras.metodo === "fila_virtual" ? "Fila virtual" : "Mais próximo"})`,
         dados: {
-          metodo: regras.metodo, raioKm, rodada: rod.n + 1, embarque: { lat: c.embarque.lat ?? null, lng: c.embarque.lng ?? null },
+          metodo: regras.metodo, raioKm: raioKm === Infinity ? null : raioKm, rodada: idx + 1, etapa: idx + 1, embarque: { lat: c.embarque.lat ?? null, lng: c.embarque.lng ?? null },
           candidatos: candidatos.slice(0, 30).map((x) => {
             const cad = cadastro.get(x.id), pos = e.online.get(x.id);
             return { id: x.id, nome: String(cad?.nome ?? ""), vtr: String(cad?.viatura ?? ""), kmReta: x.km != null ? arred(x.km, 3) : null, favorito: x.fav, recebeu: escolhidos.some((y) => y.id === x.id), lat: pos?.lat ?? null, lng: pos?.lng ?? null };
@@ -473,7 +481,7 @@ export function despachar(empresaId: string) {
       });
     }
     for (const melhor of escolhidos) {
-    const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + (process.env.APPS_OFERTA_SEGUNDOS ? OFERTA_MS() : regras.tempoTela * 1000), distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
+    const o: Oferta = { id: crypto.randomUUID(), corridaId: c.id, motoristaId: melhor.id, expira: agora + tempoDaEtapa(regras, et) * 1000, distanciaKm: melhor.km != null ? arred(melhor.km, 1) : null };
     e.ofertas.set(o.id, o);
     avisarOferta(empresaId, o, "oferecida");
     comOferta.add(melhor.id);
@@ -660,7 +668,7 @@ export function controlarPendencias(empresaId: string, agora = Date.now()): Prom
     if (rod && rod.pausaAte > agora) continue; // em pendência: esperando alguém pegar
     const ref = Math.max(e.movimento.get(c.id) ?? 0, pedidaEmMs(c), rod?.pausaAte ?? 0);
     if (!rod || rod.pendencias < 1) {
-      if (agora - ref < regras.maxTentativas * OFERTA_MS() + 30_000) continue;
+      if (agora - ref < duracaoDasTentativasMs(regras) + 30_000) continue;
       const tpend = tempoPendenciaDaFilial(regras, c.filialId);
       if (tpend <= 0) { feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined)); e.rodadas.delete(c.id); continue; }
       e.rodadas.set(c.id, { n: 0, pausaAte: agora + tpend * 60_000, pendencias: 1 });
@@ -743,7 +751,9 @@ export function corridasAbertas(empresaId: string, motoristaId: string) {
   const cad = motorista(empresaId, motoristaId);
   const filtros = filtrosDoDespacho(empresaId);
   const pode = (c: CorridaPropria) => !!cad && cad.status === "Ativo" && filtros.podeAtender(c, motoristaId) && habilitado(cad, c.categoria);
-  const noRaio = (c: CorridaPropria) => { const km = kmAteEmbarque(e, motoristaId, c); return km == null || km <= RAIO_KM(); };
+  const raioLista = raioDaListaKm(empresaId), raioPendencia = distanciaListarKm(empresaId);
+  // Disponíveis: o raio do Despacho. Pendentes e programadas: "distância para listar" do Despacho (Alterando Bandeira).
+  const noRaio = (c: CorridaPropria) => { const km = kmAteEmbarque(e, motoristaId, c); return km == null || km <= (c.status === "procurando" && !aindaAgendada(c) && pendenciaAte(empresaId, c.id) == null ? raioLista : raioPendencia); };
   const procurando = lista.filter((c) => c.status === "procurando" && pode(c) && noRaio(c) && !e.recusadas.get(c.id)?.has(motoristaId));
   const porDistancia = (a: CorridaPropria, b: CorridaPropria) => (kmAteEmbarque(e, motoristaId, a) ?? Infinity) - (kmAteEmbarque(e, motoristaId, b) ?? Infinity);
   const item = (c: CorridaPropria) => dadosDaLista(empresaId, c, motoristaId, kmAteEmbarque(e, motoristaId, c));
@@ -764,6 +774,10 @@ export async function pegarCorrida(empresaId: string, motoristaId: string, corri
   if (!aindaAgendada(c) && ocupados(lista).has(motoristaId)) throw new Error("Termine a corrida em andamento antes de pegar outra.");
   const cad = motorista(empresaId, motoristaId);
   if (!cad || !filtrosDoDespacho(empresaId).podeAtender(c, motoristaId) || !habilitado(cad, c.categoria)) throw new Error("Esta corrida não é para você.");
+  if (pendenciaAte(empresaId, c.id) != null) { // pendência: só quem está dentro da "distância limite para aceitar pendência"
+    const km = kmAteEmbarque(e, motoristaId, c);
+    if (km != null && km > distanciaPendenciaKm(empresaId)) throw new Error("Esta pendência está longe demais de você.");
+  }
   const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
   if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
   e.contraofertas.delete(c.id);

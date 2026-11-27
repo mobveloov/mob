@@ -8,7 +8,23 @@ import { Aviso, Carregando, FiltroPeriodo, PERIODOS_MACHINE, dinheiro, pedirConf
 import { baixarCsv } from "./FinanceiroMachine";
 
 const HOJE: PeriodoSel = { chave: "hoje", inicio: "", fim: "" };
-const SEM_FILTRO = { status: "todos", pagamento: "" };
+// Como na Machine: o filtro nasce com tudo marcado; "Todos" marca ou desmarca as demais. Tudo marcado = sem filtro.
+const STATUS_TODOS = ["Finalizada", "Cancelada", "Não atendida"];
+const FORMAS_TODAS = ["Dinheiro", "Maquininha de débito", "Maquininha de crédito", "eTicket", "Voucher", "Cartão no app", "Pix", "Picpay", "Whatsapp", "Pix no app"];
+const SEM_FILTRO = { status: STATUS_TODOS, pagamento: FORMAS_TODAS };
+const valorFiltro = (marcadas: string[], todas: string[]) => (marcadas.length === todas.length || !marcadas.length ? "" : marcadas.join("|"));
+function Grupo({ rotulo, opcoes, marcadas, onChange }: { rotulo: string; opcoes: string[]; marcadas: string[]; onChange: (m: string[]) => void }) {
+  const todas = marcadas.length === opcoes.length;
+  return (
+    <fieldset className="dm-campo" style={{ flexBasis: "100%", border: 0, padding: 0 }}>
+      <span>{rotulo}</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        <label><input type="checkbox" checked={todas} onChange={() => onChange(todas ? [] : opcoes)} /> Todos</label>
+        {opcoes.map((o) => <label key={o}><input type="checkbox" checked={marcadas.includes(o)} onChange={() => onChange(marcadas.includes(o) ? marcadas.filter((m) => m !== o) : opcoes.filter((x) => x === o || marcadas.includes(x)))} /> {o}</label>)}
+      </div>
+    </fieldset>
+  );
+}
 const dataHoraCompleta = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}, ${s.slice(11, 19)}`;
 const TOM: Record<string, string> = { Finalizada: "ok", Cancelada: "ruim", "Não atendida": "alerta" };
 
@@ -24,14 +40,14 @@ export function RelatorioFaturamento() {
   const [pagina, setPagina] = useState(1);
   const { msg, salvar } = useSalvar();
   useEffect(() => { const t = setTimeout(() => { setOs(busca); setPagina(1); }, 300); return () => clearTimeout(t); }, [busca]);
-  const filtro = `${queryPeriodo(per)}&status=${encodeURIComponent(aplicado.status)}&pagamento=${encodeURIComponent(aplicado.pagamento)}&busca=${encodeURIComponent(os)}`;
+  const filtro = `${queryPeriodo(per)}&status=${encodeURIComponent(valorFiltro(aplicado.status, STATUS_TODOS))}&pagamento=${encodeURIComponent(valorFiltro(aplicado.pagamento, FORMAS_TODAS))}&busca=${encodeURIComponent(os)}`;
   const d = useCarregar(() => pedirConfig(`/relatorio-faturamento?${filtro}&pagina=${pagina}`), [filtro, pagina]);
-  const formas = useCarregar(() => fetch("/api/relatorios/definicoes", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null), []);
   const x = d.dados;
   const de = x ? (x.total ? (x.pagina - 1) * x.porPagina + 1 : 0) : 0, ate = x ? Math.min(x.total, x.pagina * x.porPagina) : 0;
   const numeros: number[] = x ? Array.from({ length: x.paginas }, (_, i) => i + 1).filter((p) => p === 1 || p === x.paginas || Math.abs(p - x.pagina) <= 2) : [];
   return (
     <>
+      <div className="aviso" role="note">Atenção: O histórico de faturamento vem das corridas registradas neste painel. Para períodos anteriores ao início do uso do painel, não há dados.</div>
       <div className="dm-cab">
         <div><h1>Relatório de faturamento</h1><p>Período: {textoPeriodo(per)}{x ? ` (${x.periodo.inicio.split("-").reverse().join("/")} a ${x.periodo.fim.split("-").reverse().join("/")})` : ""}</p></div>
         <div className="dm-cab-acoes">
@@ -41,11 +57,13 @@ export function RelatorioFaturamento() {
         </div>
       </div>
       {mais && (
-        <form className="dm-cartao dm-filtros" onSubmit={(e) => { e.preventDefault(); setPagina(1); setAplicado(f); }}>
-          <label>Status<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="todos">Todos</option>{(x?.status ?? []).map((s: string) => <option key={s}>{s}</option>)}</select></label>
-          <label>Forma de pagamento<select value={f.pagamento} onChange={(e) => setF({ ...f, pagamento: e.target.value })}><option value="">Todas</option>{(formas.dados?.formas ?? []).map((n: string) => <option key={n}>{n}</option>)}</select></label>
+        <form className="dm-cartao dm-filtros" aria-label="Filtro de pesquisa" onSubmit={(e) => { e.preventDefault(); setPagina(1); setAplicado(f); setMais(false); }}>
+          <div style={{ flexBasis: "100%" }}><h3 className="dm-secao">Filtro de pesquisa</h3><small>Você pode filtrar um ou mais campos</small></div>
+          <Grupo rotulo="Forma de pagamento" opcoes={FORMAS_TODAS} marcadas={f.pagamento} onChange={(m) => setF({ ...f, pagamento: m })} />
+          <Grupo rotulo="Status" opcoes={STATUS_TODOS} marcadas={f.status} onChange={(m) => setF({ ...f, status: m })} />
           <button className="botao primario">Filtrar</button>
           <button type="button" className="botao" onClick={() => { setF(SEM_FILTRO); setAplicado(SEM_FILTRO); setPagina(1); }}>Limpar filtros</button>
+          <button type="button" className="botao" onClick={() => { setF(aplicado); setMais(false); }}>Cancelar</button>
         </form>
       )}
       <Aviso erro={d.erro ?? msg?.erro} ok={msg?.ok} />
