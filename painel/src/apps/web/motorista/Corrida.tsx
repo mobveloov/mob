@@ -93,7 +93,7 @@ export function EmCorrida({ corrida: c, posicao, marca, mudou, finalizou, abrirC
     const chave = `${c.id}-${c.status}-${parada}`;
     if (longe == null || longe > 0.3 || avisado.current === chave || (emViagem && !c.destino && !naParada)) return;
     avisado.current = chave;
-    falar(!emViagem ? "Você está chegando ao local de embarque." : naParada ? `Você está chegando à parada ${parada + 1}.` : "Você está chegando ao destino.");
+    falar(!emViagem ? "Você está chegando ao local de embarque." : naParada ? `Você está chegando à parada ${parada + 1}.` : "Você está chegando ao destino.", !naParada);
   }, [longe, c.id, c.status, parada, emViagem, naParada, c.destino]);
 
   const status = async (s: string, extra: Record<string, unknown> = {}) => {

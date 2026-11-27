@@ -129,3 +129,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--cor); outli
 .vazio-desafios p { margin: 0; max-width: 28ch; opacity: .7; line-height: 1.4; }
 .cartao-desafio { border-radius: 18px; padding: 1rem; }
 .cartao-desafio .barra span { background: var(--cor); }
+
+/* Tela de abertura (imagem do painel em tela cheia; sem imagem, ícone da marca no fundo da marca) */
+.abertura { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.abertura-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.abertura-icone { width: 38%; max-width: 180px; aspect-ratio: 1; object-fit: contain; border-radius: 22%; }
+
+/* Ajustes da voz dos avisos */
+.ajustes-voz { display: flex; flex-direction: column; gap: .75rem; padding: .9rem 1rem; }
+.ajustes-voz label { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
+.ajustes-voz select { padding: .55rem; border-radius: .6rem; border: 1px solid var(--borda); background: transparent; color: inherit; }
+.ajustes-voz-linha { flex-direction: row !important; align-items: center; gap: .5rem !important; }
+.ajustes-voz-atual { margin: 0; font-size: .85rem; }

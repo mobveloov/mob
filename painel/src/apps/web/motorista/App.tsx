@@ -7,7 +7,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
-import { Carregando, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
+import { aquecerFrasesFixas } from "../comum/voz";
+import { Abertura, useAberturaMinima } from "../comum/Abertura";
+import { mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { avisarNovoAviso, PopupDeAvisos, useNaoLidos } from "../comum/Avisos";
 import { PermissoesPasso } from "./Permissoes";
@@ -29,6 +31,7 @@ import type { Corrida, Eu, Oferta } from "./tipos";
 
 export default function App() {
   const { marca: marcaBase, erro } = useMarca();
+  const abrindo = useAberturaMinima();
   const pers = usePersonalizacao();
   // O nome escolhido em Configurações > Personalização app motorista vale no app inteiro.
   const marca = marcaBase && pers?.empresa.nome ? { ...marcaBase, nome: pers.empresa.nome } : marcaBase;
@@ -37,7 +40,7 @@ export default function App() {
   const [cadastrando, setCadastrando] = useState(false);
   useEffect(() => { aplicarTema(); const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
-  if (!marca) return <Carregando />;
+  if (!marca || abrindo) return <Abertura marca={marca} />;
   if (!logado) return cadastrando
     ? <Cadastro voltarAoLogin={() => setCadastrando(false)} concluir={() => { setCadastrando(false); setLogado(!!token()); }} />
     : <Entrar marca={marca} aoEntrar={() => setLogado(true)} cadastrar={() => setCadastrando(true)} />;
@@ -45,6 +48,7 @@ export default function App() {
 }
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
+  useEffect(() => { const t = setTimeout(() => void aquecerFrasesFixas(), 5000); return () => clearTimeout(t); }, []);
   const [ajustes, mudarAjustes] = useAjustes();
   const pers = usePersonalizacao();
   // Lê a personalização ao entrar, a cada minuto e ao voltar para o app (muda no painel, muda aqui, sem gerar APK).
@@ -182,7 +186,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   };
   const recusar = async () => { if (oferta) await api(`/ofertas/${oferta.id}/recusar`, { corpo: {} }).catch(() => undefined); setOferta(null); };
 
-  if (!eu) return <Carregando />;
+  if (!eu) return <Abertura marca={marca} />;
   if (chat && corrida) return <ChatCorrida corrida={corrida} mensagens={mensagens} fechar={() => setChat(false)} />;
 
   const chamada = oferta && (

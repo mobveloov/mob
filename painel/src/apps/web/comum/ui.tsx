@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, Phone, Square, Volume2 } from "lucide-react";
+import { escolherVoz, lerConfigVoz } from "./voz";
 import { reaplicarPersonalizacao } from "./personalizacao";
 import { ACEITA_MIDIA, api, urlApi, config, enviarMidiaDoChat, ErroApi, guardarToken, Gravador, problemaDaMidia, trocarServidor, urlArquivo, urlDaMidia, urlDoAudio, type Papel, type Posicao } from "./api";
 
@@ -184,7 +185,7 @@ function useVozPtBr() {
     if (!s) return;
     const escolher = () => {
       const vozes = s.getVoices();
-      setVoz(vozes.find((v) => v.lang.replace("_", "-").toLowerCase() === "pt-br") ?? null);
+      setVoz(escolherVoz(vozes, lerConfigVoz().nome));
     };
     escolher();
     s.addEventListener?.("voiceschanged", escolher);
@@ -200,7 +201,7 @@ function BotaoOuvir({ texto, voz }: { texto: string; voz: SpeechSynthesisVoice }
     s.cancel();
     if (falando) { setFalando(false); return; }
     const f = new SpeechSynthesisUtterance(texto);
-    f.voice = voz; f.lang = voz.lang;
+    f.voice = voz; f.lang = voz.lang; f.rate = lerConfigVoz().velocidade;
     f.onend = f.onerror = () => setFalando(false);
     setFalando(true);
     s.speak(f);

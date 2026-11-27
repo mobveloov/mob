@@ -1,6 +1,7 @@
 // Telas do menu do app do motorista: Corridas (Disp., Pend., Prog.), Maçaneta, histórico de viagens, meus veículos,
 // meu cadastro, alterar senha, configurações, diagnóstico, chat com o suporte, fale conosco e o menu lateral.
 
+import { AjustesDeVoz } from "../comum/AjustesDeVoz";
 import { useEffect, useState } from "react";
 import {
   Bell, BadgeCheck, Banknote, Calendar, Car, ChevronDown, ChevronRight, ClipboardList, FileText, Gauge, GitFork, Gift, Hand, Headphones, Headset, Info, LifeBuoy, LocateFixed, LogOut, Lock,
@@ -336,7 +337,7 @@ export function AlterarSenha({ voltar }: Voltar) {
 
 export function Configuracoes({ voltar, irPermissoes }: Voltar & { irPermissoes?: () => void }) {
   const [a, mudar] = useAjustes();
-  const [abrir, setAbrir] = useState<"" | "tema" | "navegador" | "sons">("");
+  const [abrir, setAbrir] = useState<"" | "tema" | "navegador" | "sons" | "voz">("");
   const linha = (I: typeof User, titulo: string, texto: string | undefined, valor: string, f: () => void) => (
     <button type="button" className="config-linha" onClick={f}><span className="item-icone"><I size={19} /></span><span className="item-textos"><strong>{titulo}</strong>{texto && <small>{texto}</small>}<small className="valor">{valor}</small></span><ChevronRight size={18} className="item-seta" /></button>
   );
@@ -369,12 +370,14 @@ export function Configuracoes({ voltar, irPermissoes }: Voltar & { irPermissoes?
         <Chave icone={Wifi} ligado={a.gravarSoWifi} mudar={(v) => mudar({ gravarSoWifi: v })} titulo="Enviar gravações só no Wi‑Fi" texto={`A cópia fica no seu celular por ${DIAS_COPIA()} dias e sobe quando houver Wi‑Fi. Desligado, sobe também no 4G/5G.`} />
         <Chave icone={Smartphone} ligado={a.manterTela} mudar={(v) => mudar({ manterTela: v })} titulo="Manter a tela ligada" texto="Evita que a tela apague enquanto você está online ou em corrida" />
         <Chave icone={Mic} ligado={a.voz} mudar={(v) => mudar({ voz: v })} titulo="Assistente de Voz (Co-piloto)" texto="Avisos por voz ao chegar perto do destino" />
+        {linha(Volume2, "Voz dos avisos", "Voz, velocidade e exemplo", "Ajustar", () => setAbrir("voz"))}
         {linha(Music, "Toque da chamada", undefined, NOMES_SONS[a.sons], () => setAbrir("sons"))}
         <Chave icone={Volume2} ligado={a.volume} mudar={(v) => mudar({ volume: v })} titulo="Volume Automático" texto="Ajustar volume da mídia ao tocar alarme" />
       </div>
       <p className="dica" style={{ textAlign: "center", padding: "1.4rem 1rem 2rem", fontSize: ".72rem" }}>Versão {VERSAO}</p>
       {abrir === "tema" && <Folha titulo="Tema do Aplicativo" fechar={() => setAbrir("")}>{(Object.keys(NOMES_TEMA) as Tema[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.tema === k ? "ativa" : ""}`} onClick={() => { mudar({ tema: k }); setAbrir(""); }}>{NOMES_TEMA[k]}{a.tema === k && <BadgeCheck size={20} />}</button>)}</Folha>}
       {abrir === "navegador" && <Folha titulo="Navegador Padrão" fechar={() => setAbrir("")}>{(Object.keys(NOMES_NAVEGADOR) as Navegador[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.navegador === k ? "ativa" : ""}`} onClick={() => { mudar({ navegador: k }); setAbrir(""); }}>{NOMES_NAVEGADOR[k]}{a.navegador === k && <BadgeCheck size={20} />}</button>)}</Folha>}
+      {abrir === "voz" && <Folha titulo="Voz dos avisos" fechar={() => setAbrir("")}><AjustesDeVoz /></Folha>}
       {abrir === "sons" && <Folha titulo="Toque da chamada" fechar={() => setAbrir("")}>{(Object.keys(NOMES_SONS) as Sons[]).map((k) => <button key={k} type="button" className={`opcao-folha ${a.sons === k ? "ativa" : ""}`} onClick={() => { mudar({ sons: k }); tocar(2); }}>{NOMES_SONS[k]}{a.sons === k && <BadgeCheck size={20} />}</button>)}</Folha>}
     </Pagina>
   );

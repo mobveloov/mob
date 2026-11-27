@@ -1,0 +1,140 @@
+{
+  "quando": "2026-11-27T20:46:09.853Z",
+  "resultados": [
+    {
+      "item": "toque Xperia em laço na oferta (padrão)",
+      "passou": true,
+      "detalhe": "[{\"via\":\"ctx\",\"loop\":true,\"dur\":16.14}]"
+    },
+    {
+      "item": "botão Recusar na oferta",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "Recusar fecha a oferta e para o toque",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "passageiro ouve som quando o motorista aceita (app aberto)",
+      "passou": true,
+      "detalhe": "[{\"via\":\"ctx\",\"loop\":false,\"dur\":1},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/d10741e3-6ad0-4dd4-b635-d78a35f8a9db\",\"loop\":false},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/b57f444d-64b3-47d2-9c1f-819e12259136\",\"loop\":false}] marcos=[\"cancelada\",\"a_caminho\"]"
+    },
+    {
+      "item": "tela sempre ligada (wake lock pedido) nos dois apps",
+      "passou": true,
+      "detalhe": "passageiro 2, motorista 4"
+    },
+    {
+      "item": "placa do veículo visível no passageiro (a caminho)",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "placa dentro da tela (não cortada)",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "folha de baixo sem texto cortado (passageiro)",
+      "passou": true,
+      "detalhe": "{\"falhas\":[],\"achou\":5}"
+    },
+    {
+      "item": "folha de baixo sem botão cortado (motorista)",
+      "passou": true,
+      "detalhe": "[]"
+    },
+    {
+      "item": "foto do motorista redonda (largura = altura, raio 50%)",
+      "passou": true,
+      "detalhe": "[{\"w\":84,\"h\":84,\"img\":\"84x84\",\"raio\":\"50%\"}]"
+    },
+    {
+      "item": "Ver perfil abre a foto grande",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "chat escuro: bolhas legíveis (não preto sobre preto)",
+      "passou": true,
+      "detalhe": "{\"fundoBody\":0,\"bolhas\":[96]}"
+    },
+    {
+      "item": "Meus veículos mostra o veículo cadastrado (Fiat Argo Prata, ABC1D23)",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "Desafios no motorista (abas, progresso, prêmio, prazo)",
+      "passou": true,
+      "detalhe": "Desafios | Ativos | 1 | Concluídos | Expirados | Dez corridas na semana |  | Desafio de corridas · até 03/12/2026 |  | Complete 10 corridas e ganhe R$ 50. |  | 0 de 10 · prêmio R$ 50"
+    },
+    {
+      "item": "Desafios no passageiro (abas)",
+      "passou": true,
+      "detalhe": "‹ Voltar | Desafios | Ativos | Concluídos | Expirados | Nenhum desafio agora |  | Quando a central lançar um desafio, ele aparece aqui"
+    },
+    {
+      "item": "tela Voz dos avisos mostra qual voz está em uso",
+      "passou": true,
+      "detalhe": "Voz feminina do painel (neural)"
+    },
+    {
+      "item": "voz: o app baixou mp3 do servidor (>2 KB) e o servidor entrega audio/mpeg válido",
+      "passou": true,
+      "detalhe": "13 frases carregadas (cache/cache/cache/cache/cache/cache/cache/cache/cache/cache/cache/cache/cache ; ex.: 15696 bytes); teste direto: 200 audio/mpeg 13248 bytes, cabeçalho ÿód"
+    },
+    {
+      "item": "voz: tocou o mp3 com o player (não a voz do aparelho)",
+      "passou": true,
+      "detalhe": "1 reprodução(ões), falas do aparelho: 0"
+    },
+    {
+      "item": "voz: frase guardada no aparelho (Cache Storage)",
+      "passou": true,
+      "detalhe": "13 arquivo(s): 15696, 16560, 20736, 13248, 15840, 20448, 18720, 15696, 15840, 16992, 17136, 17136, 17424 bytes"
+    },
+    {
+      "item": "voz: sem rede toca a frase guardada (sem novo pedido)",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "botão SOS na folha aberta da corrida em andamento",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "SOS aberto (central notificada)",
+      "passou": true,
+      "detalhe": "{\"alerta\":{\"id\":\"b4a4151d-aa1e-47dd-b169-74d3e2aa55cd\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T17:45:40"
+    },
+    {
+      "item": "rua sem número: o app pede o número da casa",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "endereço fica como 'Rua das Flores, 123'",
+      "passou": true,
+      "detalhe": "Seu Local de Partida|Minha localização|Destino|Rua das Flores, 123|© OpenStreetMap|Agora|Agendar|Opções para você|Opcion"
+    },
+    {
+      "item": "pop-up do aviso aparece no MEIO da tela",
+      "passou": true,
+      "detalhe": "centro vertical 458 de 915"
+    },
+    {
+      "item": "pop-up traz o texto do CRM",
+      "passou": true,
+      "detalhe": ""
+    },
+    {
+      "item": "aviso fica na caixa (sininho)",
+      "passou": true,
+      "detalhe": ""
+    }
+  ]
+}

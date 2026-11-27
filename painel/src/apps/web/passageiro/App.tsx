@@ -19,6 +19,8 @@ import { Opcoes } from "./Opcoes";
 import { ParaOnde, type ModoParaOnde } from "./ParaOnde";
 import { Avaliar, OpcoesDaCorrida } from "./PosCorrida";
 import { avisarNovoAviso, PopupDeAvisos } from "../comum/Avisos";
+import { aquecerFrasesFixas } from "../comum/voz";
+import { Abertura, useAberturaMinima } from "../comum/Abertura";
 import "./passageiro.css";
 import "./passageiro-m.css";
 
@@ -27,6 +29,7 @@ type Fluxo = { tela: "" } | { tela: "paraonde"; modo: ModoParaOnde } | { tela: "
 
 export default function App() {
   const { marca: marcaBase, erro } = useMarca();
+  const abrindo = useAberturaMinima();
   const pers = usePersonalizacao();
   // O nome escolhido em Configurações > Personalização vale no app inteiro.
   const marca = marcaBase && pers?.empresa.nome ? { ...marcaBase, nome: pers.empresa.nome } : marcaBase;
@@ -36,7 +39,7 @@ export default function App() {
   useEffect(() => (logado ? acompanharPersonalizacao() : undefined), [logado]);
   useEffect(() => { const f = () => setLogado(false); window.addEventListener("app-sair", f); return () => window.removeEventListener("app-sair", f); }, []);
   if (erro) return <div className="tela centro"><Aviso texto={erro} /><ServidorTeste /></div>;
-  if (!marca) return <Carregando />;
+  if (!marca || abrindo) return <Abertura marca={marca} />;
   if (!logado) return <Entrar marca={marca} aoEntrar={() => setLogado(true)} />;
   return <><Logado marca={marca} sair={() => setLogado(false)} /><CartaoMeuSos /><PopupDeAvisos /></>;
 }
@@ -54,6 +57,7 @@ async function partidaAgora(aqui: Posicao | null): Promise<Ponto> {
 }
 
 function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
+  useEffect(() => { const t = setTimeout(() => void aquecerFrasesFixas(), 5000); return () => clearTimeout(t); }, []);
   const [eu, setEu] = useState<Eu | null>(null);
   const [corrida, setCorrida] = useState<Corrida | null>(null);
   const [posMotorista, setPosMotorista] = useState<Posicao | null>(null);
@@ -71,12 +75,16 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const avisarSemMotorista = (c: Corrida) => { if (c.status === "nao_atendida") { setSemMotorista(c.mensagemCancelamento || c.statusTexto || "Não há nenhum motorista disponível no momento."); setFluxo({ tela: "" }); setAba("inicio"); } };
   const atualRef = useRef<string | null>(null);
   const statusVisto = useRef<Record<string, string>>({});
+  const jaCarregou = useRef(false);
 
   const carregar = useCallback(async () => {
     const [e, s] = await Promise.all([api<{ eu: Eu }>("/eu"), api<{ corrida: Corrida | null; posicaoMotorista: Posicao | null }>("/estado")]);
     // Voltou do segundo plano (ou a conexão em tempo real caiu) e a corrida mudou de etapa: avisa com som, como no tempo real.
     const c = s.corrida;
-    if (c) { const visto = statusVisto.current[c.id]; if (visto && visto !== c.status) avisoDoMarco(c.status); statusVisto.current[c.id] = c.status; }
+    // Corrida que o app ainda não conhecia (o tempo real ficou fora do ar, ou o app estava em segundo plano quando o motorista aceitou):
+    // depois da primeira leitura, qualquer etapa nova também avisa com som. Antes ficava mudo (o app só avisava quem já "tinha visto" a corrida).
+    if (c) { const visto = statusVisto.current[c.id]; if ((visto && visto !== c.status) || (!visto && jaCarregou.current && c.status !== "procurando")) avisoDoMarco(c.status); statusVisto.current[c.id] = c.status; }
+    jaCarregou.current = true;
     setEu(e.eu); setCorrida(c); setPosMotorista(s.posicaoMotorista);
   }, []);
   const carregarLugares = useCallback(() => { void lerLugares().then(setLugares).catch(() => undefined); }, []);
@@ -107,7 +115,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
       const c = d as Corrida;
       if (esperandoHorario(c)) return; // agendada: aparece na aba Agendadas até chegar a hora
       const visto = statusVisto.current[c.id];
-      if (visto && visto !== c.status) avisoDoMarco(c.status); // som forte e voz em cada marco (só quando o status muda de verdade)
+      if ((visto && visto !== c.status) || (!visto && jaCarregou.current && c.status !== "procurando")) avisoDoMarco(c.status); // som forte e voz em cada marco (só quando o status muda de verdade)
       statusVisto.current[c.id] = c.status;
       setCorrida((antes) => {
         if (antes && antes.id === c.id && antes.status !== c.status) vibrar([200, 100, 200]);
@@ -124,7 +132,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
     }
   }, (ligado) => { setConectado(ligado); if (ligado) void carregar().catch(() => undefined); }), [carregar]);
 
-  if (!eu) return <Carregando />;
+  if (!eu) return <Abertura marca={marca} />;
   if (chat && corrida) return <Chat corridaId={corrida.id} papel="passageiro" mensagens={mensagens} titulo={corrida.motorista?.nome} avatar={corrida.motorista ? <Avatar foto={corrida.motorista.foto} nome={corrida.motorista.nome} tamanho={40} /> : undefined} telefone={corrida.motorista?.telefone} aberto={!!corrida.motorista && corrida.aberta} fechar={() => { setChat(false); void api(`/corridas/${corrida.id}/chat/lida`, { corpo: {} }).catch(() => undefined); }} />;
   if (avaliar) return <Avaliar corrida={avaliar} fechar={() => setAvaliar(null)} />;
 

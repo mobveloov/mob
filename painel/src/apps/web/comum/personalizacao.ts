@@ -11,6 +11,7 @@ interface Basico {
   empresa: { id: string; nome: string; nomeExibido: string; logoClaro: string; logoEscuro: string; icone: string };
   cores: { principal: string; textoSobrePrincipal: string; escura: string; clara: string };
   design: { estiloTela: "flutuante" | "neutro" | "marcante"; marca: string; mostrarNome: boolean; mostrarImagem: boolean; imagemMarcaUrl: string; dimensoesImagem: { largura: number; altura: number } | null };
+  voz?: { ligada: boolean; motor: string; genero: "feminina" | "masculina"; velocidade: number; app: "passageiro" | "motorista"; url: string; formato: string; maxCaracteres: number };
   veiculoMapa: { id: string; tipo: number; iconeLivreUrl: string; iconeOcupadoUrl: string; diferenciaOcupado: boolean };
 }
 export interface PersonalizacaoPassageiro extends Basico {
