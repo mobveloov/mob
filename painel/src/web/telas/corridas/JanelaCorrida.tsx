@@ -134,7 +134,7 @@ export function JanelaCorrida({ id, onFechar, onMudou, editarDireto, embutida, o
 function Extras({ d }: { d: Detalhe }) {
   const c = d.corrida, f = d.financeiro, dt = d.datas;
   const cancelada = c.status === "cancelada";
-  if (!d.repasses.length && !cancelada && !c.observacao && !(c.paradas ?? []).length && !d.motorista) return null;
+  if (!d.repasses.length && !cancelada && !c.observacao && !c.infoAntes && !c.infoDepois && !c.infoInterna && !c.pagamentosAceitos?.length && !(c.paradas ?? []).length && !d.motorista) return null;
   return (
     <div className="oc-det-celulas" style={{ marginTop: 12 }}>
       {(c.paradas ?? []).length > 0 && <div className="oc-det-cel"><h2>Paradas</h2>{c.paradas.map((x: { texto: string }, i: number) => <span className="oc-det-lin" key={i}><label>Parada {i + 1}</label><span>{x.texto}</span></span>)}</div>}
@@ -147,6 +147,11 @@ function Extras({ d }: { d: Detalhe }) {
         <span className="oc-det-lin"><label>Responsável</label><span>{c.canceladaPor || "---"}</span></span>
         <span className="oc-det-lin"><label>Taxa cobrada</label><span>{reais(f.taxaCancelamento)}</span></span>
         <span className="oc-det-lin"><label>Motivo registrado</label><span>{c.motivoCancelamento || "---"}</span></span></div>}
+      {(c.infoAntes || c.infoDepois || c.infoInterna || c.pagamentosAceitos?.length) && <div className="oc-det-cel"><h2><Info size={13} /> Dados da solicitação</h2>
+        {c.pagamentosAceitos?.length > 0 && <span className="oc-det-lin"><label>Formas de pagamento aceitas</label><span>{c.pagamentosAceitos.join(", ")}</span></span>}
+        {c.infoAntes && <span className="oc-det-lin"><label>Informação antes do aceite</label><span>{c.infoAntes}</span></span>}
+        {c.infoDepois && <span className="oc-det-lin"><label>Informação após o aceite</label><span>{c.infoDepois}</span></span>}
+        {c.infoInterna && <span className="oc-det-lin"><label>Informação interna</label><span>{c.infoInterna}</span></span>}</div>}
       {c.observacao && <div className="oc-det-cel"><h2><Info size={13} /> Observação</h2><p style={{ margin: 0 }}>{c.observacao}</p></div>}
     </div>
   );

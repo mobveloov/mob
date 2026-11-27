@@ -7,15 +7,13 @@ import { AbrirAssociada } from "./AbrirAssociada";
 import { baixarCsvCentrais, pedirCentrais } from "./comum";
 
 const DICAS = {
-  extrato: "A associada decide se a central principal pode ver o extrato dela. A principal nunca vê nomes de motoristas ou passageiros.",
-  debito: "Define de qual conta sai a cobrança da plataforma: da própria central ou da central principal.",
-  conta: "Define qual conta online (recebimentos) a central usa: a própria ou a da central principal.",
+  extrato: "Quando ativo, a central pode visualizar seu extrato e gerenciar sua conta de créditos. Quando inativo, o extrato e a gerência da conta ficam ocultos para a central. Na central principal, essa opção fica sempre ativa.",
+  debito: "Define se os valores devidos à plataforma serão capturados automaticamente e de qual conta corrente essa cobrança será realizada.",
+  conta: "Indica se as corridas online da central são processadas na conta própria ou na conta da central principal.",
 };
-const OPCOES = {
-  exibirExtrato: ["Não permitir", "Permitir"],
-  debitoAutomatico: ["Usar conta desta central", "Usar conta da central principal"],
-  contaOnline: ["Conta própria", "Conta da central principal"],
-} as const;
+// Débito automático: a principal escolhe entre desligar e a conta dela; a associada ainda pode usar a conta da principal.
+const OPCOES_DEBITO = { principal: ["Não permitir", "Usar conta desta central"], associada: ["Não permitir", "Usar conta desta central", "Usar conta da central principal"] } as const;
+const OPCOES_CONTA = ["Conta própria", "Conta da central principal"] as const;
 const Dica = ({ texto }: { texto: string }) => <span className="cc-dica" title={texto} aria-label={texto}><Info size={13} /></span>;
 
 export function ControleCentrais() {
@@ -43,15 +41,23 @@ export function ControleCentrais() {
             {!d.dados ? <tr><td colSpan={5}><Carregando /></td></tr> : !linhas.length ? <tr><td colSpan={5} className="vazio">Nenhuma central encontrada.</td></tr> : linhas.map((l: any) => (
               <tr key={l.id}>
                 <td>{l.rotulo}{l.tipo === "principal" && <span className="selo info cc-selo">Principal</span>}{!l.ativa && <span className="selo ruim cc-selo">Desativada</span>}</td>
-                {(["exibirExtrato", "debitoAutomatico", "contaOnline"] as const).map((campo) => (
-                  <td key={campo}>
-                    {l.tipo === "principal" ? <span className="cc-fixo">{campo === "exibirExtrato" ? "—" : campo === "debitoAutomatico" ? "Usar conta desta central" : "Conta própria"}</span> : (
-                      <select value={l.controle[campo]} disabled={!l.pode[campo]} onChange={(e) => mudar(l.id, campo, e.target.value)} aria-label={`${campo} de ${l.nome}`}>
-                        {OPCOES[campo].map((o) => <option key={o}>{o}</option>)}
-                      </select>
-                    )}
-                  </td>
-                ))}
+                <td>
+                  <label className="cc-switch" aria-label={`Alterar visibilidade do extrato de ${l.rotulo}`}>
+                    <input type="checkbox" checked={l.tipo === "principal" ? true : l.controle.exibirExtrato === "Permitir"} disabled={l.tipo === "principal" || !l.pode.exibirExtrato} onChange={(e) => mudar(l.id, "exibirExtrato", e.target.checked ? "Permitir" : "Não permitir")} />
+                  </label>
+                </td>
+                <td>
+                  <select value={l.controle.debitoAutomatico} disabled={!l.pode.debitoAutomatico} onChange={(e) => mudar(l.id, "debitoAutomatico", e.target.value)} aria-label={`Alterar débito automático de ${l.rotulo}`}>
+                    {OPCOES_DEBITO[l.tipo === "principal" ? "principal" : "associada"].map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </td>
+                <td>
+                  {l.tipo === "principal" ? <span className="cc-fixo">Conta própria</span> : (
+                    <select value={l.controle.contaOnline} disabled={!l.pode.contaOnline} onChange={(e) => mudar(l.id, "contaOnline", e.target.value)} aria-label={`Alterar conta online de ${l.rotulo}`}>
+                      {OPCOES_CONTA.map((o) => <option key={o}>{o}</option>)}
+                    </select>
+                  )}
+                </td>
                 <td className="cc-acoes">
                   {(l.id === principalId || l.controle.exibirExtrato === "Permitir") && <button className="botao" onClick={() => setExtrato({ id: l.id, nome: l.nome })}>Ver extrato</button>}
                   {plataforma && l.tipo === "associada" && l.id !== principalId && <button className="botao" onClick={() => { if (confirm(`Desfazer o vínculo de ${l.nome} com a central principal?`)) salvar(async () => { await pedirCentrais(`/associadas/${l.id}`, "DELETE"); atualizar(); }, "Vínculo desfeito."); }}>Desvincular</button>}

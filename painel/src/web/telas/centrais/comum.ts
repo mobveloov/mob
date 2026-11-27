@@ -19,12 +19,15 @@ export async function pedirCentrais<T = any>(url: string, metodo = "GET", corpo?
   return b as T;
 }
 
-/** Baixa um CSV do servidor (a proteção contra injeção de fórmula é feita lá). */
-export async function baixarCsvCentrais(url: string, nome: string) {
+/** Busca um CSV do servidor (a proteção contra injeção de fórmula é feita lá). */
+export async function buscarCsvCentrais(url: string): Promise<Blob> {
   const emp = empresaEscolhida();
   const r = await fetch(`/api/centrais${url}`, { credentials: "same-origin", headers: emp ? { "X-Empresa": emp } : {} });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { erro?: string }).erro || `Erro ${r.status}`);
-  const blob = await r.blob();
+  return r.blob();
+}
+export async function baixarCsvCentrais(url: string, nome: string) {
+  const blob = await buscarCsvCentrais(url);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);

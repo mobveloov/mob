@@ -11,11 +11,12 @@ export function TransacaoPix() {
   const admin = useAdmin();
   const [per, setPer] = useState<PeriodoPag>(PERIODO_HOJE);
   const [os, setOs] = useState(""), [motorista, setMotorista] = useState(""), [situacao, setSituacao] = useState("");
-  const [f, setF] = useState({ os: "", motorista: "", situacao: "" });
+  const [bandeira, setBandeira] = useState(""), [bandeiraCorrida, setBandeiraCorrida] = useState("");
+  const [f, setF] = useState({ os: "", motorista: "", situacao: "", bandeira: "", bandeiraCorrida: "" });
   const [pagina, setPagina] = useState(1);
   const [erroAcao, setErroAcao] = useState<string | null>(null);
   const [marcar, setMarcar] = useState<any>(null);
-  useEffect(() => { const t = setTimeout(() => { setF({ os, motorista, situacao }); setPagina(1); }, 350); return () => clearTimeout(t); }, [os, motorista, situacao]);
+  useEffect(() => { const t = setTimeout(() => { setF({ os, motorista, situacao, bandeira, bandeiraCorrida }); setPagina(1); }, 350); return () => clearTimeout(t); }, [os, motorista, situacao, bandeira, bandeiraCorrida]);
   const filtro = { ...f, ...paramsPeriodo(per) };
   const { dados, erro, carregando, recarregar } = useDados<any>(() => op(`/pix${qs({ ...filtro, pagina })}`), [JSON.stringify(filtro), pagina]);
   return (
@@ -24,8 +25,10 @@ export function TransacaoPix() {
         <BotaoExportar caminho={`/pix/exportar${qs(filtro)}`} nome="transacoes-pix.csv" onErro={setErroAcao} />
       </Cab>
       <div className="dm-cartao dm-filtros">
-        <label>Buscar por OS<input value={os} onChange={(e) => setOs(e.target.value)} placeholder="Nº da OS" /></label>
+        <label>Buscar por OS<input value={os} onChange={(e) => setOs(e.target.value)} placeholder="Nº OS" /></label>
         <label>Período<SeletorPeriodo valor={per} onChange={(p) => { setPer(p); setPagina(1); }} opcoes={PERIODOS_PIX} /></label>
+        <label>Bandeira<select value={bandeira} onChange={(e) => setBandeira(e.target.value)}><option value="">Todas</option>{(dados?.bandeiras ?? []).map((n: string) => <option key={n}>{n}</option>)}</select></label>
+        <label>Bandeira da corrida<select value={bandeiraCorrida} onChange={(e) => setBandeiraCorrida(e.target.value)}><option value="">Selecione</option>{(dados?.bandeiras ?? []).map((n: string) => <option key={n}>{n}</option>)}</select></label>
         <label>Nome/VTR do motorista<input value={motorista} onChange={(e) => setMotorista(e.target.value)} /></label>
         <fieldset className="dm-campo" style={{ border: 0, padding: 0, flexBasis: "100%" }}>
           <span>Situação do Pagamento</span>
@@ -33,7 +36,8 @@ export function TransacaoPix() {
             <label key={s}><input type="checkbox" checked={situacao.split("|").includes(s)} onChange={() => { const l = situacao.split("|").filter(Boolean); setSituacao((l.includes(s) ? l.filter((x) => x !== s) : [...l, s]).join("|")); }} /> {s}</label>
           ))}</div>
         </fieldset>
-        <button className="botao" onClick={() => { setOs(""); setMotorista(""); setSituacao(""); setPer(PERIODO_HOJE); setPagina(1); }}>Limpar filtro</button>
+        <button className="botao primario" onClick={() => { setF({ os, motorista, situacao, bandeira, bandeiraCorrida }); setPagina(1); }}>Filtrar</button>
+        <button className="botao" onClick={() => { setOs(""); setMotorista(""); setSituacao(""); setBandeira(""); setBandeiraCorrida(""); setPer(PERIODO_HOJE); setPagina(1); }}>Limpar filtro</button>
       </div>
       <div className="dm-kpis">
         <div className="dm-kpi"><small>Total pago por Pix</small><strong>{brl(dados?.totalPago ?? 0)}</strong></div>

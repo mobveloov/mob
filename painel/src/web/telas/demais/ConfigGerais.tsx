@@ -23,7 +23,7 @@ export function ConfigGerais() {
   const [lido, setLido] = useState<unknown>(null);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setC(structuredClone(d.dados)); }
   const { msg, salvando, salvar } = useSalvar();
-  const [chat, setChat] = useState(""), [novoDoc, setNovoDoc] = useState(false), [novoFiltro, setNovoFiltro] = useState(false), [upload, setUpload] = useState(false);
+  const [novoDoc, setNovoDoc] = useState(false), [novoFiltro, setNovoFiltro] = useState(false), [upload, setUpload] = useState(false);
   const termos = useCarregar(() => pedirConfig("/termos"), []);
   const [tx, setTx] = useState<any>(null);
   const [txLido, setTxLido] = useState<unknown>(null);
@@ -46,7 +46,14 @@ export function ConfigGerais() {
       <p className="sub">Os Recursos Premium mudaram para Personalização app passageiro / motorista. Os valores salvos foram mantidos.</p>
       <Aviso erro={msg?.erro} ok={msg?.ok} />
       {aba === "despacho" && <BandeiraDespacho />}
-      {ABAS_FORM.filter((a) => a.id !== "premium" && a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : undefined} extra={a.id === "motorista" ? (<Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
+      {ABAS_FORM.filter((a) => a.id !== "premium" && a.id === aba).map((a) => <BandeiraAbas key={a.id} aba={a} especiais={a.id === "motorista" ? { documentos: <DocumentosPadrao docs={g.motorista.documentos} admin={admin} onMudar={(l) => set(["motorista", "documentos"], l)} onAdicionar={() => setNovoDoc(true)} /> } : undefined} aoGravar={a.id === "motorista" ? async () => { await pedirConfig("/gerais", "PUT", { motorista: g.motorista }); } : a.id === "filtros" ? async () => { await pedirConfig("/gerais", "PUT", { preferencias: g.preferencias }); } : undefined} extra={a.id === "filtros" ? (<Secao titulo="Filtros customizáveis" sub="Opcionais e formas de pagamento extras que o passageiro pode pedir; aparecem nos apps. Grave para valer." acao={admin && <button className="botao" onClick={() => setNovoFiltro(true)}><Plus size={14} /> Adicionar novo opcional customizável</button>}>
+          {!g.preferencias.length ? <p className="vazio">Nenhum opcional customizável.</p> : <ul className="dm-docs">{g.preferencias.map((p: any, i: number) => (
+            <li key={p.id}><span><strong>{p.nome}</strong><small>{p.tipo === "pagamento" ? "Forma de pagamento" : "Filtro de carro ou serviço"}</small></span>
+              <Interruptor valor={p.ativo} onChange={(v) => set(["preferencias", String(i), "ativo"], v)} rotulo={`${p.nome} ativo`} desabilitado={!admin} />
+              {admin && <button className="icone" aria-label={`Remover ${p.nome}`} onClick={() => set(["preferencias"], g.preferencias.filter((_: unknown, j: number) => j !== i))}><Trash2 size={14} /></button>}</li>
+          ))}</ul>}
+          <NovoFiltro aberto={novoFiltro} onFechar={() => setNovoFiltro(false)} onAdd={(p) => { set(["preferencias"], [...g.preferencias, p]); setNovoFiltro(false); }} />
+        </Secao>) : a.id === "motorista" ? (<Secao titulo="Diagnóstico do App" sub="Quando o app do motorista deixa de falar com a central, o diagnóstico do motorista mostra APP OFF.">
               <Campo rotulo="Dias sem contato para o app aparecer como OFF" dica="Define há quantos dias sem contato do app o diagnóstico mostra APP OFF"><input type="number" min={1} max={90} step={1} disabled={!admin} value={g.motorista.diasSemContatoApp} onChange={(e) => set(["motorista", "diasSemContatoApp"], Math.min(90, Math.max(1, Math.round(Number(e.target.value)) || 1)))} /></Campo>
             </Secao>) : undefined} />)}
       {aba === "motorista" && <NovoDocumento aberto={novoDoc} onFechar={() => setNovoDoc(false)} onAdd={(d) => { set(["motorista", "documentos"], [...g.motorista.documentos, d]); setNovoDoc(false); }} />}
@@ -84,12 +91,7 @@ export function ConfigGerais() {
               </>
             )}
           </Secao>
-          <Secao titulo="Mensagens Rápidas (Chat)" sub="Textos prontos para o motorista enviar com 1 toque.">
-            <ul className="dm-lista-edit">{g.motorista.mensagensRapidas.map((m: string, i: number) => (
-              <li key={i}><input value={m} aria-label={`Mensagem ${i + 1}`} onChange={(e) => set(["motorista", "mensagensRapidas"], g.motorista.mensagensRapidas.map((x: string, j: number) => (j === i ? e.target.value : x)))} />{admin && <button className="icone" aria-label="Remover mensagem" onClick={() => set(["motorista", "mensagensRapidas"], g.motorista.mensagensRapidas.filter((_: string, j: number) => j !== i))}><Trash2 size={14} /></button>}</li>
-            ))}</ul>
-            {admin && <div className="dm-linha"><input value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Escreva uma nova mensagem..." aria-label="Nova mensagem rápida" maxLength={120} /><button className="botao" onClick={() => { if (chat.trim()) { set(["motorista", "mensagensRapidas"], [...g.motorista.mensagensRapidas, chat.trim()]); setChat(""); } }}>Adicionar</button></div>}
-          </Secao>
+          <Secao titulo="Mensagens Rápidas (Chat)" sub="As mensagens rápidas do motorista (com o cliente e com a central) ficam na aba Motorista, no fim da lista de configurações do aplicativo."><span /></Secao>
           <Secao titulo="Gravação das corridas" sub="O app do motorista grava o áudio da corrida para a segurança dele. O passageiro é avisado.">
             {sw(["motorista", "gravacao", "ativa"], "Gravar as corridas", "Liga a gravação de áudio nos aplicativos dos motoristas.")}
             {g.motorista.gravacao.ativa && sw(["motorista", "gravacao", "obrigatoria"], "Gravação obrigatória", "O motorista não consegue desligar a gravação.")}

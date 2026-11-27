@@ -9,6 +9,7 @@ import { aberturaDoApp } from "./abertura.ts";
 import { marca } from "../servidor/dados.ts";
 import { TIPO_VEICULO, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { gravarConfig, lerConfig, texto, umDe } from "./armazem.ts";
+import { sanearVoz, vozParaOApp, type VozApp } from "./voz-app.ts";
 import { ajustarCor, CORES_PRINCIPAIS, ESTILOS_TELA, luminosidade, MAX_IMAGEM_MARCA } from "./personalizacao.ts";
 
 export const TEMAS = ["sistema", "claro", "escuro"] as const;
@@ -23,6 +24,7 @@ const ARQUIVO = /^personalizacaoMarcaMotorista\.(png|jpg)$/;
 export interface PersonalizacaoMotorista {
   nome: string; corPrincipal: string; tema: (typeof TEMAS)[number]; veiculoMapa: VeiculoMapa; marca: (typeof MARCAS_MOTORISTA)[number]; imagemMarca: string;
   estiloTela: (typeof ESTILOS_TELA)[number]; recursos: Array<{ id: IdRecursoMotorista; visivel: boolean }>;
+  /** Voz do app (gerada no servidor): ligada, motor, voz e velocidade. */ voz: VozApp;
 }
 export interface PersonalizacaoMotoristaVista extends PersonalizacaoMotorista { imagemMarcaUrl: string }
 
@@ -36,6 +38,7 @@ export function sanearPersonalizacaoMotorista(e: unknown, nomePadrao = "", corPa
     tema: umDe(o.tema, TEMAS, "sistema"), veiculoMapa: umDe(o.veiculoMapa, VEICULOS_MAPA, "realista"), marca: umDe(o.marca, MARCAS_MOTORISTA, "texto"),
     imagemMarca: typeof o.imagemMarca === "string" && ARQUIVO.test(o.imagemMarca) ? o.imagemMarca : "", estiloTela: umDe(o.estiloTela, ESTILOS_TELA, "flutuante"),
     recursos: RECURSOS_MOTORISTA.map((id) => ({ id, visivel: RECURSOS_FIXOS.includes(id) ? true : pedidos.get(id) ?? true })),
+    voz: sanearVoz(o.voz),
   };
 }
 
@@ -93,6 +96,7 @@ export function dadosParaOAppMotorista(empresaId: string) {
     veiculoMapa: { id: p.veiculoMapa, tipo: TIPO_VEICULO[p.veiculoMapa], iconeLivreUrl: `${base}/livre.svg`, iconeOcupadoUrl: `${base}/ocupado.svg`, diferenciaOcupado: p.veiculoMapa !== "realista" },
     recursos: Object.fromEntries(p.recursos.map((r) => [r.id, r.visivel])) as Record<IdRecursoMotorista, boolean>,
     abertura: aberturaDoApp(empresaId, "motorista"),
+    voz: vozParaOApp(empresaId, "motorista", p.voz),
   };
   return { versao: crypto.createHash("sha1").update(JSON.stringify(dados)).digest("hex").slice(0, 12), ...dados };
 }

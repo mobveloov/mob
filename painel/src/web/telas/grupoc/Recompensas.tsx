@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { Abas, Aviso, Cab, Carregando, dinheiro, useCarregar } from "../demais/comum";
 
-const PERIODOS: Array<[string, string]> = [["todo", "Todos os períodos"], ["hoje", "Hoje"], ["ontem", "Ontem"], ["esta_semana", "Esta semana"], ["este_mes", "Este mês"], ["mes_passado", "Mês passado"], ["este_ano", "Este ano"], ["personalizado", "Personalizado"]];
+const PERIODOS: Array<[string, string]> = [["todo", "Período"], ["hoje", "Hoje"], ["semana_passada", "Semana passada"], ["mes_passado", "Mês passado"], ["ultimos_7", "Últimos 7 dias"], ["ultimos_30", "Últimos 30 dias"], ["personalizado", "Personalizado"]];
 const STATUS: Array<[string, string]> = [["todos", "Todos"], ["pendente", "Pendente"], ["concluido", "Concluído"]];
 
 async function pedir(qs: string) {

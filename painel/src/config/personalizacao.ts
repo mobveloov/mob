@@ -10,6 +10,7 @@ import { aberturaDoApp } from "./abertura.ts";
 import { marca } from "../servidor/dados.ts";
 import { VEICULOS_MAPA, TIPO_VEICULO, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { gravarConfig, lerConfig, lista, texto, umDe } from "./armazem.ts";
+import { sanearVoz, vozParaOApp, type VozApp } from "./voz-app.ts";
 
 export { VEICULOS_MAPA };
 export const MARCAS_TELA = ["texto", "imagem", "texto_imagem", "imagem_alongada"] as const;
@@ -33,6 +34,7 @@ export interface Personalizacao {
   nome: string; corPrincipal: string; veiculoMapa: VeiculoMapa;
   /** nome do arquivo da imagem (vazio = sem imagem) */ marca: MarcaTela; imagemMarca: string; estiloTela: (typeof ESTILOS_TELA)[number];
   recursos: Array<{ id: IdRecurso; visivel: boolean }>;
+  /** Voz do app (gerada no servidor): ligada, motor, voz e velocidade. */ voz: VozApp;
 }
 export interface PersonalizacaoVista extends Personalizacao { imagemMarcaUrl: string; desafioLiberado: boolean }
 
@@ -60,7 +62,7 @@ export function sanearPersonalizacao(e: unknown, nomePadrao = "", corPadrao = "#
   const marcaPedida = MARCAS_ANTIGAS[String(o.marca)] ?? o.marca;
   return {
     nome: texto(o.nome, 60) || nomePadrao, corPrincipal: /^#[0-9a-fA-F]{6}$/.test(cor) ? cor.toLowerCase() : corPadrao,
-    veiculoMapa: umDe(o.veiculoMapa, VEICULOS_MAPA, "realista"), marca: umDe(marcaPedida, MARCAS_TELA, "texto"), imagemMarca: arq, estiloTela, recursos,
+    veiculoMapa: umDe(o.veiculoMapa, VEICULOS_MAPA, "realista"), marca: umDe(marcaPedida, MARCAS_TELA, "texto"), imagemMarca: arq, estiloTela, recursos, voz: sanearVoz(o.voz),
   };
 }
 
@@ -154,6 +156,7 @@ export function dadosParaOApp(empresaId: string) {
     recursos: Object.fromEntries(p.recursos.map((r) => [r.id, r.visivel])) as Record<IdRecurso, boolean>,
     desafioLiberado: desafioLiberado(empresaId),
     abertura: aberturaDoApp(empresaId, "passageiro"),
+    voz: vozParaOApp(empresaId, "passageiro", p.voz),
   };
   const versao = crypto.createHash("sha1").update(JSON.stringify(dados)).digest("hex").slice(0, 12);
   return { versao, ...dados };

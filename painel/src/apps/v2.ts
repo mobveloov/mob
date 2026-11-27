@@ -5,6 +5,7 @@
 //   rotasV2Central   no painel (login do painel): aprovar motoristas, conversas de suporte e fotos.
 // Tudo por empresa: a empresa vem da URL e o token só vale na empresa em que foi criado.
 
+import { cupomVale, mesmoTelefone } from "../cadastros/cupom-regras.ts";
 import { ENVIO_MAXIMO } from "./extras.ts";
 import { otimizarImagem } from "../comum/imagem.ts";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -15,7 +16,7 @@ import { alterarCorrida, estimarPreco, listarProprias, type Ponto } from "../cor
 import { buscarCep, cidadesAtendidas, completarPonto, rota } from "../enderecos/index.ts";
 import { exigirPapel } from "../servidor/sessao.ts";
 import { abrirCompleta, abrirParte, configGravacao, listarGravacoes, marcarParaGuardar, salvarParte } from "./gravacoes.ts";
-import { agoraBr, arred } from "../servidor/util.ts";
+import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { extraDaCategoria } from "../config/categorias.ts";
 import { arquivoDoBanner, gerais as geraisDoPainel, termos as termosDoPainel } from "../config/gerais.ts";
 import { ajustes, contatos } from "./ajustes.ts";
@@ -243,9 +244,21 @@ rotasV2.get("/foto/:papel/:chave", ok((req, res) => {
 
 /** Cupons ativos e dentro da validade, para a tela "Meus Cupons" do passageiro. */
 rotasV2.get("/cupons", so("passageiro"), ok((req, res) => {
-  const hoje = agoraBr().toISOString().slice(0, 10);
+  const agora = agoraBr().toISOString();
+  // Só entra o cupom que o cadastro deixa aparecer na lista do app (Exibir na lista de cupons disponíveis) e que vale para este passageiro
+  // (cupom de cliente específico não aparece para os outros).
+  const tel = ctx(req).sessao.chave, corridas = listarProprias(ctx(req).empresaId);
   const lista = listar(ctx(req).empresaId, cadastroPorId("cupons")!)
-    .filter((c) => c.ativo === true && c.automatico !== true && !(c.inicio && String(c.inicio) > hoje) && !(c.fim && String(c.fim) < hoje))
+    .filter((c) => {
+      if (c.automatico === true || c.exibirApp === false) return false;
+      // Usos válidos (corridas não canceladas): para não mostrar cupom "uma vez" já usado nem o que o passageiro esgotou.
+      const usos = corridas.filter((x) => normal(x.cupom) === normal(c.codigo) && x.status !== "cancelada" && x.status !== "nao_atendida");
+      const minhas = corridas.filter((x) => mesmoTelefone(x.passageiro.telefone, tel));
+      return cupomVale(c, {
+        hoje: agora.slice(0, 10), hora: agora.slice(11, 16), telefone: tel, usosTotal: usos.length,
+        usosDoPassageiro: usos.filter((x) => mesmoTelefone(x.passageiro.telefone, tel)).length, finalizadasDoPassageiro: minhas.filter((x) => x.status === "finalizada").length,
+      }).vale;
+    })
     .map((c) => ({
       codigo: String(c.codigo ?? ""), tipo: c.tipoDesconto === "Valor fixo" ? "valor" : "percentual", valor: Number(c.valor) || 0,
       maximo: typeof c.valorMaximo === "number" && c.valorMaximo > 0 ? c.valorMaximo : null,

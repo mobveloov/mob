@@ -20,7 +20,13 @@ export function DescontosMatriz() {
   if (!m || !d.dados) return <>{d.erro ? <Aviso erro={d.erro} /> : <Carregando />}</>;
   const formas: Array<{ id: string; nome: string }> = d.dados.formas;
   const ativos: number = d.dados.motoristasAtivos ?? 0;
-  const mudar = (f: string, c: string, v: string) => setM({ ...m, [f]: { ...m[f], [c]: num(v) } });
+  // O desconto pelo app #N+1 só abre quando o #N está preenchido; zerar o #N zera os de cima.
+  const mudar = (f: string, c: string, v: string) => {
+    const linha = { ...m[f], [c]: num(v) };
+    const k = APPS.indexOf(c as (typeof APPS)[number]);
+    if (k >= 0 && !linha[c]) for (const a of APPS.slice(k + 1)) linha[a] = 0;
+    setM({ ...m, [f]: linha });
+  };
   const gravar = () => salvar(async () => { const r = await pedirConfig("/descontos-matriz", "PUT", { matriz: m }); setLido(r); setM(structuredClone(r.matriz)); setEditando(false); }, "Descontos gravados.");
   const voltar = () => { setM(structuredClone(d.dados.matriz)); setEditando(false); };
   const campo = (f: string, c: string, rot: string, desab = false) => (
@@ -38,7 +44,7 @@ export function DescontosMatriz() {
             <h4>Site</h4>
             <div className="dm-grade3">{campo(f.id, "site", "Desconto pelo site")}</div>
             <h4>Aplicativo</h4>
-            <div className="dm-grade4">{APPS.map((a) => campo(f.id, a, `Desconto pelo app #${a.slice(3)}`, a !== "app1"))}</div>
+            <div className="dm-grade4">{APPS.map((a) => campo(f.id, a, `Desconto pelo app #${a.slice(3)}`, a !== "app1" && !m[f.id][APPS[APPS.indexOf(a) - 1]]))}</div>
             <h4>Desconto máximo por empresa</h4>
             <div className="dm-grade3">{campo(f.id, "maximo", "Máximo (%)")}</div>
           </section>

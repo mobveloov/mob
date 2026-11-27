@@ -28,8 +28,20 @@ export default function RuasTela() {
   const l = useCarregar(() => chamar<{ regras: Regra[] }>("GET", "/ruas"), []);
   // "nova" = cartão em branco; Regra = vendo/editando uma regra existente.
   const [aberta, setAberta] = useState<Regra | "nova">("nova");
+  const [comecou, setComecou] = useState(false);
   const { aviso } = useAviso();
   const regras = l.dados?.regras ?? [];
+  // Sem nenhuma regra, a Machine mostra primeiro a explicação e o botão "Criar nova regra".
+  if (l.dados && !regras.length && !comecou) return (
+    <div className="cg-pagina-solta">
+      <Cabecalho titulo="Ruas" />
+      <div className="cg-tabela-caixa" style={{ padding: 28, textAlign: "center" }}>
+        <h3 style={{ margin: "0 0 6px" }}>O que são regras de via?</h3>
+        <p style={{ margin: "0 0 14px", color: "var(--cg-suave)" }}>Regras de via corrigem o nome de exibição de uma rua para a sua central, dentro do traçado desenhado no mapa — útil quando o nome retornado pelo mapa não é o mesmo usado pelos moradores da região.</p>
+        <button className="cg-botao verde" onClick={() => setComecou(true)}>Criar nova regra</button>
+      </div>
+    </div>
+  );
   return (
     <div className="cg-pagina-solta">
       {aviso}

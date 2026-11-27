@@ -1,5 +1,5 @@
 {
-  "quando": "2026-11-27T17:18:42.182Z",
+  "quando": "2026-11-27T20:14:24.412Z",
   "resultados": [
     {
       "item": "toque Xperia em laço na oferta (padrão)",
@@ -19,7 +19,7 @@
     {
       "item": "passageiro ouve som quando o motorista aceita (app aberto)",
       "passou": true,
-      "detalhe": "[{\"via\":\"ctx\",\"loop\":false,\"dur\":1}] marcos=[\"cancelada\",\"a_caminho\"]"
+      "detalhe": "[{\"via\":\"ctx\",\"loop\":false,\"dur\":1},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/72ff9167-5510-4190-bba2-2ad387952c2b\",\"loop\":false},{\"via\":\"audio\",\"src\":\"blob:http://localhost:5188/33116381-6b32-41d3-8759-2da286c528ff\",\"loop\":false}] marcos=[\"cancelada\",\"a_caminho\"]"
     },
     {
       "item": "tela sempre ligada (wake lock pedido) nos dois apps",
@@ -79,7 +79,27 @@
     {
       "item": "tela Voz dos avisos mostra qual voz está em uso",
       "passou": true,
-      "detalhe": "Microsoft Daniel - Portuguese (Brazil) (voz do aparelho)"
+      "detalhe": "Voz feminina do painel (neural)"
+    },
+    {
+      "item": "voz: o app baixou mp3 do servidor (>2 KB) e o servidor entrega audio/mpeg válido",
+      "passou": true,
+      "detalhe": "13 frases carregadas (cache/cache/cache/cache/cache/cache/cache/cache/cache/cache/cache/cache/cache ; ex.: 15696 bytes); teste direto: 200 audio/mpeg 13248 bytes, cabeçalho ÿód"
+    },
+    {
+      "item": "voz: tocou o mp3 com o player (não a voz do aparelho)",
+      "passou": true,
+      "detalhe": "1 reprodução(ões), falas do aparelho: 0"
+    },
+    {
+      "item": "voz: frase guardada no aparelho (Cache Storage)",
+      "passou": true,
+      "detalhe": "13 arquivo(s): 15696, 16560, 20736, 13248, 15840, 20448, 18720, 15696, 15840, 16992, 17136, 17136, 17424 bytes"
+    },
+    {
+      "item": "voz: sem rede toca a frase guardada (sem novo pedido)",
+      "passou": true,
+      "detalhe": ""
     },
     {
       "item": "botão SOS na folha aberta da corrida em andamento",
@@ -89,7 +109,7 @@
     {
       "item": "SOS aberto (central notificada)",
       "passou": true,
-      "detalhe": "{\"alerta\":{\"id\":\"ec06b4c1-b9fa-4d71-a179-4000469a5f73\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T14:18:10"
+      "detalhe": "{\"alerta\":{\"id\":\"38e8e6ae-3ace-4f71-853e-626d1be3f054\",\"situacao\":\"aberto\",\"em\":\"2026-11-27T17:13:53"
     },
     {
       "item": "rua sem número: o app pede o número da casa",

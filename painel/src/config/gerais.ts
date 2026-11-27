@@ -3,6 +3,8 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { camposBandeira } from "./bandeira-campos.ts";
+import { mensagensRapidasDe } from "../comum/bandeira-form.ts";
 import { centavos, gravarConfig, lerConfig, lista, novoId, numero, pastaConfig, sim, texto, umDe } from "./armazem.ts";
 
 export interface DocumentoExigido { id: string; nome: string; alvo: "motorista" | "veiculo"; validade: boolean; exigir: boolean }
@@ -166,9 +168,20 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
   };
 }
 
-export const gerais = (empresaId: string): ConfigGerais => sanearGerais(lerConfig(empresaId, "gerais", {}), GERAIS_PADRAO);
+const geraisGravadas = (empresaId: string): ConfigGerais => sanearGerais(lerConfig(empresaId, "gerais", {}), GERAIS_PADRAO);
+/**
+ * Config › Gerais. As mensagens rápidas do motorista para o cliente vêm da aba Motorista (lista da Machine); quando a central
+ * ainda não gravou essa aba, vale a lista antiga gravada aqui.
+ */
+export function gerais(empresaId: string): ConfigGerais {
+  const c = geraisGravadas(empresaId);
+  // Só vale a lista do formulário depois que a central gravou a aba Motorista (antes disso valem os padrões da lista antiga).
+  const gravado = lerConfig<Record<string, unknown>>(empresaId, "bandeira-campos", {});
+  if (!Object.keys(gravado).some((k) => k.startsWith("msg_P_"))) return c;
+  return { ...c, motorista: { ...c.motorista, mensagensRapidas: mensagensRapidasDe(camposBandeira(empresaId), "P") } };
+}
 export function salvarGerais(empresaId: string, entrada: unknown): ConfigGerais {
-  const c = sanearGerais(entrada, gerais(empresaId));
+  const c = sanearGerais(entrada, geraisGravadas(empresaId));
   gravarConfig(empresaId, "gerais", c);
   return c;
 }

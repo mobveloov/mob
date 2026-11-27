@@ -8,9 +8,9 @@ import { CampoEndereco, type PontoEscolhido } from "../../componentes/CampoEnder
 import { Aviso, L, fone, msgErro, op, pino, reais, soDig, useDados, useMapa } from "./comum";
 import "./corridas.css";
 import { ajustarSeguro } from "../../../comum/mapa-seguro.ts";
+import { marcarPagamento } from "../../../comum/pagamento-marcado.ts";
 
 const PAGAMENTOS = ["Dinheiro", "Crédito", "Débito", "Pix"];
-const EXIGENCIAS = ["Porta-malas grande", "Aceita encomendas", "Adaptado para cadeirante", "Ficar à disposição do passageiro"];
 const P0: PontoEscolhido = { texto: "" };
 
 export default function Solicitar() {
@@ -33,7 +33,9 @@ export default function Solicitar() {
   const [categoria, setCategoria] = useState("");
   const [agendar, setAgendar] = useState(false);
   const [quando, setQuando] = useState("");
-  const [pagamento, setPagamento] = useState("");
+  const [pagamentos, setPagamentos] = useState<string[]>([]);
+  /** Principal: a primeira marcada, na ordem da lista (Dinheiro, Crédito, Débito, Pix). */
+  const pagamento = [...PAGAMENTOS, "Voucher"].find((p) => pagamentos.includes(p)) ?? "";
   const [exigencias, setExigencias] = useState<string[]>([]);
   const [observacao, setObservacao] = useState("");
   const [empresaConv, setEmpresaConv] = useState(""), [centroCusto, setCentroCusto] = useState(""), [voucher, setVoucher] = useState("");
@@ -52,6 +54,7 @@ export default function Solicitar() {
   const conv = useDados(() => api.registros("conveniadas"), []);
   const conveniadas = (conv.dados?.registros ?? []).filter((c) => !c.status || c.status === "Ativa");
   const centros = String(conveniadas.find((c) => String(c.nome) === empresaConv)?.centrosCusto ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const opc = useDados<{ opcionais: Array<{ id: string; nome: string }> }>(() => op("/opcionais"), []);
   const mots = useDados<{ motoristas: any[] }>(() => op("/motoristas"), []);
   const mapa = useDados<any>(() => op("/mapa"), [], 15_000);
   const categorias = (cats.dados?.registros ?? []).filter((c) => c.ativa !== false);
@@ -70,7 +73,7 @@ export default function Solicitar() {
       setDestino(c.destino ? { texto: c.destino.texto, lat: c.destino.lat, lng: c.destino.lng } : P0);
       setParadas((c.paradas ?? []).map((p: any) => ({ texto: p.texto, lat: p.lat, lng: p.lng })));
       if (c.categoria) setCategoria(c.categoria);
-      if (c.pagamento) setPagamento(c.pagamento);
+      if (c.pagamento) setPagamentos([c.pagamento]);
       if (c.observacao) setObservacao(c.observacao);
       setOk(`Dados copiados da OS ${c.os}. Confira e clique em Solicitar.`);
     }).catch((e) => vivo && setErro(msgErro(e)));
@@ -129,7 +132,7 @@ export default function Solicitar() {
     if (tel.length < 10) return setErro("Informe o telefone do passageiro (de cadastro ou contato manual).");
     if (!origem.texto.trim()) return setErro("Informe a origem.");
     if (agendar && !quando) return setErro("Escolha a data e a hora do agendamento.");
-    if (!pagamento) return setErro("Escolha a forma de pagamento.");
+    if (!pagamento) return setErro("Escolha ao menos uma forma de pagamento.");
     const fixo = Number(prefixado.replace(/\./g, "").replace(",", "."));
     if (finalModo === "prefixado" && !(fixo > 0)) return setErro("Informe o valor prefixado da corrida.");
     const modoCat = cfg.dados?.categorias.find((c) => c.nome === categoria)?.extra.solicitacoes;
@@ -140,16 +143,16 @@ export default function Solicitar() {
     try {
       const r = await op<any>("/solicitar", {
         passageiro: { nome, telefone: tel, cpf: soDig(cpf) || undefined }, embarque: origem, complemento, paradas: paradas.filter((p) => p.texto.trim()), destino: semDestino ? undefined : destino, referencia,
-        motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, exigencias, observacao, infoAntes, infoDepois, infoInterna, telefoneContato: contato || undefined, enviarVariosCarros: variosCarros, favoritarOrigem: favOrigem, favoritarDestino: favDestino, valorFinalModo: finalModo, valorPrefixado: finalModo === "prefixado" ? fixo : undefined, empresaConveniada: empresaConv || undefined, centroCusto: centroCusto || undefined, voucher: pagamento === "Voucher" ? voucher : undefined, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
+        motoristaId, categoria, agendadaPara: agendar ? quando : undefined, pagamento, pagamentosAceitos: pagamentos.filter((p) => p !== "Voucher"), opcionais: exigencias, observacao, infoAntes, infoDepois, infoInterna, telefoneContato: contato || undefined, enviarVariosCarros: variosCarros, favoritarOrigem: favOrigem, favoritarDestino: favDestino, valorFinalModo: finalModo, valorPrefixado: finalModo === "prefixado" ? fixo : undefined, empresaConveniada: empresaConv || undefined, centroCusto: centroCusto || undefined, voucher: pagamento === "Voucher" ? voucher : undefined, valor: manual != null && valor != null && Number.isFinite(valor) ? valor : undefined,
       });
       setOk(`Corrida solicitada: OS ${r.corrida.os}${r.corrida.valor != null ? ` · ${reais(r.corrida.valor)}` : ""}.${r.avisos?.length ? ` ${r.avisos.join(" ")}` : ""}`);
-      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setInfoTexto(""); setInfoModo("antes"); setCpf(""); setVariosCarros(false); setFavOrigem(true); setFavDestino(false); setFinalModo("livre"); setPrefixado(""); setExigencias([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setMotoristaTxt(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
+      setOrigem(P0); setDestino(P0); setParadas([]); setComplemento(""); setReferencia(""); setObservacao(""); setInfoTexto(""); setInfoModo("antes"); setCpf(""); setVariosCarros(false); setFavOrigem(true); setFavDestino(false); setFinalModo("livre"); setPrefixado(""); setExigencias([]); setPagamentos([]); setManual(null); setAgendar(false); setQuando(""); setMotoristaId(""); setMotoristaTxt(""); setEmpresaConv(""); setCentroCusto(""); setVoucher("");
       setBusca(""); setNome(""); setContato(""); setTelCadastro(""); setRecentes([]);
     } catch (e) { setErro(msgErro(e)); } finally { setEnviando(false); }
   }
 
   const valorTexto = manual != null ? manual : est?.valor != null ? String(est.valor).replace(".", ",") : "";
-  const pagamentos = [...PAGAMENTOS, ...(conveniadas.length ? ["Voucher"] : [])];
+  const opcoesPagto = [...PAGAMENTOS, ...(conveniadas.length ? ["Voucher"] : [])];
   return (
     <div className="oc">
       <div className="oc-topo"><h1>Solicitar nova corrida</h1></div>
@@ -179,7 +182,7 @@ export default function Solicitar() {
           <label className="oc-sw"><input type="checkbox" checked={infoModo === "depois"} onChange={(e) => setInfoModo(e.target.checked ? "depois" : "antes")} /> Informação após o aceite</label>
           <label className="oc-sw"><input type="checkbox" checked={infoModo === "interna"} onChange={(e) => setInfoModo(e.target.checked ? "interna" : "antes")} /> Informação interna</label>
           <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Forma de pagamento *</span>
-            <div className="oc-pagto">{pagamentos.map((p) => <label key={p} className={pagamento === p ? "on" : ""}><input type="radio" name="forma_pagamento" checked={pagamento === p} onChange={() => setPagamento(p)} />{p}</label>)}</div></div>
+            <div className="oc-pagto">{opcoesPagto.map((p) => <label key={p} className={pagamentos.includes(p) ? "on" : ""}><input type="checkbox" name="forma_pagamento" checked={pagamentos.includes(p)} onChange={(e) => setPagamentos(marcarPagamento(pagamentos, p, e.target.checked))} />{p}</label>)}</div></div>
           {conveniadas.length > 0 && (
             <div className="oc-grid2">
               <label className="oc-l">Empresa conveniada<select value={empresaConv} onChange={(e) => { setEmpresaConv(e.target.value); setCentroCusto(""); }}><option value="">Nenhuma</option>{conveniadas.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
@@ -189,7 +192,7 @@ export default function Solicitar() {
           {pagamento === "Voucher" && <label className="oc-l">Número do voucher<input value={voucher} maxLength={30} onChange={(e) => setVoucher(e.target.value)} /></label>}
           <label className="oc-l">Categoria<select value={categoria} onChange={(e) => setCategoria(e.target.value)}>{categorias.map((c) => <option key={c.id}>{String(c.nome)}</option>)}</select></label>
           <div><span className="oc-l" style={{ display: "block", marginBottom: 6 }}>Exigências</span>
-            <div className="oc-pagto">{EXIGENCIAS.map((x) => <label key={x} className={exigencias.includes(x) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x] : exigencias.filter((y) => y !== x))} />{x}</label>)}</div></div>
+            <div className="oc-pagto">{(opc.dados?.opcionais ?? []).map((x) => <label key={x.id} className={exigencias.includes(x.id) ? "on" : ""}><input type="checkbox" checked={exigencias.includes(x.id)} onChange={(e) => setExigencias(e.target.checked ? [...exigencias, x.id] : exigencias.filter((y) => y !== x.id))} />{x.nome}</label>)}</div></div>
           <label className="oc-sw"><input type="checkbox" checked={variosCarros} onChange={(e) => setVariosCarros(e.target.checked)} /> Enviar mais de um carro</label>
           <label className="oc-l">Corridas apenas para o motorista:
             <input list="solic-motoristas" value={motoristaTxt} placeholder="Todos" onChange={(e) => { setMotoristaTxt(e.target.value); setMotoristaId((mots.dados?.motoristas ?? []).find((m) => m.nome === e.target.value)?.id ?? ""); }} />

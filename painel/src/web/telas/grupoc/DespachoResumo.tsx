@@ -10,6 +10,11 @@ const km = (n: number) => String(n).replace(".", ",");
 export function DespachoResumo() {
   const d = useCarregar(() => pedirConfig("/bandeira"), []);
   const b = d.dados;
+  // Valores reais do despacho (Regras de Despacho): tentativas e tempo em pendência da empresa e das filiais.
+  const rg = useCarregar(() => pedirConfig("/despacho"), []).dados as { maxTentativas?: number; tempoPendencia?: number; pendenciaFilial?: Record<string, number> } | null;
+  const tentativas = rg?.maxTentativas ?? b?.tentativas ?? 0;
+  const pendMin = rg?.tempoPendencia ?? b?.expiracaoPendenciaMin ?? 0;
+  const proprios = Object.values(rg?.pendenciaFilial ?? {});
   const incluindo = (x: { secundarios: boolean; transbordo: boolean }) => {
     const partes = [x.secundarios && "motoristas de apoio", x.transbordo && "de bandeiras parceiras"].filter(Boolean);
     return partes.length ? `, incluindo ${partes.join(" e ")}` : "";
@@ -25,10 +30,10 @@ export function DespachoResumo() {
           <div className="tabela-rola"><table>
             <thead><tr><th>Disparo *</th><th>Tipo de despacho</th><th>Onde Toca</th></tr></thead>
             <tbody>
-              {b.disparos.slice(0, b.tentativas).map((x: any, i: number) => (
-                <tr key={i}><td>{i + 1}º Disparo</td><td>Proximidade</td><td>Toca em {x.motoristas} motoristas a menos de {km(x.km)} km{incluindo(x)}</td></tr>
+              {b.disparos.map((x: any, i: number) => (
+                <tr key={i}><td>{i + 1}º Disparo</td><td>Proximidade</td><td>Toca em {x.motoristas > 0 ? `${x.motoristas} motoristas` : "todos os motoristas disponíveis"} {x.km > 0 ? `a menos de ${km(x.km)} km` : "dentro do raio inicial"}{incluindo(x)}</td></tr>
               ))}
-              <tr><td>{b.tentativas + 1}º Disparo</td><td>Pendência **</td><td>A corrida fica disponível para os motoristas a menos de {km(b.distanciaPendenciaKm)} km{incluindo({ secundarios: true, transbordo: true })}, durante mais {b.expiracaoPendenciaMin} minutos antes de se tornar não atendida</td></tr>
+              <tr><td>{tentativas + 1}º Disparo</td><td>Pendência **</td><td>A corrida fica disponível para os motoristas a menos de {km(b.distanciaPendenciaKm)} km{incluindo({ secundarios: true, transbordo: true })}, durante mais {pendMin} minutos antes de se tornar não atendida{proprios.length ? ` (${proprios.length} ${proprios.length === 1 ? "filial tem" : "filiais têm"} tempo próprio, de ${Math.min(...proprios)} a ${Math.max(...proprios)} minutos)` : ""}</td></tr>
             </tbody>
           </table></div>
           <p className="sub">* Os disparos ocorrem em intervalos de 10 segundos.</p>

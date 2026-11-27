@@ -214,3 +214,18 @@
 .cg-ruas-passos b { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; background: #f97316; color: #fff; margin-right: 6px; font-size: 12px; }
 .cg-ruas-campos { display: grid; gap: 10px; }
 @media (max-width: 800px) { .cg-ruas { grid-template-columns: 1fr; } }
+
+/* Cupons: contadores e cartões como na Machine */
+.cg-cupom-contadores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 14px; }
+.cg-cupom-contador { display: flex; align-items: center; gap: 10px; font: inherit; color: var(--cg-txt); background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 14px; padding: 12px 14px; cursor: pointer; text-align: left; }
+.cg-cupom-contador span { flex: 1; font-size: 12px; font-weight: 700; color: var(--cg-suave); }
+.cg-cupom-contador strong { font-size: 22px; }
+.cg-cupom-contador.ativo { border-color: var(--cg-marca); }
+.cg-cupom-lista { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cg-cupom { background: var(--cg-cartao); border: 1px solid var(--cg-borda); border-radius: 14px; padding: 12px 14px; display: grid; gap: 10px; }
+.cg-cupom-topo { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.cg-cupom-topo > div:first-child { display: grid; }
+.cg-cupom-topo b { color: var(--cg-suave); }
+.cg-cupom-selos { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cg-cupom-pe { display: grid; gap: 6px; font-size: 12px; color: var(--cg-suave); }
+@media (max-width: 860px) { .cg-cupom-lista { grid-template-columns: 1fr; } .cg-cupom-contadores { grid-template-columns: 1fr; } }

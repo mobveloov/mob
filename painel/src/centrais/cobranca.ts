@@ -144,7 +144,7 @@ export function meusPlanos(visorId: string, alvoId: unknown) {
 
 // ------------------------------------------------------------------ Demonstrativo Mensal
 
-export interface LinhaDemonstrativo { descricao: string; quantidade: number | null; valorUnitario: string; debito: number | null; credito: number | null }
+export interface LinhaDemonstrativo { descricao: string; quantidade: number | null; valorUnitario: string; debito: number | null; credito: number | null; /** linha só de resumo (não entra na soma) */ resumo?: true }
 
 /**
  * Demonstrativo de uma central numa competência. A associada vê o próprio. A principal vê o das associadas só quando o débito
@@ -160,6 +160,8 @@ export function demonstrativo(visorId: string, alvoId: unknown, competencia: unk
   const l: LinhaDemonstrativo[] = [];
   l.push({ descricao: "Corridas finalizadas", quantidade: n.finalizadas, valorUnitario: `${reais(plano.tarifaFixa)} + ${String(plano.percentual * 100).replace(".", ",")}% do valor (teto ${reais(plano.teto)})`, debito: n.tarifas, credito: null });
   l.push({ descricao: "Corridas não finalizadas", quantidade: n.naoFinalizadas, valorUnitario: "sem cobrança", debito: 0, credito: null });
+  // como na Machine: "Valor corridas" resume o que as corridas custaram (mesmo número da linha de finalizadas; não soma de novo)
+  l.push({ descricao: "Valor corridas", quantidade: null, valorUnitario: "---", debito: n.tarifas, credito: null, resumo: true });
   if (plano.mensalidade) l.push({ descricao: `Mensalidade do plano ${plano.nome}`, quantidade: 1, valorUnitario: `${reais(plano.mensalidade)} por mês`, debito: plano.mensalidade, credito: null });
   for (const s of SERVICOS.filter((x) => ativos.includes(x.id))) {
     if (s.unidade === "mês") l.push({ descricao: s.nome, quantidade: 1, valorUnitario: `${reais(s.preco)} por mês`, debito: s.preco, credito: null });
@@ -168,7 +170,8 @@ export function demonstrativo(visorId: string, alvoId: unknown, competencia: unk
   // bonificação: crédito só na principal, sobre as tarifas de toda a rede
   const rede = !principalDe(alvo) && associadasDe(alvo).length ? bonificacaoDaRede(alvo, comp) : null;
   if (rede && rede.recebidaNoMes > 0) l.push({ descricao: `Bonificação da rede (${rede.categoria}, ${rede.percentual}%)`, quantidade: null, valorUnitario: `${rede.percentual}% das tarifas da rede`, debito: null, credito: rede.recebidaNoMes });
-  const debitos = cent(l.reduce((s, x) => s + (x.debito ?? 0), 0)), creditos = cent(l.reduce((s, x) => s + (x.credito ?? 0), 0));
+  const somar = l.filter((x) => !x.resumo);
+  const debitos = cent(somar.reduce((s, x) => s + (x.debito ?? 0), 0)), creditos = cent(somar.reduce((s, x) => s + (x.credito ?? 0), 0));
   const quemPaga = alvo !== visorId ? "principal" : principalDe(alvo) && controleDe(alvo).debitoAutomatico === "Usar conta da central principal" ? "principal" : "propria";
   return {
     central: { id: alvo, nome: empresa(alvo)?.nome ?? "" }, competencia: comp, competencias: competencias(), plano: { id: plano.id, nome: plano.nome },

@@ -29,6 +29,7 @@ export function prepararEmpresa(empresaId: string, entrada: Record<string, unkno
   if (criando) {
     for (const [k, r] of [["nome", "Nome fantasia"], ["cnpj", "CPF/CNPJ"], ["numeroContrato", "Número do contrato"]] as const) if (!String(d[k] ?? "").trim()) throw new Error(`Preencha "${r}".`);
     d.permiteEspecificarMotorista ??= "Sim";
+    d.tipoOperacao ||= "Corporativo";
     d.tipoDocumento ??= soDigitos(d.cnpj).length === 11 ? "CPF" : "CNPJ";
   }
   const tipoDoc = String(d.tipoDocumento ?? anterior?.tipoDocumento ?? (soDigitos(d.cnpj ?? anterior?.cnpj).length === 11 ? "CPF" : "CNPJ"));
@@ -120,8 +121,8 @@ export function rotasEmpresas(r: Router) {
   /** Exportar relatório (CSV com proteção contra fórmula). */
   r.get("/empresas-exportar", ok((req, res) => {
     const { f } = montarLista(emp(req), req.query as Record<string, unknown>);
-    const cab = ["Nome fantasia", "Razão social", "CPF/CNPJ", "Contrato", "Responsável", "Telefone", "Cidade", "Funcionários", "Fatura do mês", "Última solicitação", "Situação"];
-    const linhas = f.map((x) => [x.nome, x.razaoSocial ?? "", x.cnpj ?? "", x.numeroContrato ?? "", x.contato ?? "", x.telefone ?? "", x.cidade ?? "", x.funcionarios, x.faturaMes, x.ultimaSolicitacao ? new Date(x.ultimaSolicitacao).toLocaleString("pt-BR") : "", x.status ?? ""]);
+    const cab = ["Nome fantasia", "Tipo de operação", "Razão social", "CPF/CNPJ", "Contrato", "Responsável", "Telefone", "Cidade", "Funcionários", "Fatura do mês", "Última solicitação", "Situação"];
+    const linhas = f.map((x) => [x.nome, x.tipoOperacao ?? "Corporativo", x.razaoSocial ?? "", x.cnpj ?? "", x.numeroContrato ?? "", x.contato ?? "", x.telefone ?? "", x.cidade ?? "", x.funcionarios, x.faturaMes, x.ultimaSolicitacao ? new Date(x.ultimaSolicitacao).toLocaleString("pt-BR") : "", x.status ?? ""]);
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", 'attachment; filename="empresas.csv"');
     res.send("﻿" + [cab, ...linhas].map((l) => l.map(celulaCsv).join(";")).join("\r\n") + "\r\n");

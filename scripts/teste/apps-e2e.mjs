@@ -158,6 +158,26 @@ await passo("passageiro: desafios e voz", async () => {
   const uso = await C.p.getByTestId("voz-em-uso").innerText().catch(() => "");
   ok("tela Voz dos avisos mostra qual voz está em uso", uso.length > 3, uso);
   await foto(C.p, SAIDA, "e2e-passageiro-voz");
+  // VOZ REAL: baixa o mp3 do servidor, toca com o player, guarda no aparelho e repete sem rede (sem usar a voz do aparelho)
+  const baixados = [];
+  C.p.on("response", (r) => { if (r.url().includes("/voz?")) baixados.push(r); });
+  await C.p.evaluate(() => { window.__sons.length = 0; window.__falas.length = 0; });
+  await C.p.getByRole("button", { name: /Ouvir exemplo/ }).click(); await esperar(6000);
+  const reg = await C.p.evaluate(() => window.__vozRegistro);
+  const do_servidor = reg; // baixadas do servidor (ou, depois de recarregar, lidas do aparelho)
+  const bytes1 = do_servidor[0]?.bytes ?? 0;
+  const mp3 = await C.p.evaluate(async () => { const r = await fetch("/api/apps/" + new URLSearchParams(location.search).get("empresa") + "/voz?texto=" + encodeURIComponent("Corrida finalizada.") + "&app=passageiro"); const b = new Uint8Array(await r.arrayBuffer()); return { st: r.status, tipo: r.headers.get("content-type"), n: b.length, cab: String.fromCharCode(b[0], b[1], b[2]), sync: b[0] === 0xff || String.fromCharCode(b[0], b[1], b[2]) === "ID3" }; });
+  ok("voz: o app baixou mp3 do servidor (>2 KB) e o servidor entrega audio/mpeg válido", bytes1 > 2000 && mp3.st === 200 && /audio\/mpeg/.test(mp3.tipo) && mp3.sync, `${do_servidor.length} frases carregadas (${reg.map((x) => x.origem).join("/")} ; ex.: ${bytes1} bytes); teste direto: ${mp3.st} ${mp3.tipo} ${mp3.n} bytes, cabeçalho ${mp3.cab}`);
+  const sons1 = await C.p.evaluate(() => window.__sons.filter((x) => x.via === "audio" && x.src.startsWith("blob:")).length);
+  ok("voz: tocou o mp3 com o player (não a voz do aparelho)", sons1 >= 1 && (await C.p.evaluate(() => window.__falas.length)) === 0, `${sons1} reprodução(ões), falas do aparelho: 0`);
+  const guardado = await C.p.evaluate(async () => { const c = await caches.open("voz-v2"); const ks = await c.keys(); const t = []; for (const k of ks) t.push((await (await c.match(k)).blob()).size); return t; });
+  ok("voz: frase guardada no aparelho (Cache Storage)", guardado.length >= 1 && guardado.includes(bytes1), `${guardado.length} arquivo(s): ${guardado.join(", ")} bytes`);
+  await C.ctx.setOffline(true);
+  const antes = baixados.length;
+  await C.p.evaluate(() => { window.__sons.length = 0; });
+  await C.p.getByRole("button", { name: /Ouvir exemplo/ }).click(); await esperar(2500);
+  ok("voz: sem rede toca a frase guardada (sem novo pedido)", baixados.length === antes && (await C.p.evaluate(() => window.__sons.filter((x) => x.src.startsWith("blob:")).length)) >= 1);
+  await C.ctx.setOffline(false);
   await C.ctx.close();
 });
 

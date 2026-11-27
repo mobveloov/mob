@@ -2,7 +2,7 @@
 // Busca pelo nome da empresa, "Mais filtros" (empresa, categoria e os 4 tipos), atualização automática e janela com os detalhes.
 import { useState } from "react";
 import { ExternalLink, Filter, MapPin, Search } from "lucide-react";
-import { Aviso, Dado, Janela, Paginacao, Selo, Vazio, fone, hora, op, qs, reais, useDados } from "./comum";
+import { Aviso, Dado, Janela, Paginacao, Selo, Vazio, dh, fone, hora, msgErro, op, qs, reais, useDados } from "./comum";
 import { JanelaCorrida } from "./JanelaCorrida";
 import "./corridas.css";
 
@@ -20,7 +20,7 @@ export default function Ocorrencias() {
   const [sel, setSel] = useState<any>(null);
   const [corrida, setCorrida] = useState<string | null>(null);
   const todos = filtro.status.length === 4;
-  const { dados, erro, carregando } = useDados<any>(
+  const { dados, erro, carregando, recarregar } = useDados<any>(
     () => op(`/ocorrencias${qs({ pagina, nomeEmpresa, empresa: filtro.empresa, categoria: filtro.categoria, status: todos ? "" : filtro.status.join(",") || "-" })}`),
     [pagina, nomeEmpresa, JSON.stringify(filtro)], auto ? 15_000 : undefined);
   const de = dados ? (dados.total ? (dados.pagina - 1) * 20 + 1 : 0) : 0;
@@ -29,6 +29,13 @@ export default function Ocorrencias() {
   const aplicar = () => { setFiltro(rasc); setPagina(1); setAberto(false); };
   const limpar = () => { setRasc(SEM); setFiltro(SEM); setNomeEmpresa(""); setBusca(""); setPagina(1); setAberto(false); };
   const o = dados?.opcoes;
+  const [erroCiencia, setErroCiencia] = useState<string | null>(null);
+  /** Registra (ou desfaz) a ciência: a ocorrência deixa de contar no aviso fixo do topo do painel. */
+  async function ciencia(i: any, desfazer: boolean) {
+    setErroCiencia(null);
+    try { const r = await op<{ ciencia: { por: string; em: string } | null }>(`/ocorrencias/${encodeURIComponent(i.id)}/ciencia`, { desfazer }); setSel({ ...i, ciencia: r.ciencia }); recarregar(); window.dispatchEvent(new Event("ocorrencias-mudou")); }
+    catch (e) { setErroCiencia(msgErro(e)); }
+  }
   return (
     <div className="oc">
       <div className="oc-topo"><h1>Retorno e Ocorrências</h1></div>
@@ -52,7 +59,7 @@ export default function Ocorrencias() {
               <tr key={i.id} className="clic" onClick={() => setSel(i)}>
                 <td className="forte">{i.os}</td>
                 <td>{i.passageiro || "—"}<br /><small className="suave"><em>{i.embarque}</em></small></td>
-                <td><Selo tom={i.tipo === "C" ? "ruim" : "alerta"}>{i.ocorrencia}</Selo></td>
+                <td><Selo tom={i.tipo === "C" ? "ruim" : "alerta"}>{i.ocorrencia}</Selo>{i.ciencia && <><br /><small className="suave">Ciência de {i.ciencia.por}</small></>}</td>
                 <td>{i.motorista || "---"}</td>
                 <td>{i.statusTexto}</td>
                 <td>{i.previsaoMin != null ? `${i.previsaoMin} min` : "---"}</td>
@@ -74,8 +81,10 @@ export default function Ocorrencias() {
         </Janela>
       )}
       {sel && (
-        <Janela onFechar={() => setSel(null)} titulo={`Ocorrência #${sel.os}`} sub={`${hora(sel.hora)} · ${sel.statusTexto}`} tamanho="estreita"
-          rodape={<>{sel.id.startsWith("propria:") && <button className="oc-btn" onClick={() => { setCorrida(sel.id); setSel(null); }}><ExternalLink size={14} /> Abrir corrida</button>}<button className="oc-btn pri" onClick={() => setSel(null)}>Fechar Detalhes</button></>}>
+        <Janela onFechar={() => { setSel(null); setErroCiencia(null); }} titulo={`Ocorrência #${sel.os}`} sub={`${hora(sel.hora)} · ${sel.statusTexto}`} tamanho="estreita"
+          rodape={<><button className="oc-btn" onClick={() => ciencia(sel, !!sel.ciencia)}>{sel.ciencia ? "Desfazer ciência" : "Registrar ciência"}</button>{sel.id.startsWith("propria:") && <button className="oc-btn" onClick={() => { setCorrida(sel.id); setSel(null); }}><ExternalLink size={14} /> Abrir corrida</button>}<button className="oc-btn pri" onClick={() => setSel(null)}>Fechar Detalhes</button></>}>
+          <Aviso texto={erroCiencia} erro />
+          {sel.ciencia && <p className="suave" style={{ margin: "0 0 8px" }}>Ciência registrada por {sel.ciencia.por} em {dh(sel.ciencia.em)}.</p>}
           <div className="oc-aviso erro"><b>Motivo do Problema</b><br />{sel.motivo}</div>
           <Dado r="Passageiro" v={sel.passageiro} /><Dado r="Telefone" v={fone(sel.telefone)} />
           <div className="oc-trajeto" style={{ margin: "14px 0" }}><div><i /><small>Origem</small><b>{sel.embarque}</b></div><div className="dest"><i /><small>Destino</small><b>{sel.destino || "Sem destino"}</b></div></div>

@@ -10,7 +10,8 @@ import { percentualDaMatriz, type CanalDesconto, type FormaDesconto } from "../c
 import { extraDaCategoria, tarifaVigente } from "../config/categorias.ts";
 import { calcularTarifa } from "../config/tarifa-calculo.ts";
 import { completarPonto, rota } from "../enderecos/index.ts";
-import { motivoDeBloqueio } from "../areas/areas.ts";
+import { areasDaEmpresa, dentroDe, motivoDeBloqueio } from "../areas/areas.ts";
+import { cupomVale, mesmoTelefone, type ContextoCupom } from "../cadastros/cupom-regras.ts";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -43,6 +44,13 @@ const PROXIMOS: Record<StatusProprio, StatusProprio[]> = {
 };
 
 export interface Ponto { texto: string; lat?: number; lng?: number }
+/** Formas que a central pode marcar juntas ao solicitar (como na Machine). A principal vem primeiro; repetidas e desconhecidas saem. */
+export const PAGAMENTOS_MARCAVEIS = ["Dinheiro", "Crédito", "Débito", "Pix"];
+export function pagamentosAceitosValidos(lista: unknown, principal: string): string[] {
+  const l = Array.isArray(lista) ? lista.map((x) => String(x)) : [];
+  const ok = [principal, ...l].filter((x, i, a) => PAGAMENTOS_MARCAVEIS.includes(x) && a.indexOf(x) === i);
+  return ok.length > 1 ? ok : [];
+}
 export interface NovaCorridaPropria {
   passageiro: { nome: string; telefone: string };
   embarque: Ponto;
@@ -83,6 +91,8 @@ export interface NovaCorridaPropria {
   telefoneContato?: string;
   /** Oferta enviada a vários carros ao mesmo tempo. */
   enviarVariosCarros?: boolean;
+  /** Formas de pagamento marcadas na solicitação da central (a primeira é a principal, gravada em `pagamento`). */
+  pagamentosAceitos?: string[];
   /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
   valorFinal?: { modo: "livre" | "prefixado"; valor?: number };
   /** Sistema do aparelho de quem pediu (Android, iOS ou Web), para as "Informações de controle". */
@@ -151,6 +161,8 @@ export interface CorridaPropria {
   telefoneContato?: string;
   /** Oferta enviada a vários carros ao mesmo tempo. */
   enviarVariosCarros?: boolean;
+  /** Formas de pagamento marcadas na solicitação da central (a primeira é a principal, gravada em `pagamento`). */
+  pagamentosAceitos?: string[];
   /** Sistema do aparelho de quem pediu (Android, iOS ou Web). */
   sistema?: string;
   /** Desconto da empresa conveniada pela forma de pagamento (já somado em "desconto"): percentual e valor em reais. */
@@ -334,20 +346,48 @@ export function taxaServicoDaCorrida(empresaId: string, c: CorridaPropria): numb
   return somaCobrancas(cobrancas(empresaId, "passageiro", { categoria: c.categoria, valor: base, forma: formaDaTaxa(c.pagamento) }));
 }
 
-/** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). */
-export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string, automatico = false): number {
+/** Quem está pedindo (para as regras do cupom: cliente específico, limite de uso, pagamento e local). */
+export interface QuemUsaCupom { telefone: string; pagamento?: string; embarque?: { lat?: number | null; lng?: number | null }; destino?: { lat?: number | null; lng?: number | null }; corridas: CorridaPropria[] }
+
+function contextoDoCupom(empresaId: string, codigo: string, valor: number, categoria: string, q?: QuemUsaCupom): ContextoCupom {
+  const agora = agoraBr().toISOString();
+  const base: ContextoCupom = { hoje: agora.slice(0, 10), hora: agora.slice(11, 16), valor, categoria };
+  if (!q) return base;
+  const usos = q.corridas.filter((c) => normal(c.cupom) === normal(codigo) && c.status !== "cancelada" && c.status !== "nao_atendida");
+  const minhas = q.corridas.filter((c) => mesmoTelefone(c.passageiro.telefone, q.telefone));
+  return {
+    ...base, telefone: q.telefone, forma: formaDaTaxa(q.pagamento) as ContextoCupom["forma"], embarque: q.embarque, destino: q.destino,
+    usosTotal: usos.length, usosDoPassageiro: usos.filter((c) => mesmoTelefone(c.passageiro.telefone, q.telefone)).length,
+    finalizadasDoPassageiro: minhas.filter((c) => c.status === "finalizada").length,
+    naArea: (areaId, p) => { const a = areasDaEmpresa(empresaId).find((x) => x.id === areaId); return !a || a.poligono.length < 3 || dentroDe(p.lat as number, p.lng as number, a.poligono); },
+  };
+}
+
+/** Aplica um cupom ativo do cadastro. Devolve o desconto em reais (0 se não vale). Com `q`, vale também as regras de quem pede
+ *  (cliente específico, limite de uso, forma de pagamento e área); sem `q` (refazer o desconto de corrida que já tinha o cupom), só prazo e categoria. */
+export function descontoDoCupom(empresaId: string, codigo: string, valor: number | null, categoria: string, automatico = false, q?: QuemUsaCupom): number {
   if (!codigo || valor == null) return 0;
   const c = achar(listar(empresaId, cadastroPorId("cupons")!), "codigo", codigo);
   if (!c || c.ativo !== true) return 0;
   if (c.automatico === true && !automatico) return 0; // automático só vale pela regra dele, não digitado
-  const hoje = agoraBr().toISOString().slice(0, 10);
-  if ((c.inicio && String(c.inicio) > hoje) || (c.fim && String(c.fim) < hoje)) return 0;
-  const cats = String(c.categorias ?? "").split(",").map((x) => normal(x)).filter(Boolean);
-  if (cats.length && !cats.includes(normal(categoria))) return 0;
+  if (!cupomVale(c, contextoDoCupom(empresaId, codigo, valor, categoria, q)).vale) return 0;
   const v = Number(c.valor) || 0;
   let d = c.tipoDesconto === "Valor fixo" ? v : (valor * v) / 100;
   if (typeof c.valorMaximo === "number" && c.valorMaximo > 0) d = Math.min(d, c.valorMaximo);
   return arred(Math.min(d, valor));
+}
+
+/** Cupom de cliente específico que vale sozinho para este pedido (sem digitar o código), o de maior desconto. */
+export function cupomDoCliente(empresaId: string, valor: number | null, categoria: string, q: QuemUsaCupom): { codigo: string; desconto: number } | null {
+  if (valor == null) return null;
+  let melhor: { codigo: string; desconto: number } | null = null;
+  for (const c of listar(empresaId, cadastroPorId("cupons")!)) {
+    if (c.ativo !== true || c.automatico === true || c.publico !== "especificos") continue;
+    const codigo = String(c.codigo ?? "");
+    const d = descontoDoCupom(empresaId, codigo, valor, categoria, false, q);
+    if (d > 0 && (!melhor || d > melhor.desconto)) melhor = { codigo: codigo.toUpperCase(), desconto: d };
+  }
+  return melhor;
 }
 
 /** Cupons automáticos da Machine: valem sozinhos, sem o passageiro digitar código. */
@@ -455,8 +495,14 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       if (est.valor != null && v > est.valor * 3) throw new Error("O valor oferecido está muito acima do preço estimado.");
       if (est.valor == null || v !== est.valor) valorOferecido = v;
     }
-    let desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria);
+    const quemUsa: QuemUsaCupom = { telefone, pagamento: n.pagamento, embarque: n.embarque, destino: n.destino, corridas: lista };
+    let desconto = descontoDoCupom(empresaId, n.cupom ?? "", valorOferecido ?? est.valor, n.categoria, false, quemUsa);
     let codigoCupom = desconto ? String(n.cupom).toUpperCase() : "";
+    if (!desconto && !String(n.cupom ?? "").trim()) {
+      // Cupom de cliente específico entra sozinho (sem digitar o código); depois os automáticos.
+      const esp = cupomDoCliente(empresaId, valorOferecido ?? est.valor, n.categoria, quemUsa);
+      if (esp) { desconto = esp.desconto; codigoCupom = esp.codigo; }
+    }
     if (!desconto && !String(n.cupom ?? "").trim()) {
       const auto = cupomAutomatico(empresaId, lista.filter((c) => c.passageiro.telefone === telefone), valorOferecido ?? est.valor, n.categoria);
       if (auto) { desconto = auto.desconto; codigoCupom = auto.codigo; }
@@ -497,6 +543,7 @@ export async function criarCorridaPropria(empresaId: string, pedido: NovaCorrida
       ...(limpo(n.infoInterna, 500) ? { infoInterna: limpo(n.infoInterna, 500) } : {}),
       ...(soDigitos(n.telefoneContato ?? "").length >= 10 ? { telefoneContato: soDigitos(n.telefoneContato ?? "").slice(0, 13) } : {}),
       ...(n.enviarVariosCarros ? { enviarVariosCarros: true } : {}),
+      ...(pagamentosAceitosValidos(n.pagamentosAceitos, n.pagamento).length > 1 ? { pagamentosAceitos: pagamentosAceitosValidos(n.pagamentosAceitos, n.pagamento) } : {}),
       ...(n.sistema && /^(Android|iOS|Web)$/.test(n.sistema) ? { sistema: n.sistema } : {}),
       ...(daEmpresa ? { descontoEmpresa: daEmpresa } : {}),
       ...(n.valorFinal ? { valorFinal: n.valorFinal.modo === "prefixado" ? { modo: "prefixado" as const, valor: arred(Number(n.valorFinal.valor)) } : { modo: "livre" as const } } : {}),

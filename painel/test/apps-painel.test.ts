@@ -452,7 +452,7 @@ test("painel → app: tarifa da categoria muda a estimativa; cupom criado/desati
   assert.ok(depois.valor > antes.valor, `estimativa subiu: ${antes.valor} -> ${depois.valor}`);
   atualizar(E.id, cadastroPorId("categorias")!, cat.id, { ...cat, valorKm: 2 }, "teste");
   // 2) Cupom: criado no painel aparece para o passageiro; desativado, some.
-  const c = criar(E.id, cadastroPorId("cupons")!, { codigo: "PAINEL10", tipoDesconto: "Percentual", valor: 10, ativo: true, automatico: false }, "teste");
+  const c = criar(E.id, cadastroPorId("cupons")!, { codigo: "PAINEL10", tipoDesconto: "Percentual", valor: 10, ativo: true, automatico: false, exibirApp: true }, "teste");
   assert.ok(((await chamar("GET", `${API}/cupons`, undefined, tokP)).corpo.cupons as Array<{ codigo: string }>).some((x) => x.codigo === "PAINEL10"), "cupom novo aparece");
   atualizar(E.id, cadastroPorId("cupons")!, c.id, { ...c, ativo: false }, "teste");
   assert.ok(!((await chamar("GET", `${API}/cupons`, undefined, tokP)).corpo.cupons as Array<{ codigo: string }>).some((x) => x.codigo === "PAINEL10"), "cupom desativado some");

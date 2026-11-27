@@ -2,7 +2,7 @@
 // (nome, cor principal, tema, veículo no mapa, logo no topo, estilo da tela, recursos da tela do mapa) e a pré-visualização do
 // celular do motorista, que muda ao vivo enquanto se edita.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Bell, Car, ChevronRight, Eye, Hand, HelpCircle, LayoutGrid, Lock, LocateFixed, Menu as MenuIcone, Moon, Palette, Play, SlidersHorizontal, Sparkles, Sun, TriangleAlert, Type, Wallet, Contrast, Map as MapaIcone } from "lucide-react";
 import { iconeCarroUrl, type VeiculoMapa } from "../../../comum/icone-carro";
 import { Aviso, Cab, Carregando, Interruptor, pedirConfig, useAdmin, useCarregar, useSalvar } from "../demais/comum";
@@ -22,6 +22,7 @@ const RECURSOS: Record<string, { nome: string; desc: string; fixo?: string }> = 
   rodape: { nome: "Rodapé Mapa e Corridas", desc: "Barra de baixo para trocar entre o mapa e as corridas", fixo: "O rodapé não pode ser ocultado." },
 };
 import { MENU_ABERTURA, SecaoAberturaPremium } from "./AberturaPremium";
+import type { ComandosAba } from "./BandeiraAbas";
 const MENU: SecaoMenu[] = [
   { titulo: "Geral", itens: [{ id: "nome", rotulo: "Nome", icone: <Type size={16} /> }, { id: "cor-principal", rotulo: "Cor principal", icone: <Palette size={16} /> }, { id: "tema", rotulo: "Tema", icone: <Contrast size={16} /> }, { id: "veiculo-no-mapa", rotulo: "Veículo no mapa", icone: <Car size={16} /> }] },
   { titulo: "Tela do mapa", itens: [{ id: "sua-marca", rotulo: "Logo no topo", icone: <Sparkles size={16} /> }, { id: "estilo-de-tela", rotulo: "Estilo da tela", icone: <LayoutGrid size={16} /> }, { id: "recursos", rotulo: "Recursos", icone: <SlidersHorizontal size={16} /> }] },
@@ -35,6 +36,7 @@ export function PersonalizacaoMotorista() {
   const [erroNome, setErroNome] = useState(false), [enviando, setEnviando] = useState(false), [online, setOnline] = useState(false);
   if (d.dados && lido !== d.dados) { setLido(d.dados); setSalvo(d.dados); setP(structuredClone(d.dados)); }
   const { msg, salvando, salvar, setMsg } = useSalvar();
+  const premium = useRef<ComandosAba | null>(null); // Recursos Premium: gravam e voltam junto com a personalização
   if (!p) return <>{d.erro ? <Aviso erro={d.erro} /> : <Carregando />}</>;
   const set = (k: string, v: unknown) => setP((x: any) => ({ ...x, [k]: v }));
   const rec = (id: string) => !!p.recursos.find((r: any) => r.id === id)?.visivel;
@@ -53,7 +55,7 @@ export function PersonalizacaoMotorista() {
     if (!p.nome.trim()) { setErroNome(true); document.getElementById("nome")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
     if (p.marca === "imagem" && !p.imagemMarcaUrl) { setMsg({ erro: "Envie uma imagem para salvar as alterações." }); return; }
     setErroNome(false);
-    void salvar(async () => { const r = await pedirConfig("/personalizacao-motorista", "PUT", p); setSalvo(r); setP(structuredClone(r)); }, "Alterações salvas.");
+    void salvar(async () => { const r = await pedirConfig("/personalizacao-motorista", "PUT", p); setSalvo(r); setP(structuredClone(r)); await premium.current?.gravar(); }, "Alterações salvas.");
   };
 
   const escuro = p.tema !== "claro"; // Automático aparece escuro (o aparelho em modo escuro)
@@ -156,9 +158,9 @@ export function PersonalizacaoMotorista() {
             </ul>
           </Item>
         </section>
-        <SecaoAberturaPremium app="motorista" />
+        <SecaoAberturaPremium app="motorista" premium={premium} voz={p.voz} aoMudarVoz={(v) => set("voz", v)} />
         <div className="dm-salvar">
-          <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); }}>Voltar</button>
+          <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); premium.current?.desfazer(); }}>Voltar</button>
           {admin && <button className="botao primario" disabled={salvando || enviando} onClick={gravar}>Salvar alterações</button>}
         </div>
         {!admin && <p className="sub">Só o administrador altera a personalização.</p>}
