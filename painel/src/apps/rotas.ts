@@ -32,6 +32,7 @@ import { aposCancelar, aposFinalizar, conferirPagamento, PAGAMENTO_SALDO, rotasE
 import { gerais } from "../config/gerais.ts";
 import { extraDaCategoria } from "../config/categorias.ts";
 import { ajustes, formasDePagamento } from "./ajustes.ts";
+import { aberturaDoApp, ehAppAbertura } from "../config/abertura.ts";
 import { dadosParaOApp } from "../config/personalizacao.ts";
 import { dadosParaOAppMotorista } from "../config/personalizacao-motorista.ts";
 import { iconeCarroSvg, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
@@ -136,6 +137,14 @@ r.use(rotasPublicasV2);
 
 // Link público de acompanhar a viagem (sem token).
 r.use(rotasPublicasExtras);
+
+// Imagem de abertura (tela que aparece assim que o app abre, antes do login): pública, com versão para o cache.
+r.get("/abertura/:app", ok((req, res) => {
+  if (!ehAppAbertura(req.params.app)) return res.status(404).json({ erro: "App inválido." });
+  const a = aberturaDoApp(req.params.empresa, req.params.app);
+  res.setHeader("Cache-Control", "no-cache");
+  res.json({ url: a?.url ?? null, versao: a?.versao ?? "" });
+}));
 
 r.use(exigirApp);
 // Personalização do app do passageiro (Configurações do painel): cores, design, veículo no mapa, tela inicial e recursos. Aplique ao abrir, sem gerar APK.

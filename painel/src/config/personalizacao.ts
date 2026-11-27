@@ -6,6 +6,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import * as D from "../servidor/dados.ts";
+import { aberturaDoApp } from "./abertura.ts";
 import { marca } from "../servidor/dados.ts";
 import { VEICULOS_MAPA, TIPO_VEICULO, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { gravarConfig, lerConfig, lista, texto, umDe } from "./armazem.ts";
@@ -152,6 +153,7 @@ export function dadosParaOApp(empresaId: string) {
     telaInicial: { estilo: p.estiloTela, recursos, ordemVisiveis: visiveis.map((r) => r.id), mapaFixo: p.estiloTela === "flutuante" },
     recursos: Object.fromEntries(p.recursos.map((r) => [r.id, r.visivel])) as Record<IdRecurso, boolean>,
     desafioLiberado: desafioLiberado(empresaId),
+    abertura: aberturaDoApp(empresaId, "passageiro"),
   };
   const versao = crypto.createHash("sha1").update(JSON.stringify(dados)).digest("hex").slice(0, 12);
   return { versao, ...dados };

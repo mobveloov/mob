@@ -5,6 +5,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import * as D from "../servidor/dados.ts";
+import { aberturaDoApp } from "./abertura.ts";
 import { marca } from "../servidor/dados.ts";
 import { TIPO_VEICULO, VEICULOS_MAPA, type VeiculoMapa } from "../comum/icone-carro.ts";
 import { gravarConfig, lerConfig, texto, umDe } from "./armazem.ts";
@@ -91,6 +92,7 @@ export function dadosParaOAppMotorista(empresaId: string) {
     design: { estiloTela: p.estiloTela, marca: p.marca, mostrarNome: p.marca === "texto", mostrarImagem: p.marca === "imagem" && !!v.imagemMarcaUrl, imagemMarcaUrl: v.imagemMarcaUrl, dimensoesImagem: p.marca === "imagem" ? { largura: 52, altura: 52 } : null },
     veiculoMapa: { id: p.veiculoMapa, tipo: TIPO_VEICULO[p.veiculoMapa], iconeLivreUrl: `${base}/livre.svg`, iconeOcupadoUrl: `${base}/ocupado.svg`, diferenciaOcupado: p.veiculoMapa !== "realista" },
     recursos: Object.fromEntries(p.recursos.map((r) => [r.id, r.visivel])) as Record<IdRecursoMotorista, boolean>,
+    abertura: aberturaDoApp(empresaId, "motorista"),
   };
   return { versao: crypto.createHash("sha1").update(JSON.stringify(dados)).digest("hex").slice(0, 12), ...dados };
 }

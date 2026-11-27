@@ -17,6 +17,7 @@ const RECURSOS: Record<string, { nome: string; desc: string; icone: typeof Searc
 const MARCAS: Array<[string, string]> = [["texto", "Apenas nome"], ["imagem", "Apenas imagem"], ["texto_imagem", "Nome + Imagem"], ["imagem_alongada", "Apenas imagem"]];
 const DIMENSOES: Record<string, [number, number]> = { imagem: [52, 52], texto_imagem: [52, 52], imagem_alongada: [184, 52] };
 const ESTILOS: Array<[string, string, string]> = [["flutuante", "Flutuante", "Conteúdo flutuante sobre o mapa"], ["neutro", "Neutro", "Conteúdo sobre o fundo branco"], ["marcante", "Marcante", "Conteúdo sobre fundo branco e com destaque da cor principal"]];
+import { MENU_ABERTURA, SecaoAberturaPremium } from "./AberturaPremium";
 const MENU: SecaoMenu[] = [
   { titulo: "Geral", itens: [{ id: "nome", rotulo: "Nome", icone: <Type size={16} /> }, { id: "cor-principal", rotulo: "Cor principal", icone: <Palette size={16} /> }, { id: "veiculo-no-mapa", rotulo: "Veículo no mapa", icone: <Car size={16} /> }] },
   { titulo: "Tela inicial", itens: [{ id: "sua-marca", rotulo: "Sua marca", icone: <Sparkles size={16} /> }, { id: "estilo-de-tela", rotulo: "Estilo da tela", icone: <LayoutGrid size={16} /> }, { id: "recursos", rotulo: "Recursos", icone: <ReceiptText size={16} /> }] },
@@ -118,7 +119,7 @@ export function Personalizacao() {
     <>
       <Cab titulo="Personalização" />
       <Aviso erro={msg?.erro ?? d.erro} ok={msg?.ok} />
-      <PaginaPers secoes={MENU} previa={previa}>
+      <PaginaPers secoes={[...MENU, MENU_ABERTURA]} previa={previa}>
         <section className="dm-cartao" id="geral">
           <h2>Geral</h2>
           <Item id="nome" titulo="Nome" desc="Insira o nome que você deseja exibir para os seus clientes.">
@@ -167,6 +168,7 @@ export function Personalizacao() {
             </ul>
           </Item>
         </section>
+        <SecaoAberturaPremium app="passageiro" />
         <div className="dm-salvar">
           <button className="botao" onClick={() => { setP(structuredClone(salvo)); setErroNome(false); }}>Voltar</button>
           {admin && <button className="botao primario" disabled={salvando || enviando} onClick={gravar}>Salvar alterações</button>}
