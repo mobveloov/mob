@@ -19,7 +19,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   { id: "painel", nome: "Painel", cor: "laranja", blocos: [{ ids: ["painel"] }] },
   {
     id: "cadastro", nome: "Cadastro", cor: "verde", blocos: [
-      { ids: ["equipe", "cupons", "passe-livre", "empresas", "faixas-vouchers"] },
+      { ids: ["equipe", "cupons", "passe-livre", "empresas", "filiais", "faixas-vouchers"] },
       { titulo: "Gestão de áreas", ids: ["areas", "plantao"] },
       { ids: ["motoristas", "punicoes"] },
       { titulo: "Clientes", ids: ["passageiros", "consulta-cartoes"] },
@@ -58,7 +58,7 @@ export const GRUPOS_MENU: GrupoMenu[] = [
   { id: "crm", nome: "CRM", cor: "fucsia", blocos: [{ ids: ["crm", "recuperacao", "funil-clientes", "mapa-bairros"] }] },
   {
     id: "mais", nome: "Mais telas", cor: "ardosia", blocos: [
-      { titulo: "Operação", ids: ["analise", "documentos", "destravar", "veiculos", "filiais"] },
+      { titulo: "Operação", ids: ["analise", "documentos", "destravar", "veiculos"] },
       { titulo: "Financeiro", ids: ["extrato", "saques", "recargas", "relatorios"] },
       { titulo: "Conta e plataforma", ids: ["marca", "superadmin", "alterar-senha"] },
     ],
