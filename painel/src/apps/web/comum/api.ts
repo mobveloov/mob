@@ -521,7 +521,7 @@ export function avisoDoMarco(status: string) {
     case "no_local": tocarAlerta(1, "buzina"); setTimeout(() => falarAviso("Seu motorista está no local."), 1500); vibrar([500, 200, 500, 200, 500]); break;
     case "em_andamento": tocarAlerta(1, "iniciada"); setTimeout(() => falarAviso("Sua corrida começou. Boa viagem."), 1200); break;
     case "finalizada": tocarAlerta(1, "finalizada"); setTimeout(() => falarAviso("Corrida finalizada."), 900); break;
-    case "cancelada": case "nao_atendida": tocarAlerta(1, "cancelado"); setTimeout(() => falarAviso(status === "cancelada" ? "Sua corrida foi cancelada." : "Não encontramos motorista agora."), 900); break;
+    case "cancelada": case "nao_atendida": tocarAlerta(1, "cancelado"); setTimeout(() => falarAviso(status === "cancelada" ? "Sua corrida foi cancelada." : "Não há nenhum motorista disponível no momento."), 900); break;
   }
 }
 /** Reserva, se o navegador não deixar tocar o arquivo: um bipe simples. */

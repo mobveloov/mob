@@ -177,8 +177,7 @@ export function RegrasDespacho() {
       <section className="dm-cartao"><h3>Regras de Fila e Pendência</h3>
         <div className="dm-grade4">
           {n("maxTentativas", "Máx. Tentativas", undefined, "Antes de ir para pendência.")}
-          {n("tempoPendencia", "Tempo em Pendência (Min)", undefined, "Espera entre a última rodada de chamadas e a nova tentativa.")}
-          {n("cancelarSemAceite", "Cancelar sem aceite após (Min)", "min", "Se ninguém aceitar nesse tempo, a corrida é cancelada sozinha e o passageiro recebe \"Não há nenhum motorista disponível\". 0 = nunca cancela.")}
+          {n("tempoPendencia", "Tempo em Pendência (Min)")}
           <Campo rotulo="Notificar Grupo"><select disabled={!admin} value={r.notificarGrupo} onChange={(e) => set("notificarGrupo", e.target.value)}><option value="prioritario">Apenas Prioritários</option><option value="todos">Todos os Motoristas</option></select></Campo>
           {n("distanciaProxima", "Dist. Aceitar Próxima (m)", undefined, "Para pegar corrida em viagem.")}
         </div>

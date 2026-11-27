@@ -133,8 +133,6 @@ export interface CorridaPropria {
   opcionais?: string[];
   /** Etiquetas de elogio ou problema que o passageiro marcou na avaliação. */
   etiquetas?: string[];
-  /** Quando a corrida caiu em pendência (rodadas de chamada esgotadas sem aceite). Some ao ser aceita; no painel aparece como "Pendente". */
-  pendenciaDesde?: string | null;
   /** Maçaneta (corrida de rua): "taximetro" cobra pela distância e pelo tempo reais; "destino" pela rota. */
   macaneta?: { modo: "taximetro" | "destino"; km: number; ultimaLat?: number; ultimaLng?: number; ultimaEm?: number };
   osExterna?: string;
@@ -769,29 +767,14 @@ export function editarCorridaPropria(empresaId: string, id: string, e: EdicaoCor
   });
 }
 
-/** A corrida caiu em pendência: ninguém aceitou nas rodadas. Continua "procurando" (o motorista ainda pode pegar) até o cancelamento automático. */
-export function marcarPendencia(empresaId: string, id: string) {
+/** Sem motorista por muito tempo: vira "não atendida" (chame de tempos em tempos). */
+export function encerrarSemMotorista(empresaId: string, minutos = 20) {
   return emFila(empresaId, () => {
-    const x = listarProprias(empresaId).find((c) => c.id === id);
-    if (!x || x.status !== "procurando" || x.pendenciaDesde) return false;
-    const c = structuredClone(x);
-    c.pendenciaDesde = agoraBr().toISOString();
-    c.historico.push({ em: c.pendenciaDesde, status: "procurando", por: "sistema", nota: "Pendente: ninguém aceitou" });
-    registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: "Corrida pendente: ninguém aceitou ainda", usuario: "sistema", canal: "Despacho automático" });
-    gravar(empresaId, [c]);
-    return true;
-  });
-}
-
-/** Sem aceite por "minutos" (Config › Regras de Despacho, por empresa): vira "não atendida" e o passageiro é avisado (0 = nunca). Chame de tempos em tempos. */
-export function encerrarSemMotorista(empresaId: string, minutos = 10) {
-  return emFila(empresaId, () => {
-    if (!(minutos > 0)) return 0;
     const limite = agoraBr().getTime() - minutos * 60_000;
     const mudadas = listarProprias(empresaId).filter((c) => c.status === "procurando" && Date.parse(horaDaCorrida(c)) < limite).map((x) => {
       const c = structuredClone(x);
-      c.status = "nao_atendida"; c.historico.push({ em: agoraBr().toISOString(), status: "nao_atendida", por: "sistema", nota: "Não há nenhum motorista disponível" });
-      registrarEvento(empresaId, c.id, { tipo: "nao_atendida", descricao: `Corrida cancelada automaticamente: ninguém aceitou em ${minutos} min`, usuario: "sistema", canal: "Sistema" });
+      c.status = "nao_atendida"; c.historico.push({ em: agoraBr().toISOString(), status: "nao_atendida", por: "sistema" });
+      registrarEvento(empresaId, c.id, { tipo: "nao_atendida", descricao: `Corrida não atendida: ninguém aceitou em ${minutos} minutos`, usuario: "sistema", canal: "Sistema" });
       return c;
     });
     gravar(empresaId, mudadas);
@@ -805,7 +788,7 @@ export const CANAL_TEXTO: Record<Canal, string> = { painel: "Central", bot: "Wha
 
 export function corridaPropriaParaPainel(c: CorridaPropria, origemNome = "Próprias"): CorridaPainel {
   return {
-    ...corridaVazia({ id: `propria:${c.id}`, origem: "propria", origemNome, os: c.os, grupo: GRUPO[c.status], statusTexto: c.status === "procurando" && c.pendenciaDesde ? "Pendente" : STATUS_TEXTO[c.status] }),
+    ...corridaVazia({ id: `propria:${c.id}`, origem: "propria", origemNome, os: c.os, grupo: GRUPO[c.status], statusTexto: STATUS_TEXTO[c.status] }),
     solicitadaEm: c.solicitadaEm, iniciadaEm: c.iniciadaEm, finalizadaEm: c.finalizadaEm,
     categoria: c.categoria, pagamento: c.pagamento, canal: CANAL_TEXTO[c.canal] ?? c.canal,
     motorista: c.motorista, telefoneMotorista: c.telefoneMotorista, passageiro: c.passageiro.nome, telefonePassageiro: c.passageiro.telefone,
