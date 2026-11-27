@@ -5,6 +5,7 @@
 //   rotasV2Central   no painel (login do painel): aprovar motoristas, conversas de suporte e fotos.
 // Tudo por empresa: a empresa vem da URL e o token só vale na empresa em que foi criado.
 
+import { MOTIVOS_PASSAGEIRO } from "../comum/machine.ts";
 import { cupomVale, mesmoTelefone } from "../cadastros/cupom-regras.ts";
 import { ENVIO_MAXIMO } from "./extras.ts";
 import { otimizarImagem } from "../comum/imagem.ts";
@@ -270,7 +271,8 @@ rotasV2.get("/cupons", so("passageiro"), ok((req, res) => {
 rotasV2.get("/opcionais", ok((req, res) => res.json({ opcionais: ajustes(ctx(req).empresaId).opcionais })));
 rotasV2.get("/motivos-cancelamento", ok((req, res) => {
   const a = ajustes(ctx(req).empresaId);
-  res.json({ motivos: ctx(req).sessao.papel === "motorista" ? a.motivosMotorista : a.motivosPassageiro });
+  // O passageiro também recebe a lista com ids (motivo_id da Machine) para cancelar pelo id.
+  res.json({ motivos: ctx(req).sessao.papel === "motorista" ? a.motivosMotorista : a.motivosPassageiro, ...(ctx(req).sessao.papel === "passageiro" ? { motivosComId: MOTIVOS_PASSAGEIRO } : {}) });
 }));
 rotasV2.get("/etiquetas-avaliacao", ok((req, res) => { const a = ajustes(ctx(req).empresaId); res.json({ boas: a.etiquetasBoas, ruins: a.etiquetasRuins }); }));
 rotasV2.get("/contatos", ok((req, res) => res.json(contatos(ctx(req).empresaId))));

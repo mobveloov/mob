@@ -6,6 +6,7 @@
 import { saques } from "../apps/extras.ts";
 import { sosAbertos } from "../apps/sos.ts";
 import { listarProprias } from "../corridas/index.ts";
+import { NOTA_BAIXA_ATE } from "../comum/machine.ts";
 import { todasPendencias } from "../operacao/pendencias.ts";
 import { pixDasCorridas } from "../operacao/pix.ts";
 import { agoraBr } from "../servidor/util.ts";
@@ -29,6 +30,13 @@ function montar(empresaId: string): Omit<Notificacao, "lida">[] {
   const pend = todasPendencias(empresaId).filter((x) => x.situacao === "pendente").sort((a, b) => b.data.localeCompare(a.data));
   for (const p of pend.slice(0, POR_FONTE)) n.push({ chave: `pendencia:${p.id}`, nivel: "atencao", titulo: `Pendência de pagamento: ${p.tipo.toLowerCase()}`, texto: `${p.passageiro}${p.os ? ` (OS ${p.os})` : ""} deve ${reais(p.valor)}.`, em: p.data, rota: "/pagamentos-pendentes" });
   for (const x of pixDasCorridas(empresaId).filter((p) => p.situacao === "Em disputa" || p.situacao === "Chargeback").slice(0, POR_FONTE)) n.push({ chave: `pix:${x.id}:${x.situacao}`, nivel: x.situacao === "Chargeback" ? "urgente" : "atencao", titulo: `Pix ${x.situacao === "Chargeback" ? "com chargeback" : "em disputa"}`, texto: `OS ${x.os}, ${x.passageiro}, ${reais(x.valor)}.`, em: x.marcadaEm ?? x.data, rota: "/transacao-pix" });
+  // Motorista deu nota baixa (1 a 3) ao passageiro: aviso à central nas últimas 48 h (ocorrência "LR" da Machine).
+  const desdeNota = new Date(agoraBr().getTime() - 48 * 3_600_000).toISOString();
+  for (const c of listarProprias(empresaId)) {
+    const nota = c.avaliacaoPassageiro?.nota;
+    if (nota == null || nota > NOTA_BAIXA_ATE || (c.finalizadaEm ?? c.solicitadaEm) < desdeNota) continue;
+    n.push({ chave: `nota-baixa:${c.id}`, nivel: "atencao", titulo: "Motorista deu nota baixa ao passageiro", texto: `${c.motorista || "Motorista"} deu nota ${nota} a ${c.passageiro.nome || c.passageiro.telefone}, OS ${c.os}${c.avaliacaoPassageiro?.comentario ? `: ${c.avaliacaoPassageiro.comentario}` : "."}`, em: c.finalizadaEm ?? c.solicitadaEm, rota: "/historico" });
+  }
   const agora = agoraBr(), h = agora.toISOString().slice(0, 13), desde = new Date(agora.getTime() - 3_600_000).toISOString();
   const falhas = listarProprias(empresaId).filter((c) => (c.status === "cancelada" || c.status === "nao_atendida") && c.solicitadaEm >= desde).length;
   if (falhas) n.push({ chave: `ocorrencias:${h}`, nivel: "atencao", titulo: "Corridas que podem pedir atenção", texto: `${falhas} corrida${falhas > 1 ? "s" : ""} cancelada${falhas > 1 ? "s" : ""} ou não atendida${falhas > 1 ? "s" : ""} na última hora. Veja a tela de Retorno/Ocorrências.`, em: agora.toISOString(), rota: "/ocorrencias" });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, Plus, Save, Trash2, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, KeyRound, Plus, Save, Send, Trash2, Upload, XCircle } from "lucide-react";
 import { api, type Integracoes as Dados } from "../api";
 import { Cartao, Titulo, useCarregar } from "../componentes/ui";
 
@@ -35,6 +35,8 @@ export default function Integracoes() {
           </div>
         </Cartao>
       </div>
+      <h2 className="secao">Webhooks de saída</h2>
+      <WebhooksSaida tentar={tentar} />
       <h2 className="secao">Inteligência artificial</h2>
       <div className="grade">
         <Cartao titulo="Qual IA em cada caso">
@@ -93,5 +95,54 @@ function ChavesIa({ preenchidas, tentar }: { preenchidas: Record<string, boolean
       <p className="sub">Deixe em branco para usar as chaves da plataforma (se ela permitir). Para apagar uma chave, limpe o campo e salve.</p>
       <button className="botao primario" onClick={() => tentar(() => api.salvarChavesIa(v), "Chaves salvas.")}><Save size={14} /> Salvar chaves</button>
     </Cartao>
+  );
+}
+
+const ROTULO_TIPO_WEBHOOK: Record<string, string> = { Status: "Status da corrida (aceita, a caminho, no local, finalizada, cancelada...)", Ocorrencia: "Ocorrências (taxa de cancelamento, tarifa recalculada, sem aceite, motorista atrasado, nota baixa)" };
+
+/** Webhooks de saída: a empresa cadastra endereços e recebe as mudanças das corridas, assinadas com o segredo de cada endereço. */
+function WebhooksSaida({ tentar }: { tentar: (f: () => Promise<unknown>, ok: string) => void }) {
+  const { dados, recarregar } = useCarregar(() => api.webhooksSaida(), []);
+  const [tipo, setTipo] = useState("Status");
+  const [url, setUrl] = useState("");
+  const [segredo, setSegredo] = useState<{ id: string; valor: string } | null>(null);
+  if (!dados) return null;
+  const nome = (id: string) => { const w = dados.webhooks.find((x) => x.id === id); return w ? `${w.tipo} · ${w.url}` : id; };
+  return (
+    <div className="grade">
+      <Cartao titulo="Endereços cadastrados">
+        <p className="sub">Cada empresa pode ter até {dados.maximoPorTipo} endereços por tipo. Cada envio leva o cabeçalho Signature-V2 (HMAC-SHA-512 do corpo com o segredo do endereço), um event_id novo a cada tentativa e um source_event_id fixo para você descartar repetidos. Se o endereço não responder 2xx, o painel tenta de novo (10 s, 1 min, 5 min, 30 min, 2 h e 6 h).</p>
+        {segredo && <div className="aviso ok">Segredo de {nome(segredo.id)}: <code>{segredo.valor}</code>. Copie agora: ele não aparece de novo.</div>}
+        {dados.webhooks.length === 0 && <p className="sub">Nenhum webhook cadastrado.</p>}
+        {dados.webhooks.map((w) => (
+          <div key={w.id} className="rota-ia">
+            <strong>{w.tipo}</strong> <span className="txt-suave">{w.url}</span> <small>(segredo termina em {w.segredoFim})</small>
+            <div className="acoes">
+              <label className="check"><input type="checkbox" checked={w.ativo} onChange={(e) => tentar(() => api.salvarWebhook(w.id, { ativo: e.target.checked }).then(recarregar), e.target.checked ? "Webhook ligado." : "Webhook desligado.")} /> Ligado</label>
+              <button className="botao" onClick={() => tentar(async () => { const r = await api.testarWebhook(w.id); if (!r.ok) throw new Error(r.erro || "O endereço não respondeu."); recarregar(); }, "O endereço respondeu 2xx ao teste.")}><Send size={14} /> Testar</button>
+              <button className="botao" onClick={() => tentar(async () => { const r = await api.girarSegredoWebhook(w.id); setSegredo({ id: w.id, valor: r.segredo }); recarregar(); }, "Segredo novo gerado.")}><KeyRound size={14} /> Novo segredo</button>
+              <button className="icone" aria-label="Remover webhook" onClick={() => confirm("Remover este webhook? As entregas pendentes dele são descartadas.") && tentar(() => api.apagarWebhook(w.id).then(recarregar), "Webhook removido.")}><Trash2 size={14} /></button>
+            </div>
+          </div>
+        ))}
+      </Cartao>
+      <Cartao titulo="Adicionar webhook">
+        <div className="form">
+          <label>Tipo<select value={tipo} onChange={(e) => setTipo(e.target.value)}>{dados.tipos.map((t) => <option key={t} value={t}>{t}</option>)}</select><small>{ROTULO_TIPO_WEBHOOK[tipo]}</small></label>
+          <label>Endereço (https)<input value={url} placeholder="https://sua-empresa.com.br/webhook" onChange={(e) => setUrl(e.target.value)} /></label>
+        </div>
+        <button className="botao primario" onClick={() => tentar(async () => { const r = await api.criarWebhook({ tipo, url }); setSegredo({ id: r.webhook.id, valor: r.segredo }); setUrl(""); recarregar(); }, "Webhook cadastrado. Copie o segredo mostrado acima.")}><Plus size={14} /> Cadastrar</button>
+      </Cartao>
+      <Cartao titulo="Últimas entregas">
+        {dados.entregas.length === 0 ? <p className="sub">Nada enviado ainda.</p> : (
+          <div className="tabela-rola"><table>
+            <thead><tr><th>Quando</th><th>Evento</th><th>Endereço</th><th>Situação</th><th>Tentativas</th></tr></thead>
+            <tbody>{dados.entregas.map((x) => (
+              <tr key={x.id}><td>{x.criadoEm.slice(0, 16).replace("T", " ")}</td><td>{x.tipo} {x.evento}</td><td>{nome(x.webhookId)}</td><td className={x.estado === "entregue" ? "txt-ok" : x.estado === "falhou" ? "txt-ruim" : "txt-suave"}>{x.estado === "entregue" ? "Entregue" : x.estado === "falhou" ? "Falhou" : "Aguardando"}{x.ultimoErro ? ` (${x.ultimoErro})` : ""}</td><td>{x.tentativas}</td></tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </Cartao>
+    </div>
   );
 }

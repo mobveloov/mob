@@ -26,6 +26,8 @@ import { idValido, raiz } from "../servidor/dados.ts";
 import { agoraBr, normal } from "../servidor/util.ts";
 import { arquivoDoBanco, banco, migrarUmaVez, transacao } from "../servidor/banco.ts";
 import { canalDoPor, registrarEvento, type TipoEvento } from "./registro.ts";
+import { ErroCorrida, eventosDaMudanca, motivoPorId, type Marcas } from "../comum/machine.ts";
+import { enfileirar } from "../integracoes/webhooks.ts";
 
 export type StatusProprio = "procurando" | "a_caminho" | "no_local" | "em_andamento" | "finalizada" | "cancelada" | "nao_atendida";
 export type Canal = "painel" | "bot" | "totem" | "app" | "macaneta";
@@ -169,6 +171,16 @@ export interface CorridaPropria {
   descontoEmpresa?: { pct: number; valor: number };
   /** Valor final: "livre" (definido ao final, taxímetro ou motorista) ou "prefixado" (valor fechado na solicitação). */
   valorFinal?: { modo: "livre" | "prefixado"; valor?: number };
+  /** Quando a corrida entrou em pendência (ninguém aceitou nas tentativas; horário de Brasília como UTC). Some quando alguém aceita. */
+  pendenteEm?: string | null;
+  /** O que ficou registrado no aceite: hora, posição do motorista e estimativa até o embarque (base do aviso de motorista atrasado). */
+  aceite?: { em: string; lat: number | null; lng: number | null; etaSegundos: number | null; km: number | null };
+  /** Id do motivo do cancelamento (lista de motivos do passageiro da Machine), quando informado. */
+  motivoId?: number | null;
+  /** Ocorrências já avisadas (cada uma só uma vez por corrida): sem aceite em 60 s, motorista atrasado, motorista próximo, espera prolongada. */
+  marcas?: Marcas;
+  /** Cancelamentos do motorista antes de começar em que a mesma corrida voltou a procurar (will_reopen). */
+  cancelamentos?: Array<{ em: string; motivo: string; motivoId: number | null; por: "C" }>;
 }
 
 /** Hora de referência da corrida: a agendada (se houver) ou a do pedido. */
@@ -605,6 +617,11 @@ function registrarMudancas(empresaId: string, antes: CorridaPropria, c: CorridaP
   if ((c.valorOferecido ?? null) !== (antes.valorOferecido ?? null)) ev("mudanca_valor", `Valor oferecido alterado de ${brl(antes.valorOferecido ?? null)} para ${brl(c.valorOferecido ?? null)}`, ultimaPor, ultimaEm, { de: antes.valorOferecido ?? null, para: c.valorOferecido ?? null });
   if (c.status === antes.status && c.status !== "cancelada" && (c.valor ?? null) !== (antes.valor ?? null)) ev("mudanca_valor", `Valor final alterado de ${brl(antes.valor)} para ${brl(c.valor)}`, ultimaPor, ultimaEm, { de: antes.valor, para: c.valor });
   if (c.status === "cancelada" && antes.status === "cancelada" && (c.taxaCancelamento ?? null) !== (antes.taxaCancelamento ?? null)) ev("mudanca_valor", `Taxa de cancelamento alterada de ${brl(antes.taxaCancelamento ?? null)} para ${brl(c.taxaCancelamento ?? null)}`, ultimaPor, ultimaEm, { de: antes.taxaCancelamento ?? null, para: c.taxaCancelamento ?? null });
+  // Comportamento da Machine: ocorrências na linha do tempo e webhooks de saída (Status e Ocorrência) da empresa.
+  for (const x of eventosDaMudanca(antes, c)) {
+    if (x.historico) ev(x.historico, x.descricao, "sistema", ultimaEm, x.dados);
+    enfileirar(empresaId, x.tipo, x.codigo, x.dados);
+  }
 }
 
 /** Muda uma corrida com segurança (fila por empresa). Os apps usam para valor oferecido, rota editada, taxímetro etc. */
@@ -643,18 +660,23 @@ export function atribuirMotorista(empresaId: string, id: string, motoristaId: st
     if (!c.filialId) { const fm = filialDe(empresaId, "motorista", m.id); if (fm) c.filialId = fm; }
     const agora = agoraBr().toISOString();
     c.atribuidaEm = agora;
+    c.pendenteEm = null;
     if (c.status === "procurando") c.status = "a_caminho";
     c.historico.push({ em: agora, status: c.status, por, nota: `Motorista: ${c.motorista}` });
   });
 }
 
-export function mudarStatus(empresaId: string, id: string, novo: StatusProprio, extra: { valor?: number; avaliacao?: number; nota?: string } = {}, por = "sistema") {
+export function mudarStatus(empresaId: string, id: string, novo: StatusProprio, extra: { valor?: number; avaliacao?: number; nota?: string; reabertura?: { motivo: string; motivoId?: number | null } } = {}, por = "sistema") {
   return alterar(empresaId, id, (c) => {
     if (novo === "cancelada") throw new Error("Use cancelar para cancelar a corrida.");
     if (!PROXIMOS[c.status].includes(novo)) throw new Error(`Não dá para ir de "${STATUS_TEXTO[c.status]}" para "${STATUS_TEXTO[novo]}".`);
     if ((novo === "a_caminho" || novo === "em_andamento") && !c.motoristaId) throw new Error("Atribua um motorista antes.");
     const agora = agoraBr().toISOString();
-    if (novo === "procurando") { c.motoristaId = null; c.motorista = ""; c.telefoneMotorista = ""; }
+    if (novo === "procurando") {
+      // Motorista saiu antes de começar: a corrida volta à fila (will_reopen). Guarda o cancelamento e zera o que era do aceite anterior.
+      if (extra.reabertura) (c.cancelamentos ??= []).push({ em: agora, motivo: String(extra.reabertura.motivo ?? "").slice(0, 200), motivoId: extra.reabertura.motivoId ?? null, por: "C" });
+      c.motoristaId = null; c.motorista = ""; c.telefoneMotorista = ""; c.aceite = undefined; c.marcas = { ...c.marcas, proximo: undefined, esperaProlongada: undefined, atraso: undefined };
+    }
     if (novo === "em_andamento") c.iniciadaEm = agora;
     if (novo === "finalizada") {
       c.finalizadaEm = agora;
@@ -668,9 +690,13 @@ export function mudarStatus(empresaId: string, id: string, novo: StatusProprio, 
   });
 }
 
-export function cancelarCorrida(empresaId: string, id: string, quem: "Passageiro" | "Motorista" | "Central" | "Sistema", motivo: string, por = "sistema") {
+export function cancelarCorrida(empresaId: string, id: string, quem: "Passageiro" | "Motorista" | "Central" | "Sistema", motivo: string, por = "sistema", motivoId?: number | null) {
   return alterar(empresaId, id, (c) => {
-    if (GRUPO[c.status] !== "aberta") throw new Error("Esta corrida já terminou.");
+    if (GRUPO[c.status] !== "aberta") throw new ErroCorrida(151, "Esta corrida já terminou.");
+    // Motivo escolhido pelo id da lista da Machine: o texto vem da lista quando não foi informado.
+    const m = motivoId != null ? motivoPorId(motivoId) : undefined;
+    if (motivoId != null && !m) throw new Error("Motivo de cancelamento inválido.");
+    if (m) { c.motivoId = m.id; if (!String(motivo ?? "").trim()) motivo = m.texto; }
     // Taxa: passageiro que cancela depois que o motorista aceitou e já passou a tolerância da categoria.
     if (quem === "Passageiro" && c.motoristaId && (c.status === "a_caminho" || c.status === "no_local")) {
       const cat = achar(categorias(empresaId), "nome", c.categoria);

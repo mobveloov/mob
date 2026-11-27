@@ -36,6 +36,7 @@ import { avisar } from "./push.ts";
 import { configGravacao, limparGravacoes, temGravacao } from "./gravacoes.ts";
 import type { PapelApp } from "./sessoes.ts";
 import { gravarUltimaPosicao } from "./ultima-posicao.ts";
+import { codigoDoStatus, ESPERA_PROLONGADA_MIN, faseDaCorrida, FOLGA_ATRASO_MIN, PROXIMO_KM, SEM_ACEITE_S } from "../comum/machine.ts";
 
 /** Quanto tempo o motorista tem para aceitar: o "Tempo na Tela" do painel (Despacho) da empresa; sem empresa, o padrão do painel. */
 export const OFERTA_MS = (empresaId?: string) => (empresaId ? regrasDespacho(empresaId).tempoTela : DESPACHO_PADRAO.tempoTela) * 1000;
@@ -166,6 +167,9 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
   const m = c.motoristaId ? motorista(empresaId, c.motoristaId) : undefined;
   return {
     id: c.id, os: c.os, status: c.status, statusTexto: STATUS_TEXTO[c.status], aberta,
+    // Comportamento da Machine: código do status, fase (a_caminho, proximo, no_local, espera_prolongada) e quando entrou em pendência.
+    codigoStatus: codigoDoStatus(c), fase: faseDaCorrida(c), pendenteEm: c.pendenteEm ?? null,
+    dataHoraProximo: c.marcas?.proximo ?? null, dataHoraEsperaProlongada: c.marcas?.esperaProlongada ?? null,
     ...(papel === "motorista" && aberta ? (({ taxaCentral, valorLiquido }) => ({ taxaCentral, valorLiquido }))(valoresDaCorrida(empresaId, c, c.motoristaId ?? undefined)) : {}),
     embarque: c.embarque, destino: c.destino ?? null, categoria: c.categoria, pagamento: c.pagamento, observacao: c.observacao,
     estimativa: c.estimativa, valor: c.valor, cupom: c.cupom, desconto: c.desconto, avaliacao: c.avaliacao,
@@ -560,13 +564,22 @@ export async function aceitar(empresaId: string, motoristaId: string, ofertaId: 
   avisarOferta(empresaId, o, "aceitou");
   e.rodadas.delete(c.id);
   e.tentados.delete(c.id);
+  feita = await registrarAceite(empresaId, feita);
   vigiar(empresaId);
   return feita;
 }
 
+/** Anota no aceite a posição do motorista e a estimativa até o embarque (2,5 min por km em linha reta): base do aviso de motorista atrasado. */
+async function registrarAceite(empresaId: string, c: CorridaPropria): Promise<CorridaPropria> {
+  const p = c.motoristaId ? estado(empresaId).online.get(c.motoristaId) : undefined;
+  const km = p && c.embarque.lat != null && c.embarque.lng != null ? arred(linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }), 2) : null;
+  try { return await alterarCorrida(empresaId, c.id, (x) => { x.aceite = { em: x.atribuidaEm ?? agoraBr().toISOString(), lat: p?.lat ?? null, lng: p?.lng ?? null, etaSegundos: km != null ? Math.max(60, Math.round(km * 2.5 * 60)) : null, km }; }); }
+  catch { return c; }
+}
+
 /** Motorista desiste antes de chegar: a corrida volta a procurar outro (e ele não recebe essa de novo logo). */
 export async function desistir(empresaId: string, motoristaId: string, corridaId: string, motivo = "") {
-  const c = await mudarStatus(empresaId, corridaId, "procurando", { nota: `Motorista desistiu pelo app${motivo ? `: ${motivo}` : ""}` }, "app do motorista");
+  const c = await mudarStatus(empresaId, corridaId, "procurando", { nota: `Motorista desistiu pelo app${motivo ? `: ${motivo}` : ""}`, reabertura: { motivo } }, "app do motorista");
   const e = estado(empresaId);
   const t = e.tentados.get(corridaId) ?? new Map<string, number>();
   t.set(motoristaId, Date.now());
@@ -580,7 +593,7 @@ export async function desistir(empresaId: string, motoristaId: string, corridaId
 
 // ------------------------------------------------------------------ vigia (avisa os apps das mudanças)
 
-const assinatura = (c: CorridaPropria) => `${c.status}|${c.motoristaId ?? ""}|${c.historico.length}|${c.avaliacao ?? ""}`;
+const assinatura = (c: CorridaPropria) => `${c.status}|${c.motoristaId ?? ""}|${c.historico.length}|${c.avaliacao ?? ""}|${c.pendenteEm ? 1 : 0}${c.marcas?.proximo ? 1 : 0}${c.marcas?.esperaProlongada ? 1 : 0}`;
 const TEXTO_PUSH: Partial<Record<CorridaPropria["status"], string>> = {
   a_caminho: "Seu motorista está a caminho.", no_local: "Seu motorista está no local.", em_andamento: "Boa viagem!",
   finalizada: "Corrida finalizada. Avalie o motorista.", cancelada: "A corrida foi cancelada.", nao_atendida: TEXTO_SEM_MOTORISTA,
@@ -662,7 +675,12 @@ export function controlarPendencias(empresaId: string, agora = Date.now()): Prom
   const feitos: Array<Promise<unknown>> = [];
   const regras = regrasDespacho(empresaId);
   const comOferta = new Set([...e.ofertas.values()].map((o) => o.corridaId));
-  for (const c of listarProprias(empresaId)) {
+  const lista = listarProprias(empresaId);
+  // Ocorrência "sem aceite": passou o tempo e ninguém aceitou. Uma vez por corrida; programada e corrida que já teve motorista não geram.
+  for (const c of lista) {
+    if (c.status === "procurando" && !c.agendadaPara && !c.marcas?.semAceite && !c.atribuidaEm && agora - pedidaEmMs(c) >= SEM_ACEITE_S * 1000) feitos.push(marcarOcorrencia(empresaId, c.id, "semAceite", (x) => x.status === "procurando"));
+  }
+  for (const c of lista) {
     if (c.status !== "procurando" || aindaAgendada(c) || comOferta.has(c.id)) continue;
     const rod = e.rodadas.get(c.id);
     if (rod && rod.pausaAte > agora) continue; // em pendência: esperando alguém pegar
@@ -672,11 +690,45 @@ export function controlarPendencias(empresaId: string, agora = Date.now()): Prom
       const tpend = tempoPendenciaDaFilial(regras, c.filialId);
       if (tpend <= 0) { feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: "Ninguém aceitou depois das tentativas." }, "despacho").catch(() => undefined)); e.rodadas.delete(c.id); continue; }
       e.rodadas.set(c.id, { n: 0, pausaAte: agora + tpend * 60_000, pendencias: 1 });
+      feitos.push(alterarCorrida(empresaId, c.id, (x) => { if (x.status === "procurando" && !x.pendenteEm) x.pendenteEm = agoraBr().toISOString(); }).catch(() => undefined));
       registrarEvento(empresaId, c.id, { tipo: "sem_motorista", descricao: `Corrida em pendência por ${tpend} min: ninguém aceitou; qualquer motorista pode pegar pela aba Pend.`, usuario: "sistema", canal: "Despacho automático" });
       void avisar(empresaId, passageiroAlvo(c), { titulo: "Ainda procurando", texto: "Estamos procurando um motorista para você.", dados: { tipo: "corrida", corridaId: c.id }, canal: "corridas" });
     } else if (agora - ref >= 30_000) {
       feitos.push(mudarStatus(empresaId, c.id, "nao_atendida", { nota: `Ninguém aceitou no tempo de pendência (${tempoPendenciaDaFilial(regras, c.filialId)} min).` }, "despacho").catch(() => undefined));
       e.rodadas.delete(c.id);
+    }
+  }
+  return Promise.all(feitos);
+}
+
+/** Corridas com uma marca de ocorrência sendo gravada agora (a fila é assíncrona: sem isto a mesma ocorrência sairia duas vezes). */
+const gravandoMarca = new Set<string>();
+/** Grava uma marca de ocorrência na corrida (só se `vale` ainda for verdade e a marca ainda não existir). O diff de marcas é que dispara a linha do tempo e o webhook. */
+function marcarOcorrencia(empresaId: string, corridaId: string, marca: keyof NonNullable<CorridaPropria["marcas"]>, vale: (c: CorridaPropria) => boolean): Promise<unknown> {
+  const k = `${empresaId}|${corridaId}|${marca}`;
+  if (gravandoMarca.has(k)) return Promise.resolve();
+  gravandoMarca.add(k);
+  return alterarCorrida(empresaId, corridaId, (x) => { if (vale(x) && !x.marcas?.[marca]) x.marcas = { ...x.marcas, [marca]: agoraBr().toISOString() }; })
+    .catch(() => undefined).finally(() => gravandoMarca.delete(k));
+}
+
+/**
+ * Fases da corrida aceita e ocorrências de tempo: "próximo" (motorista a menos de 500 m do embarque), "espera prolongada" (parado no local há
+ * ESPERA_PROLONGADA_MIN min) e "motorista atrasado" (passou o tempo estimado no aceite mais a folga, sem chegar perto). Cada uma só uma vez.
+ */
+export function controlarFases(empresaId: string, agora = Date.now()): Promise<unknown> {
+  const e = estado(empresaId);
+  const feitos: Array<Promise<unknown>> = [];
+  const realMs = (s: string | null | undefined) => (s ? Date.parse(s) + 3 * 3600_000 : NaN);
+  for (const c of listarProprias(empresaId)) {
+    if (c.status === "a_caminho" && c.motoristaId) {
+      const p = e.online.get(c.motoristaId);
+      const perto = !!p && c.embarque.lat != null && c.embarque.lng != null && linhaReta({ lat: p.lat, lng: p.lng }, { lat: c.embarque.lat, lng: c.embarque.lng }) < PROXIMO_KM;
+      if (perto && !c.marcas?.proximo) feitos.push(marcarOcorrencia(empresaId, c.id, "proximo", (x) => x.status === "a_caminho"));
+      else if (!perto && !c.marcas?.proximo && !c.marcas?.atraso && c.aceite?.etaSegundos != null && agora - realMs(c.aceite.em) > c.aceite.etaSegundos * 1000 + FOLGA_ATRASO_MIN * 60_000) feitos.push(marcarOcorrencia(empresaId, c.id, "atraso", (x) => x.status === "a_caminho"));
+    } else if (c.status === "no_local" && !c.marcas?.esperaProlongada) {
+      const chegou = realMs([...c.historico].reverse().find((h) => h.status === "no_local")?.em);
+      if (Number.isFinite(chegou) && agora - chegou >= ESPERA_PROLONGADA_MIN * 60_000) feitos.push(marcarOcorrencia(empresaId, c.id, "esperaProlongada", (x) => x.status === "no_local"));
     }
   }
   return Promise.all(feitos);
@@ -692,6 +744,7 @@ export function ciclo(empresaId: string) {
   limparMemoria(empresaId, e, agora);
   if (agora - (ultimaLimpezaGravacoes.get(empresaId) ?? 0) > 3600_000) { ultimaLimpezaGravacoes.set(empresaId, agora); try { limparGravacoes(empresaId, agora); } catch { /* sem pasta de gravações */ } }
   controlarPendencias(empresaId, agora);
+  controlarFases(empresaId, agora);
   vigiar(empresaId);
   despachar(empresaId);
 }
@@ -778,9 +831,10 @@ export async function pegarCorrida(empresaId: string, motoristaId: string, corri
     const km = kmAteEmbarque(e, motoristaId, c);
     if (km != null && km > distanciaPendenciaKm(empresaId)) throw new Error("Esta pendência está longe demais de você.");
   }
-  const feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
+  let feita = await atribuirMotorista(empresaId, c.id, motoristaId, "app do motorista");
   if (feita.motoristaId !== motoristaId) throw new Error("Esta corrida não está mais disponível.");
   e.contraofertas.delete(c.id);
+  feita = await registrarAceite(empresaId, feita);
   vigiar(empresaId);
   return feita;
 }
@@ -822,7 +876,8 @@ export async function aceitarContraoferta(empresaId: string, telefone: string, c
   if (!o) throw new Error("Esta oferta já venceu.");
   if (!e.online.has(o.motoristaId) || ocupados(listarProprias(empresaId)).has(o.motoristaId)) throw new Error("Este motorista não está mais disponível.");
   await alterarCorrida(empresaId, c.id, (x) => { x.valorOferecido = o.valor; x.desconto = descontoDoCupom(empresaId, x.cupom, o.valor, x.categoria) || null; });
-  const feita = await atribuirMotorista(empresaId, c.id, o.motoristaId, "contra-oferta aceita");
+  let feita = await atribuirMotorista(empresaId, c.id, o.motoristaId, "contra-oferta aceita");
+  feita = await registrarAceite(empresaId, feita);
   const outras = e.contraofertas.get(corridaId) ?? [];
   e.contraofertas.delete(corridaId);
   for (const x of outras) if (x.id !== o.id) emitir(empresaId, motoristaAlvo(x.motoristaId), "contraoferta_encerrada", { corridaId, id: x.id });
