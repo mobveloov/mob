@@ -3,6 +3,7 @@
 //   historico -> Histórico, ocorrencias -> Retorno/Ocorrências, programadas -> Programadas, pagamentos-pendentes -> Pagamentos Pend., objetos -> Objetos Perdidos.
 import type { JSX } from "react";
 import AlertasSeguranca from "./AlertasSeguranca";
+import Gravacoes from "./Gravacoes";
 import Historico from "./Historico";
 import MapaReal from "./MapaReal";
 import Monitoramento from "./Monitoramento";
@@ -19,6 +20,7 @@ export const TELAS_CORRIDAS: Record<string, JSX.Element> = {
   recuperacao: <Recuperacao />,
   monitoramento: <Monitoramento />,
   mapa: <MapaReal />,
+  gravacoes: <Gravacoes />,
   historico: <Historico />,
   ocorrencias: <Ocorrencias />,
   "alertas-seguranca": <AlertasSeguranca />,

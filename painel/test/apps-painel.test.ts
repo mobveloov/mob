@@ -282,10 +282,11 @@ test("gravação da corrida: o motorista envia, o passageiro vê o aviso, só a 
   for (let i = 0; i < 10 && !o; i++) { await new Promise((r) => setTimeout(r, 300)); o = (await chamar("GET", `${API}/estado`, undefined, tokM)).corpo.oferta; }
   await chamar("POST", `${API}/ofertas/${o.id}/aceitar`, {}, tokM);
   assert.equal((await chamar("GET", `${API}/gravacao/config`, undefined, tokM)).corpo.ativa, true);
-  assert.equal((await chamar("GET", `${API}/corridas/${id}`, undefined, tokP)).corpo.corrida.gravada, true, "o passageiro vê que a corrida é gravada");
+  assert.equal((await chamar("GET", `${API}/corridas/${id}`, undefined, tokP)).corpo.corrida.gravada, false, "sem nenhum pedaço enviado ainda, o aviso de gravação não aparece");
   const enviar = async (n: number, bytes: Buffer, tipo = "audio/webm", tok = tokM) => (await fetch(`${base}${API}/corridas/${id}/gravacao`, { method: "POST", headers: { authorization: `Bearer ${tok}`, "content-type": tipo, "x-parte": String(n), "x-segundos": "60" }, body: bytes as unknown as BodyInit })).status;
   { const r0 = await fetch(`${base}${API}/corridas/${id}/gravacao`, { method: "POST", headers: { authorization: `Bearer ${tokM}`, "content-type": "audio/webm", "x-parte": "0", "x-segundos": "60" }, body: Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]) as unknown as BodyInit }); assert.equal(r0.status, 200, await r0.text()); }
   { const r1 = await fetch(`${base}${API}/corridas/${id}/gravacao`, { method: "POST", headers: { authorization: `Bearer ${tokM}`, "content-type": "audio/webm", "x-parte": "1", "x-segundos": "60" }, body: Buffer.from([9, 9, 9, 9]) as unknown as BodyInit }); assert.equal(r1.status, 200, await r1.text()); }
+  assert.equal((await chamar("GET", `${API}/corridas/${id}`, undefined, tokP)).corpo.corrida.gravada, true, "chegou gravação: o passageiro vê que a corrida é gravada");
   assert.equal(await enviar(0, Buffer.from("não é webm")), 400, "o primeiro pedaço precisa ter o cabeçalho de gravação");
   assert.equal(await enviar(2, Buffer.from([1, 2, 3]), "text/html"), 400, "formato não aceito");
   assert.equal(await enviar(2, Buffer.from([1, 2, 3]), "audio/webm", tokP), 403, "passageiro não envia gravação");

@@ -77,6 +77,27 @@ export function abrirParte(empresaId: string, corridaId: string, n: number, por:
   return { caminho, mime: p.tipo };
 }
 
+/** Já chegou algum pedaço desta corrida? (o aviso "Esta corrida é gravada" do passageiro só vale se sim) */
+export function temGravacao(empresaId: string, corridaId: string): boolean {
+  try { return idCorridaValido(corridaId) && fs.existsSync(arqIndice(empresaId, corridaId)); } catch { return false; }
+}
+
+/** A gravação inteira (os pedaços em ordem, como um arquivo só), registrando quem abriu. */
+export function abrirCompleta(empresaId: string, corridaId: string, por: string): { dados: Buffer; mime: string; extensao: string } | null {
+  const lido = ler<IndiceGravacao | null>(arqIndice(empresaId, corridaId), null);
+  const idx = lido ? structuredClone(lido) : null;
+  if (!idx?.partes.length) return null;
+  const blocos: Buffer[] = [];
+  for (const p of idx.partes) {
+    const caminho = path.join(pasta(empresaId, corridaId), `${p.n}.${TIPOS[p.tipo]}`);
+    if (fs.existsSync(caminho)) blocos.push(fs.readFileSync(caminho));
+  }
+  if (!blocos.length) return null;
+  idx.acessos = [...idx.acessos, { em: new Date().toISOString(), por: por.slice(0, 120) }].slice(-500);
+  gravar(arqIndice(empresaId, corridaId), idx);
+  return { dados: Buffer.concat(blocos), mime: idx.partes[0].tipo, extensao: TIPOS[idx.partes[0].tipo] };
+}
+
 export function marcarParaGuardar(empresaId: string, corridaId: string, guardar: boolean) {
   const lido = ler<IndiceGravacao | null>(arqIndice(empresaId, corridaId), null);
   if (!lido) throw new Error("Gravação não encontrada.");

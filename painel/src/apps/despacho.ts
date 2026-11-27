@@ -32,7 +32,7 @@ import { agoraBr, arred, normal } from "../servidor/util.ts";
 import { arquivo, gravar, ler } from "./armazem.ts";
 import { emitir, empresasComOuvintes, temOuvinte, type Alvo, conectado } from "./eventos.ts";
 import { avisar } from "./push.ts";
-import { configGravacao, limparGravacoes } from "./gravacoes.ts";
+import { configGravacao, limparGravacoes, temGravacao } from "./gravacoes.ts";
 import type { PapelApp } from "./sessoes.ts";
 import { gravarUltimaPosicao } from "./ultima-posicao.ts";
 
@@ -191,7 +191,7 @@ export function corridaParaApp(empresaId: string, c: CorridaPropria, papel: Pape
     paradas: c.paradas ?? [], agendadaPara: c.agendadaPara ?? null, comentario: c.comentario ?? "",
     avaliacaoPassageiro: papel === "motorista" ? c.avaliacaoPassageiro ?? null : undefined,
     taxaCancelamento: c.taxaCancelamento ?? null,
-    gravada: configGravacao(empresaId).ativa && aberta,
+    gravada: configGravacao(empresaId).ativa && aberta && temGravacao(empresaId, c.id), // só avisa se a gravação existe de verdade
     compartilhar: papel === "passageiro" && c.compartilhamento ? `acompanhar/${c.compartilhamento}` : null,
     motoristaId: papel === "passageiro" ? c.motoristaId : undefined,
   };
