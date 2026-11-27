@@ -36,6 +36,8 @@ export interface Oferta { id: string; expira: number; segundos: number; distanci
 /** Corrida das abas Disp., Pend. e Prog. */
 export interface CorridaAberta extends Partial<Omit<DadosChamada, "id" | "embarque">> {
   id: string; embarque: Ponto; distanciaKm?: number | null; status?: string; statusTexto?: string; solicitadaEm?: string;
+  /** Pendência: ninguém aceitou nas tentativas; qualquer motorista pode pegar até `pendenciaAte` (o tempo vem do painel). */
+  emPendencia?: boolean; pendenciaAte?: string | null; esperaMinutos?: number;
 }
 export interface CorridasAbertas { disponiveis: CorridaAberta[]; pendentes: CorridaAberta[]; programadas: CorridaAberta[] }
 

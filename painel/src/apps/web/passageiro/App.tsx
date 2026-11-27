@@ -66,6 +66,9 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const [avaliar, setAvaliar] = useState<Corrida | null>(null);
   const [conectado, setConectado] = useState(false);
   const [aviso, setAviso] = useState("");
+  // Passou o tempo de pendência (definido no painel) e nenhum motorista aceitou: pop-up no meio da tela e volta para o início.
+  const [semMotorista, setSemMotorista] = useState("");
+  const avisarSemMotorista = (c: Corrida) => { if (c.status === "nao_atendida") { setSemMotorista(c.mensagemCancelamento || c.statusTexto || "Não há nenhum motorista disponível no momento."); setFluxo({ tela: "" }); setAba("inicio"); } };
   const atualRef = useRef<string | null>(null);
   const statusVisto = useRef<Record<string, string>>({});
 
@@ -112,6 +115,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
       });
       if (c.status === "finalizada" && c.avaliacao == null) setAvaliar(c);
       if (avisoDaTaxa(c)) setAviso(avisoDaTaxa(c));
+      avisarSemMotorista(c);
       if (!c.aberta) setChat(false);
     } else if (tipo === "posicao") setPosMotorista({ lat: d.lat, lng: d.lng });
     else if (tipo === "chat" && d.corridaId === atualRef.current) {
@@ -126,7 +130,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   // Corrida em andamento: procurando motorista ou acompanhando a viagem (tela cheia, sem abas).
   if (corrida && !esperandoHorario(corrida)) {
-    const mudou = (c: Corrida) => { setCorrida(c.aberta ? c : null); if (avisoDaTaxa(c)) setAviso(avisoDaTaxa(c)); };
+    const mudou = (c: Corrida) => { setCorrida(c.aberta ? c : null); if (avisoDaTaxa(c)) setAviso(avisoDaTaxa(c)); avisarSemMotorista(c); };
     return corrida.status === "procurando"
       ? <Procurando corrida={corrida} mudou={mudou} recarregar={() => void carregar()} />
       : <Acompanhar corrida={corrida} pos={posMotorista} marca={marca} naoLidas={mensagens.filter((m) => m.de !== "passageiro").length} abrirChat={() => setChat(true)} mudou={mudou} />;
@@ -148,7 +152,15 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
 
   return (
     <div className="app">
-      
+      {semMotorista && (
+        <div className="popup-aviso-fundo" role="dialog" aria-modal="true" aria-label="Sem motorista disponível">
+          <div className="popup-aviso">
+            <h2>Não há nenhum motorista disponível</h2>
+            <p>{semMotorista}</p>
+            <button type="button" className="popup-aviso-acao" onClick={() => setSemMotorista("")}>Entendi</button>
+          </div>
+        </div>
+      )}
       {aviso && <div style={{ padding: "1rem 1rem 0", position: aba === "inicio" ? "fixed" : "static", zIndex: 40, top: aba === "inicio" ? "9rem" : undefined, left: 0, right: 0 }}><Aviso texto={aviso} tipo="info" /></div>}
       {aba === "inicio" ? <Inicio eu={eu} aqui={aqui} lugares={lugares} irPara={() => setFluxo({ tela: "paraonde", modo: "destino" })} atalho={(a) => void atalho(a)} indique={() => { setAba("conta"); }} />
         : aba === "agendadas" ? <Agendadas pedir={() => mudarAba("inicio")} />

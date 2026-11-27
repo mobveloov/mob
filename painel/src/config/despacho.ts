@@ -19,7 +19,7 @@ export interface RegrasDespacho {
 }
 export const DESPACHO_PADRAO: RegrasDespacho = {
   metodo: "mais_proximo", raioMetros: 20_000, tempoTela: 20, limiteMotoristas: 20, prioritarios: 20, secundarios: 15, reserva: 10,
-  maxTentativas: 4, tempoPendencia: 1, notificarGrupo: "prioritario", distanciaProxima: 500, permitirProxima: false, permitirTransbordo: true,
+  maxTentativas: 4, tempoPendencia: 10, notificarGrupo: "prioritario", distanciaProxima: 500, permitirProxima: false, permitirTransbordo: true,
 };
 
 export function sanearDespacho(e: unknown, atual: RegrasDespacho = DESPACHO_PADRAO): RegrasDespacho {
