@@ -1,7 +1,7 @@
 // Cadastro › Filiais: nome, cidade, endereço, responsável e se está ativa; liga motoristas e operadores a cada filial.
 // Servidor: /api/filiais.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useCarregar } from "../../componentes/ui";
 import { CampoEndereco } from "../../componentes/CampoEndereco";
@@ -62,30 +62,47 @@ function FormFilial({ f, onFechar, onSalvo }: { f: Filial | null; onFechar: () =
     lat: f?.lat == null ? "" : String(f.lat), lng: f?.lng == null ? "" : String(f.lng), zoom: f?.zoom == null ? "" : String(f.zoom), raioKm: f?.raioKm ? String(f.raioKm) : "", areaIds: f?.areaIds ?? [] as string[],
   });
   const { aviso, tentar } = useAviso();
+  // Campos que a pessoa mexeu à mão: a cidade nunca os sobrescreve. Os outros acompanham a cidade escolhida.
+  const tocados = useRef(new Set<string>(f ? ["lat", "lng", "zoom", "raioKm", "uf"].filter((k) => (f as unknown as Record<string, unknown>)[k]) : []));
+  const [achando, setAchando] = useState("");
+  const preencher = async (cidade: string, uf: string, forcar = false) => {
+    if (cidade.trim().length < 3) return;
+    setAchando("Buscando o centro da cidade...");
+    try {
+      const g = await api<{ uf: string; lat: number; lng: number; zoom: number; raioKm: number }>("GET", `/geocidade?cidade=${encodeURIComponent(cidade.trim())}&uf=${encodeURIComponent(uf)}`);
+      const livre = (k: string) => forcar || !tocados.current.has(k);
+      setV((a) => ({ ...a, ...(livre("uf") && g.uf ? { uf: g.uf } : {}), ...(livre("lat") ? { lat: String(g.lat) } : {}), ...(livre("lng") ? { lng: String(g.lng) } : {}), ...(livre("zoom") ? { zoom: String(g.zoom) } : {}), ...(livre("raioKm") ? { raioKm: String(g.raioKm) } : {}) }));
+      if (forcar) tocados.current.clear();
+      setAchando("");
+    } catch (e) { setAchando(e instanceof Error ? e.message : "Não achei essa cidade."); }
+  };
+  // Filial que já existe sem coordenadas: preenche ao abrir.
+  useEffect(() => { if (f && f.cidade && (f.lat == null || f.lng == null)) void preencher(f.cidade, f.uf); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const areas = useCarregar(() => chamar<{ areas: Array<{ id: string; nome: string }> }>("GET", "/areas"), []);
   const salvar = async () => {
     const corpo = { ...v, lat: v.lat.trim(), lng: v.lng.trim(), zoom: v.zoom.trim(), raioKm: v.raioKm.trim() };
     if (await tentar(() => (f ? api("PUT", `/${f.id}`, corpo) : api("POST", "", corpo)))) { esquecerCentros(); onSalvo(); onFechar(); }
   };
-  const set = (k: keyof typeof v, x: string | boolean | string[]) => setV({ ...v, [k]: x });
+  const set = (k: keyof typeof v, x: string | boolean | string[]) => { tocados.current.add(k); setV({ ...v, [k]: x }); };
   return (
     <Janela aberta titulo={f ? "Editar filial" : "Nova filial"} sub="Preencha os dados abaixo" onFechar={onFechar} largura="pequena" rodape={<><button className="cg-botao" onClick={onFechar}>Cancelar</button><button className="cg-botao primario" onClick={() => void salvar()}>Salvar</button></>}>
       {aviso}
       <div style={{ display: "grid", gap: 12 }}>
         <Campo rotulo="Nome *"><input value={v.nome} maxLength={80} onChange={(e) => set("nome", e.target.value)} /></Campo>
         <div className="cg-duplo">
-          <Campo rotulo="Cidade"><input value={v.cidade} maxLength={80} onChange={(e) => set("cidade", e.target.value)} /></Campo>
+          <Campo rotulo="Cidade" dica={achando || "Ao escolher a cidade, o centro, o zoom e o raio são preenchidos sozinhos."}><input value={v.cidade} maxLength={80} onChange={(e) => { tocados.current.delete("cidade"); setV({ ...v, cidade: e.target.value }); }} onBlur={() => void preencher(v.cidade, v.uf)} /></Campo>
           <Campo rotulo="UF"><input value={v.uf} maxLength={2} placeholder="SP" onChange={(e) => set("uf", e.target.value.toUpperCase())} /></Campo>
         </div>
-        <CampoEndereco rotulo="Endereço (escolha uma sugestão para marcar no mapa)" valor={{ texto: v.endereco }} onChange={(p) => setV({ ...v, endereco: p.texto.slice(0, 160), ...(p.lat != null && p.lng != null ? { lat: String(p.lat), lng: String(p.lng) } : {}) })} />
+        <CampoEndereco rotulo="Endereço (escolha uma sugestão para marcar no mapa)" valor={{ texto: v.endereco }} onChange={(p) => setV({ ...v, endereco: p.texto.slice(0, 160), ...(p.lat != null && p.lng != null ? (tocados.current.add("lat"), tocados.current.add("lng"), { lat: String(p.lat), lng: String(p.lng) }) : {}) })} />
         <div className="cg-duplo">
-          <Campo rotulo="Latitude" dica="Onde o mapa abre para esta filial."><input value={v.lat} inputMode="decimal" placeholder="-21.0128" onChange={(e) => set("lat", e.target.value)} /></Campo>
-          <Campo rotulo="Longitude"><input value={v.lng} inputMode="decimal" placeholder="-48.2217" onChange={(e) => set("lng", e.target.value)} /></Campo>
+          <Campo rotulo="Latitude" dica="Onde o mapa abre para esta filial. Editável."><input value={v.lat} inputMode="decimal" placeholder="automático pela cidade" onChange={(e) => set("lat", e.target.value)} /></Campo>
+          <Campo rotulo="Longitude"><input value={v.lng} inputMode="decimal" placeholder="automático pela cidade" onChange={(e) => set("lng", e.target.value)} /></Campo>
         </div>
         <div className="cg-duplo">
-          <Campo rotulo="Zoom do mapa" dica="3 a 19. Vazio: o sistema escolhe."><input value={v.zoom} inputMode="numeric" placeholder="13" onChange={(e) => set("zoom", e.target.value)} /></Campo>
-          <Campo rotulo="Raio de cobertura (km)" dica="Círculo em volta do ponto. Vazio: sem círculo."><input value={v.raioKm} inputMode="decimal" placeholder="5" onChange={(e) => set("raioKm", e.target.value)} /></Campo>
+          <Campo rotulo="Zoom do mapa" dica="3 a 19. Vazio: o sistema escolhe."><input value={v.zoom} inputMode="numeric" placeholder="automático" onChange={(e) => set("zoom", e.target.value)} /></Campo>
+          <Campo rotulo="Raio de cobertura (km)" dica="Círculo em volta do ponto. Vazio: sem círculo."><input value={v.raioKm} inputMode="decimal" placeholder="automático" onChange={(e) => set("raioKm", e.target.value)} /></Campo>
         </div>
+        {v.cidade.trim().length >= 3 && <button type="button" className="cg-botao" onClick={() => void preencher(v.cidade, v.uf, true)}>Preencher de novo pela cidade</button>}
         <Campo rotulo="Áreas desenhadas que a filial cobre" dica="De Gestão de áreas > Áreas. Sem escolha, vale a área que contém o ponto da filial.">
           <div style={{ display: "grid", gap: 4 }}>
             {(areas.dados?.areas ?? []).map((a) => <label key={a.id} style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={v.areaIds.includes(a.id)} onChange={(e) => set("areaIds", e.target.checked ? [...v.areaIds, a.id] : v.areaIds.filter((x) => x !== a.id))} />{a.nome}</label>)}
