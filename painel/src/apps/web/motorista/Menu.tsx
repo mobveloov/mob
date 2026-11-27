@@ -64,7 +64,7 @@ export function Corridas({ barra, aoPegar, aoMudar }: { barra: React.ReactNode; 
       </div>
       {barra}
       {aberta && <Chamada dados={{ ...aberta, estimativa: aberta.estimativa!, observacao: aberta.observacao ?? "", categoria: aberta.categoria ?? "", pagamento: aberta.pagamento ?? "", passageiro: aberta.passageiro ?? "Passageiro", os: aberta.os ?? "" } as never}
-        distanciaKm={aberta.distanciaKm} tocarSom={false} rotuloRecusar="Fechar" erro={erroAcao} recusar={() => { setAberta(null); setErroAcao(""); }}
+        distanciaKm={aberta.distanciaKm} tocarSom={false} erro={erroAcao} recusar={() => { const id = aberta.id; setAberta(null); setErroAcao(""); void api(`/corridas/${id}/recusar`, { corpo: {} }).catch(() => undefined).then(() => { aoMudar?.(); void recarregar(); }); }}
         aceitar={async (valor, contra) => {
           setErroAcao("");
           try {

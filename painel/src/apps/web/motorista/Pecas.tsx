@@ -95,7 +95,7 @@ export function Erro({ texto }: { texto: string }) { return texto ? <div classNa
 export function Info({ texto, tipo = "info" }: { texto: string; tipo?: "info" | "ok" | "erro" }) { return texto ? <div className={`aviso aviso-${tipo}`} role="status">{texto}</div> : null; }
 
 /** Aviso de confirmação: janela central com ícone redondo, título, texto e dois botões. */
-export function Dialogo({ icone: I, perigo, titulo, texto, children, cancelar, confirmar, rotulo, ocupado, rotuloCancelar = "Cancelar" }: {
+export function Dialogo({ icone: I, perigo, titulo, texto, children, cancelar, confirmar, rotulo, ocupado, rotuloCancelar = "Voltar" }: {
   icone: LucideIcon; perigo?: boolean; titulo: string; texto?: string; children?: ReactNode; cancelar: () => void; confirmar?: () => void; rotulo?: string; ocupado?: boolean; rotuloCancelar?: string;
 }) {
   return (

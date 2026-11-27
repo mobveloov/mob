@@ -14,10 +14,12 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 
 /**
- * Bolinha com o ícone do app, por cima de outros aplicativos. Dá para arrastar; um toque traz o app de volta.
+ * Bolha com o ícone do app (quadrado de cantos arredondados), por cima de outros aplicativos. Dá para arrastar; um toque traz o app de volta.
  * Só roda enquanto o motorista está online e com o app minimizado (quem liga e desliga é o app, pelo plugin Flutuante).
  */
 public class FlutuanteService extends Service {
+    /** Lado da bolha em dp: igual nos dois apps. */
+    private static final int TAMANHO = 52;
     private WindowManager janela;
     private View bolinha;
 
@@ -39,24 +41,27 @@ public class FlutuanteService extends Service {
     private void mostrar() {
         janela = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         ImageView img = new ImageView(this);
+        // O mesmo ícone oficial do launcher (vem da Personalização do painel), em quadrado de cantos arredondados, nunca redondo.
+        // O ícone adaptativo do Android é um quadro de 108 dp em que só os 72 dp do meio aparecem; desenhar o quadro inteiro deixava
+        // uma borda de fundo (preto) sobrando. Aqui desenha o quadro e recorta só a parte visível.
         try {
             Drawable icone = getPackageManager().getApplicationIcon(getPackageName());
-            img.setImageDrawable(icone);
-        } catch (Exception e) { /* sem ícone: a bolinha fica vazia */ }
-        img.setElevation(dp(6));
-        // Bolha redonda e pequena (o ícone do app é um quadrado grande): recorta em círculo.
-        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            img.setImageBitmap(recortarIcone(icone));
+        } catch (Exception e) { /* sem ícone: a bolha fica vazia */ }
+        img.setScaleType(ImageView.ScaleType.FIT_XY);
+        img.setElevation(dp(4));
         img.setClipToOutline(true);
+        final float raio = dp(TAMANHO) * 0.22f;
         img.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
-            public void getOutline(View v, android.graphics.Outline o) { o.setOval(0, 0, v.getWidth(), v.getHeight()); }
+            public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), raio); }
         });
 
         int tipo = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
         final WindowManager.LayoutParams p = new WindowManager.LayoutParams(
-                dp(48), dp(48), tipo,
+                dp(TAMANHO), dp(TAMANHO), tipo,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         p.gravity = Gravity.TOP | Gravity.START;
@@ -95,6 +100,18 @@ public class FlutuanteService extends Service {
             bolinha = null;
             stopSelf();
         }
+    }
+
+    private android.graphics.Bitmap recortarIcone(Drawable icone) {
+        final int lado = 432; // 108 dp x 4
+        android.graphics.Bitmap quadro = android.graphics.Bitmap.createBitmap(lado, lado, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas tela = new android.graphics.Canvas(quadro);
+        icone.setBounds(0, 0, lado, lado);
+        icone.draw(tela);
+        boolean adaptativo = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && icone instanceof android.graphics.drawable.AdaptiveIconDrawable;
+        if (!adaptativo) return quadro;
+        int margem = lado / 6; // 18 dp de cada lado: sobram os 72 dp visíveis
+        return android.graphics.Bitmap.createBitmap(quadro, margem, margem, lado - 2 * margem, lado - 2 * margem);
     }
 
     private void abrirApp() {
