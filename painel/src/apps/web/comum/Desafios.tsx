@@ -45,7 +45,7 @@ export function ListaDeDesafios({ classeCartao }: { classeCartao: string }) {
         })}
       </div>
       {erro && <p className="dica" role="alert">{erro}</p>}
-      {!mostrados.length && <p className="dica vazio-desafios"><Trophy size={28} />{aba === "ativos" ? "Nenhum desafio agora. Volte mais tarde." : aba === "concluidos" ? "Você ainda não concluiu nenhum desafio." : "Nenhum desafio expirado."}</p>}
+      {!mostrados.length && <div className="vazio-desafios"><span className="vazio-desafios-icone"><Trophy size={34} /></span><strong>{aba === "ativos" ? "Nenhum desafio agora" : aba === "concluidos" ? "Nada concluído ainda" : "Nenhum desafio expirado"}</strong><p>{aba === "ativos" ? "Quando a central lançar um desafio, ele aparece aqui com a meta e o prêmio." : aba === "concluidos" ? "Complete as metas dos desafios ativos para ganhar prêmios." : "Os desafios que passaram do prazo ficam guardados aqui."}</p></div>}
       {mostrados.map((x, i) => {
         const s = situacaoDe(x), pct = x.meta > 0 ? Math.min(100, Math.round((x.feito / x.meta) * 100)) : 0;
         return (

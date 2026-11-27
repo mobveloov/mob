@@ -472,7 +472,7 @@ export function MenuLateral({ eu, marca, fechar, ir, sair }: { eu: Eu; marca: Ma
       <div onClick={(e) => e.stopPropagation()}>
         <div className="menu-perfil">
           <Avatar foto={eu.foto} nome={eu.nome} tamanho={60} selo={eu.aprovado ? <span className="selo-ok"><BadgeCheck size={16} /></span> : undefined} />
-          <div className="nome"><strong>{eu.nome.split(" ")[0]}</strong>{(eu.veiculo || eu.placa) && <span>{[eu.veiculo, eu.placa].filter(Boolean).join(" · ")}</span>}</div>
+          <div className="nome"><strong>{eu.nome}</strong>{eu.veiculo && <span className="veiculo-menu">{eu.veiculo}</span>}{eu.placa && <span className="placa-menu">{eu.placa}</span>}</div>
           <button type="button" className="fechar" aria-label="Fechar o menu" onClick={fechar}><X size={18} /></button>
         </div>
         <div style={{ padding: "0 .8rem" }}><Banners tipo="app" /></div>
