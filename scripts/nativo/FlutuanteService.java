@@ -73,6 +73,7 @@ public class FlutuanteService extends Service {
         p.x = dp(12);
         p.y = dp(160);
 
+        final int alvoTam = dp(64);
         img.setOnTouchListener(new View.OnTouchListener() {
             private int x0, y0;
             private float tx0, ty0;
@@ -85,13 +86,20 @@ public class FlutuanteService extends Service {
                         x0 = p.x; y0 = p.y; tx0 = e.getRawX(); ty0 = e.getRawY(); moveu = false;
                         return true;
                     case MotionEvent.ACTION_MOVE:
-                        if (Math.abs(e.getRawX() - tx0) > dp(6) || Math.abs(e.getRawY() - ty0) > dp(6)) moveu = true;
+                        if (!moveu && (Math.abs(e.getRawX() - tx0) > dp(6) || Math.abs(e.getRawY() - ty0) > dp(6))) { moveu = true; mostrarAlvo(alvoTam); }
+                        if (!moveu) return true;
                         p.x = x0 + Math.round(e.getRawX() - tx0);
                         p.y = y0 + Math.round(e.getRawY() - ty0);
                         janela.updateViewLayout(v, p);
+                        alvoAceso(sobreAlvo(p, alvoTam));
                         return true;
                     case MotionEvent.ACTION_UP:
-                        if (!moveu) abrirApp();
+                    case MotionEvent.ACTION_CANCEL:
+                        boolean fechar = moveu && sobreAlvo(p, alvoTam);
+                        esconderAlvo();
+                        if (fechar) { stopSelf(); return true; } // soltou no X: a bolha é removida
+                        if (!moveu) { abrirApp(); return true; }
+                        encostarNaBorda(v, p); // soltou fora: volta para a borda mais perto
                         return true;
                     default:
                         return false;
@@ -105,6 +113,69 @@ public class FlutuanteService extends Service {
             bolinha = null;
             stopSelf();
         }
+    }
+
+    // ------------------------------------------------------------------ zona "X" (aparece ao arrastar a bolha)
+    private View alvo;
+    private WindowManager.LayoutParams alvoP;
+    private boolean alvoLigado;
+
+    private int tipoJanela() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    /** Círculo escuro com um X desenhado (sem emoji), no meio da parte de baixo da tela. */
+    private void mostrarAlvo(final int tam) {
+        if (alvo != null) return;
+        alvo = new View(this) {
+            @Override
+            protected void onDraw(android.graphics.Canvas c) {
+                android.graphics.Paint f = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                f.setColor(alvoLigado ? 0xFFE53935 : 0xCC111111);
+                float r = getWidth() / 2f;
+                c.drawCircle(r, r, alvoLigado ? r : r * 0.86f, f);
+                android.graphics.Paint l = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                l.setColor(0xFFFFFFFF); l.setStrokeWidth(dp(3)); l.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                float d = getWidth() * 0.17f;
+                c.drawLine(r - d, r - d, r + d, r + d, l);
+                c.drawLine(r + d, r - d, r - d, r + d, l);
+            }
+        };
+        alvoP = new WindowManager.LayoutParams(tam, tam, tipoJanela(),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT);
+        alvoP.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        alvoP.y = dp(48);
+        try { janela.addView(alvo, alvoP); } catch (Exception e) { alvo = null; }
+    }
+
+    private boolean sobreAlvo(WindowManager.LayoutParams p, int tam) {
+        if (alvoP == null) return false;
+        android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+        float cx = p.x + dp(TAMANHO) / 2f, cy = p.y + dp(TAMANHO) / 2f;
+        float ax = m.widthPixels / 2f, ay = m.heightPixels - alvoP.y - tam / 2f;
+        double dist = Math.hypot(cx - ax, cy - ay);
+        return dist < tam * 0.9;
+    }
+
+    private void alvoAceso(boolean ligado) {
+        if (alvo == null || ligado == alvoLigado) return;
+        alvoLigado = ligado;
+        alvo.animate().scaleX(ligado ? 1.25f : 1f).scaleY(ligado ? 1.25f : 1f).setDuration(120).start();
+        alvo.invalidate();
+    }
+
+    private void esconderAlvo() {
+        if (alvo != null) { try { janela.removeView(alvo); } catch (Exception e) { /* já saiu */ } }
+        alvo = null; alvoP = null; alvoLigado = false;
+    }
+
+    /** Solta a bolha fora do X: ela volta para a borda esquerda ou direita mais próxima. */
+    private void encostarNaBorda(View v, WindowManager.LayoutParams p) {
+        android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+        int margem = dp(8);
+        p.x = (p.x + dp(TAMANHO) / 2 < m.widthPixels / 2) ? margem : m.widthPixels - dp(TAMANHO) - margem;
+        p.y = Math.max(dp(40), Math.min(p.y, m.heightPixels - dp(TAMANHO) - dp(140)));
+        try { janela.updateViewLayout(v, p); } catch (Exception e) { /* já saiu */ }
     }
 
     private android.graphics.Bitmap recortarIcone(Drawable icone) {
@@ -134,6 +205,7 @@ public class FlutuanteService extends Service {
             try { janela.removeView(bolinha); } catch (Exception e) { /* já saiu */ }
         }
         bolinha = null;
+        esconderAlvo();
         super.onDestroy();
     }
 }

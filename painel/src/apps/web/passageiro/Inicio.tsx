@@ -56,17 +56,20 @@ export function Inicio({ eu, aqui, lugares, irPara, atalho, indique }: {
           </div>
         )}
         <div className="inicio-ola">
-          <Avatar foto={eu.foto} nome={eu.nome} tamanho={52} />
-          <div><small>{saudacao()}</small><strong>{primeiro}! <span aria-hidden="true">👋</span></strong></div>
-          <button className="icone-botao presente" onClick={indique} aria-label="Indique e ganhe"><Gift size={24} /></button>
+          <Avatar foto={eu.foto} nome={eu.nome} tamanho={40} />
+          <div><small>{saudacao()}</small><strong>{primeiro}</strong></div>
         </div>
-        <div className="inicio-blocos">{blocoDestino}{blocoCupons}{blocoDesafio}</div>
-        <div className="atalhos">
-          <button onClick={() => atalho("casa")}><span className="icone-redondo claro"><House size={18} /></span><strong>Casa</strong><small>{lugares?.casa ? "Ir para casa" : "Definir"}</small></button>
-          <button onClick={() => atalho("trabalho")}><span className="icone-redondo claro"><Briefcase size={18} /></span><strong>Trabalho</strong><small>{lugares?.trabalho ? "Ir trabalhar" : "Definir"}</small></button>
-          <button onClick={() => atalho("recentes")}><span className="icone-redondo claro"><History size={18} /></span><strong>Recentes</strong><small>Ver últimos</small></button>
-        </div>
+        <button className="icone-botao presente" onClick={indique} aria-label="Indique e ganhe"><Gift size={22} /></button>
       </div>
+      <section className="inicio-fundo">
+        {blocoDestino}
+        <div className="atalhos">
+          <button onClick={() => atalho("casa")}><span className="icone-redondo claro"><House size={18} /></span><span className="atalho-texto"><strong>Casa</strong><small>{lugares?.casa ? "Ir para casa" : "Definir"}</small></span></button>
+          <button onClick={() => atalho("trabalho")}><span className="icone-redondo claro"><Briefcase size={18} /></span><span className="atalho-texto"><strong>Trabalho</strong><small>{lugares?.trabalho ? "Ir trabalhar" : "Definir"}</small></span></button>
+          <button onClick={() => atalho("recentes")}><span className="icone-redondo claro"><History size={18} /></span><span className="atalho-texto"><strong>Recentes</strong><small>Ver últimos</small></span></button>
+        </div>
+        {(blocoCupons || blocoDesafio) && <div className="inicio-blocos">{blocoCupons}{blocoDesafio}</div>}
+      </section>
     </div>
   );
 }
