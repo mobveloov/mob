@@ -118,6 +118,10 @@ app.get("/api/publico/arquivo/:empresa/:nome", ok((req, res) => {
   res.setHeader("Content-Type", a.mime);
   res.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
   res.setHeader("X-Content-Type-Options", "nosniff");
+  // Imagem pública (sem login): os apps (origem https://localhost no Android) baixam com fetch() a imagem de abertura para guardar no aparelho;
+  // sem estes cabeçalhos o navegador do app bloqueia a leitura e a imagem do painel nunca aparece.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   // Com ?v= (versão da imagem, vinda da marca; o nome do arquivo sozinho não conta) a url muda a cada troca: pode guardar por muito tempo. Sem versão, sempre confere se mudou.
   res.setHeader("Cache-Control", req.query.v && req.query.v !== req.params.nome ? "public, max-age=31536000, immutable" : "no-cache");
   res.send(fs.readFileSync(a.arquivo));
