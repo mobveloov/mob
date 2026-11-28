@@ -38,9 +38,18 @@ export function Topo({ titulo, subtitulo, voltar, contador, direita, estilo = "m
 
 /** Barra de baixo do início e das Corridas: Mapa | situação | Corridas (e o botão PARAR quando está online). */
 export function BarraBaixo({ ativa, online, procurando, aoMapa, aoCorridas, aberta, alternar, children }: { ativa: "mapa" | "corridas"; online: boolean; procurando?: boolean; aoMapa: () => void; aoCorridas: () => void; aberta?: boolean; alternar?: () => void; children?: ReactNode }) {
+  const arraste = useRef<number | null>(null), moveu = useRef(false);
   return (
     <div className={`folha-inicio ${aberta ? "aberta" : ""}`}>
-      {alternar ? <button type="button" className="puxador-inicio" aria-label={aberta ? "Recolher" : "Mostrar mais"} aria-expanded={!!aberta} onClick={alternar}><span className="puxador" /></button> : <span className="puxador" />}
+      {alternar ? <button type="button" className="puxador-inicio" aria-label={aberta ? "Recolher" : "Mostrar mais"} aria-expanded={!!aberta}
+        onPointerDown={(e) => { arraste.current = e.clientY; moveu.current = false; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* sem captura */ } }}
+        onPointerUp={(e) => {
+          const d = arraste.current == null ? 0 : e.clientY - arraste.current; arraste.current = null;
+          if (d < -24) { moveu.current = true; if (!aberta) alternar(); } // arrastar para cima abre (Desconectar fica visível)
+          else if (d > 24) { moveu.current = true; if (aberta) alternar(); } // para baixo recolhe
+        }}
+        onPointerCancel={() => { arraste.current = null; }}
+        onClick={() => { if (moveu.current) { moveu.current = false; return; } alternar(); }}><span className="puxador" /></button> : <span className="puxador" />}
       {online ? <div className={`progresso ${procurando === false ? "parado" : ""}`} /> : null}
       <p className="dica-inicio">{online ? "Você está online" : "Toque em INICIAR para receber viagens"}</p>
       <div className="barra-baixo">

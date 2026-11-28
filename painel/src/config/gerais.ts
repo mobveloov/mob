@@ -168,7 +168,14 @@ export function sanearGerais(entrada: unknown, atual: ConfigGerais = GERAIS_PADR
   };
 }
 
-const geraisGravadas = (empresaId: string): ConfigGerais => sanearGerais(lerConfig(empresaId, "gerais", {}), GERAIS_PADRAO);
+/** Banners guardados (só os bem formados): o nome do arquivo nunca vem solto para um caminho. */
+const bannersGuardados = (bruto: unknown): Banner[] => (Array.isArray(bruto) ? bruto : []).filter((b): b is Banner =>
+  !!b && typeof b === "object" && typeof (b as Banner).id === "string" && /^banner-[a-f0-9]+\.(png|jpg|webp)$/.test(String((b as Banner).arquivo)) && typeof (b as Banner).mime === "string");
+// Os banners vêm do que está gravado (antes eram descartados e os anúncios nunca apareciam nos apps).
+const geraisGravadas = (empresaId: string): ConfigGerais => {
+  const bruto = lerConfig<Record<string, unknown>>(empresaId, "gerais", {});
+  return sanearGerais(bruto, { ...GERAIS_PADRAO, banners: bannersGuardados(bruto.banners) });
+};
 /**
  * Config › Gerais. As mensagens rápidas do motorista para o cliente vêm da aba Motorista (lista da Machine); quando a central
  * ainda não gravou essa aba, vale a lista antiga gravada aqui.

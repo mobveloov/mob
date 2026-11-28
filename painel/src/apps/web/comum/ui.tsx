@@ -365,7 +365,14 @@ export function useConfigDoPainel(): ConfigDoPainel | null {
 /** Faixa com os banners que a empresa enviou pelo painel (tipo "app" na tela inicial, "login" na entrada). Sem banner, não mostra nada. */
 export function Banners({ tipo }: { tipo: "app" | "login" }) {
   const [lista, setLista] = useState<Array<{ id: string; link: string; imagem: string }>>([]);
-  useEffect(() => { void api<{ banners: Array<{ id: string; link: string; imagem: string }> }>(`/banners?tipo=${tipo}`).then((r) => setLista(r.banners)).catch(() => undefined); }, [tipo]);
+  useEffect(() => {
+    const ler = () => void api<{ banners: Array<{ id: string; link: string; imagem: string }> }>(`/banners?tipo=${tipo}`).then((r) => setLista(r.banners)).catch(() => undefined);
+    ler();
+    const ao = () => { if (document.visibilityState === "visible") ler(); }; // volta para o app: pega o anúncio novo do painel
+    document.addEventListener("visibilitychange", ao);
+    const t = setInterval(ler, 5 * 60_000);
+    return () => { document.removeEventListener("visibilitychange", ao); clearInterval(t); };
+  }, [tipo]);
   if (!lista.length) return null;
   return (
     <div className="faixa-banners">
