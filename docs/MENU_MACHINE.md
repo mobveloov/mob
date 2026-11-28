@@ -1,5 +1,7 @@
 # Menu da Machine x menu lateral do painel (20/11/2026)
 
+> **Atualização:** o menu lateral foi enxugado (telas parecidas viraram abas de uma entrada). Os caminhos "Grupo > Submenu" abaixo valem para a Machine; no painel, cada item continua existindo como aba. Veja `docs/MENU_ENXUTO.md`.
+
 Fonte do menu da Machine: captura da tela "Taxas Bandeira" com cargo Administrador. Cada linha abaixo é um item do menu da Machine.
 "Onde está no painel" é o caminho no menu lateral (grupo e submenu). "Existe?" diz se a tela já abre com conteúdo.
 "Igual?" vem das comparações em `docs/comparacao/GRUPO_A..E.md`: **sim**, **quase** (com diferença pequena listada lá) ou **não existe / sem página de referência**.

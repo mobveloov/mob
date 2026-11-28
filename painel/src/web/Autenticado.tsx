@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { ChevronDown, KeyRound, LogOut, Menu, Moon, Newspaper, Search, Sun, X } from "lucide-react";
 import { NOME_CARGO, podeCargo } from "../comum/cargos.ts";
 import { moduloDaFuncao } from "../comum/modulos.ts";
 import { imagemDaEmpresa } from "../comum/marca.ts";
-import { funcoesDoCargo, type Funcao } from "../comum/funcoes.ts";
+import { funcoesDoCargo } from "../comum/funcoes.ts";
+import { menuLateral, redirecionamentos } from "../comum/menu-lateral.ts";
+import { EntradaAbas, RedirecionaParaAba } from "./telas/abas/EntradaAbas";
 import { BotaoRecolher, MenuItens } from "./menu/MenuLateral";
 import { BuscaGlobal } from "./menu/BuscaGlobal";
 import { Atualizacoes } from "./menu/Atualizacoes";
@@ -52,7 +54,7 @@ const PROVISORIAS: Record<string, JSX.Element> = {
   bot: <BotWhatsApp />, totem: <LocaisTotem />, "app-totem": <AppTotem />, analise: <Analise />, apps: <AppsCentral />, documentos: <DocumentosMotoristas />,
   enderecos: <Enderecos />, marca: <MarcaAparencia />,
 };
-const tela = (f: Funcao) => TELAS_ENTREGUES[f.id] ?? PROVISORIAS[f.id] ?? <p className="vazio">Tela não encontrada.</p>;
+const tela = (id: string) => TELAS_ENTREGUES[id] ?? PROVISORIAS[id] ?? <p className="vazio">Tela não encontrada.</p>;
 
 // ------------------------------------------------------------------ menu
 
@@ -82,6 +84,8 @@ export default function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { es
   const admin = podeCargo(sessao.usuario.papel, "gestor"); // seletor de centrais (cobrança)
   const desligados = new Set(sessao.recursosDesligados ?? []);
   const funcoes = funcoesDoCargo(sessao.usuario.papel).filter((f) => { const m = moduloDaFuncao(f.id); return !m || !desligados.has(m); });
+  const entradas = menuLateral(funcoes).flatMap((g) => g.entradas);
+  const antigas = redirecionamentos(funcoes);
   const nomeUsuario = sessao.usuario.nome || sessao.usuario.email;
   useEffect(() => { window.scrollTo(0, 0); setAberto(false); }, [local.pathname]);
   // Ctrl K (ou Cmd K) abre a busca de telas em qualquer lugar do painel.
@@ -176,8 +180,9 @@ export default function Layout({ escuro, trocarTema, trocarEmpresa, sair }: { es
         <main className="conteudo">
           <FaixaAlerta />
           <Routes>
-            {funcoes.map((f) => <Route key={f.id} path={f.rota} element={tela(f)} />)}
-            {funcoes.flatMap((f) => (f.antigas ?? []).map((a) => <Route key={a} path={a} element={<Navigate to={f.rota} replace />} />))}
+            {/* Cada entrada do menu é uma rota com abas; toda rota antiga (de tela ou de apelido) abre a aba certa dela. */}
+            {entradas.map((e) => <Route key={e.id} path={e.rota} element={<EntradaAbas key={e.id} entrada={e} tela={tela} />} />)}
+            {antigas.map((r) => <Route key={r.de} path={r.de} element={<RedirecionaParaAba para={r.para} />} />)}
             <Route path="*" element={<p className="vazio">Página não encontrada.</p>} />
           </Routes>
         </main>

@@ -1,5 +1,6 @@
 // Busca global (Ctrl K): "Buscar configuração ou tela". Filtra todas as telas do menu lateral, mostra o caminho
-// "Grupo > Submenu"; ↑ ↓ navegam, Enter abre, Esc fecha.
+// "Grupo > Entrada > Seção" (cada aba de uma entrada é um resultado, que abre na aba certa); acha também os nomes antigos das telas.
+// ↑ ↓ navegam, Enter abre, Esc fecha.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -24,8 +25,9 @@ export function BuscaGlobal({ funcoes, assistente, empresa, cargo, aberta, fecha
     if (!q) return todos;
     const partes = q.split(/\s+/);
     // Quem tem a frase inteira no nome vem primeiro; depois quem tem todas as palavras no nome; por fim as do caminho.
-    const nota = (i: { nome: string; caminho: string }) => (sem(i.nome).includes(q) ? 0 : partes.every((p) => sem(i.nome).includes(p)) ? 1 : 2);
-    return todos.filter((i) => partes.every((p) => sem(`${i.nome} ${i.caminho}`).includes(p))).map((i, n) => ({ i, n, k: nota(i) })).sort((a, b) => a.k - b.k || a.n - b.n).map((x) => x.i);
+    const nota = (i: { nome: string; tambem: string }) => (sem(i.nome).includes(q) ? 0 : sem(i.tambem).includes(q) ? 1 : partes.every((p) => sem(i.nome).includes(p)) ? 2 : 3);
+    // Acha o nome novo (aba e entrada, no caminho) e o nome antigo da tela (campo `tambem`).
+    return todos.filter((i) => partes.every((p) => sem(`${i.nome} ${i.caminho} ${i.tambem}`).includes(p))).map((i, n) => ({ i, n, k: nota(i) })).sort((a, b) => a.k - b.k || a.n - b.n).map((x) => x.i);
   }, [todos, texto]);
 
   useEffect(() => { if (aberta) { setTexto(""); setSel(0); setTimeout(() => campo.current?.focus(), 0); } }, [aberta]);
