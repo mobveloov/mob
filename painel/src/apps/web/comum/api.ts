@@ -331,7 +331,7 @@ const FlutuanteNativo = registerPlugin<PluginFlutuante>("Flutuante");
 /** Situação das permissões do Android que o motorista precisa para receber corrida com o app minimizado ou a tela bloqueada. */
 export interface Permissoes { sobrePosicao: boolean; notificacoes: boolean; bateria: boolean; localizacao: boolean; localizacaoSempre: boolean; telaCheia: boolean; fabricante: string; sdk: number }
 /** As essenciais: sem elas o motorista não fica online (no APK). */
-export const ESSENCIAIS: Array<keyof Permissoes> = ["localizacaoSempre", "notificacoes", "sobrePosicao", "bateria"];
+export const ESSENCIAIS: Array<keyof Permissoes> = ["localizacaoSempre", "notificacoes", "sobrePosicao", "bateria", "telaCheia"];
 export const permissoesNativas = {
   disponivel: () => nativo() && Capacitor.isPluginAvailable("Flutuante"),
   ler: async (): Promise<Permissoes | null> => { try { return permissoesNativas.disponivel() ? (await FlutuanteNativo.permissoes?.()) ?? null : null; } catch { return null; } },
