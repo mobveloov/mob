@@ -185,7 +185,9 @@ if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsW
 {
   const nodpi = path.join(saida, "android", "app", "src", "main", "res", "drawable-nodpi");
   fs.mkdirSync(nodpi, { recursive: true });
-  const arte = await sharp(icone, { density: 384 }).resize(288, 288, { fit: "contain", background: fundoIcone }).png().toBuffer();
+  // Margem interna de 14% de cada lado: a logo inteira cabe dentro do quadrado de cantos arredondados (a view recorta só os cantos do quadrado).
+  const miolo = await sharp(icone, { density: 384 }).resize(208, 208, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+  const arte = await sharp({ create: { width: 288, height: 288, channels: 4, background: fundoIcone } }).composite([{ input: miolo, gravity: "center" }]).png().toBuffer();
   fs.writeFileSync(path.join(nodpi, "icone_flutuante.png"), arte);
 }
 // Motorista: plugin do ícone flutuante, serviço e abrir por cima da tela bloqueada quando chega uma corrida.
