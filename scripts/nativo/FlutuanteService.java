@@ -19,7 +19,7 @@ import android.widget.ImageView;
  */
 public class FlutuanteService extends Service {
     /** Lado da bolha em dp: igual nos dois apps. */
-    private static final int TAMANHO = 52;
+    private static final int TAMANHO = 46;
     private WindowManager janela;
     private View bolinha;
 
