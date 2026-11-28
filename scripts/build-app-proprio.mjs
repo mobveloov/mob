@@ -185,9 +185,12 @@ if (fs.existsSync(sonsDir)) for (const f of fs.readdirSync(sonsDir)) if (f.endsW
 {
   const nodpi = path.join(saida, "android", "app", "src", "main", "res", "drawable-nodpi");
   fs.mkdirSync(nodpi, { recursive: true });
-  // Margem interna de 14% de cada lado: a logo inteira cabe dentro do quadrado de cantos arredondados (a view recorta só os cantos do quadrado).
-  const miolo = await sharp(icone, { density: 384 }).resize(208, 208, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
-  const arte = await sharp({ create: { width: 288, height: 288, channels: 4, background: fundoIcone } }).composite([{ input: miolo, gravity: "center" }]).png().toBuffer();
+  // A arte ocupa a bolha INTEIRA (sem margem nem zoom) e só os cantos dela viram transparentes, com o raio de 14%: a logo nunca é cortada.
+  const L = 288;
+  const arteBolha = [path.join(pastaEmpresa, "assets", `icone-bolha-${papel}.png`)].find((f) => fs.existsSync(f)) ?? icone; // arte da bolha enviada pelo dono (inteira, com margem própria), senão o ícone do app
+  const quadrada = await sharp(arteBolha, { density: 384 }).resize(L, L, { fit: "contain", background: fundoIcone }).png().toBuffer();
+  const mascara = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${L}" height="${L}"><rect width="${L}" height="${L}" rx="${Math.round(L * 0.14)}" ry="${Math.round(L * 0.14)}" fill="#fff"/></svg>`);
+  const arte = await sharp(quadrada).ensureAlpha().composite([{ input: mascara, blend: "dest-in" }]).png().toBuffer();
   fs.writeFileSync(path.join(nodpi, "icone_flutuante.png"), arte);
 }
 // Motorista: plugin do ícone flutuante, serviço e abrir por cima da tela bloqueada quando chega uma corrida.

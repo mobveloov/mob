@@ -19,7 +19,7 @@ import android.widget.ImageView;
  */
 public class FlutuanteService extends Service {
     /** Lado da bolha em dp: igual nos dois apps. */
-    private static final int TAMANHO = 46;
+    private static final int TAMANHO = 48;
     private WindowManager janela;
     private View bolinha;
 
@@ -55,8 +55,8 @@ public class FlutuanteService extends Service {
         } catch (Exception e) { /* sem ícone: a bolha fica vazia */ }
         img.setScaleType(ImageView.ScaleType.FIT_CENTER);
         img.setElevation(dp(4));
-        img.setClipToOutline(true);
-        final float raio = dp(TAMANHO) * 0.22f;
+        img.setClipToOutline(false); // a arte já vem com os cantos arredondados: nada é recortado pela view
+        final float raio = dp(TAMANHO) * 0.14f; // só a sombra segue o canto da arte
         img.setOutlineProvider(new android.view.ViewOutlineProvider() {
             @Override
             public void getOutline(View v, android.graphics.Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), raio); }
