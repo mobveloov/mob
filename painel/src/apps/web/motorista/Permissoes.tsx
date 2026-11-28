@@ -14,7 +14,7 @@ const PASSOS: Passo[] = [
   { id: "notificacoes", abrir: "notificacoes", titulo: "Notificações", texto: "Para tocar a chamada e mostrar \"Você está online\" com o botão Ficar offline.", icone: Bell, essencial: true },
   { id: "sobrePosicao", abrir: "sobre", titulo: "Exibir sobre outros apps", texto: "Para a chamada abrir por cima de qualquer app e mostrar o ícone flutuante quando você minimizar.", icone: Layers, essencial: true },
   { id: "bateria", abrir: "bateria", titulo: "Sem otimização de bateria", texto: "Para o Android não desligar o app em segundo plano e você não perder corrida.", icone: BatteryCharging, essencial: true },
-  { id: "telaCheia", abrir: "telaCheia", titulo: "Chamada em tela cheia", texto: "Android 14 ou mais novo: permite abrir a chamada com a tela bloqueada.", icone: Smartphone, essencial: false },
+  { id: "telaCheia", abrir: "telaCheia", titulo: "Chamada em tela cheia", texto: "Android 14 ou mais novo: permite abrir a chamada com a tela bloqueada.", icone: Smartphone, essencial: true },
 ];
 const FABRICANTES_EXIGENTES = ["xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "vivo", "samsung", "huawei", "honor", "asus"];
 
