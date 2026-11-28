@@ -315,6 +315,8 @@ test("imagem enviada: só tipo de imagem, nada de HTML/SVG executável servido c
     const r = await pedir(`/api/publico/arquivo/${ctx.empresaA}/${nome}`);
     assert.match(String(r.cab.get("content-security-policy")), /sandbox/);
     assert.equal(r.cab.get("x-content-type-options"), "nosniff");
+    // Os apps leem a imagem com fetch() de outra origem (abertura): precisa liberar a leitura pública.
+    assert.equal(r.cab.get("access-control-allow-origin"), "*");
   }
   const html = await pedir("/api/marca/arquivo?tipo=logoClaro", { metodo: "POST", cookie: ctx.a, cab: { "content-type": "text/html" }, bruto: "<script>alert(1)</script>" });
   assert.ok(html.status >= 400, "aceitou HTML como imagem");
