@@ -180,7 +180,7 @@ function JanelaCategoria({ inicial, outras, automacoes, dinamicas, regras, icone
         )}
         {passo === "avancado" && (
           <>
-            <p className="sub">Opções do painel de referência que a Machine não tem.</p>
+            <p className="sub">Opções extras de categoria do painel.</p>
             <div className="dm-grade3">
               <Campo rotulo="Cidade" dica="Cidade onde esta categoria irá operar."><input value={ex.cidade} onChange={(e) => setEx("cidade", e.target.value)} maxLength={80} /></Campo>
               <Campo rotulo="Tipo Físico" dica="Ícone do veículo animado no mapa."><select value={ex.tipoFisico} onChange={(e) => setEx("tipoFisico", e.target.value)}><option value="carro">Carro (4 Rodas)</option><option value="moto">Moto (2 Rodas)</option><option value="caminhao">Caminhão / Frete</option></select></Campo>

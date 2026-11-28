@@ -1,9 +1,9 @@
-// Menu da Machine: todo item (com o caminho exato) existe em funcoes.ts e aparece no menu lateral do ADMIN com o mesmo
-// nome, no mesmo grupo e submenu. Lista copiada do menu real da Machine (cargo Administrador).
+// Menu da Machine: todo item existe em funcoes.ts (mesmo nome e rota) e continua alcançável no menu lateral ENXUTO do ADMIN
+// (agora como aba de uma entrada; veja docs/MENU_ENXUTO.md). Lista copiada do menu real da Machine (cargo Administrador).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FUNCOES, funcoesDoCargo } from "../src/comum/funcoes.ts";
-import { itensParaBusca, menuLateral } from "../src/comum/menu-lateral.ts";
+import { destinoDaFuncao, itensParaBusca, menuLateral, rotaDaEntrada } from "../src/comum/menu-lateral.ts";
 
 // "Cadastro > Gestão de áreas > Cidades" não entra: o dono não achou essa tela na Machine.
 // [grupo, submenu ("" = solto no grupo), nome, id]
@@ -51,46 +51,43 @@ test("o menu da Machine tem 75 itens e todos estão em funcoes.ts, com rota /id"
   }
 });
 
-test("ADMIN vê no menu lateral cada item da Machine com o mesmo nome, grupo e submenu", () => {
+test("ADMIN alcança no menu lateral cada item da Machine: a tela virou aba de uma entrada, com o mesmo nome", () => {
   const menu = menuLateral(funcoesDoCargo("admin"));
-  for (const [grupo, sub, nome, id] of MACHINE) {
-    const g = menu.find((x) => x.nome === grupo);
-    assert.ok(g, `grupo ${grupo} ausente do menu lateral`);
-    const b = g.blocos.find((x) => x.itens.some((i) => i.id === id));
-    assert.ok(b, `${grupo} > ${nome} (${id}) ausente do menu lateral do admin`);
-    assert.equal(b.titulo ?? "", sub, `submenu de ${grupo} > ${nome}`);
-    assert.equal(b.itens.find((i) => i.id === id)!.nome, nome);
+  const abas = menu.flatMap((g) => g.entradas.flatMap((e) => e.abas.map((x) => ({ grupo: g.nome, entrada: e, aba: x }))));
+  for (const [, , nome, id] of MACHINE) {
+    const x = abas.find((y) => y.aba.id === id);
+    assert.ok(x, `${nome} (${id}) ausente do menu lateral do admin`);
+    assert.equal(x.aba.funcao.nome, nome, `nome antigo de ${id}`);
+    assert.equal(destinoDaFuncao(id)!.entrada.id, x.entrada.id);
   }
 });
 
-test("a busca global lista as mesmas telas do menu, com caminho \"Grupo > Submenu\"", () => {
+test("a busca global acha cada item da Machine pelo nome da Machine e leva à aba certa", () => {
   const busca = itensParaBusca(funcoesDoCargo("admin"));
-  const ids = busca.map((i) => i.id);
-  assert.equal(new Set(ids).size, ids.length);
-  for (const [grupo, sub, , id] of MACHINE) assert.equal(busca.find((i) => i.id === id)?.caminho, sub ? `${grupo} > ${sub}` : grupo);
-});
-
-test("Taxas da central e as categorias estão soltas em Configurações (sem bloco recolhido)", () => {
-  const cfg = menuLateral(funcoesDoCargo("admin")).find((g) => g.nome === "Configurações")!;
-  assert.ok(cfg.blocos.every((b) => !b.titulo));
-  const nomes = cfg.blocos.flatMap((b) => b.itens.map((i) => i.nome));
-  assert.ok(nomes.includes("Taxas da central") && nomes.includes("Tarifas e categorias"));
+  const sem = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  for (const [grupo, sub, nome, id] of MACHINE) {
+    const i = busca.find((y) => y.id === id);
+    assert.ok(i, `${id} fora da busca`);
+    assert.ok(sem(`${i.nome} ${i.caminho} ${i.tambem}`).includes(sem(nome)), `a busca não acha "${nome}" (${grupo} > ${sub})`);
+    const d = destinoDaFuncao(id)!;
+    assert.ok(i.rota.startsWith(rotaDaEntrada(d.entrada)), `${id} abre na entrada errada`);
+  }
 });
 
 test("o cargo esconde o que não pode: operador não vê Configurações, Cartão nem Taxas da central", () => {
-  const op = menuLateral(funcoesDoCargo("operador")).flatMap((g) => g.blocos.flatMap((b) => b.itens.map((i) => i.id)));
+  const op = menuLateral(funcoesDoCargo("operador")).flatMap((g) => g.entradas.flatMap((e) => e.abas.map((i) => i.id)));
   for (const id of ["taxas-central", "config-gerais", "cartao-painel", "creditos-extrato", "ultimo-boleto", "equipe", "passe-livre"]) assert.ok(!op.includes(id), id);
   for (const id of ["painel", "solicitar", "conversas", "ajuda-termos", "ouvidoria"]) assert.ok(op.includes(id), id);
 });
 
 // Itens nossos, fora da Machine (não entram na lista MACHINE acima).
-test("Personalização app motorista é item nosso: logo depois da do passageiro, só admin", () => {
+test("Personalização app motorista é item nosso: aba Motorista dentro de Apps, só admin", () => {
   assert.ok(!MACHINE.some(([, , , id]) => id === "personalizacao-motorista"));
   const f = FUNCOES.find((x) => x.id === "personalizacao-motorista")!;
   assert.equal(f.rota, "/personalizacao-motorista");
   assert.equal(f.minimo, "admin");
-  const ids = menuLateral(funcoesDoCargo("admin")).find((g) => g.nome === "Configurações")!.blocos.flatMap((b) => b.itens.map((i) => i.id));
-  assert.equal(ids.indexOf("personalizacao-motorista"), ids.indexOf("personalizacao-app") + 1);
-  const op = menuLateral(funcoesDoCargo("operador")).flatMap((g) => g.blocos.flatMap((b) => b.itens.map((i) => i.id)));
+  const apps = menuLateral(funcoesDoCargo("admin")).flatMap((g) => g.entradas).find((e) => e.id === "apps")!;
+  assert.equal(apps.abas.find((x) => x.id === "personalizacao-motorista")!.secao, "Motorista");
+  const op = menuLateral(funcoesDoCargo("operador")).flatMap((g) => g.entradas.flatMap((e) => e.abas.map((i) => i.id)));
   assert.ok(!op.includes("personalizacao-motorista"));
 });
