@@ -46,9 +46,19 @@ export function Abertura({ marca }: { marca?: MarcaApp | null }) {
   );
 }
 
-/** A abertura fica na tela pelo menos ~1,2 s quando o app já foi aberto antes (imagem ou ícone guardados) (não some num piscar); sem imagem, sai assim que o app está pronto. */
+/**
+ * A abertura fica na tela pelo menos ~1,2 s quando o app já foi aberto antes (imagem ou ícone guardados). No PRIMEIRO início (sem nada
+ * guardado) ela espera o download da imagem do painel, no máximo 2,5 s, para a imagem já aparecer na 1ª abertura; sem rede, sai logo.
+ */
 export function useAberturaMinima(): boolean {
   const [fica, setFica] = useState(true);
-  useEffect(() => { const t = setTimeout(() => setFica(false), lerAbertura() ? 1200 : 0); return () => clearTimeout(t); }, []);
+  useEffect(() => {
+    let vivo = true;
+    const sair = (ms: number) => setTimeout(() => { if (vivo) setFica(false); }, ms);
+    if (lerAbertura()) { const t = sair(1200); return () => { vivo = false; clearTimeout(t); }; }
+    const limite = sair(2500);
+    void atualizarAbertura(null, null).then(() => { clearTimeout(limite); if (vivo) setFica(false); });
+    return () => { vivo = false; clearTimeout(limite); };
+  }, []);
   return fica;
 }

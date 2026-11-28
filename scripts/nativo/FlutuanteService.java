@@ -77,16 +77,23 @@ public class FlutuanteService extends Service {
         img.setOnTouchListener(new View.OnTouchListener() {
             private int x0, y0;
             private float tx0, ty0;
-            private boolean moveu;
+            private boolean moveu, segurou;
+            private final android.os.Handler relogio = new android.os.Handler(android.os.Looper.getMainLooper());
+            private final Runnable doisSegundos = new Runnable() {
+                @Override
+                public void run() { if (!moveu) { segurou = true; vibrar(); mostrarSos(); } }
+            };
 
             @Override
             public boolean onTouch(View v, MotionEvent e) {
                 switch (e.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        x0 = p.x; y0 = p.y; tx0 = e.getRawX(); ty0 = e.getRawY(); moveu = false;
+                        x0 = p.x; y0 = p.y; tx0 = e.getRawX(); ty0 = e.getRawY(); moveu = false; segurou = false;
+                        relogio.postDelayed(doisSegundos, 2000); // segurar 2 s sem arrastar: pede confirmação do SOS
                         return true;
                     case MotionEvent.ACTION_MOVE:
-                        if (!moveu && (Math.abs(e.getRawX() - tx0) > dp(6) || Math.abs(e.getRawY() - ty0) > dp(6))) { moveu = true; mostrarAlvo(alvoTam); }
+                        if (segurou) return true;
+                        if (!moveu && (Math.abs(e.getRawX() - tx0) > dp(6) || Math.abs(e.getRawY() - ty0) > dp(6))) { moveu = true; relogio.removeCallbacks(doisSegundos); mostrarAlvo(alvoTam); }
                         if (!moveu) return true;
                         p.x = x0 + Math.round(e.getRawX() - tx0);
                         p.y = y0 + Math.round(e.getRawY() - ty0);
@@ -95,6 +102,8 @@ public class FlutuanteService extends Service {
                         return true;
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
+                        relogio.removeCallbacks(doisSegundos);
+                        if (segurou) return true; // o diálogo do SOS já está na tela
                         boolean fechar = moveu && sobreAlvo(p, alvoTam);
                         esconderAlvo();
                         if (fechar) { stopSelf(); return true; } // soltou no X: a bolha é removida
@@ -178,6 +187,84 @@ public class FlutuanteService extends Service {
         try { janela.updateViewLayout(v, p); } catch (Exception e) { /* já saiu */ }
     }
 
+    // ------------------------------------------------------------------ SOS pela bolha (segurar 2 s sem arrastar)
+    private View sosView;
+
+    private void vibrar() {
+        try {
+            android.os.Vibrator vb = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (vb == null) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) vb.vibrate(android.os.VibrationEffect.createOneShot(120, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+            else vb.vibrate(120);
+        } catch (Exception e) { /* sem vibrador */ }
+    }
+
+    private android.widget.Button botao(String texto, int cor, int corTexto) {
+        android.widget.Button b = new android.widget.Button(this);
+        b.setText(texto); b.setAllCaps(false); b.setTextColor(corTexto); b.setTextSize(16);
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setColor(cor); g.setCornerRadius(dp(24));
+        b.setBackground(g);
+        return b;
+    }
+
+    /** Cartão no meio da tela: "Pedir ajuda (SOS)?" com Confirmar e Cancelar. */
+    private void mostrarSos() {
+        if (sosView != null) return;
+        android.widget.LinearLayout caixa = new android.widget.LinearLayout(this);
+        caixa.setOrientation(android.widget.LinearLayout.VERTICAL);
+        caixa.setPadding(dp(22), dp(22), dp(22), dp(18));
+        android.graphics.drawable.GradientDrawable fundo = new android.graphics.drawable.GradientDrawable();
+        fundo.setColor(0xFFFFFFFF); fundo.setCornerRadius(dp(26));
+        caixa.setBackground(fundo); caixa.setElevation(dp(12));
+        android.widget.TextView t = new android.widget.TextView(this);
+        t.setText("Pedir ajuda (SOS)?"); t.setTextColor(0xFF111111); t.setTextSize(20); t.setTypeface(null, android.graphics.Typeface.BOLD);
+        android.widget.TextView d = new android.widget.TextView(this);
+        d.setText("A central recebe o alerta com a sua localização e a corrida atual."); d.setTextColor(0xFF555555); d.setTextSize(14); d.setPadding(0, dp(8), 0, dp(16));
+        android.widget.Button ok = botao("Confirmar SOS", 0xFFD33A3A, 0xFFFFFFFF), nao = botao("Cancelar", 0xFFEDEDED, 0xFF111111);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+        lp.topMargin = dp(8);
+        caixa.addView(t); caixa.addView(d); caixa.addView(ok, lp); caixa.addView(nao, lp);
+        ok.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { fecharSos(); enviarSos(); } });
+        nao.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { fecharSos(); } });
+        WindowManager.LayoutParams lpJ = new WindowManager.LayoutParams(Math.min(getResources().getDisplayMetrics().widthPixels - dp(48), dp(340)), WindowManager.LayoutParams.WRAP_CONTENT, tipoJanela(),
+                WindowManager.LayoutParams.FLAG_DIM_BEHIND | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, PixelFormat.TRANSLUCENT);
+        lpJ.dimAmount = 0.5f; lpJ.gravity = Gravity.CENTER;
+        sosView = caixa;
+        try { janela.addView(sosView, lpJ); } catch (Exception e) { sosView = null; }
+    }
+
+    private void fecharSos() {
+        if (sosView != null) { try { janela.removeView(sosView); } catch (Exception e) { /* já saiu */ } }
+        sosView = null;
+    }
+
+    /** Mesmo alerta do botão SOS do app: POST /sos com a posição; o servidor junta a corrida atual e avisa a central. */
+    private void enviarSos() {
+        final String u = PosicaoService.sosUrl, t = PosicaoService.sosToken;
+        final double lat = PosicaoService.sosLat, lng = PosicaoService.sosLng;
+        if (u == null || t == null) { abrirApp(); return; } // sem sessão guardada: abre o app para o motorista usar o botão SOS
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                java.net.HttpURLConnection c = null;
+                boolean enviou = false;
+                try {
+                    c = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                    c.setRequestMethod("POST"); c.setConnectTimeout(8000); c.setReadTimeout(8000); c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json"); c.setRequestProperty("Authorization", "Bearer " + t);
+                    String corpo = Double.isNaN(lat) ? "{\"motivo\":\"SOS pela bolha\"}" : "{\"lat\":" + lat + ",\"lng\":" + lng + ",\"motivo\":\"SOS pela bolha\"}";
+                    java.io.OutputStream o = c.getOutputStream(); o.write(corpo.getBytes("UTF-8")); o.close();
+                    enviou = c.getResponseCode() == 200;
+                } catch (Exception e) { /* sem rede */ } finally { if (c != null) c.disconnect(); }
+                final boolean deu = enviou;
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                    @Override public void run() { android.widget.Toast.makeText(getApplicationContext(), deu ? "SOS enviado à central" : "Não consegui enviar o SOS. Abra o app e use o botão SOS.", android.widget.Toast.LENGTH_LONG).show(); }
+                });
+            }
+        }).start();
+    }
+
     private android.graphics.Bitmap recortarIcone(Drawable icone) {
         final int lado = 432; // 108 dp x 4
         android.graphics.Bitmap quadro = android.graphics.Bitmap.createBitmap(lado, lado, android.graphics.Bitmap.Config.ARGB_8888);
@@ -206,6 +293,7 @@ public class FlutuanteService extends Service {
         }
         bolinha = null;
         esconderAlvo();
+        fecharSos();
         super.onDestroy();
     }
 }

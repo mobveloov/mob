@@ -30,6 +30,9 @@ public class PosicaoService extends Service implements LocationListener {
     private LocationManager lm;
     private PowerManager.WakeLock wake;
     private String url, token;
+    /** Último endereço, token e posição: a bolha flutuante usa para disparar o SOS sem abrir o app. */
+    static volatile String sosUrl, sosToken;
+    static volatile double sosLat = Double.NaN, sosLng = Double.NaN;
     private long ultimoEnvio = 0;
 
     @Override
@@ -46,6 +49,7 @@ public class PosicaoService extends Service implements LocationListener {
         if (intent != null) {
             url = intent.getStringExtra("url");
             token = intent.getStringExtra("token");
+            if (url != null && token != null) { sosUrl = url.replace("/posicao", "/sos"); sosToken = token; }
         }
         iniciarEmPrimeiroPlano();
         try {
@@ -130,6 +134,7 @@ public class PosicaoService extends Service implements LocationListener {
         ultimoEnvio = agora;
         final double lat = l.getLatitude();
         final double lng = l.getLongitude();
+        sosLat = lat; sosLng = lng;
         new Thread(new Runnable() {
             @Override
             public void run() {
