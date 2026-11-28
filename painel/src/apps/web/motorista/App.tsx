@@ -9,7 +9,7 @@ import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons
 import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
 import { aquecerFrasesFixas } from "../comum/voz";
 import { Abertura, useAberturaMinima } from "../comum/Abertura";
-import { mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
+import { Banners, mensagemDeErro, ServidorTeste, useConfigDoPainel, useMarca, Aviso, type MarcaApp, type Mensagem } from "../comum/ui";
 import { Cadastro } from "./Cadastro";
 import { avisarNovoAviso, PopupDeAvisos, useNaoLidos } from "../comum/Avisos";
 import { PermissoesPasso } from "./Permissoes";
@@ -230,6 +230,7 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const analise = eu.aprovado === false;
   const barra = (ativa: "mapa" | "corridas") => (
     <BarraBaixo ativa={ativa} online={online} procurando={conectado} aoMapa={() => setTela("")} aoCorridas={() => setTela("corridas")} aberta={online && folhaAberta} alternar={online ? () => setFolhaAberta((v) => !v) : undefined}>
+      {(!online || folhaAberta) && <div className="anuncios-inicio"><Banners tipo="app" /></div>}
       {online && folhaAberta && (
         <>
           <AvisoDoMotorista />

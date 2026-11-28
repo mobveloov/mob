@@ -507,7 +507,8 @@ html[data-tema="escuro"] { --m-bg: #000000; --m-card: #0d0d0d; --m-card2: #1c1c1
 .pilula-menu .logo-circulo { border-width: 2px; box-shadow: none; }
 .botao-alerta { position: absolute; z-index: 21; right: .8rem; top: calc(8.2rem + env(safe-area-inset-top)); width: 52px; height: 52px; border-radius: 50%; border: 0; background: #d9480f; color: #fff; display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0,0,0,.45); cursor: pointer; padding: 0; }
 .botao-ligar-emergencia { display: flex; align-items: center; justify-content: center; gap: .5rem; margin: .8rem 0 .2rem; padding: .75rem; border-radius: 14px; background: var(--m-card, #0d0d0d); color: inherit; font-weight: 800; text-decoration: none; border: 1px solid var(--m-line, rgba(255,255,255,.15)); }
-.puxador-inicio { background: none; border: 0; padding: .1rem 0 .4rem; cursor: pointer; display: block; width: 100%; }
+.puxador-inicio { background: none; border: 0; padding: .85rem 0 1rem; margin-top: -.7rem; cursor: pointer; display: block; width: 100%; touch-action: none; /* o WebView não rouba o arraste vertical */ }
+.anuncios-inicio { margin: .2rem 0 .6rem; }
 .folha-inicio.aberta .dica-inicio { display: none; }
 .aviso-motorista { margin: .5rem 0 .2rem; padding: .8rem .9rem; border-radius: 16px; background: var(--cor); color: var(--cor-texto); }
 .aviso-motorista .am-titulo { display: flex; align-items: center; gap: .4rem; font-weight: 900; font-size: .78rem; letter-spacing: .04em; margin-bottom: .2rem; }
