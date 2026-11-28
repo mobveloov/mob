@@ -18,7 +18,7 @@ export function aberturaDoApp(empresaId: string, app: AppAbertura): Abertura | n
   const nome = `${TIPO[app]}.webp`;
   if (!D.caminhoImagem(empresaId, nome)) return null;
   const versao = D.versaoImagem(empresaId, nome);
-  return { url: `/api/publico/arquivo/${empresaId}/${nome}?v=${encodeURIComponent(versao)}`, versao };
+  return { url: `/api/publico/arquivo/${empresaId}/${nome}?v=${encodeURIComponent(versao)}&cors=1`, versao }; // &cors=1: chave de cache nova (o Cloudflare guardou por 1 ano a versão sem CORS)
 }
 
 /** Recebe PNG, JPG ou WebP, converte para WebP e grava. */
