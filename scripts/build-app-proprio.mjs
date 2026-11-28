@@ -67,8 +67,11 @@ const asset = (tipo) => {
 };
 // Ícone próprio de cada app (arquivos.iconeMotorista / iconePassageiro); sem ele, o ícone da empresa (iconeApp) vale para os dois (white-label).
 const iconeDoPapel = asset(papel === "motorista" ? "iconeMotorista" : "iconePassageiro");
+// Arte ORIGINAL do dono (inteira, com a margem dela): vale para o ícone do launcher e para a bolha. Sem ela, o ícone do app/empresa.
+const arteDoDono = path.join(pastaEmpresa, "assets", `icone-bolha-${papel}.png`);
+const arteInteira = fs.existsSync(arteDoDono) ? arteDoDono : null;
 const arteSangrada = !!iconeDoPapel;
-const icone = iconeDoPapel ?? asset("iconeApp") ?? asset("favicon");
+const icone = arteInteira ?? iconeDoPapel ?? asset("iconeApp") ?? asset("favicon");
 if (!icone) falhar("Falta o ícone do app (arquivos.iconeApp em assets/, de preferência PNG 1024×1024).");
 
 const saida = path.join(RAIZ, "build", "apps", `${empresa}-${papel}`);
@@ -94,7 +97,7 @@ const fundoIcone = canto[3] > 200 ? `#${[canto[0], canto[1], canto[2]].map((n) =
 await sharp(icone, { density: 384 }).resize(1024, 1024, { fit: "contain", background: fundoIcone }).png().toFile(path.join(saida, "assets", "icon-only.png"));
 // Ícone adaptativo do Android: o capacitor-assets já põe o primeiro plano num inset de 16,7% (zona segura). Arte de ícone própria do app (sangrada até a borda,
 // como a do motorista/passageiro) ocupa 92% desse quadro e preenche o ícone; logo comum de empresa (white-label) fica em 66% para não ser cortado pela máscara.
-const desenho = await sharp(icone, { density: 384 }).resize(arteSangrada ? 940 : 660, arteSangrada ? 940 : 660, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+const desenho = await sharp(icone, { density: 384 }).resize(arteInteira ? 860 : arteSangrada ? 940 : 660, arteInteira ? 860 : arteSangrada ? 940 : 660, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: desenho, gravity: "center" }]).png().toFile(path.join(saida, "assets", "icon-foreground.png"));
 await sharp({ create: { width: 1024, height: 1024, channels: 4, background: fundoIcone } }).png().toFile(path.join(saida, "assets", "icon-background.png"));
 // Imagem de abertura do PAINEL (Personalização do app): baixada na hora do build para a tela nativa de abertura (sem piscar). Sem ela, vale a arte da pasta da empresa, ou o ícone.
