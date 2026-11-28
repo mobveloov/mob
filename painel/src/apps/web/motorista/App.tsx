@@ -4,7 +4,7 @@
 // cadastro, carteira, documentos, preferências, suporte, diagnóstico e configurações.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { Bell, ChevronRight, Eye, EyeOff, Hand, Hourglass, LocateFixed, Menu as IconeMenu, Moon, Sun, Phone, Power, Wallet, ShieldAlert, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { api, ErroApi, flutuante, manterTelaLigada, permissoesNativas, pararSons, rastrearEmSegundoPlano, ligarPush, observarPosicao, posicaoAgora, reais, tempoReal, tocarAlerta, token, vibrar, type Posicao } from "../comum/api";
 import { aoChegarSos, aoFimDoSos, aoMudarSos, CartaoMeuSos, EmergenciaPerto, enviarSos, type SosPerto } from "../comum/sos";
 import { aquecerFrasesFixas } from "../comum/voz";
@@ -230,6 +230,11 @@ function Logado({ marca, sair }: { marca: MarcaApp; sair: () => void }) {
   const analise = eu.aprovado === false;
   const barra = (ativa: "mapa" | "corridas") => (
     <BarraBaixo ativa={ativa} online={online} procurando={conectado} aoMapa={() => setTela("")} aoCorridas={() => setTela("corridas")} aberta={online && folhaAberta} alternar={online ? () => setFolhaAberta((v) => !v) : undefined}>
+      {rec("saldo") && <button type="button" className="cartao-ganhos" onClick={() => setTela("atividades")}>
+        <span className="cg-icone"><Wallet size={20} /></span>
+        <span className="cg-texto"><small>Ganhos de hoje</small><strong>{ajustes.esconderGanhos ? "R$ ••••" : hoje == null ? "…" : reais(hoje)}</strong></span>
+        <ChevronRight size={20} className="cg-seta" />
+      </button>}
       {(!online || folhaAberta) && <div className="anuncios-inicio"><Banners tipo="app" /></div>}
       {online && folhaAberta && (
         <>
